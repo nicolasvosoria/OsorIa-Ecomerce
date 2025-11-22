@@ -25,6 +25,10 @@ export function StylesProvider({ children }: { children: ReactNode }) {
       const stylesMap = new Map(data.map((style) => [style.component_name, style.variables]))
       setStyles(stylesMap)
       console.log("[v0] Loaded styles from Supabase:", stylesMap.size, "components")
+      console.log("[v0] Component names loaded:", Array.from(stylesMap.keys()))
+      stylesMap.forEach((variables, componentName) => {
+        console.log(`[v0] ${componentName} styles:`, variables)
+      })
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error"
       console.log("[v0] Could not load styles from Supabase:", errorMessage)
@@ -68,6 +72,8 @@ export function useComponentStyle(componentName: string, defaultStyles: Record<s
     if (currentStyles) {
       setComponentStyles(currentStyles)
       console.log("[v0] Loaded styles for component:", componentName, currentStyles)
+    } else {
+      console.log("[v0] No styles found for component:", componentName, "using defaults:", defaultStyles)
     }
 
     let channel: any = null

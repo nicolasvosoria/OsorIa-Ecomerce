@@ -1,32 +1,45 @@
 "use client"
 
 import Link from "next/link"
-import Image from "next/image"
 import { Search, Heart, ShoppingCart } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { useComponentStyle } from "@/contexts/styles-context"
+import Image from "next/image"
 
 export function Header() {
   const { styles: styleData } = useComponentStyle("header", {
     brandName: "Osoria",
     tagline: "Big Sale! Hurry up! Sale ends in 2025",
+    bannerBgColor: "#c4faff",
+    bannerTextColor: "#005aa1",
+    searchPlaceholder: "Search...",
   })
+
+  console.log("[v0] Header rendering with styles:", styleData)
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-white">
       <div className="container mx-auto px-4 py-6">
         <div className="flex items-center justify-between gap-6 mb-4">
-          <div className="text-[16px] font-inter whitespace-nowrap rounded-lg bg-[#c4faff] py-1 px-5">
-            <span className="font-bold text-[#005aa1]">Big Sale!</span>
-            <span className="font-medium text-[#005aa1]"> Hurry up! Sale ends in 2025</span>
+          <div
+            className="text-[16px] font-inter whitespace-nowrap rounded-lg py-1 px-5"
+            style={{ backgroundColor: styleData.bannerBgColor || "#c4faff" }}
+          >
+            <span className="font-bold" style={{ color: styleData.bannerTextColor || "#005aa1" }}>
+              {styleData.tagline?.split("!")[0] || "Big Sale"}!
+            </span>
+            <span className="font-medium" style={{ color: styleData.bannerTextColor || "#005aa1" }}>
+              {" "}
+              {styleData.tagline?.split("!").slice(1).join("!") || "Hurry up! Sale ends in 2025"}
+            </span>
           </div>
 
           <div className="flex-1 max-w-xl relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[#adadad]" />
             <Input
               type="search"
-              placeholder="Search..."
+              placeholder={styleData.searchPlaceholder || "Search..."}
               className="pl-12 pr-4 bg-gray-100 border-gray-200 h-10 rounded-full focus:bg-white w-full text-[#adadad] font-inter font-medium placeholder:text-[#adadad]"
             />
           </div>
@@ -43,7 +56,7 @@ export function Header() {
 
         <nav className="flex items-center gap-8 pt-4 border-t">
           <Link href="/" className="flex items-center">
-            <Image
+            <Image 
               src="/logo-osoria.png"
               alt="Osoria Logo"
               width={120}
