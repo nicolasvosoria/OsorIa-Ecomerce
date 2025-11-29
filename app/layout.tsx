@@ -13,6 +13,9 @@ import dynamic from "next/dynamic"
 import { V0Provider } from "../lib/context"
 import { cn } from "../lib/utils"
 import { StylesProvider } from "@/contexts/styles-context"
+import { ThemeProvider } from "@/contexts/theme-context"
+import { FontProvider } from "@/contexts/font-context"
+import { viewport } from "./viewport"
 
 const V0Setup = dynamic(() => import("@/components/v0-setup"))
 
@@ -35,6 +38,8 @@ export const metadata: Metadata = {
   generator: "v0.app",
 }
 
+export { viewport }
+
 export default async function RootLayout({
   children,
 }: Readonly<{
@@ -50,16 +55,20 @@ export default async function RootLayout({
       >
         <V0Provider isV0={isV0}>
           <StylesProvider>
-            <CartProvider>
-              <NuqsAdapter>
-                <main data-vaul-drawer-wrapper="true">
-                  <Header collections={collections} />
-                  {children}
-                </main>
-                {isDevelopment && <DebugGrid />}
-                <Toaster closeButton position="bottom-right" />
-              </NuqsAdapter>
-            </CartProvider>
+            <ThemeProvider>
+              <FontProvider>
+                <CartProvider>
+                  <NuqsAdapter>
+                    <main data-vaul-drawer-wrapper="true">
+                      <Header />
+                      {children}
+                    </main>
+                    {isDevelopment && <DebugGrid />}
+                    <Toaster closeButton position="bottom-right" />
+                  </NuqsAdapter>
+                </CartProvider>
+              </FontProvider>
+            </ThemeProvider>
           </StylesProvider>
           {isV0 && <V0Setup />}
         </V0Provider>

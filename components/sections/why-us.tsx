@@ -32,23 +32,29 @@ export function WhyUs() {
   ]
 
   return (
-    <section className="py-16 px-4 bg-background">
+    <section className="py-8 md:py-16 px-4" style={{ backgroundColor: "var(--background)" }}>
       <div className="container mx-auto">
-        <h2 className="text-[47px] font-inter font-normal text-left mb-12" style={{ color: "#1e354e" }}>
+        <h2 className="text-2xl md:text-4xl lg:text-[47px] font-inter font-normal text-center md:text-left mb-6 md:mb-12" style={{ color: "var(--foreground)" }}>
           {styleData.title || "Why us?"}
         </h2>
 
-        <div className="grid md:grid-cols-4 gap-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
           {features.map((feature, index) => (
-            <div key={index} className="flex flex-col items-center text-center space-y-4">
-              <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center border-2 border-gray-300">
-                <feature.icon className="h-8 w-8 text-primary" />
+            <div key={index} className="flex flex-col items-center text-center space-y-2 md:space-y-4">
+              <div 
+                className="w-12 h-12 md:w-16 md:h-16 rounded-full flex items-center justify-center border-2"
+                style={{ 
+                  backgroundColor: "var(--muted)",
+                  borderColor: "var(--border)"
+                }}
+              >
+                <feature.icon className="h-6 w-6 md:h-8 md:w-8" style={{ color: "var(--primary)" }} />
               </div>
               <div>
-                <h3 className="font-inter font-normal text-[19px] mb-1" style={{ color: "#1e354e" }}>
+                <h3 className="font-inter font-normal text-sm md:text-[19px] mb-1" style={{ color: "var(--foreground)" }}>
                   {feature.title}
                 </h3>
-                <p className="text-[15px] font-inter font-normal text-muted-foreground">{feature.description}</p>
+                <p className="text-xs md:text-[15px] font-inter font-normal" style={{ color: "var(--muted-foreground)" }}>{feature.description}</p>
               </div>
             </div>
           ))}

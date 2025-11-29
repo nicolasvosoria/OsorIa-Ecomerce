@@ -51,7 +51,7 @@ const COMPONENT_FIELDS: Record<
       { key: "textColor", label: "Color de Texto", type: "color" },
     ],
     defaults: {
-      title: "Popular Items",
+      title: "Lo más vendido",
       bgColor: "#ffffff",
       textColor: "#1e354e",
     },

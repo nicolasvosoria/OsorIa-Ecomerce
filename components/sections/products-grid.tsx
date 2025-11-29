@@ -29,26 +29,33 @@ export function ProductsGrid() {
   ]
 
   return (
-    <section className="py-12 px-4">
+    <section className="py-8 md:py-12 px-4">
       <div className="container mx-auto max-w-7xl">
-        <h2 className="text-[51px] font-inter font-normal mb-8" style={{ color: "#1e354e" }}>
+        <h2 className="text-2xl md:text-4xl lg:text-[51px] font-inter font-normal mb-6 md:mb-8" style={{ color: "var(--foreground)" }}>
           {styleData.title || "Productos populares"}
         </h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
           {products.map((product, index) => (
-            <div key={index} className="bg-gray-50 rounded-2xl overflow-hidden hover:shadow-lg transition-shadow">
+            <div 
+              key={index} 
+              className="rounded-2xl overflow-hidden hover:shadow-lg transition-shadow"
+              style={{ backgroundColor: "var(--card)" }}
+            >
               <div className="p-4">
-                <h3 className="font-inter font-normal text-[17.4854px] mb-1" style={{ color: "#1e354e" }}>
+                <h3 className="font-inter font-normal text-[17.4854px] mb-1" style={{ color: "var(--card-foreground)" }}>
                   {product.name}
                 </h3>
-                <p className="text-[13.9775px] font-inter font-normal text-muted-foreground mb-2">{product.category}</p>
-                <p className="text-[20.5864px] font-inter font-normal" style={{ color: "#1e354e" }}>
+                <p className="text-[13.9775px] font-inter font-normal mb-2" style={{ color: "var(--muted-foreground)" }}>{product.category}</p>
+                <p className="text-[20.5864px] font-inter font-normal" style={{ color: "var(--card-foreground)" }}>
                   {product.price}
                 </p>
               </div>
 
-              <div className="aspect-square flex items-center justify-center bg-white p-4">
+              <div 
+                className="aspect-square flex items-center justify-center p-4"
+                style={{ backgroundColor: "var(--background)" }}
+              >
                 <img
                   src={product.image || "/placeholder.svg"}
                   alt={product.name}
