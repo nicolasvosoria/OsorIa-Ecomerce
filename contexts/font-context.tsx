@@ -23,12 +23,14 @@ export function FontProvider({ children }: { children: ReactNode }) {
 
   const refreshFonts = async () => {
     try {
+      console.log("[Font] Iniciando carga de fuentes...")
       setLoading(true)
       setError(null)
       const [fontsData, activeFontData] = await Promise.all([
         getFonts(),
         getActiveFont(),
       ])
+      console.log("[Font] Fuentes recibidas:", fontsData.length, "Fuente activa:", activeFontData ? "Sí" : "No")
       setFonts(fontsData)
       setActiveFontState(activeFontData)
     } catch (err) {
@@ -86,6 +88,7 @@ export function FontProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
+    console.log("[Font] Provider montado, iniciando carga de fuentes (independiente de autenticación)...")
     refreshFonts()
   }, [])
 

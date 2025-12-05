@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
+import { createContext, useContext, useEffect, useState, useMemo, type ReactNode } from "react"
 import { getComponentStyles, subscribeToStyleChanges } from "@/lib/supabase/styles-api"
 
 interface StylesContextType {
@@ -24,11 +24,10 @@ export function StylesProvider({ children }: { children: ReactNode }) {
       const data = await getComponentStyles()
       const stylesMap = new Map(data.map((style) => [style.component_name, style.variables]))
       setStyles(stylesMap)
-      console.log("[v0] Loaded styles from Supabase:", stylesMap.size, "components")
-      console.log("[v0] Component names loaded:", Array.from(stylesMap.keys()))
-      stylesMap.forEach((variables, componentName) => {
-        console.log(`[v0] ${componentName} styles:`, variables)
-      })
+      // Logs reducidos para evitar spam en consola
+      if (stylesMap.size > 0) {
+        console.log("[v0] Loaded styles from Supabase:", stylesMap.size, "components")
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error"
       console.log("[v0] Could not load styles from Supabase:", errorMessage)
@@ -63,28 +62,40 @@ export function useStyles() {
 
 export function useComponentStyle(componentName: string, defaultStyles: Record<string, any> = {}) {
   const { styles, loading } = useStyles()
+  
+  // Memoizar defaultStyles para evitar re-renders infinitos
+  const memoizedDefaults = useMemo(() => defaultStyles, [JSON.stringify(defaultStyles)])
+  
   const [componentStyles, setComponentStyles] = useState<Record<string, any>>(
-    styles.get(componentName) || defaultStyles,
+    styles.get(componentName) || memoizedDefaults,
   )
 
   useEffect(() => {
     const currentStyles = styles.get(componentName)
     if (currentStyles) {
-      setComponentStyles(currentStyles)
-      console.log("[v0] Loaded styles for component:", componentName, currentStyles)
+      // Solo actualizar si realmente cambió
+      setComponentStyles(prev => {
+        const currentStr = JSON.stringify(currentStyles)
+        const prevStr = JSON.stringify(prev)
+        return currentStr !== prevStr ? currentStyles : prev
+      })
     } else {
-      console.log("[v0] No styles found for component:", componentName, "using defaults:", defaultStyles)
+      // Solo actualizar si realmente cambió
+      setComponentStyles(prev => {
+        const defaultStr = JSON.stringify(memoizedDefaults)
+        const prevStr = JSON.stringify(prev)
+        return defaultStr !== prevStr ? memoizedDefaults : prev
+      })
     }
 
     let channel: any = null
 
     try {
       channel = subscribeToStyleChanges(componentName, (newStyle) => {
-        console.log("[v0] Real-time style update for:", componentName, newStyle.variables)
         setComponentStyles(newStyle.variables)
       })
     } catch (error) {
-      console.log("[v0] Could not subscribe to style changes for", componentName)
+      // Error silencioso para evitar spam en consola
     }
 
     return () => {
@@ -92,7 +103,7 @@ export function useComponentStyle(componentName: string, defaultStyles: Record<s
         channel.unsubscribe()
       }
     }
-  }, [componentName, styles])
+  }, [componentName, styles, memoizedDefaults])
 
   return { styles: componentStyles, loading }
 }

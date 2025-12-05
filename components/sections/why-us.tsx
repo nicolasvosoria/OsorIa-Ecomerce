@@ -5,29 +5,29 @@ import { useComponentStyle } from "@/contexts/styles-context"
 
 export function WhyUs() {
   const { styles: styleData } = useComponentStyle("whyus", {
-    title: "Why us?",
+    title: "¿Por qué nosotros?",
   })
 
   const features = [
     {
       icon: Headphones,
-      title: "24/7 Support",
-      description: "& 24/6 (holiday)",
+      title: "Soporte 24/7",
+      description: "Y 24/6 (festivos)",
     },
     {
       icon: Truck,
-      title: "Free Shipping",
-      description: "Delivery 10 Days",
+      title: "Envío Gratis",
+      description: "Entrega en 10 Días",
     },
     {
       icon: CreditCard,
-      title: "Easy Payment",
-      description: "Credit, Debit, QR",
+      title: "Pago Fácil",
+      description: "Crédito, Débito, QR",
     },
     {
       icon: Tag,
-      title: "Big Discounts",
-      description: "Up Big Stock",
+      title: "Grandes Descuentos",
+      description: "Gran Stock Disponible",
     },
   ]
 
@@ -35,7 +35,7 @@ export function WhyUs() {
     <section className="py-8 md:py-16 px-4" style={{ backgroundColor: "var(--background)" }}>
       <div className="container mx-auto">
         <h2 className="text-2xl md:text-4xl lg:text-[47px] font-inter font-normal text-center md:text-left mb-6 md:mb-12" style={{ color: "var(--foreground)" }}>
-          {styleData.title || "Why us?"}
+          {styleData.title || "¿Por qué nosotros?"}
         </h2>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">

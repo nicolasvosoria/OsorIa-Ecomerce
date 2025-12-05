@@ -1,24 +1,89 @@
 import { getSupabaseBrowserClient } from "./client"
 import type { AppFont } from "@/lib/types/font"
 
+// Helper para agregar timeout a las promesas
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number = 10000): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`Timeout después de ${timeoutMs}ms`)), timeoutMs)
+    ),
+  ])
+}
+
 export async function getFonts(): Promise<AppFont[]> {
+  console.log("[Font] === INICIANDO getFonts ===")
   const supabase = getSupabaseBrowserClient()
   if (!supabase) {
-    console.warn("[Font] Supabase not configured")
+    console.error("[Font] ❌ Supabase no configurado - retornando array vacío")
     return []
   }
+  console.log("[Font] ✅ Cliente Supabase obtenido")
 
-  const { data, error } = await supabase
-    .from("app_fonts")
-    .select("*")
-    .order("font_name")
+  try {
+    // Las peticiones de fuentes son independientes de la autenticación
+    // No verificamos sesión para evitar bloqueos
+    console.log("[Font] Ejecutando consulta a app_fonts (sin verificar sesión)...")
+    console.log("[Font] URL de Supabase:", process.env.NEXT_PUBLIC_SUPABASE_URL)
+    const startTime = Date.now()
+    
+    // Primero hacer una consulta simple para verificar conectividad
+    try {
+      console.log("[Font] Probando conectividad con Supabase...")
+      const testQuery = supabase.from("app_fonts").select("id").limit(1)
+      const testResult = await Promise.race([
+        testQuery,
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Test timeout")), 5000))
+      ])
+      console.log("[Font] Test de conectividad:", testResult ? "✅ OK" : "❌ Falló")
+    } catch (testError) {
+      console.error("[Font] ❌ Error en test de conectividad:", testError)
+      console.error("[Font] Esto sugiere un problema de red o que RLS está bloqueando completamente las consultas")
+    }
+    
+    const queryPromise = supabase
+      .from("app_fonts")
+      .select("*")
+      .order("font_name")
+    
+    console.log("[Font] Enviando consulta completa...")
+    const { data, error } = await withTimeout(queryPromise, 20000)
+    const elapsedTime = Date.now() - startTime
+    console.log("[Font] Consulta completada en", elapsedTime, "ms. Error:", error ? "Sí" : "No")
 
-  if (error) {
-    console.error("[Font] Error fetching fonts:", error)
+    if (error) {
+      console.error("[Font] ❌ Error fetching fonts:", {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+        fullError: JSON.stringify(error, null, 2),
+      })
+      
+      // Si el error es de permisos o RLS, dar más información
+      if (error.code === 'PGRST301' || error.message?.includes('permission') || error.message?.includes('RLS')) {
+        console.error("[Font] ⚠️ Posible problema de RLS o permisos. Verifica que RLS esté deshabilitado o que las políticas permitan lectura pública.")
+      }
+      
+      return []
+    }
+
+    if (!data || data.length === 0) {
+      console.warn("[Font] ⚠️ No se encontraron fuentes en la base de datos")
+      return []
+    }
+
+    console.log("[Font] ✅ Fuentes cargadas exitosamente:", data.length)
+    console.log("[Font] === FINALIZANDO getFonts ===")
+    return data as AppFont[]
+  } catch (err) {
+    console.error("[Font] ❌ Excepción al obtener fuentes:", err)
+    if (err instanceof Error) {
+      console.error("[Font] Mensaje de error:", err.message)
+      console.error("[Font] Stack:", err.stack)
+    }
     return []
   }
-
-  return (data || []) as AppFont[]
 }
 
 export async function getActiveFont(): Promise<AppFont | null> {

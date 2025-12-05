@@ -7,80 +7,51 @@ import { FooterNew } from "@/components/sections/footer-new"
 import { useCart } from "@/contexts/cart-context"
 import { toast } from "sonner"
 
-export default function SalePage() {
+export default function StandsPage() {
   const { addToCart } = useCart()
-  const saleProducts = [
+  
+  const stands = [
     {
       id: 1,
-      name: "Bocinas Bluetooth",
-      category: "Audio",
-      originalPrice: "$356.00",
-      salePrice: "$249.00",
-      discount: 30,
-      image: "/bluetooth-speaker-modern.jpg",
+      name: "Soporte para Laptop",
+      category: "Stands",
+      price: "$82.00",
+      image: "/laptop-stand.png",
     },
     {
       id: 2,
-      name: "Auriculares Premium",
-      category: "Audio",
-      originalPrice: "$199.00",
-      salePrice: "$139.00",
-      discount: 30,
-      image: "/premium-headphones.png",
+      name: "Soporte Ajustable para Laptop",
+      category: "Stands",
+      price: "$99.00",
+      image: "/laptop-stand.png",
     },
     {
       id: 3,
-      name: "Soporte para Laptop",
-      category: "Accesorios",
-      originalPrice: "$82.00",
-      salePrice: "$57.00",
-      discount: 30,
+      name: "Soporte Ergonómico",
+      category: "Stands",
+      price: "$129.00",
       image: "/laptop-stand.png",
     },
     {
       id: 4,
-      name: "Mini Proyector",
-      category: "Proyección",
-      originalPrice: "$199.00",
-      salePrice: "$149.00",
-      discount: 25,
-      image: "/mini-projector.jpg",
+      name: "Soporte Portátil",
+      category: "Stands",
+      price: "$59.00",
+      image: "/laptop-stand.png",
     },
     {
       id: 5,
-      name: "Bocina Inteligente",
-      category: "Electrónica",
-      originalPrice: "$89.00",
-      salePrice: "$62.00",
-      discount: 30,
-      image: "/black-smart-speaker.jpg",
+      name: "Soporte con Ventilación",
+      category: "Stands",
+      price: "$89.00",
+      image: "/laptop-stand.png",
     },
     {
       id: 6,
-      name: "Audífonos Inalámbricos",
-      category: "Audio",
-      originalPrice: "$45.00",
-      salePrice: "$31.00",
-      discount: 31,
-      image: "/green-earphones-product.jpg",
-    },
-    {
-      id: 7,
-      name: "Funda para Teléfono",
-      category: "Accesorios",
-      originalPrice: "$25.00",
-      salePrice: "$17.00",
-      discount: 32,
-      image: "/modern-phone-case-product.jpg",
-    },
-    {
-      id: 8,
-      name: "Proyector Blanco",
-      category: "Proyección",
-      originalPrice: "$1,420.00",
-      salePrice: "$994.00",
-      discount: 30,
-      image: "/white-projector.jpg",
+      name: "Soporte Premium",
+      category: "Stands",
+      price: "$149.00",
+      image: "/laptop-stand.png",
     },
   ]
 
@@ -100,31 +71,21 @@ export default function SalePage() {
             </Button>
           </Link>
           <h1 className="text-4xl md:text-6xl lg:text-[72px] font-inter font-bold mb-4" style={{ color: "var(--foreground)" }}>
-            Gran Oferta
+            Stands
           </h1>
           <p className="text-lg md:text-xl" style={{ color: "var(--muted-foreground)" }}>
-            Aprovecha nuestros descuentos especiales. ¡Ofertas limitadas!
+            Mejora tu espacio de trabajo con nuestros soportes y bases de alta calidad
           </p>
         </div>
 
         {/* Products Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 md:gap-8">
-          {saleProducts.map((product) => (
+          {stands.map((product) => (
             <div
               key={product.id}
               className="group relative rounded-2xl overflow-hidden hover:shadow-xl transition-all duration-300"
               style={{ backgroundColor: "var(--card)" }}
             >
-              {/* Discount Badge */}
-              <div className="absolute top-4 right-4 z-10">
-                <div
-                  className="rounded-full px-4 py-2 font-bold text-white text-sm md:text-base shadow-lg"
-                  style={{ backgroundColor: "var(--accent)" }}
-                >
-                  -{product.discount}%
-                </div>
-              </div>
-
               {/* Product Image */}
               <div
                 className="aspect-square flex items-center justify-center p-6 relative overflow-hidden"
@@ -149,10 +110,7 @@ export default function SalePage() {
                 {/* Pricing */}
                 <div className="flex items-center gap-3 mb-4">
                   <span className="text-xl md:text-2xl font-inter font-bold" style={{ color: "var(--primary)" }}>
-                    {product.salePrice}
-                  </span>
-                  <span className="text-sm md:text-base line-through" style={{ color: "var(--muted-foreground)" }}>
-                    {product.originalPrice}
+                    {product.price}
                   </span>
                 </div>
 
@@ -173,11 +131,9 @@ export default function SalePage() {
                     addToCart({
                       id: product.id,
                       name: product.name,
-                      price: product.salePrice,
+                      price: product.price,
                       image: product.image,
                       category: product.category,
-                      originalPrice: product.originalPrice,
-                      salePrice: product.salePrice,
                     })
                     toast.success("Producto agregado al carrito", {
                       description: `${product.name} ha sido agregado exitosamente`,
@@ -198,4 +154,8 @@ export default function SalePage() {
     </main>
   )
 }
+
+
+
+
 

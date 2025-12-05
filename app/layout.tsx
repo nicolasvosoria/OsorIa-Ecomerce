@@ -4,7 +4,8 @@ import { Geist, Geist_Mono } from "next/font/google"
 import "./globals.css"
 import { Toaster } from "sonner"
 import { NuqsAdapter } from "nuqs/adapters/next/app"
-import { CartProvider } from "@/components/cart/cart-context"
+import { CartProvider as ShopifyCartProvider } from "@/components/cart/cart-context"
+import { CartProvider } from "@/contexts/cart-context"
 import { DebugGrid } from "@/components/debug-grid"
 import { isDevelopment } from "@/lib/constants"
 import { getCollections } from "@/lib/shopify"
@@ -15,7 +16,9 @@ import { cn } from "../lib/utils"
 import { StylesProvider } from "@/contexts/styles-context"
 import { ThemeProvider } from "@/contexts/theme-context"
 import { FontProvider } from "@/contexts/font-context"
+import { AuthProvider } from "@/contexts/auth-context"
 import { viewport } from "./viewport"
+import { FloatingContactButton } from "@/components/ui/floating-contact-button"
 
 const V0Setup = dynamic(() => import("@/components/v0-setup"))
 
@@ -55,20 +58,25 @@ export default async function RootLayout({
       >
         <V0Provider isV0={isV0}>
           <StylesProvider>
-            <ThemeProvider>
-              <FontProvider>
-                <CartProvider>
-                  <NuqsAdapter>
-                    <main data-vaul-drawer-wrapper="true">
-                      <Header />
-                      {children}
-                    </main>
-                    {isDevelopment && <DebugGrid />}
-                    <Toaster closeButton position="bottom-right" />
-                  </NuqsAdapter>
-                </CartProvider>
-              </FontProvider>
-            </ThemeProvider>
+            <AuthProvider>
+              <ThemeProvider>
+                <FontProvider>
+                  <ShopifyCartProvider>
+                    <CartProvider>
+                      <NuqsAdapter>
+                      <main data-vaul-drawer-wrapper="true">
+                        <Header />
+                        {children}
+                      </main>
+                      {isDevelopment && <DebugGrid />}
+                      <Toaster closeButton position="top-left" />
+                      <FloatingContactButton />
+                        </NuqsAdapter>
+                      </CartProvider>
+                    </ShopifyCartProvider>
+                  </FontProvider>
+                </ThemeProvider>
+            </AuthProvider>
           </StylesProvider>
           {isV0 && <V0Setup />}
         </V0Provider>

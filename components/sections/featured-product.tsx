@@ -5,12 +5,12 @@ import { useComponentStyle } from "@/contexts/styles-context"
 
 export function FeaturedProduct() {
   const { styles: styleData } = useComponentStyle("featured", {
-    title: "Please, don't stop the music!",
-    subtitle: "Users choice in this world",
-    productName: "BelPhones XTRM earphones",
+    title: "¡Por favor, no detengas la música!",
+    subtitle: "La elección de los usuarios en este mundo",
+    productName: "Auriculares BelPhones XTRM",
     originalPrice: "$99.99",
     salePrice: "$79.00",
-    linkText: "See all products",
+    linkText: "Ver todos los productos",
     bgColor: "#5daba8",
   })
 
@@ -34,10 +34,10 @@ export function FeaturedProduct() {
           <div className="space-y-6 md:space-y-8 text-center md:text-left" style={{ color: "var(--secondary-foreground)" }}>
             <div>
               <h2 className="text-2xl md:text-4xl lg:text-[46.5225px] font-inter font-normal mb-2">
-                {styleData.title || "Please, don't stop the music!"}
+                {styleData.title || "¡Por favor, no detengas la música!"}
               </h2>
               <p className="text-base md:text-lg lg:text-[19.1856px] font-inter font-normal" style={{ opacity: 0.9 }}>
-                {styleData.subtitle || "Users choice in this world"}
+                {styleData.subtitle || "La elección de los usuarios en este mundo"}
               </p>
             </div>
 
@@ -51,7 +51,7 @@ export function FeaturedProduct() {
               }}
             >
               <h3 className="mb-3 md:mb-4 font-semibold text-sm md:text-base" style={{ color: "var(--card-foreground)" }}>
-                {styleData.productName || "BelPhones XTRM earphones"}
+                {styleData.productName || "Auriculares BelPhones XTRM"}
               </h3>
               <div className="flex items-baseline gap-2 mb-4 md:mb-6">
                 <span className="line-through text-sm md:text-base" style={{ color: "var(--muted-foreground)" }}>
@@ -79,7 +79,7 @@ export function FeaturedProduct() {
               onMouseEnter={(e) => e.currentTarget.style.opacity = "0.8"}
               onMouseLeave={(e) => e.currentTarget.style.opacity = "1"}
             >
-              {styleData.linkText || "See all products"} →
+              {styleData.linkText || "Ver todos los productos"} →
             </Button>
           </div>
         </div>

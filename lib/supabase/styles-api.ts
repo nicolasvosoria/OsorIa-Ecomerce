@@ -69,24 +69,31 @@ export async function subscribeToStyleChanges(componentName: string, callback: (
     }
   }
 
-  const channel = supabase
-    .channel(`component_styles:${componentName}`)
-    .on(
-      "postgres_changes",
-      {
-        event: "*",
-        schema: "public",
-        table: "component_styles",
-        filter: `component_name=eq.${componentName}`,
-      },
-      (payload) => {
-        console.log("[v0] Style change detected:", payload)
-        if (payload.new) {
-          callback(payload.new as ComponentStyle)
-        }
-      },
-    )
-    .subscribe()
+  try {
+    const channel = supabase
+      .channel(`component_styles:${componentName}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "component_styles",
+          filter: `component_name=eq.${componentName}`,
+        },
+        (payload) => {
+          if (payload.new) {
+            callback(payload.new as ComponentStyle)
+          }
+        },
+      )
+      .subscribe()
 
-  return channel
+    return channel
+  } catch (error) {
+    // Falla silenciosamente si el realtime no está disponible
+    // Esto no es crítico para la funcionalidad básica
+    return {
+      unsubscribe: () => {},
+    }
+  }
 }

@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
 import { getThemes, getActiveTheme, setActiveTheme } from "@/lib/supabase/themes-api"
+import { useAuth } from "@/contexts/auth-context"
 import type { AppTheme } from "@/lib/types/theme"
 
 interface ThemeContextType {
@@ -20,21 +21,43 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [activeTheme, setActiveThemeState] = useState<AppTheme | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const { isAuthenticated } = useAuth()
 
   const refreshThemes = async () => {
     try {
+      console.log("[Theme] Iniciando carga de temas...")
       setLoading(true)
       setError(null)
       const [themesData, activeThemeData] = await Promise.all([
         getThemes(),
         getActiveTheme(),
       ])
+      console.log("[Theme] Temas recibidos:", themesData.length, "Tema activo:", activeThemeData ? "Sí" : "No")
       setThemes(themesData)
-      setActiveThemeState(activeThemeData)
+      
+      // Si no hay usuario autenticado o no hay tema activo, usar "Claro Original" por defecto
+      let themeToUse = activeThemeData
+      if (!isAuthenticated || !activeThemeData) {
+        const defaultTheme = themesData.find((t) => t.theme_name === "Claro Original")
+        if (defaultTheme) {
+          themeToUse = defaultTheme
+          console.log("[Theme] Usando tema por defecto 'Claro Original' (usuario no autenticado o sin tema activo)")
+        }
+      }
+      
+      setActiveThemeState(themeToUse)
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Error al cargar temas"
       setError(errorMessage)
       console.error("[Theme] Error loading themes:", err)
+      
+      // En caso de error, intentar aplicar "Claro Original" si hay temas cargados
+      if (themes.length > 0 && !isAuthenticated) {
+        const defaultTheme = themes.find((t) => t.theme_name === "Claro Original")
+        if (defaultTheme) {
+          setActiveThemeState(defaultTheme)
+        }
+      }
     } finally {
       setLoading(false)
     }
@@ -84,14 +107,32 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
+    console.log("[Theme] Provider montado, iniciando carga de temas...")
     refreshThemes()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Refrescar temas cuando cambie el estado de autenticación
+  useEffect(() => {
+    if (!loading && themes.length > 0) {
+      refreshThemes()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated])
 
   useEffect(() => {
     if (activeTheme) {
       applyTheme(activeTheme)
+    } else if (themes.length > 0 && !isAuthenticated) {
+      // Si no hay tema activo y el usuario no está autenticado, aplicar "Claro Original"
+      const defaultTheme = themes.find((t) => t.theme_name === "Claro Original")
+      if (defaultTheme) {
+        applyTheme(defaultTheme)
+        setActiveThemeState(defaultTheme)
+      }
     }
-  }, [activeTheme])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTheme, themes, isAuthenticated])
 
   const value: ThemeContextType = {
     themes,

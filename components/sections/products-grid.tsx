@@ -10,19 +10,19 @@ export function ProductsGrid() {
   const products = [
     {
       name: "BeShow Volcano",
-      category: "Projectors",
+      category: "Proyectores",
       price: "$1,420.00",
       image: "/white-projector.jpg",
     },
     {
-      name: "Laptop stand Desk MUO-g",
-      category: "Stands",
+      name: "Soporte para Laptop Desk MUO-g",
+      category: "Soportes",
       price: "$82.00",
       image: "/laptop-stand.png",
     },
     {
       name: "BeShow Volcano",
-      category: "Projectors",
+      category: "Proyectores",
       price: "$1,420.00",
       image: "/white-projector.jpg",
     },

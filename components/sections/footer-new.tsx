@@ -55,31 +55,31 @@ export function FooterNew() {
         {/* Footer Links */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 md:gap-12 mb-8 md:mb-12">
           <div>
-            <h3 className="font-semibold text-foreground mb-3 md:mb-4 text-sm md:text-base">Navigation</h3>
+            <h3 className="font-semibold text-foreground mb-3 md:mb-4 text-sm md:text-base">Navegación</h3>
             <ul className="space-y-1 md:space-y-2">
-              <li><Link href="#about" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">About</Link></li>
-              <li><Link href="#terms" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">Terms and Conditions</Link></li>
-              <li><Link href="#contact" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">Contact</Link></li>
-              <li><Link href="#sales" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">Sales</Link></li>
+              <li><Link href="#about" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">Acerca de</Link></li>
+              <li><Link href="#terms" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">Términos y Condiciones</Link></li>
+              <li><Link href="#contact" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">Contacto</Link></li>
+              <li><Link href="#sales" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">Ventas</Link></li>
             </ul>
           </div>
 
           <div>
-            <h3 className="font-semibold text-foreground mb-3 md:mb-4 text-sm md:text-base">Customer service</h3>
+            <h3 className="font-semibold text-foreground mb-3 md:mb-4 text-sm md:text-base">Servicio al cliente</h3>
             <ul className="space-y-1 md:space-y-2">
-              <li><Link href="#help" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">Help & FAQs</Link></li>
-              <li><Link href="#track" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">Track Order</Link></li>
-              <li><Link href="#shipping" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">Shipping & Delivery</Link></li>
-              <li><Link href="#returns" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">Delivery & Returns</Link></li>
+              <li><Link href="#help" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">Ayuda y Preguntas Frecuentes</Link></li>
+              <li><Link href="#track" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">Rastrear Pedido</Link></li>
+              <li><Link href="#shipping" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">Envío y Entrega</Link></li>
+              <li><Link href="#returns" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">Entrega y Devoluciones</Link></li>
             </ul>
           </div>
 
           <div>
-            <h3 className="font-semibold text-foreground mb-3 md:mb-4 text-sm md:text-base">Our Company</h3>
+            <h3 className="font-semibold text-foreground mb-3 md:mb-4 text-sm md:text-base">Nuestra Empresa</h3>
             <ul className="space-y-1 md:space-y-2">
-              <li><Link href="#team" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">Our team</Link></li>
-              <li><Link href="#stationary" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">Stationary Stores</Link></li>
-              <li><Link href="#cooperation" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">Marketing Cooperation</Link></li>
+              <li><Link href="#team" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">Nuestro equipo</Link></li>
+              <li><Link href="#stationary" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">Tiendas Físicas</Link></li>
+              <li><Link href="#cooperation" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">Cooperación de Marketing</Link></li>
             </ul>
           </div>
         </div>
@@ -87,7 +87,7 @@ export function FooterNew() {
         {/* Copyright */}
         <div className="pt-8 border-t" style={{ borderColor: "var(--border)" }}>
           <p className="text-sm text-center" style={{ color: "var(--muted-foreground)" }}>
-            © 2025 Electronics by Muffin group | All Rights Reserved
+            © 2025 Electrónica por Muffin group | Todos los Derechos Reservados
           </p>
         </div>
       </div>

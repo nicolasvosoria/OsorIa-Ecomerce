@@ -27,10 +27,10 @@ export function HeroBanner() {
   // Array de productos para el carrusel
   const heroProducts = [
     {
-      label: "Electronics",
+      label: "Electrónica",
       title: "BALFE",
       subtitle: "NUEVO MODELO",
-      description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua",
+      description: "Descubre la última tecnología en dispositivos electrónicos. Calidad premium y diseño innovador para una experiencia única.",
       buttonText: "Comprar ahora",
       image: "/black-smart-speaker.jpg",
     },

@@ -4,6 +4,7 @@ import { createContext, useContext, useState, type ReactNode } from "react"
 
 interface AdminContextType {
   isEditMode: boolean
+  isAdmin: boolean
   selectedComponent: string | null
   selectComponent: (componentName: string | null) => void
   componentEdits: Map<string, Record<string, any>>
@@ -15,15 +16,20 @@ interface AdminContextType {
 const AdminContext = createContext<AdminContextType | undefined>(undefined)
 
 export function AdminProvider({ children }: { children: ReactNode }) {
-  const [isEditMode] = useState(true)
+  const [isEditMode, setIsEditMode] = useState(false)
   const [selectedComponent, setSelectedComponent] = useState<string | null>(null)
   const [componentEdits, setComponentEdits] = useState<Map<string, Record<string, any>>>(new Map())
 
+  // Sin autenticación, el modo admin está deshabilitado
+  const isAdmin = false
+
   const selectComponent = (componentName: string | null) => {
+    if (!isAdmin) return
     setSelectedComponent(componentName)
   }
 
   const updateComponentEdit = (componentName: string, key: string, value: any) => {
+    if (!isAdmin) return
     setComponentEdits((prev) => {
       const newMap = new Map(prev)
       const currentEdits = newMap.get(componentName) || {}
@@ -33,6 +39,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   }
 
   const clearComponentEdits = (componentName: string) => {
+    if (!isAdmin) return
     setComponentEdits((prev) => {
       const newMap = new Map(prev)
       newMap.delete(componentName)
@@ -46,6 +53,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     <AdminContext.Provider
       value={{
         isEditMode,
+        isAdmin,
         selectedComponent,
         selectComponent,
         componentEdits,
@@ -64,6 +72,7 @@ export function useAdmin() {
   if (context === undefined) {
     return {
       isEditMode: false,
+      isAdmin: false,
       selectedComponent: null,
       selectComponent: () => {},
       componentEdits: new Map(),

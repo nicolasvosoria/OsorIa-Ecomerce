@@ -11,49 +11,52 @@ import {
   type CarouselApi,
 } from "@/components/ui/carousel"
 import { Button } from "@/components/ui/button"
+import { useCart } from "@/contexts/cart-context"
+import { toast } from "sonner"
 
 export function PopularItems() {
   const { styles: styleData } = useComponentStyle("popular", {
     title: "Lo más vendido",
-    priceLabel: "Starting at $29",
+    priceLabel: "Desde $29",
   })
+  const { addToCart } = useCart()
   const [api, setApi] = useState<CarouselApi>()
   const autoplayRef = useRef<NodeJS.Timeout | null>(null)
 
   const items = [
     {
-      title: "Bluetooth Speakers",
-      price: "Starting at $356",
+      title: "Bocinas Bluetooth",
+      price: "Desde $356",
       image: "/bluetooth-speaker-modern.jpg",
     },
     {
-      title: "Headphones & Earphones",
-      price: "Starting at $29",
+      title: "Auriculares y Audífonos",
+      price: "Desde $29",
       image: "/premium-headphones.png",
     },
     {
-      title: "Laptop stands",
-      price: "Starting at $82",
+      title: "Soportes para Laptop",
+      price: "Desde $82",
       image: "/laptop-stand.png",
     },
     {
-      title: "Projectors",
-      price: "Starting at $199",
+      title: "Proyectores",
+      price: "Desde $199",
       image: "/mini-projector.jpg",
     },
     {
-      title: "Smart Speakers",
-      price: "Starting at $89",
+      title: "Bocinas Inteligentes",
+      price: "Desde $89",
       image: "/black-smart-speaker.jpg",
     },
     {
-      title: "Wireless Earphones",
-      price: "Starting at $45",
+      title: "Audífonos Inalámbricos",
+      price: "Desde $45",
       image: "/green-earphones-product.jpg",
     },
     {
-      title: "Phone Cases",
-      price: "Starting at $25",
+      title: "Fundas para Teléfono",
+      price: "Desde $25",
       image: "/modern-phone-case-product.jpg",
     },
   ]
@@ -146,7 +149,16 @@ export function PopularItems() {
                         }}
                         onClick={(e) => {
                           e.stopPropagation()
-                          // Aquí puedes agregar la lógica para agregar al carrito
+                          addToCart({
+                            id: `popular-${index}`,
+                            name: item.title,
+                            price: item.price,
+                            image: item.image,
+                          })
+                          toast.success("Producto agregado al carrito", {
+                            description: `${item.title} ha sido agregado exitosamente`,
+                            duration: 3000,
+                          })
                         }}
                       >
                         Agregar al carrito
