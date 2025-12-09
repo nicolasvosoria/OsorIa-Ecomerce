@@ -1,13 +1,8 @@
 const nextConfig = {
   /* config options here */
-  experimental: {
-    inlineCss: true,
-    useCache: true,
-    clientSegmentCache: true,
-  },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
+  // Next.js 16 - Configuración actualizada
+  // Nota: eslint ya no se configura aquí, se maneja en eslint.config.mjs
+  cacheComponents: true, // Requerido para 'use cache' directive (movido fuera de experimental en Next.js 16)
   typescript: {
     ignoreBuildErrors: true,
   },

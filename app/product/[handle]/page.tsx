@@ -38,9 +38,7 @@ export async function generateStaticParams() {
   }
 }
 
-// Enable ISR with 1 minute revalidation
-export const revalidate = 60;
-
+// Cache is handled via 'use cache' directive in getProduct()
 export async function generateMetadata(props: { params: Promise<{ handle: string }> }): Promise<Metadata> {
   const params = await props.params;
   const product = await getProduct(params.handle);

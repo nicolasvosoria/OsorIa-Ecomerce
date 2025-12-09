@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,7 +10,7 @@ import { updatePassword } from "@/lib/supabase/auth-api"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import Link from "next/link"
 
-export default function ResetPasswordPage() {
+function ResetPasswordContent() {
   const router = useRouter()
   const [newPassword, setNewPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
@@ -484,6 +484,18 @@ export default function ResetPasswordPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: "var(--background)" }}>
+        <Loader2 className="h-8 w-8 animate-spin" style={{ color: "var(--primary)" }} />
+      </div>
+    }>
+      <ResetPasswordContent />
+    </Suspense>
   )
 }
 

@@ -11,9 +11,7 @@ export const metadata: Metadata = {
   description: 'ACME Store, your one-stop shop for all your needs.',
 };
 
-// Enable ISR with 1 minute revalidation
-export const revalidate = 60;
-
+// Cache is handled via 'use cache' directive in getProducts()
 export default async function Shop(props: {
   searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {

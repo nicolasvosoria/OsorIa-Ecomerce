@@ -107,7 +107,7 @@ export function Chatbot({ isOpen, onClose }: ChatbotProps) {
       id: "1",
       text: "¡Hola! 👋 Soy tu asistente virtual. ¿En qué puedo ayudarte hoy?",
       sender: "bot",
-      timestamp: new Date(),
+      timestamp: typeof window !== 'undefined' ? new Date() : new Date(0),
     },
   ])
   const [inputValue, setInputValue] = useState("")
@@ -125,7 +125,7 @@ export function Chatbot({ isOpen, onClose }: ChatbotProps) {
       id: Date.now().toString(),
       text: inputValue,
       sender: "user",
-      timestamp: new Date(),
+      timestamp: typeof window !== 'undefined' ? new Date() : new Date(0),
     }
 
     setMessages((prev) => [...prev, userMessage])
@@ -137,7 +137,7 @@ export function Chatbot({ isOpen, onClose }: ChatbotProps) {
         id: (Date.now() + 1).toString(),
         text: findAnswer(inputValue),
         sender: "bot",
-        timestamp: new Date(),
+        timestamp: typeof window !== 'undefined' ? new Date() : new Date(0),
       }
       setMessages((prev) => [...prev, botResponse])
     }, 500)

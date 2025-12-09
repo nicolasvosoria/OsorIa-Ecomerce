@@ -16,7 +16,7 @@ export async function Footer() {
         </div>
         <div className="flex justify-between max-md:contents text-muted-foreground">
           <SidebarLinks className="max-w-[450px] w-full max-md:flex-col" size="base" invert />
-          <p className="text-base">{new Date().getFullYear()}© — All rights reserved</p>
+          <p className="text-base">{2025}© — All rights reserved</p>
         </div>
       </div>
     </footer>

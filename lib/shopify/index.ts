@@ -1,4 +1,4 @@
-import { unstable_cacheLife as cacheLife, unstable_cacheTag as cacheTag } from 'next/cache';
+import { cacheLife, cacheTag } from 'next/cache';
 import { TAGS } from '@/lib/constants';
 import {
   getCollections as getShopifyCollections,

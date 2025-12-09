@@ -1,5 +1,6 @@
 "use client"
 
+import { Suspense } from "react"
 import { AdminProvider } from "@/contexts/admin-context"
 import { EditorPanel } from "@/components/admin/editor-panel"
 import { EditableWrapper } from "@/components/admin/editable-wrapper"
@@ -11,10 +12,10 @@ import { FeaturedProduct } from "@/components/sections/featured-product"
 import { WhyUs } from "@/components/sections/why-us"
 import { FooterNew } from "@/components/sections/footer-new"
 import { Button } from "@/components/ui/button"
-import { Eye, ArrowLeft } from "lucide-react"
+import { Eye, ArrowLeft, Loader2 } from "lucide-react"
 import Link from "next/link"
 
-export default function AdminPage() {
+function AdminPageContent() {
   return (
     <AdminProvider>
       <div className="flex h-screen overflow-hidden">
@@ -75,5 +76,17 @@ export default function AdminPage() {
         <EditorPanel />
       </div>
     </AdminProvider>
+  )
+}
+
+export default function AdminPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center h-screen">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    }>
+      <AdminPageContent />
+    </Suspense>
   )
 }

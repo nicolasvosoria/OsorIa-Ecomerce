@@ -5,9 +5,7 @@ import { PageLayout } from '@/components/layout/page-layout';
 import { MobileFilters } from './components/mobile-filters';
 import { ProductsProvider } from './providers/products-provider';
 
-// Enable ISR with 1 minute revalidation for the layout
-export const revalidate = 60;
-
+// Cache is handled via 'use cache' directive in getCollections()
 export default async function ShopLayout({ children }: { children: React.ReactNode }) {
   const collections = await getCollections();
 
