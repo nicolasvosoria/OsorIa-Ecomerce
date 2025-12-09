@@ -396,6 +396,88 @@ export async function resendConfirmationEmail(email: string): Promise<{ success:
 }
 
 /**
+ * Enviar email de recuperación de contraseña
+ */
+export async function resetPassword(email: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = getSupabaseBrowserClient()
+    if (!supabase) {
+      return {
+        success: false,
+        error: 'Supabase no configurado',
+      }
+    }
+
+    const redirectUrl = typeof window !== 'undefined' 
+      ? `${window.location.origin}/auth/reset-password`
+      : undefined
+
+    const { error } = await withTimeout(
+      supabase.auth.resetPasswordForEmail(email, {
+        emailRedirectTo: redirectUrl,
+      }),
+      10000,
+      'resetPassword'
+    )
+
+    if (error) {
+      console.error('[Auth] Error al enviar email de recuperación:', error)
+      return {
+        success: false,
+        error: error.message || 'Error al enviar email de recuperación',
+      }
+    }
+
+    return { success: true }
+  } catch (error: any) {
+    console.error('[Auth] Error inesperado al enviar email de recuperación:', error)
+    return {
+      success: false,
+      error: error.message || 'Error inesperado al enviar email de recuperación',
+    }
+  }
+}
+
+/**
+ * Actualizar contraseña con token de recuperación
+ */
+export async function updatePassword(newPassword: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = getSupabaseBrowserClient()
+    if (!supabase) {
+      return {
+        success: false,
+        error: 'Supabase no configurado',
+      }
+    }
+
+    const { error } = await withTimeout(
+      supabase.auth.updateUser({
+        password: newPassword,
+      }),
+      10000,
+      'updatePassword'
+    )
+
+    if (error) {
+      console.error('[Auth] Error al actualizar contraseña:', error)
+      return {
+        success: false,
+        error: error.message || 'Error al actualizar contraseña',
+      }
+    }
+
+    return { success: true }
+  } catch (error: any) {
+    console.error('[Auth] Error inesperado al actualizar contraseña:', error)
+    return {
+      success: false,
+      error: error.message || 'Error inesperado al actualizar contraseña',
+    }
+  }
+}
+
+/**
  * Escuchar cambios en el estado de autenticación
  */
 export function onAuthStateChange(callback: (user: UserProfile | null) => void) {

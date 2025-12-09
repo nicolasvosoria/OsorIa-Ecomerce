@@ -14,6 +14,7 @@ import { useCart } from "@/contexts/cart-context"
 import { useAuth } from "@/contexts/auth-context"
 import { Trash2, Plus, Minus } from "lucide-react"
 import { toast } from "sonner"
+import { resetPassword } from "@/lib/supabase/auth-api"
 import {
   Sheet,
   SheetContent,
@@ -64,6 +65,9 @@ export function Header() {
   const [lastName, setLastName] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [forgotPasswordModalOpen, setForgotPasswordModalOpen] = useState(false)
+  const [resetEmail, setResetEmail] = useState("")
+  const [resetEmailSent, setResetEmailSent] = useState(false)
   const { activeTheme } = useTheme()
   const { items, removeFromCart, updateQuantity, getTotal, getTotalItems } = useCart()
   const { user, isAuthenticated, login, register, logout } = useAuth()
@@ -355,6 +359,12 @@ export function Header() {
             <SheetTitle className="text-xl font-inter font-semibold" style={{ color: "var(--foreground)" }}>
               Menú
             </SheetTitle>
+            {/* Mensaje de bienvenida para usuarios autenticados - Solo en desktop */}
+            {isAuthenticated && user && (
+              <p className="hidden md:block text-base font-medium mt-4" style={{ color: "var(--foreground)" }}>
+                Hola {user.first_name || user.email.split('@')[0]}, bienvenido a la aplicación
+              </p>
+            )}
           </SheetHeader>
           
           <div className="flex flex-col h-full">
@@ -990,7 +1000,22 @@ export function Header() {
               </Button>
             </div>
 
-            <div className="text-center text-sm pt-2">
+            <div className="text-center text-sm pt-2 space-y-2">
+              {!isRegisterMode && (
+                <div>
+                  <button
+                    type="button"
+                    className="font-medium hover:underline text-sm"
+                    style={{ color: "var(--primary)" }}
+                    onClick={() => {
+                      setLoginModalOpen(false)
+                      setForgotPasswordModalOpen(true)
+                    }}
+                  >
+                    ¿Olvidaste tu contraseña?
+                  </button>
+                </div>
+              )}
               {isRegisterMode ? (
                 <>
                   <span style={{ color: "var(--muted-foreground)" }}>
@@ -1368,6 +1393,161 @@ export function Header() {
               Cancelar
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Recuperación de Contraseña */}
+      <Dialog 
+        open={forgotPasswordModalOpen} 
+        onOpenChange={(open) => {
+          setForgotPasswordModalOpen(open)
+          if (!open) {
+            setResetEmail("")
+            setResetEmailSent(false)
+          }
+        }}
+      >
+        <DialogContent className="w-[95vw] max-w-[450px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-inter font-semibold" style={{ color: "var(--foreground)" }}>
+              {resetEmailSent ? "Email Enviado" : "Recuperar Contraseña"}
+            </DialogTitle>
+            <DialogDescription className="text-sm" style={{ color: "var(--muted-foreground)" }}>
+              {resetEmailSent 
+                ? "Revisa tu correo electrónico para restablecer tu contraseña"
+                : "Ingresa tu correo electrónico y te enviaremos un link para restablecer tu contraseña"}
+            </DialogDescription>
+          </DialogHeader>
+
+          {!resetEmailSent ? (
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault()
+                if (!resetEmail) {
+                  toast.error("Correo requerido", {
+                    description: "Por favor, ingresa tu correo electrónico",
+                    duration: 3000,
+                  })
+                  return
+                }
+
+                const result = await resetPassword(resetEmail)
+                if (result.success) {
+                  setResetEmailSent(true)
+                  toast.success("Email enviado", {
+                    description: "Revisa tu correo para restablecer tu contraseña",
+                    duration: 5000,
+                  })
+                } else {
+                  toast.error("Error al enviar email", {
+                    description: result.error || "Por favor, intenta nuevamente",
+                    duration: 5000,
+                  })
+                }
+              }}
+              className="space-y-4 mt-4"
+            >
+              <div className="space-y-2">
+                <label
+                  htmlFor="resetEmail"
+                  className="text-sm font-medium"
+                  style={{ color: "var(--foreground)" }}
+                >
+                  Correo electrónico
+                </label>
+                <Input
+                  id="resetEmail"
+                  type="email"
+                  placeholder="tu@email.com"
+                  value={resetEmail}
+                  onChange={(e) => setResetEmail(e.target.value)}
+                  required
+                  className="w-full placeholder:opacity-50"
+                  style={{
+                    backgroundColor: "var(--background)",
+                    borderColor: "var(--border)",
+                    color: "var(--foreground)",
+                  }}
+                />
+              </div>
+
+              <div className="flex flex-col gap-2 pt-4">
+                <Button
+                  type="submit"
+                  className="w-full"
+                  style={{
+                    backgroundColor: "var(--primary)",
+                    color: "var(--primary-foreground)",
+                  }}
+                >
+                  Enviar link de recuperación
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    setForgotPasswordModalOpen(false)
+                    setResetEmail("")
+                  }}
+                  style={{
+                    borderColor: "var(--border)",
+                    color: "var(--foreground)",
+                  }}
+                >
+                  Cancelar
+                </Button>
+              </div>
+            </form>
+          ) : (
+            <div className="space-y-4 mt-4">
+              <div className="p-4 rounded-lg text-center" style={{ backgroundColor: "var(--muted)" }}>
+                <p className="text-sm" style={{ color: "var(--foreground)" }}>
+                  Hemos enviado un link de recuperación a:
+                </p>
+                <p className="text-sm font-semibold mt-2" style={{ color: "var(--primary)" }}>
+                  {resetEmail}
+                </p>
+                <p className="text-xs mt-4" style={{ color: "var(--muted-foreground)" }}>
+                  Si no recibes el email, verifica tu carpeta de spam o intenta nuevamente.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-2 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    setForgotPasswordModalOpen(false)
+                    setResetEmail("")
+                    setResetEmailSent(false)
+                    setLoginModalOpen(true)
+                  }}
+                  style={{
+                    borderColor: "var(--border)",
+                    color: "var(--foreground)",
+                  }}
+                >
+                  Volver a iniciar sesión
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="w-full"
+                  onClick={() => {
+                    setResetEmail("")
+                    setResetEmailSent(false)
+                  }}
+                  style={{
+                    color: "var(--primary)",
+                  }}
+                >
+                  Enviar a otro correo
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </header>

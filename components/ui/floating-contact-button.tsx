@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { MessageSquare, X, Bot } from "lucide-react"
 import Link from "next/link"
+import { Chatbot } from "@/components/chatbot/chatbot"
 
 // Icono oficial de WhatsApp
 const WhatsAppIcon = ({ className }: { className?: string }) => (
@@ -19,6 +20,7 @@ const WhatsAppIcon = ({ className }: { className?: string }) => (
 
 export function FloatingContactButton() {
   const [isOpen, setIsOpen] = useState(false)
+  const [chatbotOpen, setChatbotOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
   // Cerrar el menú al hacer clic fuera
@@ -82,7 +84,10 @@ export function FloatingContactButton() {
 
         {/* Opción Chatbot - posición superior izquierda */}
         <button
-          onClick={handleOptionClick}
+          onClick={() => {
+            setChatbotOpen(true)
+            handleOptionClick()
+          }}
           className={`absolute flex items-center gap-3 rounded-full px-4 py-3 shadow-lg hover:shadow-xl transition-all duration-300 ${
             isOpen ? "opacity-100 scale-100 translate-x-0 translate-y-0 pointer-events-auto" : "opacity-0 scale-0 translate-x-4 translate-y-4 pointer-events-none"
           }`}
@@ -143,6 +148,9 @@ export function FloatingContactButton() {
           </>
         )}
       </Button>
+
+      {/* Chatbot */}
+      <Chatbot isOpen={chatbotOpen} onClose={() => setChatbotOpen(false)} />
     </div>
   )
 }
