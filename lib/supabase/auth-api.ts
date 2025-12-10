@@ -1,5 +1,6 @@
 import type { UserProfile, AuthResult } from '@/lib/types/user'
 import { getSupabaseBrowserClient } from './client'
+import { getUrl } from '@/lib/utils/url'
 
 // Helper para manejar timeouts
 async function withTimeout<T>(
@@ -42,7 +43,7 @@ export async function signUp(
             first_name: firstName || '',
             last_name: lastName || '',
           },
-          emailRedirectTo: typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : undefined,
+          emailRedirectTo: getUrl('/auth/callback'),
         },
       }),
       15000,
@@ -371,7 +372,7 @@ export async function resendConfirmationEmail(email: string): Promise<{ success:
         type: 'signup',
         email,
         options: {
-          emailRedirectTo: typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : undefined,
+          emailRedirectTo: getUrl('/auth/callback'),
         },
       }),
       10000,
@@ -408,13 +409,9 @@ export async function resetPassword(email: string): Promise<{ success: boolean; 
       }
     }
 
-    const redirectUrl = typeof window !== 'undefined' 
-      ? `${window.location.origin}/auth/reset-password`
-      : undefined
-
     const { error } = await withTimeout(
       supabase.auth.resetPasswordForEmail(email, {
-        emailRedirectTo: redirectUrl,
+        emailRedirectTo: getUrl('/auth/reset-password'),
       }),
       10000,
       'resetPassword'

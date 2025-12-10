@@ -20,3 +20,6 @@ pnpm list next react react-dom
 echo ""
 echo "🧪 Ejecuta 'pnpm build' para verificar que todo funciona correctamente"
 
+
+
+

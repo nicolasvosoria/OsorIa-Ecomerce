@@ -23,3 +23,6 @@ pnpm list next react react-dom
 Write-Host ""
 Write-Host "🧪 Ejecuta 'pnpm build' para verificar que todo funciona correctamente" -ForegroundColor Yellow
 
+
+
+
