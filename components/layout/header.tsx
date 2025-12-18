@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
+import { useRouter, usePathname } from "next/navigation"
 import Link from "next/link"
 import { Search, Heart, ShoppingCart, Palette, AlignLeft, Menu, X, LogIn, LogOut, User, Eye, EyeOff } from "lucide-react"
 import { Input } from "@/components/ui/input"
@@ -49,6 +50,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 
 export function Header() {
+  const router = useRouter()
   const [themeModalOpen, setThemeModalOpen] = useState(false)
   const [fontModalOpen, setFontModalOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -70,7 +72,7 @@ export function Header() {
   const [resetEmailSent, setResetEmailSent] = useState(false)
   const { activeTheme } = useTheme()
   const { items, removeFromCart, updateQuantity, getTotal, getTotalItems } = useCart()
-  const { user, isAuthenticated, login, register, logout } = useAuth()
+  const { user, isAuthenticated, login, register, logout, refreshUser } = useAuth()
   const { styles: styleData } = useComponentStyle("header", {
     brandName: "Osoria",
     tagline: "Big Sale! Hurry up! Sale ends in 2025",
@@ -100,6 +102,20 @@ export function Header() {
   }, [activeTheme])
 
   const logoSrc = isDarkTheme ? "/logo-osoria-blanco.svg" : "/logo-osoria.png"
+  const pathname = usePathname()
+  const [hasRedirected, setHasRedirected] = useState(false)
+
+  // Redirigir automáticamente a /admin solo una vez cuando el usuario se autentica como admin
+  useEffect(() => {
+    if (isAuthenticated && user?.role === 'admin' && pathname !== '/admin' && !hasRedirected) {
+      router.push('/admin')
+      setHasRedirected(true)
+    }
+    // Resetear el flag si el usuario cierra sesión
+    if (!isAuthenticated) {
+      setHasRedirected(false)
+    }
+  }, [isAuthenticated, user?.role, pathname, router, hasRedirected])
 
   // Removido console.log para evitar spam en consola y rate limiting
 
@@ -155,25 +171,43 @@ export function Header() {
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="ghost"
-                    size="icon"
-                    className="h-10 w-10 rounded-full"
+                    className="h-10 px-3 md:px-4 rounded-full gap-2"
                     style={{ backgroundColor: "transparent" }}
                     onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "var(--muted)"}
                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
                   >
-                    <User className="h-5 w-5" style={{ color: "var(--foreground)" }} />
+                    <User className="h-4 w-4 md:h-5 md:w-5" style={{ color: "var(--foreground)" }} />
+                    <span className="text-sm md:text-base font-medium" style={{ color: "var(--foreground)" }}>
+                      {user?.role === 'admin' 
+                        ? "Administrador"
+                        : user?.first_name && user?.last_name 
+                          ? `${user.first_name} ${user.last_name}`
+                          : user?.email?.split('@')[0] || "Usuario"}
+                    </span>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" style={{ backgroundColor: "var(--background)", borderColor: "var(--border)" }}>
                   <DropdownMenuLabel style={{ color: "var(--foreground)" }}>
-                    {user?.first_name && user?.last_name 
-                      ? `${user.first_name} ${user.last_name}`
-                      : user?.email || "Usuario"}
+                    {user?.role === 'admin' 
+                      ? "Administrador"
+                      : user?.first_name && user?.last_name 
+                        ? `${user.first_name} ${user.last_name}`
+                        : user?.email || "Usuario"}
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator style={{ backgroundColor: "var(--border)" }} />
                   <DropdownMenuItem
                     onClick={async () => {
+                      // Guardar si el usuario es administrador antes de cerrar sesión
+                      const wasAdmin = user?.role === 'admin'
+                      const wasOnAdminPage = pathname === '/admin'
+                      
                       await logout()
+                      
+                      // Si era administrador, redirigir a la página principal
+                      if (wasAdmin && wasOnAdminPage) {
+                        router.push('/')
+                      }
+                      
                       toast.success("Sesión cerrada", {
                         description: "Has cerrado sesión exitosamente",
                         duration: 3000,
@@ -290,60 +324,63 @@ export function Header() {
           </div>
         </div>
 
-        <nav className="flex items-center gap-4 md:gap-8 pt-3 md:pt-4 border-t -mx-4 md:-mx-4 px-4 md:px-0" style={{ borderColor: "var(--border)" }}>
-          <Link
-            href="/sale"
-            className="text-sm md:text-[16px] font-inter whitespace-nowrap rounded-lg py-1 px-3 md:px-5 cursor-pointer transition-all duration-200 hover:opacity-90 hover:scale-105"
-            style={{ backgroundColor: styleData.bannerBgColor || "#c4faff" }}
-          >
-            <span className="font-bold" style={{ color: styleData.bannerTextColor || "#005aa1" }}>
-              {styleData.tagline?.split("!")[0] || "Big Sale"}!
-            </span>
-            <span className="font-medium hidden sm:inline" style={{ color: styleData.bannerTextColor || "#005aa1" }}>
-              {" "}
-              {styleData.tagline?.split("!").slice(1).join("!") || "Hurry up! Sale ends in 2025"}
-            </span>
-          </Link>
+        {/* Ocultar barra de navegación para administradores */}
+        {user?.role !== 'admin' && (
+          <nav className="flex items-center gap-4 md:gap-8 pt-3 md:pt-4 border-t -mx-4 md:-mx-4 px-4 md:px-0" style={{ borderColor: "var(--border)" }}>
+            <Link
+              href="/sale"
+              className="text-sm md:text-[16px] font-inter whitespace-nowrap rounded-lg py-1 px-3 md:px-5 cursor-pointer transition-all duration-200 hover:opacity-90 hover:scale-105"
+              style={{ backgroundColor: styleData.bannerBgColor || "#c4faff" }}
+            >
+              <span className="font-bold" style={{ color: styleData.bannerTextColor || "#005aa1" }}>
+                {styleData.tagline?.split("!")[0] || "Big Sale"}!
+              </span>
+              <span className="font-medium hidden sm:inline" style={{ color: styleData.bannerTextColor || "#005aa1" }}>
+                {" "}
+                {styleData.tagline?.split("!").slice(1).join("!") || "Hurry up! Sale ends in 2025"}
+              </span>
+            </Link>
 
-          <div className="flex items-center gap-2 md:gap-4 lg:gap-8 ml-auto flex-wrap">
-            <Link
-              href="/catalog/speakers"
-              className="text-sm md:text-[16px] font-inter font-medium transition-colors"
-              style={{ color: "var(--primary)" }}
-              onMouseEnter={(e) => e.currentTarget.style.opacity = "0.8"}
-              onMouseLeave={(e) => e.currentTarget.style.opacity = "1"}
-            >
-              Speakers
-            </Link>
-            <Link
-              href="/catalog/earphones"
-              className="text-sm md:text-[16px] font-inter font-medium transition-colors"
-              style={{ color: "var(--primary)" }}
-              onMouseEnter={(e) => e.currentTarget.style.opacity = "0.8"}
-              onMouseLeave={(e) => e.currentTarget.style.opacity = "1"}
-            >
-              Earphones
-            </Link>
-            <Link
-              href="/catalog/projectors"
-              className="text-sm md:text-[16px] font-inter font-medium transition-colors"
-              style={{ color: "var(--primary)" }}
-              onMouseEnter={(e) => e.currentTarget.style.opacity = "0.8"}
-              onMouseLeave={(e) => e.currentTarget.style.opacity = "1"}
-            >
-              Projectors
-            </Link>
-            <Link
-              href="/catalog/stands"
-              className="text-sm md:text-[16px] font-inter font-medium transition-colors"
-              style={{ color: "var(--primary)" }}
-              onMouseEnter={(e) => e.currentTarget.style.opacity = "0.8"}
-              onMouseLeave={(e) => e.currentTarget.style.opacity = "1"}
-            >
-              Stands
-            </Link>
-          </div>
-        </nav>
+            <div className="flex items-center gap-2 md:gap-4 lg:gap-8 ml-auto flex-wrap">
+              <Link
+                href="/catalog/speakers"
+                className="text-sm md:text-[16px] font-inter font-medium transition-colors"
+                style={{ color: "var(--primary)" }}
+                onMouseEnter={(e) => e.currentTarget.style.opacity = "0.8"}
+                onMouseLeave={(e) => e.currentTarget.style.opacity = "1"}
+              >
+                Speakers
+              </Link>
+              <Link
+                href="/catalog/earphones"
+                className="text-sm md:text-[16px] font-inter font-medium transition-colors"
+                style={{ color: "var(--primary)" }}
+                onMouseEnter={(e) => e.currentTarget.style.opacity = "0.8"}
+                onMouseLeave={(e) => e.currentTarget.style.opacity = "1"}
+              >
+                Earphones
+              </Link>
+              <Link
+                href="/catalog/projectors"
+                className="text-sm md:text-[16px] font-inter font-medium transition-colors"
+                style={{ color: "var(--primary)" }}
+                onMouseEnter={(e) => e.currentTarget.style.opacity = "0.8"}
+                onMouseLeave={(e) => e.currentTarget.style.opacity = "1"}
+              >
+                Projectors
+              </Link>
+              <Link
+                href="/catalog/stands"
+                className="text-sm md:text-[16px] font-inter font-medium transition-colors"
+                style={{ color: "var(--primary)" }}
+                onMouseEnter={(e) => e.currentTarget.style.opacity = "0.8"}
+                onMouseLeave={(e) => e.currentTarget.style.opacity = "1"}
+              >
+                Stands
+              </Link>
+            </div>
+          </nav>
+        )}
       </div>
       <ThemeSelectorModal open={themeModalOpen} onOpenChange={setThemeModalOpen} />
       <FontSelectorModal open={fontModalOpen} onOpenChange={setFontModalOpen} />
@@ -362,7 +399,9 @@ export function Header() {
             {/* Mensaje de bienvenida para usuarios autenticados - Solo en desktop */}
             {isAuthenticated && user && (
               <p className="hidden md:block text-base font-medium mt-4" style={{ color: "var(--foreground)" }}>
-                Hola {user.first_name || user.email.split('@')[0]}, bienvenido a la aplicación
+                Hola {user?.role === 'admin' 
+                  ? "Administrador"
+                  : user.first_name || user.email.split('@')[0]}, bienvenido a la aplicación
               </p>
             )}
           </SheetHeader>
@@ -455,8 +494,8 @@ export function Header() {
               </Link>
             </div>
             
-            {/* Botones de tema y tipografía - Solo visibles para usuarios autenticados */}
-            {isAuthenticated && (
+            {/* Botones de tema y tipografía - Solo visibles para administradores */}
+            {user?.role === 'admin' && (
               <div className="pt-4 mt-auto border-t p-6" style={{ borderColor: "var(--border)" }}>
                 <Button
                   variant="ghost"
@@ -763,10 +802,24 @@ export function Header() {
                 // Registrar usuario
                 const result = await register(email, password, firstName, lastName)
                 if (result.success) {
-                  toast.success("Cuenta creada", {
-                    description: "Tu cuenta ha sido creada exitosamente",
-                    duration: 3000,
-                  })
+                  // Refrescar el usuario para obtener el rol actualizado
+                  await refreshUser()
+                  
+                  // Verificar si el usuario es administrador desde el resultado
+                  if (result.user?.role === 'admin') {
+                    // Redirigir a /admin si es administrador
+                    router.push('/admin')
+                    toast.success("Cuenta creada", {
+                      description: "Bienvenido, Administrador!",
+                      duration: 3000,
+                    })
+                  } else {
+                    toast.success("Cuenta creada", {
+                      description: "Tu cuenta ha sido creada exitosamente",
+                      duration: 3000,
+                    })
+                  }
+                  
                   setLoginModalOpen(false)
                   setEmail("")
                   setPassword("")
@@ -794,10 +847,24 @@ export function Header() {
                 // Iniciar sesión
                 const result = await login(email, password)
                 if (result.success) {
-                  toast.success("Sesión iniciada", {
-                    description: "Bienvenido de nuevo!",
-                    duration: 3000,
-                  })
+                  // Refrescar el usuario para obtener el rol actualizado
+                  await refreshUser()
+                  
+                  // Verificar si el usuario es administrador desde el resultado
+                  if (result.user?.role === 'admin') {
+                    // Redirigir a /admin si es administrador
+                    router.push('/admin')
+                    toast.success("Sesión iniciada", {
+                      description: "Bienvenido, Administrador!",
+                      duration: 3000,
+                    })
+                  } else {
+                    toast.success("Sesión iniciada", {
+                      description: "Bienvenido de nuevo!",
+                      duration: 3000,
+                    })
+                  }
+                  
                   setLoginModalOpen(false)
                   setEmail("")
                   setPassword("")

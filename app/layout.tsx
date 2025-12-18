@@ -17,6 +17,7 @@ import { StylesProvider } from "@/contexts/styles-context"
 import { ThemeProvider } from "@/contexts/theme-context"
 import { FontProvider } from "@/contexts/font-context"
 import { AuthProvider } from "@/contexts/auth-context"
+import { AdminPermissionsProvider } from "@/contexts/admin-permissions-context"
 import { viewport } from "./viewport"
 import { FloatingContactButton } from "@/components/ui/floating-contact-button"
 
@@ -59,7 +60,8 @@ export default async function RootLayout({
         <V0Provider isV0={isV0}>
           <StylesProvider>
             <AuthProvider>
-              <ThemeProvider>
+              <AdminPermissionsProvider>
+                <ThemeProvider>
                 <FontProvider>
                   <ShopifyCartProvider>
                     <CartProvider>
@@ -76,6 +78,7 @@ export default async function RootLayout({
                     </ShopifyCartProvider>
                   </FontProvider>
                 </ThemeProvider>
+              </AdminPermissionsProvider>
             </AuthProvider>
           </StylesProvider>
           {isV0 && <V0Setup />}
