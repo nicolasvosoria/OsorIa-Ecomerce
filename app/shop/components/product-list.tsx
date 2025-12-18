@@ -1,4 +1,5 @@
-import { getCollectionProducts, getCollections, getProducts } from '@/lib/shopify';
+// Usar productos de Supabase en lugar de Shopify
+import { getCollectionProducts, getCollections, getProducts } from '@/lib/products';
 import type { Product, ProductCollectionSortKey, ProductSortKey } from '@/lib/shopify/types';
 import { ProductListContent } from './product-list-content';
 import { mapSortKeys } from '@/lib/shopify/utils';
@@ -11,7 +12,8 @@ interface ProductListProps {
 export default async function ProductList({ collection, searchParams }: ProductListProps) {
   const query = typeof searchParams?.q === 'string' ? searchParams.q : undefined;
   const sort = typeof searchParams?.sort === 'string' ? searchParams.sort : undefined;
-  const isRootCollection = collection === 'joyco-root' || !collection;
+  // Para Supabase, si collection está vacío o es null, mostrar todos los productos
+  const isRootCollection = !collection || collection === 'all';
 
   const { sortKey, reverse } = isRootCollection ? mapSortKeys(sort, 'product') : mapSortKeys(sort, 'collection');
 
@@ -33,7 +35,7 @@ export default async function ProductList({ collection, searchParams }: ProductL
       });
     }
   } catch (error) {
-    console.error('Error fetching products:', error);
+    console.error('Error fetching products from Supabase:', error);
     products = [];
   }
 
