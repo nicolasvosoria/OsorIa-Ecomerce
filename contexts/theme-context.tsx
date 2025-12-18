@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
+import { createContext, useContext, useEffect, useState, useRef, type ReactNode } from "react"
 import { getThemes, getActiveTheme, setActiveTheme } from "@/lib/supabase/themes-api"
 import { useAuth } from "@/contexts/auth-context"
 import type { AppTheme } from "@/lib/types/theme"
@@ -22,6 +22,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const { isAuthenticated } = useAuth()
+  const appliedThemeRef = useRef<string | null>(null) // Para evitar aplicar el mismo tema múltiples veces
 
   const refreshThemes = async () => {
     try {
@@ -67,10 +68,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     try {
       const result = await setActiveTheme(themeName)
       if (result.success) {
-        // Aplicar tema inmediatamente desde la lista actual
+        // Aplicar tema inmediatamente desde la lista actual (forzar aplicación)
         const selectedTheme = themes.find((t) => t.theme_name === themeName)
         if (selectedTheme) {
-          applyTheme(selectedTheme)
+          applyTheme(selectedTheme, true) // Forzar aplicación
         }
         // Refrescar temas para actualizar el estado
         await refreshThemes()
@@ -82,8 +83,20 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const applyTheme = (theme: AppTheme) => {
+  const applyTheme = (theme: AppTheme, force: boolean = false) => {
     if (typeof document === "undefined") return
+
+    // Evitar aplicar el mismo tema múltiples veces (a menos que sea forzado)
+    if (!force && appliedThemeRef.current === theme.theme_name) {
+      return
+    }
+
+    // Si el script ya aplicó este tema desde localStorage, no volver a aplicarlo
+    // a menos que sea un cambio explícito (force = true)
+    if (!force && typeof window !== "undefined" && (window as any).__osoria_applied_theme === theme.theme_name) {
+      appliedThemeRef.current = theme.theme_name
+      return
+    }
 
     const root = document.documentElement
     const colors = theme.colors
@@ -105,6 +118,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     root.style.setProperty("--secondary-foreground", colors.foreground)
     root.style.setProperty("--accent-foreground", colors.foreground)
 
+    // Marcar que este tema ya fue aplicado
+    appliedThemeRef.current = theme.theme_name
+
     // Guardar en localStorage para aplicar inmediatamente en la próxima carga
     try {
       localStorage.setItem("osoria_active_theme", JSON.stringify(theme))
@@ -119,27 +135,57 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Refrescar temas cuando cambie el estado de autenticación
+  // Refrescar temas cuando cambie el estado de autenticación (solo si ya terminó la carga inicial)
   useEffect(() => {
-    if (!loading && themes.length > 0) {
+    // Solo refrescar si ya terminó la carga inicial y hay temas cargados
+    // Esto evita refreshes innecesarios durante la carga inicial
+    if (!loading && themes.length > 0 && appliedThemeRef.current !== null) {
       refreshThemes()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated])
 
+  // Aplicar tema solo cuando se determine el tema activo final
   useEffect(() => {
+    // Esperar a que termine la carga antes de aplicar
+    if (loading) return
+
+    // Verificar si el script ya aplicó un tema desde localStorage
+    const scriptAppliedTheme = typeof window !== "undefined" ? (window as any).__osoria_applied_theme : null
+    
+    // Solo aplicar si tenemos un tema activo y no se ha aplicado ya
     if (activeTheme) {
-      applyTheme(activeTheme)
-    } else if (themes.length > 0 && !isAuthenticated) {
-      // Si no hay tema activo y el usuario no está autenticado, aplicar "Claro Original"
+      // Si el script ya aplicó este tema, solo marcar como aplicado sin volver a aplicar
+      if (scriptAppliedTheme === activeTheme.theme_name) {
+        appliedThemeRef.current = activeTheme.theme_name
+        return
+      }
+      
+      // Solo aplicar si no se ha aplicado ya
+      if (appliedThemeRef.current !== activeTheme.theme_name) {
+        applyTheme(activeTheme)
+      }
+    } else if (!activeTheme && themes.length > 0 && !isAuthenticated) {
+      // Solo aplicar tema por defecto si no hay tema activo, hay temas disponibles, 
+      // el usuario no está autenticado y ya terminó la carga
       const defaultTheme = themes.find((t) => t.theme_name === "Claro Original")
       if (defaultTheme) {
-        applyTheme(defaultTheme)
-        setActiveThemeState(defaultTheme)
+        // Si el script ya aplicó este tema, solo marcar como aplicado
+        if (scriptAppliedTheme === defaultTheme.theme_name) {
+          appliedThemeRef.current = defaultTheme.theme_name
+          setActiveThemeState(defaultTheme)
+          return
+        }
+        
+        // Solo aplicar si no se ha aplicado ya
+        if (appliedThemeRef.current !== defaultTheme.theme_name) {
+          applyTheme(defaultTheme)
+          setActiveThemeState(defaultTheme)
+        }
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTheme, themes, isAuthenticated])
+  }, [activeTheme, loading]) // Removido themes e isAuthenticated para evitar aplicaciones múltiples
 
   const value: ThemeContextType = {
     themes,

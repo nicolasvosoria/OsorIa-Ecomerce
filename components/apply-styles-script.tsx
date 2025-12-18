@@ -15,6 +15,10 @@ export function ApplyStylesScript() {
   try {
     const root = document.documentElement;
     
+    // Marcar que los estilos ya fueron aplicados desde el script
+    // Esto evita que los providers los sobrescriban durante la carga
+    window.__osoria_styles_applied = true;
+    
     // Aplicar tema desde localStorage
     const savedTheme = localStorage.getItem('osoria_active_theme');
     if (savedTheme) {
@@ -35,6 +39,9 @@ export function ApplyStylesScript() {
           root.style.setProperty('--primary-foreground', colors.foreground);
           root.style.setProperty('--secondary-foreground', colors.foreground);
           root.style.setProperty('--accent-foreground', colors.foreground);
+          
+          // Marcar qué tema fue aplicado
+          window.__osoria_applied_theme = theme.theme_name;
         }
       } catch (e) {
         console.warn('[ApplyStyles] Error parsing saved theme:', e);
@@ -59,6 +66,9 @@ export function ApplyStylesScript() {
               document.head.appendChild(link);
             }
           }
+          
+          // Marcar qué fuente fue aplicada
+          window.__osoria_applied_font = font.font_name;
         }
       } catch (e) {
         console.warn('[ApplyStyles] Error parsing saved font:', e);
