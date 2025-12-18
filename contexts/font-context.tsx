@@ -73,6 +73,13 @@ export function FontProvider({ children }: { children: ReactNode }) {
     if (font.google_font_url) {
       loadGoogleFont(font.google_font_url)
     }
+
+    // Guardar en localStorage para aplicar inmediatamente en la próxima carga
+    try {
+      localStorage.setItem("osoria_active_font", JSON.stringify(font))
+    } catch (e) {
+      console.warn("[Font] Error saving font to localStorage:", e)
+    }
   }
 
   const loadGoogleFont = (url: string) => {

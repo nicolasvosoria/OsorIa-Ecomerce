@@ -20,6 +20,7 @@ import { AuthProvider } from "@/contexts/auth-context"
 import { AdminPermissionsProvider } from "@/contexts/admin-permissions-context"
 import { viewport } from "./viewport"
 import { FloatingContactButton } from "@/components/ui/floating-contact-button"
+import { ApplyStylesScript } from "@/components/apply-styles-script"
 
 const V0Setup = dynamic(() => import("@/components/v0-setup"))
 
@@ -57,6 +58,7 @@ export default async function RootLayout({
         className={cn(geistSans.variable, geistMono.variable, "antialiased min-h-screen", { "is-v0": isV0 })}
         suppressHydrationWarning
       >
+        <ApplyStylesScript />
         <V0Provider isV0={isV0}>
           <StylesProvider>
             <AuthProvider>

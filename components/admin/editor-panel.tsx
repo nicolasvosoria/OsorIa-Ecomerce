@@ -273,6 +273,18 @@ export function EditorPanel() {
     try {
       const edits = componentEdits.get(selectedComponent) || {}
       await updateComponentStyle(selectedComponent, edits)
+      
+      // Actualizar localStorage inmediatamente
+      try {
+        const savedStyles = localStorage.getItem("osoria_component_styles")
+        const styles = savedStyles ? JSON.parse(savedStyles) : {}
+        const currentStyles = globalStyles.get(selectedComponent) || {}
+        styles[selectedComponent] = { ...currentStyles, ...edits }
+        localStorage.setItem("osoria_component_styles", JSON.stringify(styles))
+      } catch (e) {
+        console.warn("[Editor] Error saving to localStorage:", e)
+      }
+      
       toast.success("Cambios guardados correctamente")
       clearComponentEdits(selectedComponent)
     } catch (error) {

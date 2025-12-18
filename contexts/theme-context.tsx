@@ -104,6 +104,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     root.style.setProperty("--primary-foreground", colors.foreground)
     root.style.setProperty("--secondary-foreground", colors.foreground)
     root.style.setProperty("--accent-foreground", colors.foreground)
+
+    // Guardar en localStorage para aplicar inmediatamente en la próxima carga
+    try {
+      localStorage.setItem("osoria_active_theme", JSON.stringify(theme))
+    } catch (e) {
+      console.warn("[Theme] Error saving theme to localStorage:", e)
+    }
   }
 
   useEffect(() => {
