@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
-import { getCollection, getProduct, getProducts } from '@/lib/shopify';
+import { getCollection, getProduct, getProducts } from '@/lib/products';
 import { HIDDEN_PRODUCT_TAG } from '@/lib/constants';
 import {
   Breadcrumb,
@@ -14,7 +14,7 @@ import {
 import Link from 'next/link';
 import { SidebarLinks } from '@/components/layout/sidebar/product-sidebar-links';
 import { AddToCart, AddToCartButton } from '@/components/cart/add-to-cart';
-import { storeCatalog } from '@/lib/shopify/constants';
+// Removed storeCatalog dependency - using Supabase categories instead
 import Prose from '@/components/prose';
 import { formatPrice } from '@/lib/shopify/utils';
 import { Suspense } from 'react';
@@ -97,9 +97,11 @@ export default async function ProductPage(props: { params: Promise<{ handle: str
     },
   };
 
-  const [rootParentCategory] = collection?.parentCategoryTree.filter(
-    (c: any) => c.id !== storeCatalog.rootCategoryId
-  ) ?? [undefined];
+  // Para Supabase, usamos directamente la categoría si existe
+  const rootParentCategory = collection ? {
+    id: collection.handle,
+    name: collection.title,
+  } : undefined;
 
   const hasVariants = product.variants.length > 1;
   const hasEvenOptions = product.options.length % 2 === 0;

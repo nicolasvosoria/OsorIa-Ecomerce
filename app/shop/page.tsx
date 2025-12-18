@@ -1,4 +1,3 @@
-import { storeCatalog } from '@/lib/shopify/constants';
 import ProductList from './components/product-list';
 import { Metadata } from 'next';
 import { Suspense } from 'react';
@@ -7,8 +6,8 @@ import { ProductGrid } from './components/product-grid';
 import { ProductCardSkeleton } from './components/product-card-skeleton';
 
 export const metadata: Metadata = {
-  title: 'ACME Store | Shop',
-  description: 'ACME Store, your one-stop shop for all your needs.',
+  title: 'Osoria Store | Shop',
+  description: 'Osoria Store, tu tienda de café de especialidad y productos electrónicos.',
 };
 
 // Cache is handled via 'use cache' directive in getProducts()
@@ -31,7 +30,7 @@ export default async function Shop(props: {
           </>
         }
       >
-        <ProductList collection={storeCatalog.rootCategoryId} searchParams={searchParams} />
+        <ProductList collection="" searchParams={searchParams} />
       </Suspense>
     </>
   );
