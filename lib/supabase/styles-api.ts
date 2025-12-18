@@ -1,5 +1,6 @@
 import { getSupabaseBrowserClient } from "./client"
 import type { ComponentStyle } from "./types"
+import { requireAdmin } from "./permissions-api"
 
 export async function getComponentStyles() {
   const supabase = getSupabaseBrowserClient()
@@ -38,6 +39,9 @@ export async function getComponentStyleByName(componentName: string) {
 }
 
 export async function updateComponentStyle(componentName: string, variables: Record<string, any>) {
+  // Verificar que el usuario es administrador
+  await requireAdmin()
+
   const supabase = getSupabaseBrowserClient()
   if (!supabase) {
     throw new Error("Supabase is not configured")

@@ -1,5 +1,6 @@
 import { getSupabaseBrowserClient } from "./client"
 import type { AppTheme } from "@/lib/types/theme"
+import { requireAdmin } from "./permissions-api"
 
 // Helper para agregar timeout a las promesas
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number = 10000): Promise<T> {
@@ -116,6 +117,16 @@ export async function getActiveTheme(): Promise<AppTheme | null> {
 }
 
 export async function setActiveTheme(themeName: string): Promise<{ success: boolean; error?: string }> {
+  // Verificar que el usuario es administrador
+  try {
+    await requireAdmin()
+  } catch (error) {
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : "Se requieren permisos de administrador" 
+    }
+  }
+
   const supabase = getSupabaseBrowserClient()
   if (!supabase) {
     return { success: false, error: "Supabase no configurado" }
