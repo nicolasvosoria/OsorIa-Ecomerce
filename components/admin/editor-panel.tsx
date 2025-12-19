@@ -217,8 +217,8 @@ const COMPONENT_FIELDS: Record<
 }
 
 export function EditorPanel() {
-  const { selectedComponent, selectComponent, componentEdits, updateComponentEdit, clearComponentEdits } = useAdmin()
-  const { styles: globalStyles } = useStyles()
+  const { selectedComponent, selectComponent, componentEdits, updateComponentEdit, clearComponentEdits, isEditMode } = useAdmin()
+  const { styles: globalStyles, refreshStyles } = useStyles()
   const [saving, setSaving] = useState(false)
   const [localValues, setLocalValues] = useState<Record<string, any>>({})
   const [activeTab, setActiveTab] = useState("content")
@@ -226,9 +226,15 @@ export function EditorPanel() {
   useEffect(() => {
     if (selectedComponent) {
       const config = COMPONENT_FIELDS[selectedComponent]
+      if (!config) {
+        console.warn("[Editor] No config found for component:", selectedComponent)
+        return
+      }
+      
       const currentStyles = globalStyles.get(selectedComponent) || {}
       const edits = componentEdits.get(selectedComponent) || {}
 
+      // Combinar valores: defaults primero, luego estilos de BD, luego ediciones locales
       const mergedValues = {
         ...(config?.defaults || {}),
         ...currentStyles,
@@ -236,13 +242,26 @@ export function EditorPanel() {
       }
 
       setLocalValues(mergedValues)
-      console.log("[v0] Loaded editor values for", selectedComponent, mergedValues)
+      console.log("[Editor] Loaded values for", selectedComponent, {
+        defaults: config?.defaults,
+        fromDB: currentStyles,
+        edits: edits,
+        merged: mergedValues
+      })
+    } else {
+      // Limpiar valores cuando no hay componente seleccionado
+      setLocalValues({})
     }
   }, [selectedComponent, globalStyles, componentEdits])
 
+  // No mostrar el panel si no está en modo edición (después de todos los hooks)
+  if (!isEditMode) {
+    return null
+  }
+
   if (!selectedComponent) {
     return (
-      <div className="w-96 bg-background border-l border-border h-full flex items-center justify-center p-8">
+      <div className="fixed right-0 top-0 h-screen w-96 bg-background border-l border-border z-50 flex items-center justify-center p-8 shadow-2xl">
         <div className="text-center text-muted-foreground">
           <p className="text-lg font-medium mb-2">Editor de Componentes</p>
           <p className="text-sm">Haz clic en cualquier sección de la página para editarla</p>
@@ -252,13 +271,41 @@ export function EditorPanel() {
   }
 
   const config = COMPONENT_FIELDS[selectedComponent]
-  if (!config) return null
+  if (!config) {
+    return (
+      <div className="fixed right-0 top-0 h-screen w-96 bg-background border-l border-border z-50 flex items-center justify-center p-8 shadow-2xl">
+        <div className="text-center text-muted-foreground">
+          <p className="text-lg font-medium mb-2">Componente no configurado</p>
+          <p className="text-sm">Este componente no tiene configuración de edición</p>
+        </div>
+      </div>
+    )
+  }
 
   const componentLabel = selectedComponent.charAt(0).toUpperCase() + selectedComponent.slice(1)
 
   const handleInputChange = (key: string, value: any) => {
     setLocalValues((prev) => ({ ...prev, [key]: value }))
     updateComponentEdit(selectedComponent, key, value)
+    
+    // Aplicar cambios en tiempo real para estilos
+    if (key === "bgColor" || key === "textColor" || key.includes("Color")) {
+      if (typeof document !== "undefined" && selectedComponent) {
+        const root = document.documentElement
+        const cssVar = `--${selectedComponent}-${key.replace(/([A-Z])/g, "-$1").toLowerCase()}`
+        root.style.setProperty(cssVar, value)
+        
+        // También aplicar directamente al componente si es posible
+        const componentElement = document.querySelector(`[data-component="${selectedComponent}"]`)
+        if (componentElement) {
+          if (key === "bgColor") {
+            ;(componentElement as HTMLElement).style.backgroundColor = value
+          } else if (key === "textColor") {
+            ;(componentElement as HTMLElement).style.color = value
+          }
+        }
+      }
+    }
   }
 
   const handleArrayItemChange = (arrayKey: string, index: number, fieldKey: string, value: any) => {
@@ -272,24 +319,82 @@ export function EditorPanel() {
     setSaving(true)
     try {
       const edits = componentEdits.get(selectedComponent) || {}
-      await updateComponentStyle(selectedComponent, edits)
+      
+      if (Object.keys(edits).length === 0) {
+        toast.info("No hay cambios para guardar")
+        setSaving(false)
+        return
+      }
+
+      console.log("[Editor] Guardando cambios para", selectedComponent, edits)
+      
+      // Obtener estilos actuales de la BD
+      const currentStyles = globalStyles.get(selectedComponent) || {}
+      
+      // Combinar estilos actuales con las ediciones
+      const mergedStyles = {
+        ...currentStyles,
+        ...edits,
+      }
+      
+      console.log("[Editor] Estilos combinados a guardar:", mergedStyles)
+      
+      // Guardar en Supabase
+      const result = await updateComponentStyle(selectedComponent, mergedStyles)
+      
+      console.log("[Editor] Resultado del guardado:", result)
+      
+      // Refrescar estilos desde Supabase para asegurar sincronización
+      await refreshStyles()
       
       // Actualizar localStorage inmediatamente
       try {
         const savedStyles = localStorage.getItem("osoria_component_styles")
         const styles = savedStyles ? JSON.parse(savedStyles) : {}
-        const currentStyles = globalStyles.get(selectedComponent) || {}
-        styles[selectedComponent] = { ...currentStyles, ...edits }
+        styles[selectedComponent] = mergedStyles
         localStorage.setItem("osoria_component_styles", JSON.stringify(styles))
+        
+        // Aplicar estilos inmediatamente al DOM
+        if (typeof document !== "undefined") {
+          const root = document.documentElement
+          Object.keys(mergedStyles).forEach((key) => {
+            if (key === "bgColor" || key === "textColor" || key.includes("Color")) {
+              const cssVar = `--${selectedComponent}-${key.replace(/([A-Z])/g, "-$1").toLowerCase()}`
+              root.style.setProperty(cssVar, mergedStyles[key])
+              
+              // También aplicar directamente al componente
+              const componentElement = document.querySelector(`[data-component="${selectedComponent}"]`)
+              if (componentElement) {
+                if (key === "bgColor") {
+                  ;(componentElement as HTMLElement).style.backgroundColor = mergedStyles[key]
+                } else if (key === "textColor") {
+                  ;(componentElement as HTMLElement).style.color = mergedStyles[key]
+                }
+              }
+            }
+          })
+        }
       } catch (e) {
         console.warn("[Editor] Error saving to localStorage:", e)
       }
       
       toast.success("Cambios guardados correctamente")
       clearComponentEdits(selectedComponent)
+      
+      // Forzar re-render del componente actualizando localValues
+      const config = COMPONENT_FIELDS[selectedComponent]
+      const updatedStyles = globalStyles.get(selectedComponent) || {}
+      setLocalValues({
+        ...(config?.defaults || {}),
+        ...updatedStyles,
+      })
     } catch (error) {
       toast.error("Error al guardar los cambios")
-      console.error(error)
+      console.error("[Editor] Error completo:", error)
+      if (error instanceof Error) {
+        console.error("[Editor] Mensaje:", error.message)
+        console.error("[Editor] Stack:", error.stack)
+      }
     } finally {
       setSaving(false)
     }
@@ -305,7 +410,7 @@ export function EditorPanel() {
   const hasChanges = componentEdits.has(selectedComponent)
 
   return (
-    <div className="w-96 bg-background border-l border-border h-full flex flex-col">
+    <div className="fixed right-0 top-0 h-screen w-96 bg-background border-l border-border z-50 flex flex-col shadow-2xl">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-border">
         <h2 className="text-lg font-semibold">Editando: {componentLabel}</h2>
@@ -406,26 +511,53 @@ export function EditorPanel() {
               <CardTitle className="text-base">Estilos del Componente</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {config.styles.map((field) => (
-                <div key={field.key} className="space-y-2">
-                  <Label htmlFor={`style-${field.key}`}>{field.label}</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id={`style-${field.key}`}
-                      type={field.type}
-                      value={localValues[field.key] || ""}
-                      onChange={(e) => handleInputChange(field.key, e.target.value)}
-                      className={field.type === "color" ? "h-10" : ""}
-                    />
-                    {field.type === "color" && (
-                      <div
-                        className="w-10 h-10 rounded border"
-                        style={{ backgroundColor: localValues[field.key] || "#000000" }}
-                      />
-                    )}
-                  </div>
+              {config.styles && config.styles.length > 0 ? (
+                config.styles.map((field) => {
+                  const currentValue = localValues[field.key] || ""
+                  const defaultValue = config.defaults?.[field.key] || ""
+                  const displayValue = currentValue || defaultValue || ""
+                  
+                  return (
+                    <div key={field.key} className="space-y-2">
+                      <Label htmlFor={`style-${field.key}`} className="text-sm font-medium">
+                        {field.label}
+                      </Label>
+                      <div className="flex gap-2 items-center">
+                        <Input
+                          id={`style-${field.key}`}
+                          type={field.type}
+                          value={currentValue}
+                          onChange={(e) => handleInputChange(field.key, e.target.value)}
+                          className={field.type === "color" ? "h-10 flex-1" : "flex-1"}
+                          placeholder={field.type === "color" ? "#000000" : defaultValue || "Ingrese un valor..."}
+                        />
+                        {field.type === "color" && (
+                          <div
+                            className="w-12 h-12 rounded border-2 border-border cursor-pointer hover:scale-105 transition-transform flex-shrink-0"
+                            style={{ backgroundColor: displayValue || "#000000" }}
+                            onClick={() => {
+                              const input = document.getElementById(`style-${field.key}`) as HTMLInputElement
+                              if (input) input.click()
+                            }}
+                            title="Haz clic para abrir el selector de color"
+                          />
+                        )}
+                      </div>
+                      {displayValue && (
+                        <p className="text-xs text-muted-foreground">
+                          Valor: <code className="bg-muted px-1.5 py-0.5 rounded text-xs">{displayValue}</code>
+                        </p>
+                      )}
+                    </div>
+                  )
+                })
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-sm text-muted-foreground">
+                    Este componente no tiene estilos configurables
+                  </p>
                 </div>
-              ))}
+              )}
             </CardContent>
           </Card>
         </TabsContent>

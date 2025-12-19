@@ -2,11 +2,19 @@
 
 import { Headphones, Truck, CreditCard, Tag } from "lucide-react"
 import { useComponentStyle } from "@/contexts/styles-context"
+import { useAdmin } from "@/contexts/admin-context"
 
 export function WhyUs() {
   const { styles: styleData } = useComponentStyle("whyus", {
     title: "¿Por qué nosotros?",
   })
+  const { componentEdits } = useAdmin()
+  
+  // Combinar estilos de BD con ediciones locales para mostrar cambios en tiempo real
+  const edits = componentEdits.get("whyus") || {}
+  const title = edits.title ?? styleData.title ?? "¿Por qué nosotros?"
+  const bgColor = edits.bgColor ?? styleData.bgColor
+  const textColor = edits.textColor ?? styleData.textColor
 
   const features = [
     {
@@ -32,10 +40,20 @@ export function WhyUs() {
   ]
 
   return (
-    <section className="py-8 md:py-16 px-4" style={{ backgroundColor: "var(--background)" }}>
+    <section 
+      data-component="whyus" 
+      className="py-8 md:py-16 px-4" 
+      style={{ 
+        backgroundColor: bgColor || "var(--background)",
+        ...(textColor && { color: textColor }),
+      }}
+    >
       <div className="container mx-auto">
-        <h2 className="text-2xl md:text-4xl lg:text-[47px] font-inter font-normal text-center md:text-left mb-6 md:mb-12" style={{ color: "var(--foreground)" }}>
-          {styleData.title || "¿Por qué nosotros?"}
+        <h2 
+          className="text-2xl md:text-4xl lg:text-[47px] font-inter font-normal text-center md:text-left mb-6 md:mb-12" 
+          style={{ color: textColor || "var(--foreground)" }}
+        >
+          {title}
         </h2>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">

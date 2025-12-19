@@ -103,19 +103,6 @@ export function Header() {
 
   const logoSrc = isDarkTheme ? "/logo-osoria-blanco.svg" : "/logo-osoria.png"
   const pathname = usePathname()
-  const [hasRedirected, setHasRedirected] = useState(false)
-
-  // Redirigir automáticamente a /admin solo una vez cuando el usuario se autentica como admin
-  useEffect(() => {
-    if (isAuthenticated && user?.role === 'admin' && pathname !== '/admin' && !hasRedirected) {
-      router.push('/admin')
-      setHasRedirected(true)
-    }
-    // Resetear el flag si el usuario cierra sesión
-    if (!isAuthenticated) {
-      setHasRedirected(false)
-    }
-  }, [isAuthenticated, user?.role, pathname, router, hasRedirected])
 
   // Removido console.log para evitar spam en consola y rate limiting
 
@@ -805,20 +792,13 @@ export function Header() {
                   // Refrescar el usuario para obtener el rol actualizado
                   await refreshUser()
                   
-                  // Verificar si el usuario es administrador desde el resultado
-                  if (result.user?.role === 'admin') {
-                    // Redirigir a /admin si es administrador
-                    router.push('/admin')
-                    toast.success("Cuenta creada", {
-                      description: "Bienvenido, Administrador!",
-                      duration: 3000,
-                    })
-                  } else {
-                    toast.success("Cuenta creada", {
-                      description: "Tu cuenta ha sido creada exitosamente",
-                      duration: 3000,
-                    })
-                  }
+                  // Todos los usuarios van a la página principal después del registro
+                  toast.success("Cuenta creada", {
+                    description: result.user?.role === 'admin' 
+                      ? "Bienvenido, Administrador!" 
+                      : "Tu cuenta ha sido creada exitosamente",
+                    duration: 3000,
+                  })
                   
                   setLoginModalOpen(false)
                   setEmail("")
@@ -850,20 +830,13 @@ export function Header() {
                   // Refrescar el usuario para obtener el rol actualizado
                   await refreshUser()
                   
-                  // Verificar si el usuario es administrador desde el resultado
-                  if (result.user?.role === 'admin') {
-                    // Redirigir a /admin si es administrador
-                    router.push('/admin')
-                    toast.success("Sesión iniciada", {
-                      description: "Bienvenido, Administrador!",
-                      duration: 3000,
-                    })
-                  } else {
-                    toast.success("Sesión iniciada", {
-                      description: "Bienvenido de nuevo!",
-                      duration: 3000,
-                    })
-                  }
+                  // Todos los usuarios (admin y user) van a la página principal
+                  toast.success("Sesión iniciada", {
+                    description: result.user?.role === 'admin' 
+                      ? "Bienvenido, Administrador!" 
+                      : "Bienvenido de nuevo!",
+                    duration: 3000,
+                  })
                   
                   setLoginModalOpen(false)
                   setEmail("")

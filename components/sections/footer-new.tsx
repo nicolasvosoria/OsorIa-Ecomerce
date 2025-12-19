@@ -35,7 +35,7 @@ export function FooterNew() {
   const logoSrc = isDarkTheme ? "/logo-osoria-blanco.svg" : "/logo-osoria.png"
 
   return (
-    <footer className="py-8 md:py-12 px-4" style={{ backgroundColor: "var(--background)", borderTop: "1px solid var(--border)" }}>
+    <footer data-component="footer" className="py-8 md:py-12 px-4" style={{ backgroundColor: "var(--background)", borderTop: "1px solid var(--border)" }}>
       <div className="container mx-auto">
         
         {/* Logo */}
