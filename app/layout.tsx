@@ -25,6 +25,7 @@ import { MainContentWrapper } from "@/components/admin/main-content-wrapper"
 import { viewport } from "./viewport"
 import { FloatingContactButton } from "@/components/ui/floating-contact-button"
 import { ApplyStylesScript } from "@/components/apply-styles-script"
+import { StylesLoader } from "@/components/styles-loader"
 
 const V0Setup = dynamic(() => import("@/components/v0-setup"))
 
@@ -73,17 +74,19 @@ export default async function RootLayout({
                     <CartProvider>
                       <AdminProvider>
                         <NuqsAdapter>
-                        <MainContentWrapper>
-                          <main data-vaul-drawer-wrapper="true">
-                            <Header />
-                            {children}
-                          </main>
-                        </MainContentWrapper>
-                        {isDevelopment && <DebugGrid />}
-                        <Toaster closeButton position="top-left" />
-                        <FloatingContactButton />
-                        <EditModeToggle />
-                        <EditorPanel />
+                        <StylesLoader>
+                          <MainContentWrapper>
+                            <main data-vaul-drawer-wrapper="true">
+                              <Header />
+                              {children}
+                            </main>
+                          </MainContentWrapper>
+                          {isDevelopment && <DebugGrid />}
+                          <Toaster closeButton position="top-left" />
+                          <FloatingContactButton />
+                          <EditModeToggle />
+                          <EditorPanel />
+                        </StylesLoader>
                           </NuqsAdapter>
                         </AdminProvider>
                       </CartProvider>

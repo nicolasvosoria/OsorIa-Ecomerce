@@ -15,10 +15,6 @@ export function ApplyStylesScript() {
   try {
     const root = document.documentElement;
     
-    // Marcar que los estilos ya fueron aplicados desde el script
-    // Esto evita que los providers los sobrescriban durante la carga
-    window.__osoria_styles_applied = true;
-    
     // Aplicar tema desde localStorage
     const savedTheme = localStorage.getItem('osoria_active_theme');
     if (savedTheme) {
@@ -95,8 +91,18 @@ export function ApplyStylesScript() {
         console.warn('[ApplyStyles] Error parsing saved component styles:', e);
       }
     }
+    
+    // Marcar que los estilos ya fueron aplicados desde el script
+    // Esto evita que los providers los sobrescriban durante la carga
+    window.__osoria_styles_applied = true;
+    
+    // Marcar que el script se ejecutó completamente
+    window.__osoria_script_executed = true;
   } catch (e) {
     console.warn('[ApplyStyles] Error applying styles:', e);
+    // Marcar como ejecutado incluso si hay error, para no bloquear la carga
+    window.__osoria_script_executed = true;
+    window.__osoria_styles_applied = true;
   }
 })();
         `,

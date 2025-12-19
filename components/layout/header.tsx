@@ -225,7 +225,7 @@ export function Header() {
             <Button
               variant="ghost" 
               size="icon" 
-              className="h-10 w-10 rounded-full"
+              className="h-11 w-11 md:h-10 md:w-10 rounded-full touch-manipulation"
               style={{ 
                 backgroundColor: "transparent",
               }}
@@ -237,7 +237,7 @@ export function Header() {
             <Button 
               variant="ghost" 
               size="icon" 
-              className="h-10 w-10 rounded-full"
+              className="h-11 w-11 md:h-10 md:w-10 rounded-full touch-manipulation"
               style={{ 
                 backgroundColor: "transparent",
               }}
@@ -280,7 +280,7 @@ export function Header() {
             <Button
               variant="ghost"
               size="icon"
-              className="h-9 w-9 rounded-full"
+              className="h-11 w-11 md:h-9 md:w-9 rounded-full touch-manipulation"
               style={{ backgroundColor: "transparent" }}
               onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "var(--muted)"}
               onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
@@ -292,7 +292,7 @@ export function Header() {
             <Button 
               variant="ghost" 
               size="icon" 
-              className="h-9 w-9 rounded-full relative"
+              className="h-11 w-11 md:h-9 md:w-9 rounded-full relative touch-manipulation"
               style={{ backgroundColor: "transparent" }}
               onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "var(--muted)"}
               onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
@@ -614,7 +614,7 @@ export function Header() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7"
+                            className="h-11 w-11 md:h-7 md:w-7 touch-manipulation"
                             onClick={() => updateQuantity(item.id, item.quantity - 1)}
                             style={{
                               backgroundColor: "var(--muted)",
@@ -632,7 +632,7 @@ export function Header() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7"
+                            className="h-11 w-11 md:h-7 md:w-7 touch-manipulation"
                             onClick={() => updateQuantity(item.id, item.quantity + 1)}
                             style={{
                               backgroundColor: "var(--muted)",
@@ -644,7 +644,7 @@ export function Header() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 ml-auto"
+                            className="h-11 w-11 md:h-7 md:w-7 ml-auto touch-manipulation"
                             onClick={() => {
                               removeFromCart(item.id)
                               toast.success("Producto eliminado", {

@@ -239,3 +239,4 @@ export function adaptSupabaseCategories(categories: ItemCategory[]): Collection[
   return categories.map(adaptSupabaseCategory);
 }
 
+

@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { useComponentStyle } from "@/contexts/styles-context"
 import { useAdmin } from "@/contexts/admin-context"
@@ -192,7 +193,7 @@ export function HeroBanner() {
                     </p>
                     <Button
                       size="lg"
-                      className="text-sm md:text-[16px] font-inter font-medium rounded px-6 md:px-8 w-full md:w-auto transition-all duration-200"
+                      className="text-sm md:text-[16px] font-inter font-medium rounded px-6 md:px-8 w-full md:w-auto transition-all duration-200 min-h-[44px] touch-manipulation"
                       style={{
                         backgroundColor: buttonColor || "var(--accent)",
                         color: buttonTextColor || "var(--accent-foreground)",
@@ -212,7 +213,15 @@ export function HeroBanner() {
 
                   {/* Right - Product Image */}
                   <div className="relative h-[250px] md:h-[400px] lg:h-[500px] order-first md:order-last">
-                    <img src={displayImage} alt={displayTitle} className="w-full h-full object-contain" />
+                    <Image
+                      src={displayImage}
+                      alt={displayTitle || "Product image"}
+                      width={800}
+                      height={600}
+                      className="w-full h-full object-contain"
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 40vw"
+                      priority={index === 0}
+                    />
                     {/* Feature Callouts - Ocultos en móvil */}
                     <div className="hidden md:block absolute top-[20%] right-[10%] bg-white rounded-full p-3">
                       <div className="w-3 h-3 bg-gray-800 rounded-full" />

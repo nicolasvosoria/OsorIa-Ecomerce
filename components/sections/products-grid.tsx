@@ -1,5 +1,6 @@
 "use client"
 
+import Image from "next/image"
 import { useComponentStyle } from "@/contexts/styles-context"
 import { useAdmin } from "@/contexts/admin-context"
 
@@ -77,10 +78,13 @@ export function ProductsGrid() {
                 className="aspect-square flex items-center justify-center p-4"
                 style={{ backgroundColor: "var(--background)" }}
               >
-                <img
+                <Image
                   src={product.image || "/placeholder.svg"}
                   alt={product.name}
+                  width={400}
+                  height={400}
                   className="w-full h-full object-contain"
+                  sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
                 />
               </div>
             </div>

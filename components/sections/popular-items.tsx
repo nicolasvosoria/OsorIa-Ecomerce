@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import Image from "next/image"
 import { useComponentStyle } from "@/contexts/styles-context"
 import { useAdmin } from "@/contexts/admin-context"
 import {
@@ -148,17 +149,20 @@ export function PopularItems() {
               {items.map((item, index) => (
                 <CarouselItem key={index} className="pl-2 md:pl-4 basis-full md:basis-1/2 lg:basis-1/3">
                   <div className="relative group cursor-pointer overflow-hidden rounded-2xl aspect-[4/3] bg-gray-100">
-                    <img
+                    <Image
                       src={item.image || "/placeholder.svg"}
                       alt={item.title}
+                      width={600}
+                      height={450}
                       className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+                      sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                     
                     {/* Botón Agregar al carrito - aparece en hover */}
-                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10">
+                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300 z-10">
                       <Button
-                        className="px-6 py-3 text-sm md:text-base font-inter font-medium rounded-full shadow-lg"
+                        className="px-6 py-3 text-sm md:text-base font-inter font-medium rounded-full shadow-lg min-h-[44px] min-w-[44px] touch-manipulation"
                         style={{
                           backgroundColor: "var(--accent)",
                           color: "var(--accent-foreground)",
@@ -198,7 +202,7 @@ export function PopularItems() {
               ))}
             </CarouselContent>
             <CarouselPrevious 
-              className="hidden md:flex -left-12"
+              className="hidden md:flex -left-12 min-h-[44px] min-w-[44px] touch-manipulation"
               style={{ 
                 backgroundColor: "var(--card)",
                 borderColor: "var(--border)",
@@ -206,7 +210,7 @@ export function PopularItems() {
               }}
             />
             <CarouselNext 
-              className="hidden md:flex -right-12"
+              className="hidden md:flex -right-12 min-h-[44px] min-w-[44px] touch-manipulation"
               style={{ 
                 backgroundColor: "var(--card)",
                 borderColor: "var(--border)",

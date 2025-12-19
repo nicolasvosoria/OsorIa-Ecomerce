@@ -1,5 +1,6 @@
 "use client"
 
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { useComponentStyle } from "@/contexts/styles-context"
 import { useAdmin } from "@/contexts/admin-context"
@@ -44,10 +45,13 @@ export function FeaturedProduct() {
         <div className="grid lg:grid-cols-2 gap-6 md:gap-12 items-center">
           {/* Left - Image */}
           <div className="relative">
-            <img
+            <Image
               src={mainImage || "/placeholder.svg"}
               alt={title || "Featured product"}
+              width={800}
+              height={600}
               className="w-full h-auto rounded-2xl"
+              sizes="(max-width: 1024px) 100vw, 50vw"
             />
           </div>
 
@@ -89,16 +93,20 @@ export function FeaturedProduct() {
                 className="aspect-square flex items-center justify-center rounded-lg"
                 style={{ backgroundColor: "var(--background)" }}
               >
-                <img
+                <Image
                   src={productImage || "/placeholder.svg"}
                   alt={productName}
+                  width={400}
+                  height={400}
                   className="w-full h-full object-contain"
+                  sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 400px"
                 />
               </div>
             </div>
 
             <Button 
               variant="link" 
+              className="min-h-[44px] min-w-[44px] touch-manipulation"
               style={{ color: textColor || "var(--secondary-foreground)" }}
               onMouseEnter={(e) => e.currentTarget.style.opacity = "0.8"}
               onMouseLeave={(e) => e.currentTarget.style.opacity = "1"}

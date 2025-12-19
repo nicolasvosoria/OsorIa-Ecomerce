@@ -150,3 +150,26 @@
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: var(--foreground);
 }
+
+/* Mejoras de touch targets para móviles */
+.touch-manipulation {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Asegurar que los botones tengan al menos 44x44px en móviles */
+@media (max-width: 768px) {
+  button,
+  [role="button"],
+  a[href] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Excepciones para elementos que no necesitan ser tan grandes */
+  button.size-icon-sm,
+  [role="button"].size-icon-sm {
+    min-height: 36px;
+    min-width: 36px;
+  }
+}

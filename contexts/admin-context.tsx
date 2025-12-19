@@ -124,6 +124,7 @@ export function useAdmin() {
       updateComponentEdit: () => {},
       clearComponentEdits: () => {},
       getAllEdits: () => new Map(),
+      toggleEditMode: () => {},
     }
   }
   return context
