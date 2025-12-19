@@ -3,6 +3,7 @@
 import { useAdmin } from "@/contexts/admin-context"
 import { Button } from "@/components/ui/button"
 import { Edit, X } from "lucide-react"
+import { useState, useEffect } from "react"
 
 export function EditModeToggle() {
   const { isAdmin, isEditMode, toggleEditMode, selectedComponent } = useAdmin()
@@ -11,8 +12,20 @@ export function EditModeToggle() {
     return null
   }
 
-  // Ajustar posición cuando el panel de edición está abierto (tiene un ancho de 384px = w-96)
-  const rightOffset = isEditMode && selectedComponent ? "28rem" : "1rem" // 28rem = 448px (384px + 64px de margen)
+  const [isMobile, setIsMobile] = useState(false)
+  
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
+  
+  // Ajustar posición cuando el panel de edición está abierto solo en desktop
+  // En móviles, el panel es overlay completo, así que no necesitamos ajustar la posición
+  const rightOffset = !isMobile && isEditMode && selectedComponent ? "28rem" : "1rem" // 28rem = 448px (384px + 64px de margen)
 
   return (
     <div 

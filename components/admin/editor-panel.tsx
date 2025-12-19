@@ -371,10 +371,10 @@ export function EditorPanel() {
 
   if (!selectedComponent) {
     return (
-      <div className="fixed right-0 top-0 h-screen w-96 bg-background border-l border-border z-50 flex items-center justify-center p-8 shadow-2xl">
+      <div className="fixed right-0 top-0 h-screen w-full md:w-96 bg-background border-l border-border z-50 flex items-center justify-center p-8 shadow-2xl">
         <div className="text-center text-muted-foreground">
-          <p className="text-lg font-medium mb-2">Editor de Componentes</p>
-          <p className="text-sm">Haz clic en cualquier sección de la página para editarla</p>
+          <p className="text-base md:text-lg font-medium mb-2">Editor de Componentes</p>
+          <p className="text-xs md:text-sm">Haz clic en cualquier sección de la página para editarla</p>
         </div>
       </div>
     )
@@ -383,12 +383,20 @@ export function EditorPanel() {
   const config = COMPONENT_FIELDS[selectedComponent]
   if (!config) {
     return (
-      <div className="fixed right-0 top-0 h-screen w-96 bg-background border-l border-border z-50 flex items-center justify-center p-8 shadow-2xl">
-        <div className="text-center text-muted-foreground">
-          <p className="text-lg font-medium mb-2">Componente no configurado</p>
-          <p className="text-sm">Este componente no tiene configuración de edición</p>
+      <>
+        {/* Overlay oscuro en móviles */}
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={() => selectComponent(null)}
+          aria-label="Cerrar panel"
+        />
+        <div className="fixed right-0 top-0 h-screen w-full md:w-96 bg-background border-l border-border z-50 flex items-center justify-center p-8 shadow-2xl">
+          <div className="text-center text-muted-foreground">
+            <p className="text-base md:text-lg font-medium mb-2">Componente no configurado</p>
+            <p className="text-xs md:text-sm">Este componente no tiene configuración de edición</p>
+          </div>
         </div>
-      </div>
+      </>
     )
   }
 
@@ -544,17 +552,30 @@ export function EditorPanel() {
   const hasChanges = componentEdits.has(selectedComponent)
 
   return (
-    <div 
-      className="fixed right-0 top-0 h-screen w-96 bg-background border-l border-border z-50 flex flex-col shadow-2xl"
-      data-editor-panel={selectedComponent ? "open" : "closed"}
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-border">
-        <h2 className="text-lg font-semibold">Editando: {componentLabel}</h2>
-        <Button variant="ghost" size="icon" onClick={() => selectComponent(null)}>
-          <X className="h-4 w-4" />
-        </Button>
-      </div>
+    <>
+      {/* Overlay oscuro en móviles */}
+      {selectedComponent && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={() => selectComponent(null)}
+          aria-label="Cerrar panel"
+        />
+      )}
+      
+      <div 
+        className="fixed right-0 top-0 h-screen w-full md:w-96 bg-background border-l border-border z-50 flex flex-col shadow-2xl"
+        data-editor-panel={selectedComponent ? "open" : "closed"}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-border flex-shrink-0">
+          <h2 className="text-base md:text-lg font-semibold">Editando: {componentLabel}</h2>
+          <Button variant="ghost" size="icon" onClick={() => selectComponent(null)} className="md:hidden">
+            <X className="h-5 w-5" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={() => selectComponent(null)} className="hidden md:flex">
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
@@ -750,7 +771,7 @@ export function EditorPanel() {
       </Tabs>
 
       {/* Actions */}
-      <div className="p-4 border-t border-border space-y-2">
+      <div className="p-4 border-t border-border space-y-2 flex-shrink-0">
         <Button className="w-full" onClick={handleSave} disabled={!hasChanges || saving}>
           <Save className="h-4 w-4 mr-2" />
           {saving ? "Guardando..." : "Guardar Cambios"}
@@ -761,5 +782,6 @@ export function EditorPanel() {
         </Button>
       </div>
     </div>
+    </>
   )
 }
