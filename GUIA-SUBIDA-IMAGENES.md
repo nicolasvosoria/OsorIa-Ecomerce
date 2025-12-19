@@ -117,3 +117,5 @@ scripts/
 - [Documentación de Supabase Storage](https://supabase.com/docs/guides/storage)
 - [Políticas RLS de Storage](https://supabase.com/docs/guides/storage/security/access-control)
 
+
+

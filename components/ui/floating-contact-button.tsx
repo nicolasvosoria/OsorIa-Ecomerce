@@ -22,8 +22,19 @@ const WhatsAppIcon = ({ className }: { className?: string }) => (
 export function FloatingContactButton() {
   const [isOpen, setIsOpen] = useState(false)
   const [chatbotOpen, setChatbotOpen] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const { isEditMode, selectedComponent } = useAdmin()
+  
+  // Detectar si es móvil
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
 
   // Cerrar el menú al hacer clic fuera
   useEffect(() => {
@@ -50,13 +61,14 @@ export function FloatingContactButton() {
     setIsOpen(false)
   }
 
-  // Ajustar posición cuando el panel de edición está abierto (tiene un ancho de 384px = w-96)
-  const rightOffset = isEditMode && selectedComponent ? "28rem" : "1.5rem" // 28rem = 448px (384px + 64px de margen)
+  // Ajustar posición cuando el panel de edición está abierto solo en desktop
+  // En móviles, el panel es overlay completo, así que no necesitamos ajustar la posición
+  const rightOffset = !isMobile && isEditMode && selectedComponent ? "28rem" : "1.5rem" // 28rem = 448px (384px + 64px de margen)
 
   return (
     <div 
       ref={menuRef} 
-      className="fixed bottom-6 z-50 transition-all duration-300"
+      className="fixed bottom-6 z-50 transition-all duration-300 md:transition-all md:duration-300"
       style={{ right: rightOffset }}
     >
       {/* Opciones del menú en arco */}
