@@ -40,8 +40,8 @@ function AuthCallbackContent() {
           }
 
           if (data.session) {
-            // Sesión creada exitosamente, redirigir a la tienda
-            router.push("/shop")
+            // Sesión creada exitosamente, redirigir a la página principal
+            router.push("/")
             return
           }
         }
@@ -56,8 +56,8 @@ function AuthCallbackContent() {
         }
 
         if (session) {
-          // Ya hay sesión, redirigir a la tienda
-          router.push("/shop")
+          // Ya hay sesión, redirigir a la página principal
+          router.push("/")
         } else {
           // No hay sesión, redirigir al login
           router.push("/?error=no_session")

@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
+import { createContext, useContext, useEffect, useState, useRef, type ReactNode } from "react"
 import { getFonts, getActiveFont, setActiveFont } from "@/lib/supabase/fonts-api"
 import type { AppFont } from "@/lib/types/font"
 
@@ -20,6 +20,7 @@ export function FontProvider({ children }: { children: ReactNode }) {
   const [activeFont, setActiveFontState] = useState<AppFont | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const appliedFontRef = useRef<string | null>(null) // Para evitar aplicar la misma fuente múltiples veces
 
   const refreshFonts = async () => {
     try {
@@ -46,10 +47,10 @@ export function FontProvider({ children }: { children: ReactNode }) {
     try {
       const result = await setActiveFont(fontName)
       if (result.success) {
-        // Aplicar fuente inmediatamente desde la lista actual
+        // Aplicar fuente inmediatamente desde la lista actual (forzar aplicación)
         const selectedFont = fonts.find((f) => f.font_name === fontName)
         if (selectedFont) {
-          applyFont(selectedFont)
+          applyFont(selectedFont, true) // Forzar aplicación
         }
         // Refrescar fuentes para actualizar el estado
         await refreshFonts()
@@ -61,8 +62,20 @@ export function FontProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const applyFont = (font: AppFont) => {
+  const applyFont = (font: AppFont, force: boolean = false) => {
     if (typeof document === "undefined") return
+
+    // Evitar aplicar la misma fuente múltiples veces (a menos que sea forzado)
+    if (!force && appliedFontRef.current === font.font_name) {
+      return
+    }
+
+    // Si el script ya aplicó esta fuente desde localStorage, no volver a aplicarla
+    // a menos que sea un cambio explícito (force = true)
+    if (!force && typeof window !== "undefined" && (window as any).__osoria_applied_font === font.font_name) {
+      appliedFontRef.current = font.font_name
+      return
+    }
 
     const root = document.documentElement
 
@@ -72,6 +85,16 @@ export function FontProvider({ children }: { children: ReactNode }) {
     // Si tiene URL de Google Fonts, cargar el font
     if (font.google_font_url) {
       loadGoogleFont(font.google_font_url)
+    }
+
+    // Marcar que esta fuente ya fue aplicada
+    appliedFontRef.current = font.font_name
+
+    // Guardar en localStorage para aplicar inmediatamente en la próxima carga
+    try {
+      localStorage.setItem("osoria_active_font", JSON.stringify(font))
+    } catch (e) {
+      console.warn("[Font] Error saving font to localStorage:", e)
     }
   }
 
@@ -93,10 +116,26 @@ export function FontProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
+    // Esperar a que termine la carga antes de aplicar
+    if (loading) return
+
+    // Verificar si el script ya aplicó una fuente desde localStorage
+    const scriptAppliedFont = typeof window !== "undefined" ? (window as any).__osoria_applied_font : null
+
+    // Solo aplicar si tenemos una fuente activa y no se ha aplicado ya
     if (activeFont) {
-      applyFont(activeFont)
+      // Si el script ya aplicó esta fuente, solo marcar como aplicada sin volver a aplicar
+      if (scriptAppliedFont === activeFont.font_name) {
+        appliedFontRef.current = activeFont.font_name
+        return
+      }
+      
+      // Solo aplicar si no se ha aplicado ya
+      if (appliedFontRef.current !== activeFont.font_name) {
+        applyFont(activeFont)
+      }
     }
-  }, [activeFont])
+  }, [activeFont, loading]) // Agregar loading para evitar aplicar antes de que termine la carga
 
   const value: FontContextType = {
     fonts,

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { useComponentStyle } from "@/contexts/styles-context"
+import { useAdmin } from "@/contexts/admin-context"
 import {
   Carousel,
   CarouselContent,
@@ -19,7 +20,14 @@ export function PopularItems() {
     title: "Lo más vendido",
     priceLabel: "Desde $29",
   })
+  const { componentEdits } = useAdmin()
   const { addToCart } = useCart()
+  
+  // Combinar estilos de BD con ediciones locales para mostrar cambios en tiempo real
+  const edits = componentEdits.get("popular") || {}
+  const title = edits.title ?? styleData.title ?? "Lo más vendido"
+  const bgColor = edits.bgColor ?? styleData.bgColor
+  const textColor = edits.textColor ?? styleData.textColor
   const [api, setApi] = useState<CarouselApi>()
   const autoplayRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -103,11 +111,23 @@ export function PopularItems() {
   }, [api])
 
   return (
-    <section className="py-8 md:py-12 px-4">
+    <section 
+      data-component="popular" 
+      className="py-8 md:py-12 px-4"
+      style={{
+        ...(bgColor && { backgroundColor: bgColor }),
+        ...(textColor && { color: textColor }),
+      }}
+    >
       <div className="container mx-auto max-w-7xl">
         <div className="mb-6 md:mb-8">
-          <h2 className="text-2xl md:text-4xl lg:text-[48.4146px] font-inter font-normal" style={{ color: "var(--foreground)" }}>
-            {styleData.title || "Lo más vendido"}
+          <h2 
+            className="text-2xl md:text-4xl lg:text-[48.4146px] font-inter font-normal" 
+            style={{ 
+              color: textColor || "var(--foreground)" 
+            }}
+          >
+            {title}
           </h2>
         </div>
 

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { useComponentStyle } from "@/contexts/styles-context"
+import { useAdmin } from "@/contexts/admin-context"
 import { useTheme } from "@/contexts/theme-context"
 import {
   Carousel,
@@ -21,8 +22,19 @@ export function HeroBanner() {
       "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua",
     buttonText: "Comprar ahora",
   })
+  const { componentEdits } = useAdmin()
   const [api, setApi] = useState<CarouselApi>()
   const autoplayRef = useRef<NodeJS.Timeout | null>(null)
+  
+  // Combinar estilos de BD con ediciones locales para mostrar cambios en tiempo real
+  const edits = componentEdits.get("hero") || {}
+  const label = edits.label ?? styleData.label ?? "Electronics"
+  const title = edits.title ?? styleData.title ?? "BALFE"
+  const subtitle = edits.subtitle ?? styleData.subtitle ?? "NUEVO MODELO"
+  const description = edits.description ?? styleData.description ?? "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua"
+  const buttonText = edits.buttonText ?? styleData.buttonText ?? "Comprar ahora"
+  const bgColor = edits.bgColor ?? styleData.bgColor
+  const textColor = edits.textColor ?? styleData.textColor
 
   // Array de productos para el carrusel
   const heroProducts = [
@@ -113,7 +125,14 @@ export function HeroBanner() {
   }, [api])
 
   return (
-    <section className="relative overflow-hidden rounded-2xl md:rounded-3xl mx-2 md:mx-4 mt-2 md:mt-4 mb-4 md:mb-8" style={{ backgroundColor: "var(--primary)" }}>
+    <section 
+      data-component="hero"
+      className="relative overflow-hidden rounded-2xl md:rounded-3xl mx-2 md:mx-4 mt-2 md:mt-4 mb-4 md:mb-8" 
+      style={{ 
+        backgroundColor: bgColor || "var(--primary)",
+        ...(textColor && { color: textColor }),
+      }}
+    >
       <Carousel
         opts={{
           align: "start",
@@ -123,30 +142,41 @@ export function HeroBanner() {
         className="w-full"
       >
         <CarouselContent>
-          {heroProducts.map((product, index) => (
+          {heroProducts.map((product, index) => {
+            // Usar valores editados si existen, sino usar valores del producto
+            const displayLabel = edits.label ?? product.label ?? label
+            const displayTitle = edits.title ?? product.title ?? title
+            const displaySubtitle = edits.subtitle ?? product.subtitle ?? subtitle
+            const displayDescription = edits.description ?? product.description ?? description
+            const displayButtonText = edits.buttonText ?? product.buttonText ?? buttonText
+            
+            return (
             <CarouselItem key={index} className="basis-full">
               <div className="container mx-auto px-4 md:px-8 py-8 md:py-16 lg:py-24">
                 <div className="grid lg:grid-cols-2 gap-6 md:gap-12 items-center">
-                  <div className="space-y-4 md:space-y-6 text-center md:text-left" style={{ color: "var(--primary-foreground)" }}>
+                  <div 
+                    className="space-y-4 md:space-y-6 text-center md:text-left" 
+                    style={{ color: textColor || "var(--primary-foreground)" }}
+                  >
                     <span 
                       className="inline-block rounded text-xs md:text-[14.21px] font-inter font-medium rounded-lg px-4 md:px-6 py-1"
                       style={{ backgroundColor: "rgba(255, 255, 255, 0.2)" }}
                     >
-                      {product.label}
+                      {displayLabel}
                     </span>
                     <div>
                       <h1 className="text-4xl md:text-6xl lg:text-[92px] font-inter font-medium tracking-tight leading-tight">
-                        {product.title}
+                        {displayTitle}
                       </h1>
                       <h2 className="text-2xl md:text-4xl lg:text-[51px] font-inter font-light tracking-tight">
-                        {product.subtitle}
+                        {displaySubtitle}
                       </h2>
                     </div>
                     <p 
                       className="text-sm md:text-[16px] font-inter font-medium max-w-md mx-auto md:mx-0 leading-relaxed"
                       style={{ opacity: 0.9 }}
                     >
-                      {product.description}
+                      {displayDescription}
                     </p>
                     <Button
                       size="lg"
@@ -164,13 +194,13 @@ export function HeroBanner() {
                         e.currentTarget.style.transform = "scale(1)"
                       }}
                     >
-                      {product.buttonText} →
+                      {displayButtonText} →
                     </Button>
                   </div>
 
                   {/* Right - Product Image */}
                   <div className="relative h-[250px] md:h-[400px] lg:h-[500px] order-first md:order-last">
-                    <img src={product.image} alt={product.title} className="w-full h-full object-contain" />
+                    <img src={product.image} alt={displayTitle} className="w-full h-full object-contain" />
                     {/* Feature Callouts - Ocultos en móvil */}
                     <div className="hidden md:block absolute top-[20%] right-[10%] bg-white rounded-full p-3">
                       <div className="w-3 h-3 bg-gray-800 rounded-full" />
@@ -185,7 +215,8 @@ export function HeroBanner() {
                 </div>
               </div>
             </CarouselItem>
-          ))}
+            )
+          })}
         </CarouselContent>
       </Carousel>
 

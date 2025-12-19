@@ -6,6 +6,7 @@ import { AdminProvider } from "@/contexts/admin-context"
 import { AdminPermissionsProvider, useAdminPermissions } from "@/contexts/admin-permissions-context"
 import { EditorPanel } from "@/components/admin/editor-panel"
 import { EditableWrapper } from "@/components/admin/editable-wrapper"
+import { AdminPageWrapper } from "@/components/admin/admin-page-wrapper"
 import { Header } from "@/components/layout/header"
 import { HeroBanner } from "@/components/sections/hero-banner"
 import { PopularItems } from "@/components/sections/popular-items"
@@ -64,7 +65,8 @@ function AdminPageContent() {
 
   return (
     <AdminProvider>
-      <div className="flex h-screen overflow-hidden">
+      <AdminPageWrapper>
+        <div className="flex h-screen overflow-hidden">
         {/* Preview Area */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Admin Header */}
@@ -121,6 +123,7 @@ function AdminPageContent() {
         {/* Editor Panel */}
         <EditorPanel />
       </div>
+      </AdminPageWrapper>
     </AdminProvider>
   )
 }

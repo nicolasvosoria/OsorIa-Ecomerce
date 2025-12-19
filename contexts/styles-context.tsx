@@ -24,6 +24,15 @@ export function StylesProvider({ children }: { children: ReactNode }) {
       const data = await getComponentStyles()
       const stylesMap = new Map(data.map((style) => [style.component_name, style.variables]))
       setStyles(stylesMap)
+      
+      // Guardar en localStorage para aplicar inmediatamente en la próxima carga
+      try {
+        const stylesObject = Object.fromEntries(stylesMap)
+        localStorage.setItem("osoria_component_styles", JSON.stringify(stylesObject))
+      } catch (e) {
+        console.warn("[v0] Error saving component styles to localStorage:", e)
+      }
+      
       // Logs reducidos para evitar spam en consola
       if (stylesMap.size > 0) {
         console.log("[v0] Loaded styles from Supabase:", stylesMap.size, "components")
@@ -93,6 +102,15 @@ export function useComponentStyle(componentName: string, defaultStyles: Record<s
     try {
       channel = subscribeToStyleChanges(componentName, (newStyle) => {
         setComponentStyles(newStyle.variables)
+        // Guardar en localStorage cuando se actualice desde Supabase
+        try {
+          const savedStyles = localStorage.getItem("osoria_component_styles")
+          const styles = savedStyles ? JSON.parse(savedStyles) : {}
+          styles[componentName] = newStyle.variables
+          localStorage.setItem("osoria_component_styles", JSON.stringify(styles))
+        } catch (e) {
+          console.warn("[v0] Error saving component style to localStorage:", e)
+        }
       })
     } catch (error) {
       // Error silencioso para evitar spam en consola

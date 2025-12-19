@@ -47,22 +47,61 @@ export async function updateComponentStyle(componentName: string, variables: Rec
     throw new Error("Supabase is not configured")
   }
 
-  const { data, error } = await supabase
-    .from("component_styles")
-    .upsert({
-      component_name: componentName,
-      variables,
-      updated_at: new Date().toISOString(),
-    })
-    .select()
-    .single()
+  try {
+    // Usar upsert con onConflict especificado para la columna única
+    const { data, error } = await supabase
+      .from("component_styles")
+      .upsert(
+        {
+          component_name: componentName,
+          variables,
+          updated_at: new Date().toISOString(),
+        },
+        {
+          onConflict: "component_name", // Especificar la columna única para el conflicto
+        }
+      )
+      .select()
+      .single()
 
-  if (error) {
-    console.error(`[v0] Error updating style for ${componentName}:`, error)
-    throw error
+    if (error) {
+      console.error(`[v0] Error updating style for ${componentName}:`, error)
+      console.error("[v0] Error details:", {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+      })
+      
+      // Si el error es 409, intentar con UPDATE directo
+      if (error.code === "409" || error.message?.includes("409")) {
+        console.log(`[v0] Retrying with direct UPDATE for ${componentName}`)
+        const { data: updateData, error: updateError } = await supabase
+          .from("component_styles")
+          .update({
+            variables,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("component_name", componentName)
+          .select()
+          .single()
+
+        if (updateError) {
+          console.error(`[v0] Error in UPDATE retry for ${componentName}:`, updateError)
+          throw updateError
+        }
+
+        return updateData as ComponentStyle
+      }
+
+      throw error
+    }
+
+    return data as ComponentStyle
+  } catch (err) {
+    console.error(`[v0] Unexpected error updating style for ${componentName}:`, err)
+    throw err
   }
-
-  return data as ComponentStyle
 }
 
 export async function subscribeToStyleChanges(componentName: string, callback: (payload: ComponentStyle) => void) {

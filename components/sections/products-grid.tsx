@@ -1,11 +1,19 @@
 "use client"
 
 import { useComponentStyle } from "@/contexts/styles-context"
+import { useAdmin } from "@/contexts/admin-context"
 
 export function ProductsGrid() {
   const { styles: styleData } = useComponentStyle("products", {
     title: "Productos populares",
   })
+  const { componentEdits } = useAdmin()
+  
+  // Combinar estilos de BD con ediciones locales para mostrar cambios en tiempo real
+  const edits = componentEdits.get("products") || {}
+  const title = edits.title ?? styleData.title ?? "Productos populares"
+  const bgColor = edits.bgColor ?? styleData.bgColor
+  const textColor = edits.textColor ?? styleData.textColor
 
   const products = [
     {
@@ -29,10 +37,20 @@ export function ProductsGrid() {
   ]
 
   return (
-    <section className="py-8 md:py-12 px-4">
+    <section 
+      data-component="products" 
+      className="py-8 md:py-12 px-4"
+      style={{
+        ...(bgColor && { backgroundColor: bgColor }),
+        ...(textColor && { color: textColor }),
+      }}
+    >
       <div className="container mx-auto max-w-7xl">
-        <h2 className="text-2xl md:text-4xl lg:text-[51px] font-inter font-normal mb-6 md:mb-8" style={{ color: "var(--foreground)" }}>
-          {styleData.title || "Productos populares"}
+        <h2 
+          className="text-2xl md:text-4xl lg:text-[51px] font-inter font-normal mb-6 md:mb-8" 
+          style={{ color: textColor || "var(--foreground)" }}
+        >
+          {title}
         </h2>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">

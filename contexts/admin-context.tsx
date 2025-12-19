@@ -1,6 +1,8 @@
 "use client"
 
-import { createContext, useContext, useState, type ReactNode } from "react"
+import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
+import { useAuth } from "@/contexts/auth-context"
+import { isCurrentUserAdmin } from "@/lib/supabase/permissions-api"
 
 interface AdminContextType {
   isEditMode: boolean
@@ -11,6 +13,7 @@ interface AdminContextType {
   updateComponentEdit: (componentName: string, key: string, value: any) => void
   clearComponentEdits: (componentName: string) => void
   getAllEdits: () => Map<string, Record<string, any>>
+  toggleEditMode: () => void
 }
 
 const AdminContext = createContext<AdminContextType | undefined>(undefined)
@@ -19,12 +22,53 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   const [isEditMode, setIsEditMode] = useState(false)
   const [selectedComponent, setSelectedComponent] = useState<string | null>(null)
   const [componentEdits, setComponentEdits] = useState<Map<string, Record<string, any>>>(new Map())
+  const [isAdmin, setIsAdmin] = useState(false)
+  const { isAuthenticated, user } = useAuth()
 
-  // Sin autenticación, el modo admin está deshabilitado
-  const isAdmin = false
+  // Verificar si el usuario es admin cuando cambia la autenticación
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      if (isAuthenticated && user) {
+        try {
+          const adminStatus = await isCurrentUserAdmin()
+          setIsAdmin(adminStatus)
+          // Si el usuario deja de ser admin, desactivar modo edición
+          if (!adminStatus) {
+            setIsEditMode(false)
+            setSelectedComponent(null)
+          }
+        } catch (error) {
+          console.error("[Admin] Error verificando rol de admin:", error)
+          setIsAdmin(false)
+        }
+      } else {
+        setIsAdmin(false)
+        setIsEditMode(false)
+        setSelectedComponent(null)
+      }
+    }
+
+    checkAdminStatus()
+  }, [isAuthenticated, user])
+
+  const toggleEditMode = () => {
+    if (!isAdmin) {
+      console.warn("[Admin] Intento de activar modo edición sin permisos de admin")
+      return
+    }
+    setIsEditMode((prev) => {
+      const newValue = !prev
+      console.log("[Admin] Modo edición:", newValue ? "ACTIVADO" : "DESACTIVADO")
+      if (!newValue) {
+        // Si se desactiva, limpiar selección
+        setSelectedComponent(null)
+      }
+      return newValue
+    })
+  }
 
   const selectComponent = (componentName: string | null) => {
-    if (!isAdmin) return
+    if (!isAdmin || !isEditMode) return
     setSelectedComponent(componentName)
   }
 
@@ -60,6 +104,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
         updateComponentEdit,
         clearComponentEdits,
         getAllEdits,
+        toggleEditMode,
       }}
     >
       {children}

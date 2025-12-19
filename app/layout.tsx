@@ -18,8 +18,12 @@ import { ThemeProvider } from "@/contexts/theme-context"
 import { FontProvider } from "@/contexts/font-context"
 import { AuthProvider } from "@/contexts/auth-context"
 import { AdminPermissionsProvider } from "@/contexts/admin-permissions-context"
+import { AdminProvider } from "@/contexts/admin-context"
+import { EditorPanel } from "@/components/admin/editor-panel"
+import { EditModeToggle } from "@/components/admin/edit-mode-toggle"
 import { viewport } from "./viewport"
 import { FloatingContactButton } from "@/components/ui/floating-contact-button"
+import { ApplyStylesScript } from "@/components/apply-styles-script"
 
 const V0Setup = dynamic(() => import("@/components/v0-setup"))
 
@@ -57,6 +61,7 @@ export default async function RootLayout({
         className={cn(geistSans.variable, geistMono.variable, "antialiased min-h-screen", { "is-v0": isV0 })}
         suppressHydrationWarning
       >
+        <ApplyStylesScript />
         <V0Provider isV0={isV0}>
           <StylesProvider>
             <AuthProvider>
@@ -65,15 +70,19 @@ export default async function RootLayout({
                 <FontProvider>
                   <ShopifyCartProvider>
                     <CartProvider>
-                      <NuqsAdapter>
-                      <main data-vaul-drawer-wrapper="true">
-                        <Header />
-                        {children}
-                      </main>
-                      {isDevelopment && <DebugGrid />}
-                      <Toaster closeButton position="top-left" />
-                      <FloatingContactButton />
-                        </NuqsAdapter>
+                      <AdminProvider>
+                        <NuqsAdapter>
+                        <main data-vaul-drawer-wrapper="true">
+                          <Header />
+                          {children}
+                        </main>
+                        {isDevelopment && <DebugGrid />}
+                        <Toaster closeButton position="top-left" />
+                        <FloatingContactButton />
+                        <EditModeToggle />
+                        <EditorPanel />
+                          </NuqsAdapter>
+                        </AdminProvider>
                       </CartProvider>
                     </ShopifyCartProvider>
                   </FontProvider>
