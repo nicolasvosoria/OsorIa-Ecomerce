@@ -28,10 +28,9 @@ export function PopularItems() {
   const title = edits.title ?? styleData.title ?? "Lo más vendido"
   const bgColor = edits.bgColor ?? styleData.bgColor
   const textColor = edits.textColor ?? styleData.textColor
-  const [api, setApi] = useState<CarouselApi>()
-  const autoplayRef = useRef<NodeJS.Timeout | null>(null)
-
-  const items = [
+  
+  // Obtener items editables desde estilos o ediciones locales
+  const defaultItems = [
     {
       title: "Bocinas Bluetooth",
       price: "Desde $356",
@@ -68,6 +67,11 @@ export function PopularItems() {
       image: "/modern-phone-case-product.jpg",
     },
   ]
+  
+  const items = edits.items ?? styleData.items ?? defaultItems
+  
+  const [api, setApi] = useState<CarouselApi>()
+  const autoplayRef = useRef<NodeJS.Timeout | null>(null)
 
   // Auto-play: desplazar cada 30 segundos
   useEffect(() => {

@@ -15,7 +15,8 @@ export function ProductsGrid() {
   const bgColor = edits.bgColor ?? styleData.bgColor
   const textColor = edits.textColor ?? styleData.textColor
 
-  const products = [
+  // Obtener productos editables desde estilos o ediciones locales
+  const defaultProducts = [
     {
       name: "BeShow Volcano",
       category: "Proyectores",
@@ -35,6 +36,8 @@ export function ProductsGrid() {
       image: "/white-projector.jpg",
     },
   ]
+  
+  const products = edits.products ?? styleData.products ?? defaultProducts
 
   return (
     <section 

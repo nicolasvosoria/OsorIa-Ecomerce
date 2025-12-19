@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { MessageSquare, X, Bot } from "lucide-react"
 import Link from "next/link"
 import { Chatbot } from "@/components/chatbot/chatbot"
+import { useAdmin } from "@/contexts/admin-context"
 
 // Icono oficial de WhatsApp
 const WhatsAppIcon = ({ className }: { className?: string }) => (
@@ -22,6 +23,7 @@ export function FloatingContactButton() {
   const [isOpen, setIsOpen] = useState(false)
   const [chatbotOpen, setChatbotOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+  const { isEditMode, selectedComponent } = useAdmin()
 
   // Cerrar el menú al hacer clic fuera
   useEffect(() => {
@@ -48,8 +50,15 @@ export function FloatingContactButton() {
     setIsOpen(false)
   }
 
+  // Ajustar posición cuando el panel de edición está abierto (tiene un ancho de 384px = w-96)
+  const rightOffset = isEditMode && selectedComponent ? "28rem" : "1.5rem" // 28rem = 448px (384px + 64px de margen)
+
   return (
-    <div ref={menuRef} className="fixed bottom-6 right-6 z-50">
+    <div 
+      ref={menuRef} 
+      className="fixed bottom-6 z-50 transition-all duration-300"
+      style={{ right: rightOffset }}
+    >
       {/* Opciones del menú en arco */}
       <div className="absolute bottom-14 right-0">
         {/* Opción WhatsApp - posición superior derecha */}

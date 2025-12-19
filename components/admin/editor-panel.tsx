@@ -8,10 +8,11 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
-import { X, Save, RotateCcw, Type, Palette } from "lucide-react"
+import { X, Save, RotateCcw, Type, Palette, Plus, Trash2 } from "lucide-react"
 import { useState, useEffect } from "react"
 import { updateComponentStyle } from "@/lib/supabase/styles-api"
 import { toast } from "sonner"
+import { ImageUpload } from "./image-upload"
 
 const COMPONENT_FIELDS: Record<
   string,
@@ -23,47 +24,131 @@ const COMPONENT_FIELDS: Record<
 > = {
   hero: {
     content: [
-      { key: "label", label: "Etiqueta", type: "text" },
-      { key: "title", label: "Título Principal", type: "text" },
-      { key: "subtitle", label: "Subtítulo", type: "text" },
-      { key: "description", label: "Descripción", type: "textarea" },
-      { key: "buttonText", label: "Texto del Botón", type: "text" },
+      {
+        key: "products",
+        label: "Productos del Carrusel",
+        type: "array",
+        isArray: true,
+        arrayFields: [
+          { key: "label", label: "Etiqueta", type: "text" },
+          { key: "title", label: "Título Principal", type: "text" },
+          { key: "subtitle", label: "Subtítulo", type: "text" },
+          { key: "description", label: "Descripción", type: "textarea" },
+          { key: "buttonText", label: "Texto del Botón", type: "text" },
+          { key: "image", label: "URL de la Imagen", type: "image" },
+        ],
+      },
     ],
     styles: [
       { key: "bgColor", label: "Color de Fondo", type: "color" },
       { key: "textColor", label: "Color de Texto", type: "color" },
+      { key: "buttonColor", label: "Color del Botón", type: "color" },
+      { key: "buttonTextColor", label: "Color del Texto del Botón", type: "color" },
+      { key: "barColor", label: "Color de la Barra Inferior", type: "color" },
     ],
     defaults: {
-      label: "Electronics",
-      title: "BALFE",
-      subtitle: "NUEVO MODELO",
-      description:
-        "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua",
-      buttonText: "Comprar ahora",
+      products: [
+        {
+          label: "Electrónica",
+          title: "BALFE",
+          subtitle: "NUEVO MODELO",
+          description: "Descubre la última tecnología en dispositivos electrónicos. Calidad premium y diseño innovador para una experiencia única.",
+          buttonText: "Comprar ahora",
+          image: "/black-smart-speaker.jpg",
+        },
+        {
+          label: "Audio",
+          title: "PREMIUM",
+          subtitle: "HEADPHONES",
+          description: "Experimenta el sonido de alta calidad con nuestros auriculares premium. Diseño ergonómico y cancelación de ruido activa.",
+          buttonText: "Ver más",
+          image: "/premium-headphones.png",
+        },
+        {
+          label: "Accesorios",
+          title: "LAPTOP STAND",
+          subtitle: "ERGONÓMICO",
+          description: "Mejora tu espacio de trabajo con nuestro soporte para laptop. Diseño moderno y ajustable para mayor comodidad.",
+          buttonText: "Comprar ahora",
+          image: "/laptop-stand.png",
+        },
+        {
+          label: "Proyección",
+          title: "MINI PROJECTOR",
+          subtitle: "PORTÁTIL",
+          description: "Lleva el cine contigo. Proyector compacto con alta resolución y conectividad inalámbrica para tus presentaciones.",
+          buttonText: "Descubrir",
+          image: "/mini-projector.jpg",
+        },
+      ],
       bgColor: "#4a5568",
       textColor: "#ffffff",
+      buttonColor: "#005aa1",
+      buttonTextColor: "#ffffff",
+      barColor: "#005aa1",
     },
   },
   popular: {
-    content: [{ key: "title", label: "Título de la Sección", type: "text" }],
+    content: [
+      { key: "title", label: "Título de la Sección", type: "text" },
+      {
+        key: "items",
+        label: "Productos",
+        type: "array",
+        isArray: true,
+        arrayFields: [
+          { key: "title", label: "Título del Producto", type: "text" },
+          { key: "price", label: "Precio", type: "text" },
+          { key: "image", label: "URL de la Imagen", type: "image" },
+        ],
+      },
+    ],
     styles: [
       { key: "bgColor", label: "Color de Fondo", type: "color" },
       { key: "textColor", label: "Color de Texto", type: "color" },
     ],
     defaults: {
       title: "Lo más vendido",
+      items: [
+        { title: "Bocinas Bluetooth", price: "Desde $356", image: "/bluetooth-speaker-modern.jpg" },
+        { title: "Auriculares y Audífonos", price: "Desde $29", image: "/premium-headphones.png" },
+        { title: "Soportes para Laptop", price: "Desde $82", image: "/laptop-stand.png" },
+        { title: "Proyectores", price: "Desde $199", image: "/mini-projector.jpg" },
+        { title: "Bocinas Inteligentes", price: "Desde $89", image: "/black-smart-speaker.jpg" },
+        { title: "Audífonos Inalámbricos", price: "Desde $45", image: "/green-earphones-product.jpg" },
+        { title: "Fundas para Teléfono", price: "Desde $25", image: "/modern-phone-case-product.jpg" },
+      ],
       bgColor: "#ffffff",
       textColor: "#1e354e",
     },
   },
   products: {
-    content: [{ key: "title", label: "Título de la Sección", type: "text" }],
+    content: [
+      { key: "title", label: "Título de la Sección", type: "text" },
+      {
+        key: "products",
+        label: "Productos",
+        type: "array",
+        isArray: true,
+        arrayFields: [
+          { key: "name", label: "Nombre del Producto", type: "text" },
+          { key: "category", label: "Categoría", type: "text" },
+          { key: "price", label: "Precio", type: "text" },
+          { key: "image", label: "URL de la Imagen", type: "image" },
+        ],
+      },
+    ],
     styles: [
       { key: "bgColor", label: "Color de Fondo", type: "color" },
       { key: "textColor", label: "Color de Texto", type: "color" },
     ],
     defaults: {
       title: "Productos populares",
+      products: [
+        { name: "BeShow Volcano", category: "Proyectores", price: "$1,420.00", image: "/white-projector.jpg" },
+        { name: "Soporte para Laptop Desk MUO-g", category: "Soportes", price: "$82.00", image: "/laptop-stand.png" },
+        { name: "BeShow Volcano", category: "Proyectores", price: "$1,420.00", image: "/white-projector.jpg" },
+      ],
       bgColor: "#ffffff",
       textColor: "#1e354e",
     },
@@ -73,15 +158,25 @@ const COMPONENT_FIELDS: Record<
       { key: "title", label: "Título Principal", type: "text" },
       { key: "subtitle", label: "Subtítulo", type: "text" },
       { key: "linkText", label: "Texto del Enlace", type: "text" },
+      { key: "mainImage", label: "URL Imagen Principal (Banner)", type: "image" },
+      { key: "productName", label: "Nombre del Producto (Cuadro pequeño)", type: "text" },
+      { key: "originalPrice", label: "Precio Original (Cuadro pequeño)", type: "text" },
+      { key: "salePrice", label: "Precio de Oferta (Cuadro pequeño)", type: "text" },
+      { key: "productImage", label: "URL Imagen del Producto (Cuadro pequeño)", type: "image" },
     ],
     styles: [
       { key: "bgColor", label: "Color de Fondo", type: "color" },
       { key: "textColor", label: "Color de Texto", type: "color" },
     ],
     defaults: {
-      title: "Please, don't stop the music!",
-      subtitle: "Users choice in this week!",
-      linkText: "See all products",
+      title: "¡Por favor, no detengas la música!",
+      subtitle: "La elección de los usuarios en este mundo",
+      linkText: "Ver todos los productos",
+      mainImage: "/woman-wearing-headphones-smiling.jpg",
+      productName: "Auriculares BelPhones XTRM",
+      originalPrice: "$99.99",
+      salePrice: "$79.00",
+      productImage: "/green-earphones-product.jpg",
       bgColor: "#5c9fa3",
       textColor: "#ffffff",
     },
@@ -223,6 +318,8 @@ export function EditorPanel() {
   const [localValues, setLocalValues] = useState<Record<string, any>>({})
   const [activeTab, setActiveTab] = useState("content")
 
+  // Efecto para cargar valores iniciales cuando cambia el componente seleccionado
+  // NO incluir componentEdits en las dependencias para evitar bucles infinitos
   useEffect(() => {
     if (selectedComponent) {
       const config = COMPONENT_FIELDS[selectedComponent]
@@ -241,7 +338,16 @@ export function EditorPanel() {
         ...edits,
       }
 
-      setLocalValues(mergedValues)
+      // Solo actualizar si los valores realmente cambiaron para evitar bucles infinitos
+      setLocalValues((prev) => {
+        const prevStr = JSON.stringify(prev)
+        const newStr = JSON.stringify(mergedValues)
+        if (prevStr === newStr) {
+          return prev // No actualizar si son iguales
+        }
+        return mergedValues
+      })
+      
       console.log("[Editor] Loaded values for", selectedComponent, {
         defaults: config?.defaults,
         fromDB: currentStyles,
@@ -252,7 +358,11 @@ export function EditorPanel() {
       // Limpiar valores cuando no hay componente seleccionado
       setLocalValues({})
     }
-  }, [selectedComponent, globalStyles, componentEdits])
+    // Solo actualizar cuando cambia el componente seleccionado o los estilos globales
+    // NO incluir componentEdits para evitar bucles infinitos
+    // Los cambios en componentEdits se manejan directamente en handleInputChange
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedComponent, globalStyles])
 
   // No mostrar el panel si no está en modo edición (después de todos los hooks)
   if (!isEditMode) {
@@ -285,10 +395,19 @@ export function EditorPanel() {
   const componentLabel = selectedComponent.charAt(0).toUpperCase() + selectedComponent.slice(1)
 
   const handleInputChange = (key: string, value: any) => {
-    setLocalValues((prev) => ({ ...prev, [key]: value }))
+    // Actualizar estado local de forma optimista
+    setLocalValues((prev) => {
+      // Solo actualizar si el valor realmente cambió
+      if (prev[key] === value) {
+        return prev
+      }
+      return { ...prev, [key]: value }
+    })
+    
+    // Actualizar ediciones en el contexto (esto puede disparar efectos, pero no debe causar bucles)
     updateComponentEdit(selectedComponent, key, value)
     
-    // Aplicar cambios en tiempo real para estilos
+    // Aplicar cambios en tiempo real para estilos (solo para colores)
     if (key === "bgColor" || key === "textColor" || key.includes("Color")) {
       if (typeof document !== "undefined" && selectedComponent) {
         const root = document.documentElement
@@ -312,6 +431,21 @@ export function EditorPanel() {
     const currentArray = localValues[arrayKey] || []
     const updatedArray = [...currentArray]
     updatedArray[index] = { ...updatedArray[index], [fieldKey]: value }
+    handleInputChange(arrayKey, updatedArray)
+  }
+
+  const handleAddArrayItem = (arrayKey: string, arrayFields: any[]) => {
+    const currentArray = localValues[arrayKey] || []
+    const newItem: Record<string, any> = {}
+    arrayFields.forEach((field) => {
+      newItem[field.key] = ""
+    })
+    handleInputChange(arrayKey, [...currentArray, newItem])
+  }
+
+  const handleRemoveArrayItem = (arrayKey: string, index: number) => {
+    const currentArray = localValues[arrayKey] || []
+    const updatedArray = currentArray.filter((_: any, i: number) => i !== index)
     handleInputChange(arrayKey, updatedArray)
   }
 
@@ -410,7 +544,10 @@ export function EditorPanel() {
   const hasChanges = componentEdits.has(selectedComponent)
 
   return (
-    <div className="fixed right-0 top-0 h-screen w-96 bg-background border-l border-border z-50 flex flex-col shadow-2xl">
+    <div 
+      className="fixed right-0 top-0 h-screen w-96 bg-background border-l border-border z-50 flex flex-col shadow-2xl"
+      data-editor-panel={selectedComponent ? "open" : "closed"}
+    >
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-border">
         <h2 className="text-lg font-semibold">Editando: {componentLabel}</h2>
@@ -420,8 +557,8 @@ export function EditorPanel() {
       </div>
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-        <TabsList className="mx-4 mt-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
+        <TabsList className="mx-4 mt-4 flex-shrink-0">
           <TabsTrigger value="content" className="flex-1">
             <Type className="h-4 w-4 mr-2" />
             Contenido
@@ -433,7 +570,7 @@ export function EditorPanel() {
         </TabsList>
 
         {/* Content Tab */}
-        <TabsContent value="content" className="flex-1 overflow-y-auto p-4 space-y-4 mt-0">
+        <TabsContent value="content" className="flex-1 overflow-y-auto p-4 space-y-4 mt-0 min-h-0 custom-scrollbar">
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Contenido del Componente</CardTitle>
@@ -442,41 +579,90 @@ export function EditorPanel() {
               {config.content.map((field) => (
                 <div key={field.key} className="space-y-2">
                   {field.isArray ? (
-                    <div>
-                      <Label className="mb-2 block">{field.label}</Label>
-                      {(localValues[field.key] || []).map((item: any, index: number) => (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between mb-2 sticky top-0 bg-background z-10 py-2 -mx-2 px-2 border-b border-border">
+                        <Label className="font-semibold">{field.label}</Label>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleAddArrayItem(field.key, field.arrayFields || [])}
+                          className="h-8"
+                        >
+                          <Plus className="h-3 w-3 mr-1" />
+                          Agregar
+                        </Button>
+                      </div>
+                      <div className="max-h-[400px] overflow-y-auto pr-2 space-y-3 custom-scrollbar">
+                        {(localValues[field.key] || []).map((item: any, index: number) => (
                         <Card key={index} className="mb-3">
                           <CardHeader className="pb-3">
-                            <CardTitle className="text-sm">Item {index + 1}</CardTitle>
+                            <div className="flex items-center justify-between">
+                              <CardTitle className="text-sm">Item {index + 1}</CardTitle>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleRemoveArrayItem(field.key, index)}
+                                className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </CardHeader>
                           <CardContent className="space-y-2">
                             {field.arrayFields?.map((subField) => (
                               <div key={subField.key} className="space-y-1">
-                                <Label className="text-xs">{subField.label}</Label>
-                                {subField.type === "textarea" ? (
-                                  <Textarea
+                                {subField.type === "image" || subField.key.toLowerCase().includes("image") ? (
+                                  <ImageUpload
                                     value={item[subField.key] || ""}
-                                    onChange={(e) =>
-                                      handleArrayItemChange(field.key, index, subField.key, e.target.value)
-                                    }
-                                    rows={2}
+                                    onChange={(url) => handleArrayItemChange(field.key, index, subField.key, url)}
+                                    label={subField.label}
+                                    context={`${selectedComponent}-${field.key}-${subField.key}-${index + 1}`}
                                   />
+                                ) : subField.type === "textarea" ? (
+                                  <>
+                                    <Label className="text-xs">{subField.label}</Label>
+                                    <Textarea
+                                      value={item[subField.key] || ""}
+                                      onChange={(e) =>
+                                        handleArrayItemChange(field.key, index, subField.key, e.target.value)
+                                      }
+                                      rows={2}
+                                    />
+                                  </>
                                 ) : (
-                                  <Input
-                                    type={subField.type}
-                                    value={item[subField.key] || ""}
-                                    onChange={(e) => {
-                                      const value = subField.type === "number" ? Number(e.target.value) : e.target.value
-                                      handleArrayItemChange(field.key, index, subField.key, value)
-                                    }}
-                                  />
+                                  <>
+                                    <Label className="text-xs">{subField.label}</Label>
+                                    <Input
+                                      type={subField.type}
+                                      value={item[subField.key] || ""}
+                                      onChange={(e) => {
+                                        const value = subField.type === "number" ? Number(e.target.value) : e.target.value
+                                        handleArrayItemChange(field.key, index, subField.key, value)
+                                      }}
+                                    />
+                                  </>
                                 )}
                               </div>
                             ))}
                           </CardContent>
                         </Card>
-                      ))}
+                        ))}
+                      </div>
+                      {(!localValues[field.key] || localValues[field.key].length === 0) && (
+                        <div className="text-center py-4 text-sm text-muted-foreground">
+                          No hay items. Haz clic en "Agregar" para crear uno nuevo.
+                        </div>
+                      )}
                     </div>
+                  ) : field.type === "image" || field.key.toLowerCase().includes("image") ? (
+                    <ImageUpload
+                      value={localValues[field.key] || ""}
+                      onChange={(url) => handleInputChange(field.key, url)}
+                      label={field.label}
+                      context={`${selectedComponent}-${field.key}`}
+                    />
                   ) : field.type === "textarea" ? (
                     <>
                       <Label htmlFor={field.key}>{field.label}</Label>
@@ -505,7 +691,7 @@ export function EditorPanel() {
         </TabsContent>
 
         {/* Styles Tab */}
-        <TabsContent value="styles" className="flex-1 overflow-y-auto p-4 space-y-4 mt-0">
+        <TabsContent value="styles" className="flex-1 overflow-y-auto p-4 space-y-4 mt-0 min-h-0 custom-scrollbar">
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Estilos del Componente</CardTitle>

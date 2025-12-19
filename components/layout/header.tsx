@@ -3,7 +3,8 @@
 import { useState, useMemo, useEffect } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import Link from "next/link"
-import { Search, Heart, ShoppingCart, Palette, AlignLeft, Menu, X, LogIn, LogOut, User, Eye, EyeOff } from "lucide-react"
+import { Search, Heart, ShoppingCart, Palette, AlignLeft, Menu, X, LogIn, LogOut, User, Eye, EyeOff, CreditCard, Building2, Wallet } from "lucide-react"
+import { VisaIcon, MasterCardIcon, AmexIcon } from "@/components/icons/cc-icons"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { useComponentStyle } from "@/contexts/styles-context"
@@ -1211,10 +1212,16 @@ export function Header() {
               }}
             >
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: "var(--primary)", opacity: 0.1 }}>
-                  <svg className="w-6 h-6" style={{ color: "var(--primary)" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                  </svg>
+                <div className="w-16 h-12 rounded-lg flex items-center justify-center gap-0.5 px-1.5" style={{ backgroundColor: "var(--primary)", opacity: 0.1 }}>
+                  <div className="flex items-center justify-center" style={{ width: "20px", height: "12px" }}>
+                    <VisaIcon className="w-full h-full" style={{ width: "20px", height: "12px" }} />
+                  </div>
+                  <div className="flex items-center justify-center" style={{ width: "20px", height: "12px" }}>
+                    <MasterCardIcon className="w-full h-full" style={{ width: "20px", height: "12px" }} />
+                  </div>
+                  <div className="flex items-center justify-center" style={{ width: "20px", height: "12px" }}>
+                    <AmexIcon className="w-full h-full" style={{ width: "20px", height: "12px" }} />
+                  </div>
                 </div>
                 <div className="flex-1 text-left">
                   <p className="font-semibold" style={{ color: "var(--foreground)" }}>Tarjeta de Crédito</p>
@@ -1246,9 +1253,7 @@ export function Header() {
             >
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: "var(--primary)", opacity: 0.1 }}>
-                  <svg className="w-6 h-6" style={{ color: "var(--primary)" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                  </svg>
+                  <CreditCard className="w-6 h-6" style={{ color: "var(--primary)" }} />
                 </div>
                 <div className="flex-1 text-left">
                   <p className="font-semibold" style={{ color: "var(--foreground)" }}>Tarjeta de Débito</p>
@@ -1279,8 +1284,10 @@ export function Header() {
               }}
             >
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: "#0070ba", opacity: 0.1 }}>
-                  <span className="text-lg font-bold" style={{ color: "#0070ba" }}>PP</span>
+                <div className="w-12 h-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: "#0070ba", opacity: 0.15 }}>
+                  <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M7.076 18.337H2.47a.641.641 0 0 1-.633-.74L4.944.901C5.026.382 5.474 0 5.998 0h7.46c2.57 0 4.578.543 5.69 1.81 1.174 1.305 1.05 2.785.927 3.723l-.122.95c-.061.46-.41.85-.87.85h-2.05c-.276 0-.508.19-.55.46l-.127.99c-.042.33-.31.58-.64.58h-1.48c-.276 0-.508.19-.55.46l-.127.99c-.042.33-.31.58-.64.58h-2.05c-.276 0-.508.19-.55.46l-.127.99c-.042.33-.31.58-.64.58H8.14c-.276 0-.508.19-.55.46l-.127.99c-.042.33-.31.58-.64.58H5.998c-.276 0-.508.19-.55.46l-.127.99c-.042.33-.31.58-.64.58z" fill="#0070ba"/>
+                  </svg>
                 </div>
                 <div className="flex-1 text-left">
                   <p className="font-semibold" style={{ color: "var(--foreground)" }}>PayPal</p>
@@ -1312,9 +1319,7 @@ export function Header() {
             >
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: "var(--primary)", opacity: 0.1 }}>
-                  <svg className="w-6 h-6" style={{ color: "var(--primary)" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z" />
-                  </svg>
+                  <Building2 className="w-6 h-6" style={{ color: "var(--primary)" }} />
                 </div>
                 <div className="flex-1 text-left">
                   <p className="font-semibold" style={{ color: "var(--foreground)" }}>Transferencia Bancaria</p>
@@ -1346,9 +1351,7 @@ export function Header() {
             >
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: "var(--primary)", opacity: 0.1 }}>
-                  <svg className="w-6 h-6" style={{ color: "var(--primary)" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                  </svg>
+                  <Wallet className="w-6 h-6" style={{ color: "var(--primary)" }} />
                 </div>
                 <div className="flex-1 text-left">
                   <p className="font-semibold" style={{ color: "var(--foreground)" }}>Efectivo al Recoger</p>

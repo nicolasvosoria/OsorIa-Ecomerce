@@ -28,16 +28,14 @@ export function HeroBanner() {
   
   // Combinar estilos de BD con ediciones locales para mostrar cambios en tiempo real
   const edits = componentEdits.get("hero") || {}
-  const label = edits.label ?? styleData.label ?? "Electronics"
-  const title = edits.title ?? styleData.title ?? "BALFE"
-  const subtitle = edits.subtitle ?? styleData.subtitle ?? "NUEVO MODELO"
-  const description = edits.description ?? styleData.description ?? "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua"
-  const buttonText = edits.buttonText ?? styleData.buttonText ?? "Comprar ahora"
   const bgColor = edits.bgColor ?? styleData.bgColor
   const textColor = edits.textColor ?? styleData.textColor
+  const buttonColor = edits.buttonColor ?? styleData.buttonColor
+  const buttonTextColor = edits.buttonTextColor ?? styleData.buttonTextColor
+  const barColor = edits.barColor ?? styleData.barColor
 
-  // Array de productos para el carrusel
-  const heroProducts = [
+  // Array de productos editables para el carrusel
+  const defaultProducts = [
     {
       label: "Electrónica",
       title: "BALFE",
@@ -71,13 +69,26 @@ export function HeroBanner() {
       image: "/mini-projector.jpg",
     },
   ]
+  
+  // Usar productos editables si existen, sino usar los por defecto
+  const heroProducts = edits.products ?? styleData.products ?? defaultProducts
 
   // Función helper para convertir hex a rgba
   const hexToRgba = (hex: string, alpha: number) => {
-    const r = parseInt(hex.slice(1, 3), 16)
-    const g = parseInt(hex.slice(3, 5), 16)
-    const b = parseInt(hex.slice(5, 7), 16)
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`
+    // Si el hex no empieza con #, agregarlo
+    const hexColor = hex.startsWith('#') ? hex : `#${hex}`
+    // Si el hex es muy corto, usar valores por defecto
+    if (hexColor.length < 7) {
+      return `rgba(0, 0, 0, ${alpha})`
+    }
+    try {
+      const r = parseInt(hexColor.slice(1, 3), 16)
+      const g = parseInt(hexColor.slice(3, 5), 16)
+      const b = parseInt(hexColor.slice(5, 7), 16)
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`
+    } catch (e) {
+      return `rgba(0, 0, 0, ${alpha})`
+    }
   }
 
   const accentColor = activeTheme?.colors.accent || "#005aa1"
@@ -143,12 +154,13 @@ export function HeroBanner() {
       >
         <CarouselContent>
           {heroProducts.map((product, index) => {
-            // Usar valores editados si existen, sino usar valores del producto
-            const displayLabel = edits.label ?? product.label ?? label
-            const displayTitle = edits.title ?? product.title ?? title
-            const displaySubtitle = edits.subtitle ?? product.subtitle ?? subtitle
-            const displayDescription = edits.description ?? product.description ?? description
-            const displayButtonText = edits.buttonText ?? product.buttonText ?? buttonText
+            // Usar valores del producto directamente (ya vienen editados)
+            const displayLabel = product.label || ""
+            const displayTitle = product.title || ""
+            const displaySubtitle = product.subtitle || ""
+            const displayDescription = product.description || ""
+            const displayButtonText = product.buttonText || ""
+            const displayImage = product.image || "/placeholder.svg"
             
             return (
             <CarouselItem key={index} className="basis-full">
@@ -182,8 +194,8 @@ export function HeroBanner() {
                       size="lg"
                       className="text-sm md:text-[16px] font-inter font-medium rounded px-6 md:px-8 w-full md:w-auto transition-all duration-200"
                       style={{
-                        backgroundColor: "var(--accent)",
-                        color: "var(--accent-foreground)",
+                        backgroundColor: buttonColor || "var(--accent)",
+                        color: buttonTextColor || "var(--accent-foreground)",
                       }}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.filter = "brightness(0.85)"
@@ -200,7 +212,7 @@ export function HeroBanner() {
 
                   {/* Right - Product Image */}
                   <div className="relative h-[250px] md:h-[400px] lg:h-[500px] order-first md:order-last">
-                    <img src={product.image} alt={displayTitle} className="w-full h-full object-contain" />
+                    <img src={displayImage} alt={displayTitle} className="w-full h-full object-contain" />
                     {/* Feature Callouts - Ocultos en móvil */}
                     <div className="hidden md:block absolute top-[20%] right-[10%] bg-white rounded-full p-3">
                       <div className="w-3 h-3 bg-gray-800 rounded-full" />
@@ -223,10 +235,9 @@ export function HeroBanner() {
       <div 
         className="absolute bottom-0 left-0 right-0 h-16 pointer-events-none"
         style={{
-          background: `linear-gradient(to bottom, 
-            ${hexToRgba(accentColor, 0.8)},
-            ${hexToRgba(secondaryColor, 0.6)}
-          )`,
+          background: barColor 
+            ? `linear-gradient(to bottom, ${hexToRgba(barColor, 0.8)}, ${hexToRgba(barColor, 0.4)})`
+            : `linear-gradient(to bottom, ${hexToRgba(accentColor, 0.8)}, ${hexToRgba(secondaryColor, 0.6)})`,
         }}
       />
     </section>

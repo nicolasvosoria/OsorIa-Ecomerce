@@ -5,14 +5,20 @@ import { Button } from "@/components/ui/button"
 import { Edit, X } from "lucide-react"
 
 export function EditModeToggle() {
-  const { isAdmin, isEditMode, toggleEditMode } = useAdmin()
+  const { isAdmin, isEditMode, toggleEditMode, selectedComponent } = useAdmin()
 
   if (!isAdmin) {
     return null
   }
 
+  // Ajustar posición cuando el panel de edición está abierto (tiene un ancho de 384px = w-96)
+  const rightOffset = isEditMode && selectedComponent ? "28rem" : "1rem" // 28rem = 448px (384px + 64px de margen)
+
   return (
-    <div className="fixed bottom-4 right-4 z-50">
+    <div 
+      className="fixed bottom-4 z-50 transition-all duration-300"
+      style={{ right: rightOffset }}
+    >
       <Button
         onClick={toggleEditMode}
         size="lg"

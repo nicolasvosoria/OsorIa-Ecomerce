@@ -12,6 +12,8 @@ export function FeaturedProduct() {
     originalPrice: "$99.99",
     salePrice: "$79.00",
     linkText: "Ver todos los productos",
+    mainImage: "/woman-wearing-headphones-smiling.jpg",
+    productImage: "/green-earphones-product.jpg",
     bgColor: "#5daba8",
   })
   const { componentEdits } = useAdmin()
@@ -24,6 +26,8 @@ export function FeaturedProduct() {
   const originalPrice = edits.originalPrice ?? styleData.originalPrice ?? "$99.99"
   const salePrice = edits.salePrice ?? styleData.salePrice ?? "$79.00"
   const linkText = edits.linkText ?? styleData.linkText ?? "Ver todos los productos"
+  const mainImage = edits.mainImage ?? styleData.mainImage ?? "/woman-wearing-headphones-smiling.jpg"
+  const productImage = edits.productImage ?? styleData.productImage ?? "/green-earphones-product.jpg"
   const bgColor = edits.bgColor ?? styleData.bgColor
   const textColor = edits.textColor ?? styleData.textColor
 
@@ -41,8 +45,8 @@ export function FeaturedProduct() {
           {/* Left - Image */}
           <div className="relative">
             <img
-              src="/woman-wearing-headphones-smiling.jpg"
-              alt="Woman enjoying music"
+              src={mainImage || "/placeholder.svg"}
+              alt={title || "Featured product"}
               className="w-full h-auto rounded-2xl"
             />
           </div>
@@ -86,7 +90,7 @@ export function FeaturedProduct() {
                 style={{ backgroundColor: "var(--background)" }}
               >
                 <img
-                  src="/green-earphones-product.jpg"
+                  src={productImage || "/placeholder.svg"}
                   alt={productName}
                   className="w-full h-full object-contain"
                 />
