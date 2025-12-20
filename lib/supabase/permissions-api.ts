@@ -5,20 +5,6 @@ import type { UserRole } from "@/lib/types/user"
  * Verifica si el usuario actual es administrador
  * @returns true si el usuario es administrador, false en caso contrario
  */
-// Helper para timeout
-async function withTimeout<T>(
-  promise: Promise<T>,
-  timeoutMs: number = 10000,
-  operation: string = 'operation'
-): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error(`Timeout después de ${timeoutMs}ms en ${operation}`)), timeoutMs)
-    ),
-  ])
-}
-
 export async function isCurrentUserAdmin(): Promise<boolean> {
   const supabase = getSupabaseBrowserClient()
   if (!supabase) {
@@ -27,44 +13,24 @@ export async function isCurrentUserAdmin(): Promise<boolean> {
   }
 
   try {
-    // Usar timeout para evitar esperas indefinidas
-    const { data: { user } } = await withTimeout(
-      supabase.auth.getUser(),
-      5000,
-      'getUser'
-    )
-    
+    const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
       return false
     }
 
-    // Consulta optimizada: solo seleccionar el campo 'role'
-    const { data, error } = await withTimeout(
-      supabase
-        .from("user_profiles")
-        .select("role")
-        .eq("id", user.id)
-        .single(),
-      8000,
-      'getUserRole'
-    )
+    const { data, error } = await supabase
+      .from("user_profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single()
 
     if (error) {
-      // Si el error es "no encontrado", no es admin
-      if (error.code === 'PGRST116' || error.message?.includes('No rows')) {
-        return false
-      }
       console.error("[Permissions] Error al verificar rol:", error)
       return false
     }
 
     return data?.role === "admin"
-  } catch (error: any) {
-    // Si es timeout, retornar false en lugar de lanzar error
-    if (error.message?.includes('Timeout')) {
-      console.warn("[Permissions] Timeout al verificar permisos, asumiendo no admin")
-      return false
-    }
+  } catch (error) {
     console.error("[Permissions] Error al verificar permisos:", error)
     return false
   }
@@ -82,40 +48,24 @@ export async function getCurrentUserRole(): Promise<UserRole | null> {
   }
 
   try {
-    const { data: { user } } = await withTimeout(
-      supabase.auth.getUser(),
-      5000,
-      'getUser'
-    )
-    
+    const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
       return null
     }
 
-    const { data, error } = await withTimeout(
-      supabase
-        .from("user_profiles")
-        .select("role")
-        .eq("id", user.id)
-        .single(),
-      8000,
-      'getUserRole'
-    )
+    const { data, error } = await supabase
+      .from("user_profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single()
 
     if (error) {
-      if (error.code === 'PGRST116' || error.message?.includes('No rows')) {
-        return "user" // Rol por defecto si no existe perfil
-      }
       console.error("[Permissions] Error al obtener rol:", error)
       return null
     }
 
     return (data?.role as UserRole) || "user"
-  } catch (error: any) {
-    if (error.message?.includes('Timeout')) {
-      console.warn("[Permissions] Timeout al obtener rol")
-      return null
-    }
+  } catch (error) {
     console.error("[Permissions] Error al obtener rol:", error)
     return null
   }

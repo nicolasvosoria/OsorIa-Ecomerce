@@ -277,6 +277,67 @@ export function Header() {
             />
           </div>
           <div className="flex items-center gap-1">
+            {isAuthenticated ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-11 w-11 md:h-9 md:w-9 rounded-full touch-manipulation"
+                    style={{ backgroundColor: "transparent" }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "var(--muted)"}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+                    title={user?.role === 'admin' ? "Administrador" : "Usuario"}
+                  >
+                    <User className="h-4 w-4" style={{ color: "var(--foreground)" }} />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" style={{ backgroundColor: "var(--background)", borderColor: "var(--border)" }}>
+                  <DropdownMenuLabel style={{ color: "var(--foreground)" }}>
+                    {user?.role === 'admin' 
+                      ? "Administrador"
+                      : user?.first_name && user?.last_name 
+                        ? `${user.first_name} ${user.last_name}`
+                        : user?.email || "Usuario"}
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator style={{ backgroundColor: "var(--border)" }} />
+                  <DropdownMenuItem
+                    onClick={async () => {
+                      const wasAdmin = user?.role === 'admin'
+                      const wasOnAdminPage = pathname === '/admin'
+                      
+                      await logout()
+                      
+                      if (wasAdmin && wasOnAdminPage) {
+                        router.push('/')
+                      }
+                      
+                      toast.success("Sesión cerrada", {
+                        description: "Has cerrado sesión exitosamente",
+                        duration: 3000,
+                      })
+                    }}
+                    style={{ color: "var(--foreground)" }}
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Cerrar sesión
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-11 w-11 md:h-9 md:w-9 rounded-full touch-manipulation"
+                style={{ backgroundColor: "transparent" }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "var(--muted)"}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+                onClick={() => setLoginModalOpen(true)}
+                title="Iniciar sesión"
+              >
+                <LogIn className="h-4 w-4" style={{ color: "var(--foreground)" }} />
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="icon"

@@ -525,16 +525,7 @@ export function EditorPanel() {
       console.log("[Editor] Resultado del guardado:", result)
       
       // Refrescar estilos desde Supabase para asegurar sincronización
-      // Usar un timeout más corto y no bloquear si falla
-      try {
-        await Promise.race([
-          refreshStyles(),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 10000))
-        ])
-      } catch (error) {
-        console.warn("[Editor] Error al refrescar estilos (no crítico):", error)
-        // No es crítico si falla el refresh, ya tenemos los estilos en localStorage
-      }
+      await refreshStyles()
       
       // Actualizar localStorage inmediatamente
       try {
