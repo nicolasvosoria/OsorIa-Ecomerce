@@ -15,33 +15,58 @@ export function ApplyStylesScript() {
   try {
     const root = document.documentElement;
     
-    // Aplicar tema desde localStorage
+    // Tema por defecto "Claro Original" - se usa solo si no hay tema guardado
+    const defaultTheme = {
+      theme_name: 'Claro Original',
+      colors: {
+        primary: '#005aa1',
+        secondary: '#c4faff',
+        accent: '#005aa1',
+        background: '#ffffff',
+        foreground: '#1a1a1a',
+        card: '#ffffff',
+        cardForeground: '#1a1a1a',
+        border: '#e5e5e5',
+        muted: '#f5f5f5',
+        mutedForeground: '#737373'
+      }
+    };
+    
+    // Aplicar tema desde localStorage (que será actualizado por el ThemeProvider con el tema activo de BD)
+    // Si no hay tema guardado, usar el por defecto
     const savedTheme = localStorage.getItem('osoria_active_theme');
+    let themeToApply = defaultTheme;
+    
     if (savedTheme) {
       try {
-        const theme = JSON.parse(savedTheme);
-        if (theme.colors) {
-          const colors = theme.colors;
-          root.style.setProperty('--primary', colors.primary);
-          root.style.setProperty('--secondary', colors.secondary);
-          root.style.setProperty('--accent', colors.accent);
-          root.style.setProperty('--background', colors.background);
-          root.style.setProperty('--foreground', colors.foreground);
-          root.style.setProperty('--card', colors.card);
-          root.style.setProperty('--card-foreground', colors.cardForeground);
-          root.style.setProperty('--border', colors.border);
-          root.style.setProperty('--muted', colors.muted);
-          root.style.setProperty('--muted-foreground', colors.mutedForeground);
-          root.style.setProperty('--primary-foreground', colors.foreground);
-          root.style.setProperty('--secondary-foreground', colors.foreground);
-          root.style.setProperty('--accent-foreground', colors.foreground);
-          
-          // Marcar qué tema fue aplicado
-          window.__osoria_applied_theme = theme.theme_name;
+        const parsedTheme = JSON.parse(savedTheme);
+        if (parsedTheme.colors && parsedTheme.theme_name) {
+          themeToApply = parsedTheme;
         }
       } catch (e) {
-        console.warn('[ApplyStyles] Error parsing saved theme:', e);
+        console.warn('[ApplyStyles] Error parsing saved theme, usando tema por defecto:', e);
       }
+    }
+    
+    // Aplicar el tema (guardado o por defecto)
+    if (themeToApply.colors) {
+      const colors = themeToApply.colors;
+      root.style.setProperty('--primary', colors.primary);
+      root.style.setProperty('--secondary', colors.secondary);
+      root.style.setProperty('--accent', colors.accent);
+      root.style.setProperty('--background', colors.background);
+      root.style.setProperty('--foreground', colors.foreground);
+      root.style.setProperty('--card', colors.card);
+      root.style.setProperty('--card-foreground', colors.cardForeground);
+      root.style.setProperty('--border', colors.border);
+      root.style.setProperty('--muted', colors.muted);
+      root.style.setProperty('--muted-foreground', colors.mutedForeground);
+      root.style.setProperty('--primary-foreground', colors.foreground);
+      root.style.setProperty('--secondary-foreground', colors.foreground);
+      root.style.setProperty('--accent-foreground', colors.foreground);
+      
+      // Marcar qué tema fue aplicado
+      window.__osoria_applied_theme = themeToApply.theme_name;
     }
     
     // Aplicar fuente desde localStorage

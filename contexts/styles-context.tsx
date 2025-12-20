@@ -21,7 +21,15 @@ export function StylesProvider({ children }: { children: ReactNode }) {
     try {
       setLoading(true)
       setError(null)
-      const data = await getComponentStyles()
+      
+      // Agregar timeout para evitar bloqueos
+      const data = await Promise.race([
+        getComponentStyles(),
+        new Promise<Awaited<ReturnType<typeof getComponentStyles>>>((_, reject) => 
+          setTimeout(() => reject(new Error('Timeout al obtener estilos')), 15000)
+        )
+      ])
+      
       const stylesMap = new Map(data.map((style) => [style.component_name, style.variables]))
       setStyles(stylesMap)
       
@@ -39,9 +47,14 @@ export function StylesProvider({ children }: { children: ReactNode }) {
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error"
-      console.log("[v0] Could not load styles from Supabase:", errorMessage)
+      // No loguear timeouts como errores críticos
+      if (errorMessage.includes('Timeout')) {
+        console.warn("[v0] Timeout al cargar estilos (no crítico):", errorMessage)
+      } else {
+        console.log("[v0] Could not load styles from Supabase:", errorMessage)
+      }
       setError(errorMessage)
-      // Don't throw, just continue with empty styles
+      // Don't throw, just continue with existing styles
     } finally {
       setLoading(false)
     }

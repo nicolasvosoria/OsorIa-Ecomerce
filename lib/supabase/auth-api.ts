@@ -276,29 +276,90 @@ export async function getUserProfile(userId: string): Promise<AuthResult> {
         error: 'Supabase no configurado',
       }
     }
-    const { data, error } = await withTimeout(
-      supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('id', userId)
-        .single(),
-      10000,
-      'getUserProfile'
-    )
 
-    if (error || !data) {
-      return {
-        success: false,
-        error: error?.message || 'Perfil no encontrado',
+    console.log('[Auth] Obteniendo perfil para usuario:', userId)
+    const startTime = Date.now()
+
+    // Aumentar timeout a 20 segundos y agregar reintentos
+    let lastError: any = null
+    const maxRetries = 2
+    
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        if (attempt > 0) {
+          console.log(`[Auth] Reintento ${attempt} de obtener perfil...`)
+          // Esperar un poco antes de reintentar
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempt))
+        }
+
+        const { data, error } = await withTimeout(
+          supabase
+            .from('user_profiles')
+            .select('*')
+            .eq('id', userId)
+            .single(),
+          20000, // Aumentado a 20 segundos
+          'getUserProfile'
+        )
+
+        const elapsedTime = Date.now() - startTime
+        console.log(`[Auth] Consulta de perfil completada en ${elapsedTime}ms`)
+
+        if (error) {
+          console.error('[Auth] Error en consulta de perfil:', {
+            message: error.message,
+            code: error.code,
+            details: error.details,
+            hint: error.hint,
+          })
+          
+          // Si es un error de "no encontrado", no reintentar
+          if (error.code === 'PGRST116' || error.message?.includes('No rows')) {
+            return {
+              success: false,
+              error: 'Perfil no encontrado',
+            }
+          }
+          
+          lastError = error
+          // Continuar con el siguiente intento si no es el último
+          if (attempt < maxRetries) {
+            continue
+          }
+        }
+
+        if (!data) {
+          return {
+            success: false,
+            error: 'Perfil no encontrado',
+          }
+        }
+
+        console.log('[Auth] Perfil obtenido exitosamente')
+        return {
+          success: true,
+          user: data as UserProfile,
+        }
+      } catch (timeoutError: any) {
+        const elapsedTime = Date.now() - startTime
+        console.error(`[Auth] Timeout después de ${elapsedTime}ms en intento ${attempt + 1}`)
+        lastError = timeoutError
+        
+        // Si es el último intento, retornar error
+        if (attempt >= maxRetries) {
+          break
+        }
       }
     }
 
+    // Si llegamos aquí, todos los intentos fallaron
+    console.error('[Auth] Todos los intentos de obtener perfil fallaron')
     return {
-      success: true,
-      user: data as UserProfile,
+      success: false,
+      error: lastError?.message || 'Error al obtener perfil: timeout o error de conexión',
     }
   } catch (error: any) {
-    console.error('[Auth] Error al obtener perfil:', error)
+    console.error('[Auth] Error inesperado al obtener perfil:', error)
     return {
       success: false,
       error: error.message || 'Error al obtener perfil',

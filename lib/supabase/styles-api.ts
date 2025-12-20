@@ -2,20 +2,43 @@ import { getSupabaseBrowserClient } from "./client"
 import type { ComponentStyle } from "./types"
 import { requireAdmin } from "./permissions-api"
 
+// Helper para timeout
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number = 15000,
+  operation: string = 'operation'
+): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`Timeout después de ${timeoutMs}ms en ${operation}`)), timeoutMs)
+    ),
+  ])
+}
+
 export async function getComponentStyles() {
   const supabase = getSupabaseBrowserClient()
   if (!supabase) {
     return []
   }
 
-  const { data, error } = await supabase.from("component_styles").select("*").order("component_name")
+  try {
+    const { data, error } = await withTimeout(
+      supabase.from("component_styles").select("*").order("component_name"),
+      15000,
+      'getComponentStyles'
+    )
 
-  if (error) {
-    console.error("[v0] Error fetching component styles:", error)
+    if (error) {
+      console.error("[v0] Error fetching component styles:", error)
+      return []
+    }
+
+    return (data || []) as ComponentStyle[]
+  } catch (error: any) {
+    console.error("[v0] Timeout o error al obtener estilos:", error.message || error)
     return []
   }
-
-  return data as ComponentStyle[]
 }
 
 export async function getComponentStyleByName(componentName: string) {

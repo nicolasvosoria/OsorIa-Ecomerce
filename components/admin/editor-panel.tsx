@@ -312,11 +312,17 @@ const COMPONENT_FIELDS: Record<
 }
 
 export function EditorPanel() {
-  const { selectedComponent, selectComponent, componentEdits, updateComponentEdit, clearComponentEdits, isEditMode } = useAdmin()
+  const { selectedComponent, selectComponent, componentEdits, updateComponentEdit, clearComponentEdits, isEditMode, toggleEditMode } = useAdmin()
   const { styles: globalStyles, refreshStyles } = useStyles()
   const [saving, setSaving] = useState(false)
   const [localValues, setLocalValues] = useState<Record<string, any>>({})
   const [activeTab, setActiveTab] = useState("content")
+
+  // Función para cerrar completamente el panel
+  // Siempre cierra el modo de edición completamente, no solo deselecciona el componente
+  const handleClosePanel = () => {
+    toggleEditMode()
+  }
 
   // Efecto para cargar valores iniciales cuando cambia el componente seleccionado
   // NO incluir componentEdits en las dependencias para evitar bucles infinitos
@@ -371,10 +377,26 @@ export function EditorPanel() {
 
   if (!selectedComponent) {
     return (
-      <div className="fixed right-0 top-0 h-screen w-full md:w-96 bg-background border-l border-border z-50 flex items-center justify-center p-8 shadow-2xl">
-        <div className="text-center text-muted-foreground">
-          <p className="text-base md:text-lg font-medium mb-2">Editor de Componentes</p>
-          <p className="text-xs md:text-sm">Haz clic en cualquier sección de la página para editarla</p>
+      <div className="fixed right-0 top-0 h-screen w-full md:w-96 bg-background border-l border-border z-50 flex flex-col shadow-2xl">
+        {/* Header con botón de cierre */}
+        <div className="flex items-center justify-between p-4 border-b border-border flex-shrink-0">
+          <h2 className="text-base md:text-lg font-semibold">Editor de Componentes</h2>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => toggleEditMode()}
+            className="h-9 w-9 hover:bg-destructive/10 hover:text-destructive"
+            aria-label="Cerrar panel de edición"
+            title="Cerrar panel"
+          >
+            <X className="h-5 w-5" />
+          </Button>
+        </div>
+        {/* Contenido centrado */}
+        <div className="flex-1 flex items-center justify-center p-8">
+          <div className="text-center text-muted-foreground">
+            <p className="text-xs md:text-sm">Haz clic en cualquier sección de la página para editarla</p>
+          </div>
         </div>
       </div>
     )
@@ -387,13 +409,29 @@ export function EditorPanel() {
         {/* Overlay oscuro en móviles */}
         <div 
           className="fixed inset-0 bg-black/50 z-40 md:hidden"
-          onClick={() => selectComponent(null)}
+          onClick={handleClosePanel}
           aria-label="Cerrar panel"
         />
-        <div className="fixed right-0 top-0 h-screen w-full md:w-96 bg-background border-l border-border z-50 flex items-center justify-center p-8 shadow-2xl">
-          <div className="text-center text-muted-foreground">
-            <p className="text-base md:text-lg font-medium mb-2">Componente no configurado</p>
-            <p className="text-xs md:text-sm">Este componente no tiene configuración de edición</p>
+        <div className="fixed right-0 top-0 h-screen w-full md:w-96 bg-background border-l border-border z-50 flex flex-col shadow-2xl">
+          {/* Header con botón de cierre */}
+          <div className="flex items-center justify-between p-4 border-b border-border flex-shrink-0">
+            <h2 className="text-base md:text-lg font-semibold">Componente no configurado</h2>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={handleClosePanel}
+              className="h-9 w-9 hover:bg-destructive/10 hover:text-destructive"
+              aria-label="Cerrar panel de edición"
+              title="Cerrar panel"
+            >
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+          {/* Contenido centrado */}
+          <div className="flex-1 flex items-center justify-center p-8">
+            <div className="text-center text-muted-foreground">
+              <p className="text-xs md:text-sm">Este componente no tiene configuración de edición</p>
+            </div>
           </div>
         </div>
       </>
@@ -487,7 +525,16 @@ export function EditorPanel() {
       console.log("[Editor] Resultado del guardado:", result)
       
       // Refrescar estilos desde Supabase para asegurar sincronización
-      await refreshStyles()
+      // Usar un timeout más corto y no bloquear si falla
+      try {
+        await Promise.race([
+          refreshStyles(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 10000))
+        ])
+      } catch (error) {
+        console.warn("[Editor] Error al refrescar estilos (no crítico):", error)
+        // No es crítico si falla el refresh, ya tenemos los estilos en localStorage
+      }
       
       // Actualizar localStorage inmediatamente
       try {
@@ -557,7 +604,7 @@ export function EditorPanel() {
       {selectedComponent && (
         <div 
           className="fixed inset-0 bg-black/50 z-40 md:hidden"
-          onClick={() => selectComponent(null)}
+          onClick={handleClosePanel}
           aria-label="Cerrar panel"
         />
       )}
@@ -569,11 +616,15 @@ export function EditorPanel() {
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-border flex-shrink-0">
           <h2 className="text-base md:text-lg font-semibold">Editando: {componentLabel}</h2>
-          <Button variant="ghost" size="icon" onClick={() => selectComponent(null)} className="md:hidden">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={handleClosePanel}
+            className="h-9 w-9 hover:bg-destructive/10 hover:text-destructive"
+            aria-label="Cerrar panel de edición"
+            title="Cerrar panel"
+          >
             <X className="h-5 w-5" />
-          </Button>
-          <Button variant="ghost" size="icon" onClick={() => selectComponent(null)} className="hidden md:flex">
-            <X className="h-4 w-4" />
           </Button>
         </div>
 

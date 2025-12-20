@@ -36,14 +36,16 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       console.log("[Theme] Temas recibidos:", themesData.length, "Tema activo:", activeThemeData ? "Sí" : "No")
       setThemes(themesData)
       
-      // Si no hay usuario autenticado o no hay tema activo, usar "Claro Original" por defecto
-      let themeToUse = activeThemeData
-      if (!isAuthenticated || !activeThemeData) {
-        const defaultTheme = themesData.find((t) => t.theme_name === "Claro Original")
-        if (defaultTheme) {
-          themeToUse = defaultTheme
-          console.log("[Theme] Usando tema por defecto 'Claro Original' (usuario no autenticado o sin tema activo)")
-        }
+      // Usar el tema activo de BD para TODOS los usuarios (autenticados o no)
+      // Si no hay tema activo en BD, usar "Claro Original" por defecto
+      const defaultTheme = themesData.find((t) => t.theme_name === "Claro Original")
+      let themeToUse = activeThemeData || defaultTheme
+      
+      if (activeThemeData) {
+        console.log("[Theme] Usando tema activo desde BD:", activeThemeData.theme_name, "(todos los usuarios verán este tema)")
+      } else if (defaultTheme) {
+        console.log("[Theme] No hay tema activo en BD, usando 'Claro Original' por defecto")
+        themeToUse = defaultTheme
       }
       
       setActiveThemeState(themeToUse)
@@ -135,15 +137,19 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Refrescar temas cuando cambie el estado de autenticación (solo si ya terminó la carga inicial)
+  // Refrescar temas periódicamente para detectar cambios del admin
+  // Esto permite que todos los usuarios vean el tema activo actualizado
   useEffect(() => {
-    // Solo refrescar si ya terminó la carga inicial y hay temas cargados
-    // Esto evita refreshes innecesarios durante la carga inicial
-    if (!loading && themes.length > 0 && appliedThemeRef.current !== null) {
-      refreshThemes()
+    if (!loading && themes.length > 0) {
+      // Refrescar cada 30 segundos para detectar cambios de tema del admin
+      const interval = setInterval(() => {
+        refreshThemes()
+      }, 30000) // 30 segundos
+      
+      return () => clearInterval(interval)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated])
+  }, [loading, themes.length])
 
   // Aplicar tema solo cuando se determine el tema activo final
   useEffect(() => {
@@ -165,9 +171,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       if (appliedThemeRef.current !== activeTheme.theme_name) {
         applyTheme(activeTheme)
       }
-    } else if (!activeTheme && themes.length > 0 && !isAuthenticated) {
-      // Solo aplicar tema por defecto si no hay tema activo, hay temas disponibles, 
-      // el usuario no está autenticado y ya terminó la carga
+    } else if (!activeTheme && themes.length > 0) {
+      // Si no hay tema activo, aplicar tema por defecto "Claro Original"
+      // Esto aplica para TODOS los usuarios (autenticados o no)
       const defaultTheme = themes.find((t) => t.theme_name === "Claro Original")
       if (defaultTheme) {
         // Si el script ya aplicó este tema, solo marcar como aplicado
