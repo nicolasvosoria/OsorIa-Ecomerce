@@ -58,9 +58,9 @@ export function AddToCartButton({
   }, [selectedVariant, product]);
 
   const getButtonText = () => {
-    if (!product.availableForSale) return 'Out Of Stock';
-    if (!resolvedVariant) return 'Select one';
-    return 'Add To Cart';
+    if (!product.availableForSale) return 'Agotado';
+    if (!resolvedVariant) return 'Selecciona uno';
+    return 'Añadir al carrito';
   };
 
   const isDisabled = !product.availableForSale || !resolvedVariant || isLoading;
@@ -95,7 +95,7 @@ export function AddToCartButton({
       >
         <Button
           type="submit"
-          aria-label={!resolvedVariant ? 'Select one' : 'Add to cart'}
+          aria-label={!resolvedVariant ? 'Selecciona uno' : 'Añadir al carrito'}
           disabled={isDisabled}
           className={iconOnly ? undefined : 'flex relative justify-between items-center w-full'}
           {...buttonProps}
@@ -157,19 +157,25 @@ export function AddToCart({
 }: AddToCartProps) {
   const { variants } = product;
   const selectedVariant = useSelectedVariant(product);
-  const pathname = useParams<{ handle?: string }>();
+  const pathname = useParams<{ handle?: string; slug?: string }>();
   const searchParams = useSearchParams();
 
   const hasNoVariants = variants.length === 0;
   const defaultVariantId = variants.length === 1 ? variants[0]?.id : undefined;
   const selectedVariantId = selectedVariant?.id || defaultVariantId;
+  // Verificar si estamos en la página del producto por handle o slug
   const isTargetingProduct =
-    pathname.handle === product.handle || searchParams.get('pid') === getShopifyProductId(product.id);
+    pathname.handle === product.handle ||
+    pathname.slug === product.handle ||
+    searchParams.get('pid') === getShopifyProductId(product.id);
 
   const resolvedVariant = useMemo(() => {
     if (hasNoVariants) return getBaseProductVariant(product);
-    if (!isTargetingProduct && !defaultVariantId) return undefined;
-    return variants.find(variant => variant.id === selectedVariantId);
+    // Si estamos en la página del producto o hay una variante por defecto, permitir agregar al carrito
+    if (isTargetingProduct || defaultVariantId) {
+      return variants.find(variant => variant.id === selectedVariantId) || (defaultVariantId ? variants[0] : undefined);
+    }
+    return undefined;
   }, [hasNoVariants, product, isTargetingProduct, defaultVariantId, variants, selectedVariantId]);
 
   return (
