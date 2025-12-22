@@ -5,6 +5,10 @@ import { FooterNew } from "@/components/sections/footer-new"
 import { getItems, getCategories } from "@/lib/supabase/products-api"
 import { CatalogProductsList } from "@/components/catalog/catalog-products-list"
 
+// Forzar renderizado dinámico para evitar errores de prerendering
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export default async function EarphonesPage() {
   // Obtener categoría de Earphones/Auriculares
   let categoryId: string | undefined
@@ -41,7 +45,11 @@ export default async function EarphonesPage() {
       }))
     }
   } catch (error) {
-    console.error('Error fetching earphones:', error)
+    // Silenciar errores durante el build, la página se renderizará con productos vacíos
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Error fetching earphones:', error)
+    }
+    products = []
   }
 
   return (
