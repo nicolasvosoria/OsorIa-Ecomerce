@@ -1,58 +1,46 @@
-"use client"
-
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { FooterNew } from "@/components/sections/footer-new"
-import { useQuantityModal } from "@/hooks/use-quantity-modal"
+import { getItems, getCategories } from "@/lib/supabase/products-api"
+import { CatalogProductsList } from "@/components/catalog/catalog-products-list"
 
-export default function StandsPage() {
-  const { openModal, QuantityModalComponent } = useQuantityModal()
+export default async function StandsPage() {
+  // Obtener categoría de Stands/Soportes
+  let categoryId: string | undefined
+  let products: any[] = []
   
-  const stands = [
-    {
-      id: 1,
-      name: "Soporte para Laptop",
-      category: "Stands",
-      price: "$82.00",
-      image: "/laptop-stand.png",
-    },
-    {
-      id: 2,
-      name: "Soporte Ajustable para Laptop",
-      category: "Stands",
-      price: "$99.00",
-      image: "/laptop-stand.png",
-    },
-    {
-      id: 3,
-      name: "Soporte Ergonómico",
-      category: "Stands",
-      price: "$129.00",
-      image: "/laptop-stand.png",
-    },
-    {
-      id: 4,
-      name: "Soporte Portátil",
-      category: "Stands",
-      price: "$59.00",
-      image: "/laptop-stand.png",
-    },
-    {
-      id: 5,
-      name: "Soporte con Ventilación",
-      category: "Stands",
-      price: "$89.00",
-      image: "/laptop-stand.png",
-    },
-    {
-      id: 6,
-      name: "Soporte Premium",
-      category: "Stands",
-      price: "$149.00",
-      image: "/laptop-stand.png",
-    },
-  ]
+  try {
+    const categories = await getCategories()
+    // Buscar categoría que contenga "stand" o "soporte" en el nombre
+    const standsCategory = categories.find(cat => 
+      cat.category_name.toLowerCase().includes('stand') ||
+      cat.category_name.toLowerCase().includes('soporte')
+    )
+    
+    if (standsCategory) {
+      categoryId = standsCategory.id
+      const result = await getItems({
+        category_id: categoryId,
+        is_active: true,
+        is_available_for_sale: true,
+        limit: 50,
+        order_by: 'display_order',
+        order_direction: 'asc',
+      })
+      
+      products = result.items.map(item => ({
+        id: item.id,
+        name: item.item_name,
+        category: item.category?.category_name || "Stands",
+        price: formatPrice(item.base_price, item.currency_code),
+        image: item.primary_image_url || "/placeholder.svg",
+        slug: item.item_slug || item.id,
+      }))
+    }
+  } catch (error) {
+    console.error('Error fetching stands:', error)
+  }
 
   return (
     <main className="min-h-screen" style={{ backgroundColor: "var(--background)" }}>
@@ -73,87 +61,27 @@ export default function StandsPage() {
             Stands
           </h1>
           <p className="text-lg md:text-xl" style={{ color: "var(--muted-foreground)" }}>
-            Mejora tu espacio de trabajo con nuestros soportes y bases de alta calidad
+            Soportes y stands ergonómicos para mejorar tu espacio de trabajo
           </p>
         </div>
 
         {/* Products Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 md:gap-8">
-          {stands.map((product) => (
-            <div
-              key={product.id}
-              className="group relative rounded-2xl overflow-hidden hover:shadow-xl transition-all duration-300"
-              style={{ backgroundColor: "var(--card)" }}
-            >
-              {/* Product Image */}
-              <div
-                className="aspect-square flex items-center justify-center p-6 relative overflow-hidden"
-                style={{ backgroundColor: "var(--background)" }}
-              >
-                <img
-                  src={product.image || "/placeholder.svg"}
-                  alt={product.name}
-                  className="w-full h-full object-contain transition-transform duration-300 group-hover:scale-110"
-                />
-              </div>
-
-              {/* Product Info */}
-              <div className="p-4 md:p-6">
-                <p className="text-sm md:text-base font-inter font-medium mb-1" style={{ color: "var(--muted-foreground)" }}>
-                  {product.category}
-                </p>
-                <h3 className="text-lg md:text-xl font-inter font-semibold mb-3" style={{ color: "var(--card-foreground)" }}>
-                  {product.name}
-                </h3>
-                
-                {/* Pricing */}
-                <div className="flex items-center gap-3 mb-4">
-                  <span className="text-xl md:text-2xl font-inter font-bold" style={{ color: "var(--primary)" }}>
-                    {product.price}
-                  </span>
-                </div>
-
-                {/* Add to Cart Button */}
-                <Button
-                  className="w-full"
-                  style={{
-                    backgroundColor: "var(--primary)",
-                    color: "var(--primary-foreground)",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.opacity = "0.9"
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.opacity = "1"
-                  }}
-                  onClick={() => {
-                    openModal({
-                      id: product.id,
-                      name: product.name,
-                      price: product.price,
-                      image: product.image,
-                      category: product.category,
-                    })
-                  }}
-                >
-                  Agregar al carrito
-                </Button>
-              </div>
-            </div>
-          ))}
-        </div>
+        <CatalogProductsList products={products} />
       </div>
 
       {/* Footer */}
       <FooterNew />
-
-      {/* Modal de cantidad */}
-      {QuantityModalComponent}
     </main>
   )
 }
 
-
-
-
-
+// Helper para formatear precio
+function formatPrice(price: number | string, currencyCode: string = "COP"): string {
+  const numPrice = typeof price === 'string' ? parseFloat(price) : price
+  return new Intl.NumberFormat('es-CO', {
+    style: 'currency',
+    currency: currencyCode,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(numPrice)
+}

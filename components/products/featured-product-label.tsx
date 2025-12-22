@@ -25,7 +25,7 @@ export function FeaturedProductLabel({
         <div className="col-span-2">
           <Badge className="font-black capitalize rounded-full">Best Seller</Badge>
         </div>
-        <Link href={`/product/${product.handle}`} className="col-span-1 self-start text-2xl font-semibold">
+        <Link href={`/products/${product.handle}`} className="col-span-1 self-start text-2xl font-semibold hover:underline">
           {product.title}
         </Link>
         <div className="col-span-1 mb-10">
@@ -53,7 +53,7 @@ export function FeaturedProductLabel({
     <div className={cn('flex gap-2 items-center p-2 pl-8 bg-white rounded-md max-w-full', className)}>
       <div className="pr-6 leading-4 overflow-hidden">
         <Link
-          href={`/product/${product.handle}`}
+          href={`/products/${product.handle}`}
           className="inline-block w-full truncate text-base font-semibold opacity-80 mb-1.5"
         >
           {product.title}

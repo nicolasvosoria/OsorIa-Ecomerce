@@ -1,9 +1,20 @@
 "use client"
 
 import Image from "next/image"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { useComponentStyle } from "@/contexts/styles-context"
 import { useAdmin } from "@/contexts/admin-context"
+
+// Helper para generar slug desde el nombre del producto
+function generateSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "")
+}
 
 export function FeaturedProduct() {
   const { styles: styleData } = useComponentStyle("featured", {
@@ -70,39 +81,41 @@ export function FeaturedProduct() {
             </div>
 
             {/* Product Card */}
-            <div 
-              className="rounded-xl md:rounded-2xl p-4 md:p-8" 
-              style={{ 
-                backgroundColor: "var(--card)", 
-                color: "var(--card-foreground)",
-                border: "1px solid var(--border)"
-              }}
-            >
-              <h3 className="mb-3 md:mb-4 font-semibold text-sm md:text-base" style={{ color: "var(--card-foreground)" }}>
-                {productName}
-              </h3>
-              <div className="flex items-baseline gap-2 mb-4 md:mb-6">
-                <span className="line-through text-sm md:text-base" style={{ color: "var(--muted-foreground)" }}>
-                  {originalPrice}
-                </span>
-                <span className="font-normal text-base md:text-lg" style={{ color: "var(--card-foreground)" }}>
-                  {salePrice}
-                </span>
-              </div>
+            <Link href={`/products/${generateSlug(productName)}`}>
               <div 
-                className="aspect-square flex items-center justify-center rounded-lg"
-                style={{ backgroundColor: "var(--background)" }}
+                className="rounded-xl md:rounded-2xl p-4 md:p-8 cursor-pointer hover:shadow-lg transition-shadow" 
+                style={{ 
+                  backgroundColor: "var(--card)", 
+                  color: "var(--card-foreground)",
+                  border: "1px solid var(--border)"
+                }}
               >
-                <Image
-                  src={productImage || "/placeholder.svg"}
-                  alt={productName}
-                  width={400}
-                  height={400}
-                  className="w-full h-full object-contain"
-                  sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 400px"
-                />
+                <h3 className="mb-3 md:mb-4 font-semibold text-sm md:text-base hover:text-primary transition-colors" style={{ color: "var(--card-foreground)" }}>
+                  {productName}
+                </h3>
+                <div className="flex items-baseline gap-2 mb-4 md:mb-6">
+                  <span className="line-through text-sm md:text-base" style={{ color: "var(--muted-foreground)" }}>
+                    {originalPrice}
+                  </span>
+                  <span className="font-normal text-base md:text-lg" style={{ color: "var(--card-foreground)" }}>
+                    {salePrice}
+                  </span>
+                </div>
+                <div 
+                  className="aspect-square flex items-center justify-center rounded-lg"
+                  style={{ backgroundColor: "var(--background)" }}
+                >
+                  <Image
+                    src={productImage || "/placeholder.svg"}
+                    alt={productName}
+                    width={400}
+                    height={400}
+                    className="w-full h-full object-contain"
+                    sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 400px"
+                  />
+                </div>
               </div>
-            </div>
+            </Link>
 
             <Button 
               variant="link" 
@@ -110,8 +123,11 @@ export function FeaturedProduct() {
               style={{ color: textColor || "var(--secondary-foreground)" }}
               onMouseEnter={(e) => e.currentTarget.style.opacity = "0.8"}
               onMouseLeave={(e) => e.currentTarget.style.opacity = "1"}
+              asChild
             >
-              {linkText} →
+              <Link href={`/products/${generateSlug(productName)}`}>
+                {linkText} →
+              </Link>
             </Button>
           </div>
         </div>

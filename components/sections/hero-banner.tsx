@@ -2,7 +2,20 @@
 
 import { useEffect, useRef, useState } from "react"
 import Image from "next/image"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { useComponentStyle } from "@/contexts/styles-context"
 import { useAdmin } from "@/contexts/admin-context"
 import { useTheme } from "@/contexts/theme-context"
@@ -12,6 +25,16 @@ import {
   CarouselItem,
   type CarouselApi,
 } from "@/components/ui/carousel"
+
+// Helper para generar slug desde el título
+function generateSlug(title: string): string {
+  return title
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "")
+}
 
 export function HeroBanner() {
   const { activeTheme } = useTheme()
@@ -26,6 +49,8 @@ export function HeroBanner() {
   const { componentEdits } = useAdmin()
   const [api, setApi] = useState<CarouselApi>()
   const autoplayRef = useRef<NodeJS.Timeout | null>(null)
+  const [selectedFeature, setSelectedFeature] = useState<{ title: string; description: string } | null>(null)
+  const [isFeatureDialogOpen, setIsFeatureDialogOpen] = useState(false)
   
   // Combinar estilos de BD con ediciones locales para mostrar cambios en tiempo real
   const edits = componentEdits.get("hero") || {}
@@ -34,6 +59,78 @@ export function HeroBanner() {
   const buttonColor = edits.buttonColor ?? styleData.buttonColor
   const buttonTextColor = edits.buttonTextColor ?? styleData.buttonTextColor
   const barColor = edits.barColor ?? styleData.barColor
+
+  // Características por producto
+  const productFeatures: Record<string, Array<{ title: string; description: string; position: { top: string; left?: string; right?: string; bottom?: string } }>> = {
+    "PREMIUM": [
+      {
+        title: "Cancelación de Ruido Activa",
+        description: "Tecnología avanzada que elimina el ruido ambiental para una experiencia de audio inmersiva y sin distracciones.",
+        position: { top: "20%", right: "10%" }
+      },
+      {
+        title: "Diseño Ergonómico",
+        description: "Auriculares diseñados para máximo confort durante horas de uso. Almohadillas suaves y ajuste perfecto para cualquier tipo de cabeza.",
+        position: { top: "45%", left: "15%" }
+      },
+      {
+        title: "Sonido de Alta Fidelidad",
+        description: "Drivers de 40mm con respuesta de frecuencia optimizada para reproducir cada detalle del audio con claridad cristalina.",
+        position: { bottom: "30%", right: "20%" }
+      }
+    ],
+    "BALFE": [
+      {
+        title: "Conectividad Inteligente",
+        description: "Conexión Bluetooth 5.0 de alta calidad con asistente de voz integrado para control total con comandos de voz.",
+        position: { top: "20%", right: "10%" }
+      },
+      {
+        title: "Sonido Potente",
+        description: "Altavoz de 20W con graves profundos y agudos claros, perfecto para cualquier tipo de música o contenido.",
+        position: { top: "45%", left: "15%" }
+      },
+      {
+        title: "Diseño Moderno",
+        description: "Estética minimalista que se adapta a cualquier espacio, con acabados premium y materiales de alta calidad.",
+        position: { bottom: "30%", right: "20%" }
+      }
+    ],
+    "LAPTOP STAND": [
+      {
+        title: "Ajuste Ergonómico",
+        description: "Altura y ángulo ajustables para encontrar la posición perfecta que reduce la tensión en cuello y espalda.",
+        position: { top: "20%", right: "10%" }
+      },
+      {
+        title: "Ventilación Mejorada",
+        description: "Diseño elevado que permite mejor circulación de aire, manteniendo tu laptop fresca durante largas sesiones de trabajo.",
+        position: { top: "45%", left: "15%" }
+      },
+      {
+        title: "Material Durable",
+        description: "Construido en aluminio anodizado de alta calidad, resistente y ligero para uso diario profesional.",
+        position: { bottom: "30%", right: "20%" }
+      }
+    ],
+    "MINI PROJECTOR": [
+      {
+        title: "Resolución HD",
+        description: "Proyección nítida en alta definición (1080p) con excelente calidad de imagen incluso en espacios iluminados.",
+        position: { top: "20%", right: "10%" }
+      },
+      {
+        title: "Portabilidad",
+        description: "Diseño compacto y ligero que cabe en cualquier mochila, perfecto para presentaciones y entretenimiento móvil.",
+        position: { top: "45%", left: "15%" }
+      },
+      {
+        title: "Conectividad Inalámbrica",
+        description: "Conexión WiFi y Bluetooth para transmitir contenido desde cualquier dispositivo sin cables.",
+        position: { bottom: "30%", right: "20%" }
+      }
+    ]
+  }
 
   // Array de productos editables para el carrusel
   const defaultProducts = [
@@ -206,8 +303,11 @@ export function HeroBanner() {
                         e.currentTarget.style.filter = "brightness(1)"
                         e.currentTarget.style.transform = "scale(1)"
                       }}
+                      asChild
                     >
-                      {displayButtonText} →
+                      <Link href={`/products/${generateSlug(displayTitle)}`}>
+                        {displayButtonText} →
+                      </Link>
                     </Button>
                   </div>
 
@@ -222,16 +322,39 @@ export function HeroBanner() {
                       sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 40vw"
                       priority={index === 0}
                     />
-                    {/* Feature Callouts - Ocultos en móvil */}
-                    <div className="hidden md:block absolute top-[20%] right-[10%] bg-white rounded-full p-3">
-                      <div className="w-3 h-3 bg-gray-800 rounded-full" />
-                    </div>
-                    <div className="hidden md:block absolute top-[45%] left-[15%] bg-white rounded-full p-3">
-                      <div className="w-3 h-3 bg-gray-800 rounded-full" />
-                    </div>
-                    <div className="hidden md:block absolute bottom-[30%] right-[20%] bg-white rounded-full p-3">
-                      <div className="w-3 h-3 bg-gray-800 rounded-full" />
-                    </div>
+                    {/* Feature Callouts - Interactivos */}
+                    {productFeatures[displayTitle]?.map((feature, featureIndex) => (
+                      <Tooltip key={featureIndex}>
+                        <TooltipTrigger asChild>
+                          <button
+                            className="hidden md:flex absolute items-center justify-center bg-white rounded-full p-3 shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-110 cursor-pointer group z-10"
+                            style={{
+                              top: feature.position.top,
+                              left: feature.position.left,
+                              right: feature.position.right,
+                              bottom: feature.position.bottom,
+                            }}
+                            onClick={() => {
+                              setSelectedFeature(feature)
+                              setIsFeatureDialogOpen(true)
+                            }}
+                            aria-label={`Ver característica: ${feature.title}`}
+                          >
+                            <div className="w-3 h-3 bg-gray-800 rounded-full group-hover:bg-gray-900 transition-colors" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent 
+                          side="top" 
+                          sideOffset={8}
+                          className="max-w-[280px] bg-gray-900 text-white border-none shadow-xl p-3"
+                        >
+                          <div className="space-y-1.5">
+                            <p className="font-semibold text-sm leading-tight">{feature.title}</p>
+                            <p className="text-xs opacity-90 leading-relaxed">{feature.description}</p>
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -249,6 +372,20 @@ export function HeroBanner() {
             : `linear-gradient(to bottom, ${hexToRgba(accentColor, 0.8)}, ${hexToRgba(secondaryColor, 0.6)})`,
         }}
       />
+
+      {/* Dialog para mostrar características */}
+      <Dialog open={isFeatureDialogOpen} onOpenChange={setIsFeatureDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-semibold">
+              {selectedFeature?.title}
+            </DialogTitle>
+            <DialogDescription className="text-base pt-2">
+              {selectedFeature?.description}
+            </DialogDescription>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
     </section>
   )
 }

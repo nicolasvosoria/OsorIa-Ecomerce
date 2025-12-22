@@ -18,7 +18,7 @@ export const ProductCard = ({ product }: { product: Product }) => {
   return (
     <div className="relative w-full aspect-[3/4] md:aspect-square bg-muted group overflow-hidden">
       <Link
-        href={`/product/${product.handle}`}
+        href={`/products/${product.handle}`}
         className="block size-full focus-visible:outline-none"
         aria-label={`View details for ${product.title}, price ${product.priceRange.minVariantPrice}`}
         prefetch
@@ -69,7 +69,7 @@ export const ProductCard = ({ product }: { product: Product }) => {
               </Suspense>
             ) : (
               <Button className="col-start-2" size="sm" variant="default" asChild>
-                <Link href={`/product/${product.handle}`}>
+                <Link href={`/products/${product.handle}`}>
                   <div className="flex justify-between items-center w-full">
                     <span>View Product</span>
                     <ArrowRightIcon />

@@ -1,6 +1,7 @@
+import { Suspense } from "react"
 import { HeroBanner } from "@/components/sections/hero-banner"
-import { PopularItems } from "@/components/sections/popular-items"
-import { ProductsGrid } from "@/components/sections/products-grid"
+import { PopularItemsWrapper } from "@/components/sections/popular-items-wrapper"
+import { ProductsGridWrapper } from "@/components/sections/products-grid-wrapper"
 import { FeaturedProduct } from "@/components/sections/featured-product"
 import { WhyUs } from "@/components/sections/why-us"
 import { FooterNew } from "@/components/sections/footer-new"
@@ -13,10 +14,14 @@ export default async function Home() {
         <HeroBanner />
       </EditableWrapper>
       <EditableWrapper componentName="popular" label="Productos Populares">
-        <PopularItems />
+        <Suspense fallback={<div className="py-12 text-center text-muted-foreground">Cargando productos populares...</div>}>
+          <PopularItemsWrapper />
+        </Suspense>
       </EditableWrapper>
       <EditableWrapper componentName="products" label="Productos">
-        <ProductsGrid />
+        <Suspense fallback={<div className="py-12 text-center text-muted-foreground">Cargando productos...</div>}>
+          <ProductsGridWrapper />
+        </Suspense>
       </EditableWrapper>
       <EditableWrapper componentName="featured" label="Producto Destacado">
         <FeaturedProduct />

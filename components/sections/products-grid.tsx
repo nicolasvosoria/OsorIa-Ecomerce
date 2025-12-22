@@ -1,10 +1,32 @@
 "use client"
 
 import Image from "next/image"
+import Link from "next/link"
 import { useComponentStyle } from "@/contexts/styles-context"
 import { useAdmin } from "@/contexts/admin-context"
 
-export function ProductsGrid() {
+// Helper para generar slug desde el nombre
+function generateSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "")
+}
+
+interface ProductsGridProps {
+  initialProducts?: Array<{
+    id: string
+    name: string
+    category: string
+    price: string
+    image: string
+    slug?: string
+  }>
+}
+
+export function ProductsGrid({ initialProducts }: ProductsGridProps = {}) {
   const { styles: styleData } = useComponentStyle("products", {
     title: "Productos populares",
   })
@@ -38,7 +60,10 @@ export function ProductsGrid() {
     },
   ]
   
-  const products = edits.products ?? styleData.products ?? defaultProducts
+  // Priorizar: productos de BD > ediciones > estilos > default
+  const products = initialProducts && initialProducts.length > 0
+    ? initialProducts
+    : (edits.products ?? styleData.products ?? defaultProducts)
 
   return (
     <section 
@@ -58,37 +83,42 @@ export function ProductsGrid() {
         </h2>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
-          {products.map((product, index) => (
-            <div 
-              key={index} 
-              className="rounded-2xl overflow-hidden hover:shadow-lg transition-shadow"
-              style={{ backgroundColor: "var(--card)" }}
-            >
-              <div className="p-4">
-                <h3 className="font-inter font-normal text-[17.4854px] mb-1" style={{ color: "var(--card-foreground)" }}>
-                  {product.name}
-                </h3>
-                <p className="text-[13.9775px] font-inter font-normal mb-2" style={{ color: "var(--muted-foreground)" }}>{product.category}</p>
-                <p className="text-[20.5864px] font-inter font-normal" style={{ color: "var(--card-foreground)" }}>
-                  {product.price}
-                </p>
-              </div>
-
-              <div 
-                className="aspect-square flex items-center justify-center p-4"
-                style={{ backgroundColor: "var(--background)" }}
+          {products.map((product, index) => {
+            const productSlug = product.slug || generateSlug(product.name)
+            const productId = initialProducts?.[index]?.id || `product-${index}`
+            return (
+              <Link 
+                key={productId} 
+                href={`/products/${productSlug}`}
+                className="rounded-2xl overflow-hidden hover:shadow-lg transition-shadow cursor-pointer block"
+                style={{ backgroundColor: "var(--card)" }}
               >
-                <Image
-                  src={product.image || "/placeholder.svg"}
-                  alt={product.name}
-                  width={400}
-                  height={400}
-                  className="w-full h-full object-contain"
-                  sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                />
-              </div>
-            </div>
-          ))}
+                <div className="p-4">
+                  <h3 className="font-inter font-normal text-[17.4854px] mb-1 hover:text-primary transition-colors" style={{ color: "var(--card-foreground)" }}>
+                    {product.name}
+                  </h3>
+                  <p className="text-[13.9775px] font-inter font-normal mb-2" style={{ color: "var(--muted-foreground)" }}>{product.category}</p>
+                  <p className="text-[20.5864px] font-inter font-normal" style={{ color: "var(--card-foreground)" }}>
+                    {product.price}
+                  </p>
+                </div>
+
+                <div 
+                  className="aspect-square flex items-center justify-center p-4"
+                  style={{ backgroundColor: "var(--background)" }}
+                >
+                  <Image
+                    src={product.image || "/placeholder.svg"}
+                    alt={product.name}
+                    width={400}
+                    height={400}
+                    className="w-full h-full object-contain"
+                    sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                  />
+                </div>
+              </Link>
+            )
+          })}
         </div>
       </div>
     </section>

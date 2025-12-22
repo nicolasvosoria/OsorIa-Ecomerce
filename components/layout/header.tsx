@@ -133,40 +133,42 @@ export function Header() {
       }}
     >
       <div className="container mx-auto px-4 py-3 md:py-6">
-        {/* Banner - Oculto en móvil */}
-        <div className="hidden md:flex items-center justify-between gap-6 mb-4 relative">
-          <Link href="/" className="flex items-center">
+        {/* Desktop y Tablet: Layout completo */}
+        <div className="hidden md:flex items-center justify-between gap-3 lg:gap-6 mb-4 relative">
+          {/* Logo - Izquierda */}
+          <Link href="/" className="flex items-center flex-shrink-0 z-10">
             <Image 
               src={logoSrc}
               alt="Osoria Logo"
               width={120}
               height={40}
-              className="object-contain"
+              className="object-contain w-auto h-8 lg:h-10"
               priority
             />
           </Link>
 
-          {/* Botón de menú */}
+          {/* Botón de menú - Izquierda después del logo */}
           <Button
             variant="ghost"
-            className="h-10 pl-2 pr-4 rounded-full gap-1"
+            className="h-9 lg:h-10 pl-2 pr-3 lg:pr-4 rounded-full gap-1.5 flex-shrink-0 z-10"
             style={{ backgroundColor: "transparent" }}
             onMouseEnter={(e) => e.currentTarget.style.backgroundColor = styleData.menuButtonHoverBg || "var(--muted)"}
             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
             onClick={() => setMenuOpen(true)}
             title="Abrir menú"
           >
-            <Menu className="h-5 w-5" style={{ color: styleData.menuButtonColor || "var(--foreground)" }} />
-            <span className="text-[15px] font-medium" style={{ color: styleData.menuButtonColor || "var(--foreground)" }}>Menú</span>
+            <Menu className="h-4 w-4 lg:h-5 lg:w-5" style={{ color: styleData.menuButtonColor || "var(--foreground)" }} />
+            <span className="text-sm lg:text-[15px] font-medium hidden lg:inline" style={{ color: styleData.menuButtonColor || "var(--foreground)" }}>Menú</span>
           </Button>
 
-          <div className="absolute left-1/2 -translate-x-1/2 max-w-xl w-full">
+          {/* Barra de búsqueda - Centro (responsive) */}
+          <div className="flex-1 max-w-md lg:max-w-xl mx-2 lg:mx-4 relative">
             <div className="relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: styleData.searchIconColor || "var(--muted-foreground)" }} />
+              <Search className="absolute left-3 lg:left-4 top-1/2 -translate-y-1/2 h-3.5 w-3.5 lg:h-4 lg:w-4" style={{ color: styleData.searchIconColor || "var(--muted-foreground)" }} />
               <Input
                 type="search"
                 placeholder={styleData.searchPlaceholder || "Buscar..."}
-                className="pl-12 pr-4 h-10 rounded-full w-full font-inter font-medium"
+                className="pl-9 lg:pl-12 pr-4 h-9 lg:h-10 rounded-full w-full font-inter font-medium text-sm lg:text-base"
                 style={{
                   backgroundColor: styleData.searchBgColor || "var(--muted)",
                   borderColor: styleData.searchBorderColor || "var(--border)",
@@ -176,21 +178,22 @@ export function Header() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 ml-auto">
+          {/* Iconos de acción - Derecha */}
+          <div className="flex items-center gap-1.5 lg:gap-2 flex-shrink-0 z-10">
             {isAuthenticated ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="ghost"
-                    className="h-10 px-3 md:px-4 rounded-full gap-2"
+                    className="h-9 lg:h-10 px-2.5 lg:px-4 rounded-full gap-1.5 lg:gap-2"
                     style={{ backgroundColor: "transparent" }}
                     onMouseEnter={(e) => e.currentTarget.style.backgroundColor = styleData.loginButtonHoverBg || "var(--muted)"}
                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
                   >
-                    <User className="h-4 w-4 md:h-5 md:w-5" style={{ color: styleData.loginButtonColor || "var(--foreground)" }} />
-                    <span className="text-sm md:text-base font-medium" style={{ color: styleData.loginButtonColor || "var(--foreground)" }}>
+                    <User className="h-4 w-4 lg:h-5 lg:w-5" style={{ color: styleData.loginButtonColor || "var(--foreground)" }} />
+                    <span className="text-xs lg:text-sm xl:text-base font-medium hidden xl:inline truncate max-w-[120px]" style={{ color: styleData.loginButtonColor || "var(--foreground)" }}>
                       {user?.role === 'admin' 
-                        ? "Administrador"
+                        ? "Admin"
                         : user?.first_name && user?.last_name 
                           ? `${user.first_name} ${user.last_name}`
                           : user?.email?.split('@')[0] || "Usuario"}
@@ -234,33 +237,34 @@ export function Header() {
             ) : (
               <Button 
                 variant="ghost" 
-                className="h-10 px-3 md:px-4 rounded-full gap-2"
+                className="h-9 lg:h-10 px-2.5 lg:px-4 rounded-full gap-1.5 lg:gap-2"
                 style={{ backgroundColor: "transparent" }}
                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = styleData.loginButtonHoverBg || "var(--muted)"}
                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
                 onClick={() => setLoginModalOpen(true)}
                 title="Iniciar sesión"
               >
-                <LogIn className="h-4 w-4 md:h-5 md:w-5" style={{ color: styleData.loginButtonColor || "var(--foreground)" }} />
-                <span className="text-sm md:text-base font-medium hidden sm:inline" style={{ color: styleData.loginButtonColor || "var(--foreground)" }}>Iniciar sesión</span>
+                <LogIn className="h-4 w-4 lg:h-5 lg:w-5" style={{ color: styleData.loginButtonColor || "var(--foreground)" }} />
+                <span className="text-xs lg:text-sm xl:text-base font-medium hidden xl:inline" style={{ color: styleData.loginButtonColor || "var(--foreground)" }}>Iniciar sesión</span>
               </Button>
             )}
             <Button
               variant="ghost" 
               size="icon" 
-              className="h-11 w-11 md:h-10 md:w-10 rounded-full touch-manipulation"
+              className="h-9 w-9 lg:h-10 lg:w-10 rounded-full touch-manipulation flex-shrink-0"
               style={{ 
                 backgroundColor: "transparent",
               }}
               onMouseEnter={(e) => e.currentTarget.style.backgroundColor = styleData.iconHoverBg || "var(--muted)"}
               onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+              title="Favoritos"
             >
-              <Heart className="h-5 w-5" style={{ color: styleData.iconColor || "var(--foreground)" }} />
+              <Heart className="h-4 w-4 lg:h-5 lg:w-5" style={{ color: styleData.iconColor || "var(--foreground)" }} />
             </Button>
             <Button 
               variant="ghost" 
               size="icon" 
-              className="h-11 w-11 md:h-10 md:w-10 rounded-full touch-manipulation"
+              className="h-9 w-9 lg:h-10 lg:w-10 rounded-full touch-manipulation relative flex-shrink-0"
               style={{ 
                 backgroundColor: "transparent",
               }}
@@ -269,130 +273,154 @@ export function Header() {
               onClick={() => setCartOpen(true)}
               title="Ver carrito"
             >
-              <ShoppingCart className="h-5 w-5" style={{ color: styleData.iconColor || "var(--foreground)" }} />
+              <ShoppingCart className="h-4 w-4 lg:h-5 lg:w-5" style={{ color: styleData.iconColor || "var(--foreground)" }} />
+              {getTotalItems() > 0 && (
+                <span
+                  className="absolute -top-1 -right-1 h-4 w-4 lg:h-5 lg:w-5 rounded-full flex items-center justify-center text-[10px] lg:text-xs font-bold text-white"
+                  style={{ backgroundColor: "var(--primary)" }}
+                >
+                  {getTotalItems() > 99 ? '99+' : getTotalItems()}
+                </span>
+              )}
             </Button>
           </div>
         </div>
 
-        {/* Móvil: Logo, menú y búsqueda */}
-        <div className="md:hidden flex items-center justify-between gap-2 mb-4">
-          <Link href="/" className="flex items-center flex-shrink-0">
-            <Image 
-              src={logoSrc}
-              alt="Osoria Logo"
-              width={100}
-              height={33}
-              className="object-contain"
-              priority
-            />
-          </Link>
-          <div className="flex-1 relative max-w-xs mx-2">
+        {/* Móvil: Layout optimizado */}
+        <div className="md:hidden flex flex-col gap-3 mb-4">
+          {/* Primera fila: Logo, iconos de acción */}
+          <div className="flex items-center justify-between gap-2">
+            <Link href="/" className="flex items-center flex-shrink-0">
+              <Image 
+                src={logoSrc}
+                alt="Osoria Logo"
+                width={100}
+                height={33}
+                className="object-contain h-7 sm:h-8"
+                priority
+              />
+            </Link>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              {isAuthenticated ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-10 w-10 rounded-full touch-manipulation"
+                      style={{ backgroundColor: "transparent" }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = styleData.loginButtonHoverBg || "var(--muted)"}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+                      title={user?.role === 'admin' ? "Administrador" : "Usuario"}
+                    >
+                      <User className="h-4 w-4" style={{ color: styleData.loginButtonColor || "var(--foreground)" }} />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" style={{ backgroundColor: "var(--background)", borderColor: "var(--border)" }}>
+                    <DropdownMenuLabel style={{ color: "var(--foreground)" }}>
+                      {user?.role === 'admin' 
+                        ? "Administrador"
+                        : user?.first_name && user?.last_name 
+                          ? `${user.first_name} ${user.last_name}`
+                          : user?.email || "Usuario"}
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator style={{ backgroundColor: "var(--border)" }} />
+                    <DropdownMenuItem
+                      onClick={async () => {
+                        const wasAdmin = user?.role === 'admin'
+                        const wasOnAdminPage = pathname === '/admin'
+                        
+                        await logout()
+                        
+                        if (wasAdmin && wasOnAdminPage) {
+                          router.push('/')
+                        }
+                        
+                        toast.success("Sesión cerrada", {
+                          description: "Has cerrado sesión exitosamente",
+                          duration: 3000,
+                        })
+                      }}
+                      style={{ color: "var(--foreground)" }}
+                    >
+                      <LogOut className="mr-2 h-4 w-4" />
+                      Cerrar sesión
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-10 w-10 rounded-full touch-manipulation"
+                  style={{ backgroundColor: "transparent" }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = styleData.loginButtonHoverBg || "var(--muted)"}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+                  onClick={() => setLoginModalOpen(true)}
+                  title="Iniciar sesión"
+                >
+                  <LogIn className="h-4.5 w-4.5" style={{ color: styleData.loginButtonColor || "var(--foreground)" }} />
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-10 w-10 rounded-full touch-manipulation flex-shrink-0"
+                style={{ backgroundColor: "transparent" }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = styleData.iconHoverBg || "var(--muted)"}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+                title="Favoritos"
+              >
+                <Heart className="h-4 w-4" style={{ color: styleData.iconColor || "var(--foreground)" }} />
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-10 w-10 rounded-full relative touch-manipulation flex-shrink-0"
+                style={{ backgroundColor: "transparent" }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = styleData.iconHoverBg || "var(--muted)"}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+                onClick={() => setCartOpen(true)}
+                title="Ver carrito"
+              >
+                <ShoppingCart className="h-4 w-4" style={{ color: styleData.iconColor || "var(--foreground)" }} />
+                {getTotalItems() > 0 && (
+                  <span
+                    className="absolute -top-1 -right-1 h-4 w-4 rounded-full flex items-center justify-center text-[10px] font-bold text-white"
+                    style={{ backgroundColor: "var(--primary)" }}
+                  >
+                    {getTotalItems() > 99 ? '99+' : getTotalItems()}
+                  </span>
+                )}
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-10 w-10 rounded-full touch-manipulation flex-shrink-0"
+                style={{ backgroundColor: "transparent" }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = styleData.menuButtonHoverBg || "var(--muted)"}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+                onClick={() => setMenuOpen(true)}
+                title="Abrir menú"
+              >
+                <Menu className="h-4 w-4" style={{ color: styleData.menuButtonColor || "var(--foreground)" }} />
+              </Button>
+            </div>
+          </div>
+          
+          {/* Segunda fila: Barra de búsqueda */}
+          <div className="relative w-full">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: styleData.searchIconColor || "var(--muted-foreground)" }} />
             <Input
               type="search"
-              placeholder={styleData.searchPlaceholder || "Search..."}
-              className="pl-10 pr-4 h-9 rounded-full w-full text-sm"
+              placeholder={styleData.searchPlaceholder || "Buscar..."}
+              className="pl-10 pr-4 h-10 rounded-full w-full text-sm"
               style={{
                 backgroundColor: styleData.searchBgColor || "var(--muted)",
                 borderColor: styleData.searchBorderColor || "var(--border)",
                 color: styleData.searchTextColor || "var(--foreground)",
               }}
             />
-          </div>
-          <div className="flex items-center gap-1">
-            {isAuthenticated ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-11 w-11 md:h-9 md:w-9 rounded-full touch-manipulation"
-                    style={{ backgroundColor: "transparent" }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = styleData.loginButtonHoverBg || "var(--muted)"}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
-                    title={user?.role === 'admin' ? "Administrador" : "Usuario"}
-                  >
-                    <User className="h-4 w-4" style={{ color: styleData.loginButtonColor || "var(--foreground)" }} />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" style={{ backgroundColor: "var(--background)", borderColor: "var(--border)" }}>
-                  <DropdownMenuLabel style={{ color: "var(--foreground)" }}>
-                    {user?.role === 'admin' 
-                      ? "Administrador"
-                      : user?.first_name && user?.last_name 
-                        ? `${user.first_name} ${user.last_name}`
-                        : user?.email || "Usuario"}
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator style={{ backgroundColor: "var(--border)" }} />
-                  <DropdownMenuItem
-                    onClick={async () => {
-                      const wasAdmin = user?.role === 'admin'
-                      const wasOnAdminPage = pathname === '/admin'
-                      
-                      await logout()
-                      
-                      if (wasAdmin && wasOnAdminPage) {
-                        router.push('/')
-                      }
-                      
-                      toast.success("Sesión cerrada", {
-                        description: "Has cerrado sesión exitosamente",
-                        duration: 3000,
-                      })
-                    }}
-                    style={{ color: "var(--foreground)" }}
-                  >
-                    <LogOut className="mr-2 h-4 w-4" />
-                    Cerrar sesión
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-11 w-11 md:h-9 md:w-9 rounded-full touch-manipulation"
-                style={{ backgroundColor: "transparent" }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = styleData.loginButtonHoverBg || "var(--muted)"}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
-                onClick={() => setLoginModalOpen(true)}
-                title="Iniciar sesión"
-              >
-                <LogIn className="h-4 w-4" style={{ color: styleData.loginButtonColor || "var(--foreground)" }} />
-              </Button>
-            )}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-11 w-11 md:h-9 md:w-9 rounded-full touch-manipulation"
-              style={{ backgroundColor: "transparent" }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = styleData.menuButtonHoverBg || "var(--muted)"}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
-              onClick={() => setMenuOpen(true)}
-              title="Abrir menú"
-            >
-              <Menu className="h-4 w-4" style={{ color: styleData.menuButtonColor || "var(--foreground)" }} />
-            </Button>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="h-11 w-11 md:h-9 md:w-9 rounded-full relative touch-manipulation"
-              style={{ backgroundColor: "transparent" }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = styleData.iconHoverBg || "var(--muted)"}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
-              onClick={() => setCartOpen(true)}
-              title="Ver carrito"
-            >
-              <ShoppingCart className="h-4 w-4" style={{ color: styleData.iconColor || "var(--foreground)" }} />
-              {getTotalItems() > 0 && (
-                <span
-                  className="absolute -top-1 -right-1 h-5 w-5 rounded-full flex items-center justify-center text-xs font-bold text-white"
-                  style={{ backgroundColor: "var(--primary)" }}
-                >
-                  {getTotalItems()}
-                </span>
-              )}
-            </Button>
           </div>
         </div>
 
