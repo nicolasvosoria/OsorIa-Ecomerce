@@ -20,11 +20,28 @@ import { adaptSupabaseProduct } from '@/lib/products/adapter';
 import { cn } from '@/lib/utils';
 
 // Generar parámetros estáticos para productos
-// Retornar array vacío para evitar problemas durante el build con cacheComponents
+// Con cacheComponents habilitado, debe retornar al menos un resultado
 export async function generateStaticParams() {
-  // Con cacheComponents habilitado, es mejor generar las páginas dinámicamente
-  // en lugar de pre-renderizarlas durante el build
-  return [];
+  try {
+    // Intentar obtener al menos un producto para validación
+    const { getItems } = await import('@/lib/supabase/products-api');
+    const result = await getItems({ limit: 1, is_active: true, is_available_for_sale: true });
+    
+    if (result.items.length > 0 && result.items[0].item_slug) {
+      return [{
+        slug: result.items[0].item_slug,
+      }];
+    }
+    
+    // Si no hay productos, retornar un slug dummy para cumplir con el requisito
+    return [{ slug: 'placeholder' }];
+  } catch (error) {
+    // Si falla, retornar un slug dummy para cumplir con el requisito de cacheComponents
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Error generating static params for products:', error);
+    }
+    return [{ slug: 'placeholder' }];
+  }
 }
 
 // Generar metadata para SEO
