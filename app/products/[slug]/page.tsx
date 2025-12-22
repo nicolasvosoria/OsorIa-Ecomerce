@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 import { notFound } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -19,55 +20,59 @@ import { adaptSupabaseProduct } from '@/lib/products/adapter';
 import { cn } from '@/lib/utils';
 
 // Generar parámetros estáticos para productos
+// Retornar array vacío para evitar problemas durante el build con cacheComponents
 export async function generateStaticParams() {
-  try {
-    // Obtener productos para generar rutas estáticas
-    const { getItems } = await import('@/lib/supabase/products-api');
-    const result = await getItems({ limit: 100, is_active: true, is_available_for_sale: true });
-    
-    return result.items
-      .filter(item => item.item_slug)
-      .map(item => ({
-        slug: item.item_slug!,
-      }));
-  } catch (error) {
-    console.error('Error generating static params for products:', error);
-    return [];
-  }
+  // Con cacheComponents habilitado, es mejor generar las páginas dinámicamente
+  // en lugar de pre-renderizarlas durante el build
+  return [];
 }
 
 // Generar metadata para SEO
 export async function generateMetadata(props: { params: Promise<{ slug: string }> }): Promise<Metadata> {
-  const params = await props.params;
-  const product = await getItemBySlug(params.slug);
+  try {
+    const params = await props.params;
+    const product = await getItemBySlug(params.slug);
 
-  if (!product) {
+    if (!product) {
+      return {
+        title: 'Producto no encontrado',
+      };
+    }
+
+    const imageUrl = product.primary_image_url || (product.images && product.images[0]?.image_url);
+
     return {
-      title: 'Producto no encontrado',
+      title: product.seo_title || product.item_name,
+      description: product.seo_description || product.item_description || product.item_name,
+      openGraph: imageUrl
+        ? {
+            images: [
+              {
+                url: imageUrl,
+                alt: product.primary_image_alt || product.item_name,
+              },
+            ],
+          }
+        : undefined,
+    };
+  } catch (error) {
+    // Si falla durante el build, retornar metadata básica
+    return {
+      title: 'Producto',
     };
   }
-
-  const imageUrl = product.primary_image_url || (product.images && product.images[0]?.image_url);
-
-  return {
-    title: product.seo_title || product.item_name,
-    description: product.seo_description || product.item_description || product.item_name,
-    openGraph: imageUrl
-      ? {
-          images: [
-            {
-              url: imageUrl,
-              alt: product.primary_image_alt || product.item_name,
-            },
-          ],
-        }
-      : undefined,
-  };
 }
 
-export default async function ProductDetailPage(props: { params: Promise<{ slug: string }> }) {
-  const params = await props.params;
-  const product = await getItemBySlug(params.slug);
+async function ProductContent({ slug }: { slug: string }) {
+  let product;
+  try {
+    product = await getItemBySlug(slug);
+  } catch (error) {
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Error fetching product:', error);
+    }
+    return notFound();
+  }
 
   if (!product) {
     return notFound();
@@ -365,6 +370,22 @@ export default async function ProductDetailPage(props: { params: Promise<{ slug:
         {/* Productos relacionados (opcional - se puede implementar después) */}
       </div>
     </div>
+  );
+}
+
+export default async function ProductDetailPage(props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
+
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-muted-foreground">Cargando producto...</p>
+        </div>
+      </div>
+    }>
+      <ProductContent slug={params.slug} />
+    </Suspense>
   );
 }
 
