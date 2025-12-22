@@ -1,3 +1,4 @@
+import { Suspense } from "react"
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -5,11 +6,7 @@ import { FooterNew } from "@/components/sections/footer-new"
 import { getItems, getCategories } from "@/lib/supabase/products-api"
 import { CatalogProductsList } from "@/components/catalog/catalog-products-list"
 
-// Forzar renderizado dinámico para evitar errores de prerendering
-export const dynamic = 'force-dynamic'
-export const revalidate = 0
-
-export default async function EarphonesPage() {
+async function EarphonesContent() {
   // Obtener categoría de Earphones/Auriculares
   let categoryId: string | undefined
   let products: any[] = []
@@ -52,6 +49,10 @@ export default async function EarphonesPage() {
     products = []
   }
 
+  return <CatalogProductsList products={products} />
+}
+
+export default async function EarphonesPage() {
   return (
     <main className="min-h-screen" style={{ backgroundColor: "var(--background)" }}>
       <div className="container mx-auto px-4 py-8 md:py-12">
@@ -76,7 +77,9 @@ export default async function EarphonesPage() {
         </div>
 
         {/* Products Grid */}
-        <CatalogProductsList products={products} />
+        <Suspense fallback={<div className="py-12 text-center text-muted-foreground">Cargando productos...</div>}>
+          <EarphonesContent />
+        </Suspense>
       </div>
 
       {/* Footer */}
