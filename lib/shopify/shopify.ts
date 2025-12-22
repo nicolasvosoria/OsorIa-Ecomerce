@@ -17,6 +17,11 @@ async function shopifyFetch<T>({
   query: string;
   variables?: Record<string, any>;
 }): Promise<{ data: T; errors?: any[] }> {
+  // Verificar si Shopify está configurado
+  if (!rawStoreDomain || SHOPIFY_STORE_DOMAIN === fallbackStoreDomain) {
+    console.warn('[Shopify] ⚠️ Shopify no está configurado. Usando dominio por defecto que puede no existir.');
+  }
+
   try {
     const response = await fetch(SHOPIFY_STOREFRONT_API_URL, {
       method: 'POST',
@@ -32,6 +37,11 @@ async function shopifyFetch<T>({
 
     if (!response.ok) {
       const errorBody = await response.text();
+      // Si es un error 404 o de conexión, puede ser que Shopify no esté configurado
+      if (response.status === 404 || response.status === 0) {
+        console.warn('[Shopify] ⚠️ No se pudo conectar a Shopify. Verifica que NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN esté configurado correctamente.');
+        throw new Error(`Shopify no configurado o dominio inválido: ${SHOPIFY_STORE_DOMAIN}`);
+      }
       throw new Error(`Shopify API HTTP error! Status: ${response.status}, Body: ${errorBody}`);
     }
 
@@ -44,6 +54,12 @@ async function shopifyFetch<T>({
 
     return json;
   } catch (error) {
+    // Si es un error de red o conexión, proporcionar un mensaje más útil
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      console.error('[Shopify] ❌ Error de conexión:', error.message);
+      console.warn('[Shopify] 💡 Sugerencia: Verifica que NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN esté configurado en .env.local');
+      throw new Error(`No se pudo conectar a Shopify. Verifica la configuración de NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN`);
+    }
     console.error('Shopify fetch error:', error);
     throw error;
   }
@@ -338,7 +354,7 @@ export async function getCollectionProducts({
 }
 
 // Create cart
-export async function createCart(): Promise<ShopifyCart> {
+export async function createCart(): Promise<ShopifyCart | null> {
   const query = /* gql */ `
     mutation cartCreate {
       cartCreate {
@@ -398,7 +414,8 @@ export async function createCart(): Promise<ShopifyCart> {
   }>({ query });
 
   if (data.cartCreate.userErrors.length > 0) {
-    throw new Error(data.cartCreate.userErrors[0].message);
+    console.error('[Shopify] ❌ Error creando carrito:', data.cartCreate.userErrors);
+    return null;
   }
 
   return data.cartCreate.cart;

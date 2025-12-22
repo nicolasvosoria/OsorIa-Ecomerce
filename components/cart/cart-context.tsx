@@ -28,7 +28,7 @@ type CartAction =
 type UseCartReturn = {
   isPending: boolean;
   cart: Cart | undefined;
-  addItem: (variant: ProductVariant, product: Product) => Promise<void>;
+  addItem: (variant: ProductVariant, product: Product, quantity?: number) => Promise<void>;
   updateItem: (lineId: string, merchandiseId: string, nextQuantity: number, updateType: UpdateType) => Promise<void>;
 };
 
@@ -197,12 +197,17 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   );
 
   const add = useCallback(
-    async (variant: ProductVariant, product: Product) => {
+    async (variant: ProductVariant, product: Product, quantity: number = 1) => {
       const previousQuantity = optimisticCart?.lines.find(l => l.merchandise.id === variant.id)?.quantity || 0;
-      startTransition(() => {
-        updateOptimisticCart({ type: 'ADD_ITEM', payload: { variant, product, previousQuantity } });
-      });
-      const fresh = await CartActions.addItem(variant.id);
+      // Actualizar el carrito optimista múltiples veces si la cantidad es mayor a 1
+      for (let i = 0; i < quantity; i++) {
+        const currentPreviousQuantity = previousQuantity + i;
+        startTransition(() => {
+          updateOptimisticCart({ type: 'ADD_ITEM', payload: { variant, product, previousQuantity: currentPreviousQuantity } });
+        });
+      }
+      // Llamar a la acción del servidor con la cantidad total
+      const fresh = await CartActions.addItem(variant.id, quantity);
       if (fresh) setCart(fresh);
     },
     [updateOptimisticCart, optimisticCart]

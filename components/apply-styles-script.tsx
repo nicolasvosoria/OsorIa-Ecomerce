@@ -105,10 +105,31 @@ export function ApplyStylesScript() {
           Object.keys(styles).forEach(function(componentName) {
             const componentStyles = styles[componentName];
             if (typeof componentStyles === 'object' && componentStyles !== null) {
-              Object.keys(componentStyles).forEach(function(key) {
-                const cssVar = '--' + componentName + '-' + key.replace(/([A-Z])/g, '-$1').toLowerCase();
-                root.style.setProperty(cssVar, componentStyles[key]);
-              });
+              // Aplicar fondo del sitio de manera especial
+              if (componentName === 'site_background') {
+                const body = document.body;
+                const type = componentStyles.type || 'color';
+                
+                if (type === 'color') {
+                  // Aplicar color de fondo
+                  body.style.backgroundColor = componentStyles.backgroundColor || '#ffffff';
+                  body.style.backgroundImage = 'none';
+                } else if (type === 'image' && componentStyles.backgroundImage) {
+                  // Aplicar imagen de fondo
+                  body.style.backgroundColor = componentStyles.backgroundColor || 'transparent';
+                  body.style.backgroundImage = 'url(' + componentStyles.backgroundImage + ')';
+                  body.style.backgroundPosition = componentStyles.backgroundPosition || 'center';
+                  body.style.backgroundRepeat = componentStyles.backgroundRepeat || 'no-repeat';
+                  body.style.backgroundSize = componentStyles.backgroundSize || 'cover';
+                  body.style.backgroundAttachment = 'fixed'; // Para que sea responsive y cubra toda la pantalla
+                }
+              } else {
+                // Aplicar estilos normales de componentes
+                Object.keys(componentStyles).forEach(function(key) {
+                  const cssVar = '--' + componentName + '-' + key.replace(/([A-Z])/g, '-$1').toLowerCase();
+                  root.style.setProperty(cssVar, componentStyles[key]);
+                });
+              }
             }
           });
         }

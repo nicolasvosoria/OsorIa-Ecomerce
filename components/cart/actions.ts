@@ -87,32 +87,43 @@ function adaptCart(shopifyCart: ShopifyCart | null): Cart | null {
   } satisfies Cart;
 }
 
-async function getOrCreateCartId(): Promise<string> {
+async function getOrCreateCartId(): Promise<string | null> {
   let cartId = (await cookies()).get('cartId')?.value;
   if (!cartId) {
-    const newCart = await createShopifyCart();
-    cartId = newCart.id;
-    (await cookies()).set('cartId', cartId, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 30,
-    });
+    try {
+      const newCart = await createShopifyCart();
+      if (!newCart) return null;
+      cartId = newCart.id;
+      (await cookies()).set('cartId', cartId, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 30,
+      });
+    } catch (error) {
+      console.error('[Cart] ❌ Error creando carrito de Shopify:', error);
+      return null;
+    }
   }
   return cartId;
 }
 
 // Add item server action: returns adapted Cart
-export async function addItem(variantId: string | undefined): Promise<Cart | null> {
+export async function addItem(variantId: string | undefined, quantity: number = 1): Promise<Cart | null> {
   if (!variantId) return null;
   try {
     const cartId = await getOrCreateCartId();
-    await addCartLines(cartId, [{ merchandiseId: variantId, quantity: 1 }]);
+    if (!cartId) {
+      console.warn('[Cart] ⚠️ No se pudo obtener o crear carrito. Shopify puede no estar configurado.');
+      return null;
+    }
+    await addCartLines(cartId, [{ merchandiseId: variantId, quantity }]);
     const fresh = await getShopifyCart(cartId);
     revalidateTag(TAGS.cart);
     return adaptCart(fresh);
   } catch (error) {
-    console.error('Error adding item to cart:', error);
+    console.error('[Cart] ❌ Error agregando item al carrito:', error);
+    console.warn('[Cart] 💡 Si Shopify no está configurado, agrega NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN a .env.local');
     return null;
   }
 }
@@ -141,6 +152,10 @@ export async function updateItem({ lineId, quantity }: { lineId: string; quantit
 export async function createCartAndSetCookie() {
   try {
     const newCart = await createShopifyCart();
+    if (!newCart) {
+      console.warn('[Cart] ⚠️ No se pudo crear carrito. Shopify puede no estar configurado.');
+      return null;
+    }
 
     (await cookies()).set('cartId', newCart.id, {
       httpOnly: true,
@@ -151,7 +166,8 @@ export async function createCartAndSetCookie() {
 
     return newCart;
   } catch (error) {
-    console.error('Error creating cart:', error);
+    console.error('[Cart] ❌ Error creando carrito:', error);
+    console.warn('[Cart] 💡 Si Shopify no está configurado, agrega NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN a .env.local');
     return null;
   }
 }

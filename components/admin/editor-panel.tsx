@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { X, Save, RotateCcw, Type, Palette, Plus, Trash2 } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useState, useEffect } from "react"
 import { updateComponentStyle } from "@/lib/supabase/styles-api"
 import { toast } from "sonner"
@@ -212,20 +213,46 @@ const COMPONENT_FIELDS: Record<
   header: {
     content: [
       { key: "brandName", label: "Nombre de la Marca", type: "text" },
+      { key: "logoImage", label: "Logo de la Empresa", type: "image" },
+      { key: "logoImageDark", label: "Logo para Tema Oscuro (opcional)", type: "image" },
+      { key: "searchPlaceholder", label: "Texto del Buscador", type: "text" },
       { key: "tagline", label: "Texto del Banner", type: "text" },
     ],
     styles: [
+      { key: "bgColor", label: "Color de Fondo del Header", type: "color" },
       { key: "bannerBgColor", label: "Color de Fondo del Banner", type: "color" },
       { key: "bannerTextColor", label: "Color de Texto del Banner", type: "color" },
-      { key: "bgColor", label: "Color de Fondo", type: "color" },
-      { key: "linkColor", label: "Color de Enlaces", type: "color" },
+      { key: "menuButtonColor", label: "Color del Botón de Menú", type: "color" },
+      { key: "menuButtonHoverBg", label: "Color de Fondo Hover del Botón de Menú", type: "color" },
+      { key: "loginButtonColor", label: "Color del Botón de Iniciar Sesión", type: "color" },
+      { key: "loginButtonHoverBg", label: "Color de Fondo Hover del Botón de Iniciar Sesión", type: "color" },
+      { key: "iconColor", label: "Color de los Iconos (Corazón, Carrito, etc.)", type: "color" },
+      { key: "iconHoverBg", label: "Color de Fondo Hover de los Iconos", type: "color" },
+      { key: "searchIconColor", label: "Color del Icono de Búsqueda", type: "color" },
+      { key: "searchBgColor", label: "Color de Fondo del Buscador", type: "color" },
+      { key: "searchTextColor", label: "Color del Texto del Buscador", type: "color" },
+      { key: "searchBorderColor", label: "Color del Borde del Buscador", type: "color" },
+      { key: "linkColor", label: "Color de Enlaces de Navegación", type: "color" },
     ],
     defaults: {
       brandName: "Osoria",
+      logoImage: "/logo-osoria.png",
+      logoImageDark: "/logo-osoria-blanco.svg",
+      searchPlaceholder: "Buscar...",
       tagline: "Big Sale! Hurry up! Sale ends in 2025",
+      bgColor: "#ffffff",
       bannerBgColor: "#c4faff",
       bannerTextColor: "#005aa1",
-      bgColor: "#ffffff",
+      menuButtonColor: "#1a1a1a",
+      menuButtonHoverBg: "#f5f5f5",
+      loginButtonColor: "#1a1a1a",
+      loginButtonHoverBg: "#f5f5f5",
+      iconColor: "#1a1a1a",
+      iconHoverBg: "#f5f5f5",
+      searchIconColor: "#737373",
+      searchBgColor: "#f5f5f5",
+      searchTextColor: "#1a1a1a",
+      searchBorderColor: "#e5e5e5",
       linkColor: "#005aa1",
     },
   },
@@ -308,6 +335,68 @@ const COMPONENT_FIELDS: Record<
       { key: "bgColor", label: "Color de Fondo", type: "color" },
       { key: "textColor", label: "Color de Texto", type: "color" },
     ],
+  },
+  site_background: {
+    content: [],
+    styles: [
+      { 
+        key: "type", 
+        label: "Tipo de Fondo", 
+        type: "select",
+        options: [
+          { value: "color", label: "Color" },
+          { value: "image", label: "Imagen" },
+        ]
+      },
+      { key: "backgroundColor", label: "Color de Fondo", type: "color" },
+      { key: "backgroundImage", label: "Imagen de Fondo", type: "image" },
+      { 
+        key: "backgroundPosition", 
+        label: "Posición de la Imagen", 
+        type: "select",
+        options: [
+          { value: "center", label: "Centro" },
+          { value: "top", label: "Superior" },
+          { value: "bottom", label: "Inferior" },
+          { value: "left", label: "Izquierda" },
+          { value: "right", label: "Derecha" },
+          { value: "top left", label: "Superior Izquierda" },
+          { value: "top right", label: "Superior Derecha" },
+          { value: "bottom left", label: "Inferior Izquierda" },
+          { value: "bottom right", label: "Inferior Derecha" },
+        ]
+      },
+      { 
+        key: "backgroundRepeat", 
+        label: "Repetición", 
+        type: "select",
+        options: [
+          { value: "no-repeat", label: "No repetir" },
+          { value: "repeat", label: "Repetir" },
+          { value: "repeat-x", label: "Repetir horizontal" },
+          { value: "repeat-y", label: "Repetir vertical" },
+        ]
+      },
+      { 
+        key: "backgroundSize", 
+        label: "Tamaño", 
+        type: "select",
+        options: [
+          { value: "cover", label: "Cubrir (cover)" },
+          { value: "contain", label: "Contener (contain)" },
+          { value: "auto", label: "Automático" },
+          { value: "100% 100%", label: "Estirar" },
+        ]
+      },
+    ],
+    defaults: {
+      type: "color",
+      backgroundColor: "#ffffff",
+      backgroundImage: "",
+      backgroundPosition: "center",
+      backgroundRepeat: "no-repeat",
+      backgroundSize: "cover",
+    },
   },
 }
 
@@ -393,10 +482,19 @@ export function EditorPanel() {
           </Button>
         </div>
         {/* Contenido centrado */}
-        <div className="flex-1 flex items-center justify-center p-8">
+        <div className="flex-1 flex flex-col items-center justify-center p-8 gap-4">
           <div className="text-center text-muted-foreground">
-            <p className="text-xs md:text-sm">Haz clic en cualquier sección de la página para editarla</p>
+            <p className="text-xs md:text-sm mb-4">Haz clic en cualquier sección de la página para editarla</p>
           </div>
+          {/* Botón para configurar fondo del sitio */}
+          <Button
+            variant="outline"
+            onClick={() => selectComponent("site_background")}
+            className="w-full max-w-xs"
+          >
+            <Palette className="h-4 w-4 mr-2" />
+            Configurar Fondo del Sitio
+          </Button>
         </div>
       </div>
     )
@@ -467,6 +565,51 @@ export function EditorPanel() {
             ;(componentElement as HTMLElement).style.backgroundColor = value
           } else if (key === "textColor") {
             ;(componentElement as HTMLElement).style.color = value
+          }
+        }
+      }
+    }
+    
+    // Aplicar cambios en tiempo real para el fondo del sitio
+    if (selectedComponent === "site_background") {
+      if (typeof document !== "undefined") {
+        const body = document.body
+        const type = localValues.type || value
+        
+        if (key === "type") {
+          // Cuando cambia el tipo, aplicar la configuración completa
+          const bgType = value
+          if (bgType === "color") {
+            body.style.backgroundColor = localValues.backgroundColor || "#ffffff"
+            body.style.backgroundImage = "none"
+          } else if (bgType === "image" && localValues.backgroundImage) {
+            body.style.backgroundColor = localValues.backgroundColor || "transparent"
+            body.style.backgroundImage = `url(${localValues.backgroundImage})`
+            body.style.backgroundPosition = localValues.backgroundPosition || "center"
+            body.style.backgroundRepeat = localValues.backgroundRepeat || "no-repeat"
+            body.style.backgroundSize = localValues.backgroundSize || "cover"
+            body.style.backgroundAttachment = "fixed"
+          }
+        } else if (key === "backgroundColor") {
+          body.style.backgroundColor = value
+          if (type === "image" && localValues.backgroundImage) {
+            // Mantener la imagen si existe
+            body.style.backgroundImage = `url(${localValues.backgroundImage})`
+          }
+        } else if (key === "backgroundImage") {
+          if (value && type === "image") {
+            body.style.backgroundImage = `url(${value})`
+            body.style.backgroundColor = localValues.backgroundColor || "transparent"
+            body.style.backgroundPosition = localValues.backgroundPosition || "center"
+            body.style.backgroundRepeat = localValues.backgroundRepeat || "no-repeat"
+            body.style.backgroundSize = localValues.backgroundSize || "cover"
+            body.style.backgroundAttachment = "fixed"
+          } else {
+            body.style.backgroundImage = "none"
+          }
+        } else if (key === "backgroundPosition" || key === "backgroundRepeat" || key === "backgroundSize") {
+          if (type === "image" && localValues.backgroundImage) {
+            body.style[key.replace(/([A-Z])/g, "-$1").toLowerCase()] = value
           }
         }
       }
@@ -725,6 +868,11 @@ export function EditorPanel() {
                       onChange={(url) => handleInputChange(field.key, url)}
                       label={field.label}
                       context={`${selectedComponent}-${field.key}`}
+                      // Configuración específica para logos
+                      recommendedWidth={field.key.toLowerCase().includes("logo") ? 240 : undefined}
+                      recommendedHeight={field.key.toLowerCase().includes("logo") ? 80 : undefined}
+                      fileTypes={field.key.toLowerCase().includes("logo") ? ["PNG", "SVG", "JPG", "WEBP"] : undefined}
+                      accept={field.key.toLowerCase().includes("logo") ? "image/png,image/svg+xml,image/jpeg,image/jpg,image/webp" : undefined}
                     />
                   ) : field.type === "textarea" ? (
                     <>
@@ -766,33 +914,73 @@ export function EditorPanel() {
                   const defaultValue = config.defaults?.[field.key] || ""
                   const displayValue = currentValue || defaultValue || ""
                   
+                  // Mostrar/ocultar campos según el tipo de fondo seleccionado
+                  if (selectedComponent === "site_background") {
+                    if (field.key === "backgroundColor" && localValues.type === "image") {
+                      return null // Ocultar color si es imagen
+                    }
+                    if (field.key === "backgroundImage" && localValues.type === "color") {
+                      return null // Ocultar imagen si es color
+                    }
+                    if (field.key === "backgroundPosition" || field.key === "backgroundRepeat" || field.key === "backgroundSize") {
+                      if (localValues.type === "color") {
+                        return null // Ocultar opciones de imagen si es color
+                      }
+                    }
+                  }
+                  
                   return (
                     <div key={field.key} className="space-y-2">
                       <Label htmlFor={`style-${field.key}`} className="text-sm font-medium">
                         {field.label}
                       </Label>
-                      <div className="flex gap-2 items-center">
-                        <Input
-                          id={`style-${field.key}`}
-                          type={field.type}
-                          value={currentValue}
-                          onChange={(e) => handleInputChange(field.key, e.target.value)}
-                          className={field.type === "color" ? "h-10 flex-1" : "flex-1"}
-                          placeholder={field.type === "color" ? "#000000" : defaultValue || "Ingrese un valor..."}
+                      {field.type === "select" && field.options ? (
+                        <Select
+                          value={currentValue || defaultValue}
+                          onValueChange={(value) => handleInputChange(field.key, value)}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder={`Selecciona ${field.label.toLowerCase()}`} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {field.options.map((option) => (
+                              <SelectItem key={option.value} value={option.value}>
+                                {option.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : field.type === "image" || field.key.toLowerCase().includes("image") ? (
+                        <ImageUpload
+                          value={currentValue || ""}
+                          onChange={(url) => handleInputChange(field.key, url)}
+                          label={field.label}
+                          context={`${selectedComponent}-${field.key}`}
                         />
-                        {field.type === "color" && (
-                          <div
-                            className="w-12 h-12 rounded border-2 border-border cursor-pointer hover:scale-105 transition-transform flex-shrink-0"
-                            style={{ backgroundColor: displayValue || "#000000" }}
-                            onClick={() => {
-                              const input = document.getElementById(`style-${field.key}`) as HTMLInputElement
-                              if (input) input.click()
-                            }}
-                            title="Haz clic para abrir el selector de color"
+                      ) : (
+                        <div className="flex gap-2 items-center">
+                          <Input
+                            id={`style-${field.key}`}
+                            type={field.type}
+                            value={currentValue}
+                            onChange={(e) => handleInputChange(field.key, e.target.value)}
+                            className={field.type === "color" ? "h-10 flex-1" : "flex-1"}
+                            placeholder={field.type === "color" ? "#000000" : defaultValue || "Ingrese un valor..."}
                           />
-                        )}
-                      </div>
-                      {displayValue && (
+                          {field.type === "color" && (
+                            <div
+                              className="w-12 h-12 rounded border-2 border-border cursor-pointer hover:scale-105 transition-transform flex-shrink-0"
+                              style={{ backgroundColor: displayValue || "#000000" }}
+                              onClick={() => {
+                                const input = document.getElementById(`style-${field.key}`) as HTMLInputElement
+                                if (input) input.click()
+                              }}
+                              title="Haz clic para abrir el selector de color"
+                            />
+                          )}
+                        </div>
+                      )}
+                      {displayValue && field.type !== "select" && (
                         <p className="text-xs text-muted-foreground">
                           Valor: <code className="bg-muted px-1.5 py-0.5 rounded text-xs">{displayValue}</code>
                         </p>

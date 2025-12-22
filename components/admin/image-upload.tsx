@@ -15,6 +15,9 @@ interface ImageUploadProps {
   accept?: string
   maxSizeMB?: number
   context?: string // Contexto nemotécnico para el nombre del archivo (ej: "hero-banner", "featured-product")
+  recommendedWidth?: number // Ancho recomendado en px
+  recommendedHeight?: number // Alto recomendado en px
+  fileTypes?: string[] // Tipos de archivo permitidos (ej: ["PNG", "SVG", "JPG"])
 }
 
 export function ImageUpload({
@@ -24,6 +27,9 @@ export function ImageUpload({
   accept = "image/jpeg,image/jpg,image/png,image/webp,image/gif",
   maxSizeMB = 5,
   context,
+  recommendedWidth,
+  recommendedHeight,
+  fileTypes,
 }: ImageUploadProps) {
   const [uploading, setUploading] = useState(false)
   const [preview, setPreview] = useState<string | null>(value || null)
@@ -169,9 +175,21 @@ export function ImageUpload({
       />
 
       {/* Información */}
-      <p className="text-xs text-muted-foreground">
-        Formatos permitidos: JPG, PNG, WEBP, GIF. Tamaño máximo: {maxSizeMB}MB
-      </p>
+      <div className="space-y-1">
+        {fileTypes && fileTypes.length > 0 && (
+          <p className="text-xs text-muted-foreground">
+            <span className="font-medium">Tipos de archivo permitidos:</span> {fileTypes.join(", ")}
+          </p>
+        )}
+        {recommendedWidth && recommendedHeight && (
+          <p className="text-xs text-muted-foreground">
+            <span className="font-medium">Dimensiones recomendadas:</span> {recommendedWidth}px × {recommendedHeight}px
+          </p>
+        )}
+        <p className="text-xs text-muted-foreground">
+          Tamaño máximo: {maxSizeMB}MB
+        </p>
+      </div>
     </div>
   )
 }

@@ -271,6 +271,7 @@ export async function getUserProfile(userId: string): Promise<AuthResult> {
   try {
     const supabase = getSupabaseBrowserClient()
     if (!supabase) {
+      console.warn('[Auth] Supabase no configurado')
       return {
         success: false,
         error: 'Supabase no configurado',
@@ -280,16 +281,17 @@ export async function getUserProfile(userId: string): Promise<AuthResult> {
     console.log('[Auth] Obteniendo perfil para usuario:', userId)
     const startTime = Date.now()
 
-    // Aumentar timeout a 20 segundos y agregar reintentos
+    // Reducir reintentos y timeout para evitar esperas largas
     let lastError: any = null
-    const maxRetries = 2
+    const maxRetries = 1 // Solo 1 reintento
+    const timeoutMs = 8000 // Reducido a 8 segundos
     
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
         if (attempt > 0) {
           console.log(`[Auth] Reintento ${attempt} de obtener perfil...`)
           // Esperar un poco antes de reintentar
-          await new Promise(resolve => setTimeout(resolve, 1000 * attempt))
+          await new Promise(resolve => setTimeout(resolve, 500 * attempt))
         }
 
         const { data, error } = await withTimeout(
@@ -298,8 +300,8 @@ export async function getUserProfile(userId: string): Promise<AuthResult> {
             .select('*')
             .eq('id', userId)
             .single(),
-          20000, // Aumentado a 20 segundos
-          'getUserProfile'
+          timeoutMs,
+          `getUserProfile (intento ${attempt + 1})`
         )
 
         const elapsedTime = Date.now() - startTime
@@ -313,11 +315,50 @@ export async function getUserProfile(userId: string): Promise<AuthResult> {
             hint: error.hint,
           })
           
-          // Si es un error de "no encontrado", no reintentar
-          if (error.code === 'PGRST116' || error.message?.includes('No rows')) {
+          // Si es un error de "no encontrado", intentar crear el perfil
+          if (error.code === 'PGRST116' || error.message?.includes('No rows') || error.message?.includes('not found')) {
+            console.log('[Auth] Perfil no encontrado, intentando crear perfil automáticamente...')
+            
+            // Obtener el usuario de auth para crear el perfil
+            const { data: { user: authUser } } = await supabase.auth.getUser()
+            
+            if (authUser && authUser.id === userId) {
+              // Intentar crear el perfil
+              const { data: newProfile, error: insertError } = await supabase
+                .from('user_profiles')
+                .insert({
+                  id: userId,
+                  email: authUser.email || '',
+                  first_name: authUser.user_metadata?.first_name || null,
+                  last_name: authUser.user_metadata?.last_name || null,
+                })
+                .select()
+                .single()
+
+              if (!insertError && newProfile) {
+                console.log('[Auth] Perfil creado automáticamente')
+                return {
+                  success: true,
+                  user: newProfile as UserProfile,
+                }
+              } else {
+                console.error('[Auth] Error al crear perfil automáticamente:', insertError)
+              }
+            }
+            
+            // Si no se pudo crear, retornar error
             return {
               success: false,
-              error: 'Perfil no encontrado',
+              error: 'Perfil no encontrado y no se pudo crear automáticamente',
+            }
+          }
+          
+          // Si es un error de permisos o RLS, no reintentar
+          if (error.code === '42501' || error.message?.includes('permission') || error.message?.includes('RLS')) {
+            console.error('[Auth] Error de permisos/RLS en user_profiles. Verifica que RLS esté deshabilitado o las políticas estén configuradas correctamente.')
+            return {
+              success: false,
+              error: 'Error de permisos al acceder al perfil. Verifica la configuración de RLS en Supabase.',
             }
           }
           
@@ -342,7 +383,7 @@ export async function getUserProfile(userId: string): Promise<AuthResult> {
         }
       } catch (timeoutError: any) {
         const elapsedTime = Date.now() - startTime
-        console.error(`[Auth] Timeout después de ${elapsedTime}ms en intento ${attempt + 1}`)
+        console.error(`[Auth] Timeout después de ${elapsedTime}ms en intento ${attempt + 1}:`, timeoutError.message)
         lastError = timeoutError
         
         // Si es el último intento, retornar error
@@ -353,10 +394,21 @@ export async function getUserProfile(userId: string): Promise<AuthResult> {
     }
 
     // Si llegamos aquí, todos los intentos fallaron
-    console.error('[Auth] Todos los intentos de obtener perfil fallaron')
+    console.error('[Auth] Todos los intentos de obtener perfil fallaron. Último error:', lastError?.message)
+    
+    // Proporcionar un mensaje más útil
+    let errorMessage = 'Error al obtener perfil: timeout o error de conexión'
+    if (lastError?.message) {
+      if (lastError.message.includes('timeout') || lastError.message.includes('Timeout')) {
+        errorMessage = 'Timeout al conectar con Supabase. Verifica tu conexión a internet y que Supabase esté disponible.'
+      } else {
+        errorMessage = lastError.message
+      }
+    }
+    
     return {
       success: false,
-      error: lastError?.message || 'Error al obtener perfil: timeout o error de conexión',
+      error: errorMessage,
     }
   } catch (error: any) {
     console.error('[Auth] Error inesperado al obtener perfil:', error)

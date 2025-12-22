@@ -6,6 +6,10 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  // Deshabilitar Turbopack para evitar problemas con fuentes de Google
+  experimental: {
+    turbo: false,
+  },
   images: {
     unoptimized: true,
     formats: ['image/avif', 'image/webp'],

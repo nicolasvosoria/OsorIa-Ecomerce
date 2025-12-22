@@ -4,11 +4,10 @@ import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { FooterNew } from "@/components/sections/footer-new"
-import { useCart } from "@/contexts/cart-context"
-import { toast } from "sonner"
+import { useQuantityModal } from "@/hooks/use-quantity-modal"
 
 export default function EarphonesPage() {
-  const { addToCart } = useCart()
+  const { openModal, QuantityModalComponent } = useQuantityModal()
   
   const earphones = [
     {
@@ -128,16 +127,12 @@ export default function EarphonesPage() {
                     e.currentTarget.style.opacity = "1"
                   }}
                   onClick={() => {
-                    addToCart({
+                    openModal({
                       id: product.id,
                       name: product.name,
                       price: product.price,
                       image: product.image,
                       category: product.category,
-                    })
-                    toast.success("Producto agregado al carrito", {
-                      description: `${product.name} ha sido agregado exitosamente`,
-                      duration: 3000,
                     })
                   }}
                 >
@@ -151,6 +146,9 @@ export default function EarphonesPage() {
 
       {/* Footer */}
       <FooterNew />
+
+      {/* Modal de cantidad */}
+      {QuantityModalComponent}
     </main>
   )
 }

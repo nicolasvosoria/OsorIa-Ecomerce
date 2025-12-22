@@ -4,11 +4,10 @@ import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { FooterNew } from "@/components/sections/footer-new"
-import { useCart } from "@/contexts/cart-context"
-import { toast } from "sonner"
+import { useQuantityModal } from "@/hooks/use-quantity-modal"
 
 export default function SalePage() {
-  const { addToCart } = useCart()
+  const { openModal, QuantityModalComponent } = useQuantityModal()
   const saleProducts = [
     {
       id: 1,
@@ -170,7 +169,7 @@ export default function SalePage() {
                     e.currentTarget.style.opacity = "1"
                   }}
                   onClick={() => {
-                    addToCart({
+                    openModal({
                       id: product.id,
                       name: product.name,
                       price: product.salePrice,
@@ -178,10 +177,6 @@ export default function SalePage() {
                       category: product.category,
                       originalPrice: product.originalPrice,
                       salePrice: product.salePrice,
-                    })
-                    toast.success("Producto agregado al carrito", {
-                      description: `${product.name} ha sido agregado exitosamente`,
-                      duration: 3000,
                     })
                   }}
                 >
@@ -195,6 +190,9 @@ export default function SalePage() {
 
       {/* Footer */}
       <FooterNew />
+
+      {/* Modal de cantidad */}
+      {QuantityModalComponent}
     </main>
   )
 }

@@ -22,10 +22,12 @@ import { AdminProvider } from "@/contexts/admin-context"
 import { EditorPanel } from "@/components/admin/editor-panel"
 import { EditModeToggle } from "@/components/admin/edit-mode-toggle"
 import { MainContentWrapper } from "@/components/admin/main-content-wrapper"
+import { EditableWrapper } from "@/components/admin/editable-wrapper"
 import { viewport } from "./viewport"
 import { FloatingContactButton } from "@/components/ui/floating-contact-button"
 import { ApplyStylesScript } from "@/components/apply-styles-script"
 import { StylesLoader } from "@/components/styles-loader"
+import { SiteBackground } from "@/components/site-background"
 
 const V0Setup = dynamic(() => import("@/components/v0-setup"))
 
@@ -34,11 +36,13 @@ const isV0 = process.env["VERCEL_URL"]?.includes("vusercontent.net") ?? false
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
+  display: "swap",
 })
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  display: "swap",
 })
 
 export const metadata: Metadata = {
@@ -55,7 +59,14 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  const collections = await getCollections()
+  // Intentar obtener colecciones de Shopify, pero no fallar si no está configurado
+  let collections = [];
+  try {
+    collections = await getCollections();
+  } catch (error) {
+    console.warn('[Layout] ⚠️ No se pudieron obtener colecciones de Shopify:', error);
+    // Continuar sin colecciones si Shopify no está configurado
+  }
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -66,6 +77,7 @@ export default async function RootLayout({
         <ApplyStylesScript />
         <V0Provider isV0={isV0}>
           <StylesProvider>
+            <SiteBackground />
             <AuthProvider>
               <AdminPermissionsProvider>
                 <ThemeProvider>
@@ -77,7 +89,9 @@ export default async function RootLayout({
                         <StylesLoader>
                           <MainContentWrapper>
                             <main data-vaul-drawer-wrapper="true">
-                              <Header />
+                              <EditableWrapper componentName="header" label="Header">
+                                <Header />
+                              </EditableWrapper>
                               {children}
                             </main>
                           </MainContentWrapper>

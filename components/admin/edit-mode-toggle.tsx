@@ -7,11 +7,6 @@ import { useState, useEffect } from "react"
 
 export function EditModeToggle() {
   const { isAdmin, isEditMode, toggleEditMode, selectedComponent } = useAdmin()
-
-  if (!isAdmin) {
-    return null
-  }
-
   const [isMobile, setIsMobile] = useState(false)
   
   useEffect(() => {
@@ -22,6 +17,10 @@ export function EditModeToggle() {
     window.addEventListener('resize', checkMobile)
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
+
+  if (!isAdmin) {
+    return null
+  }
   
   // Ajustar posición cuando el panel de edición está abierto solo en desktop
   // En móviles, el panel es overlay completo, así que no necesitamos ajustar la posición

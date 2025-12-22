@@ -15,8 +15,11 @@ import {
 import { Button } from "@/components/ui/button"
 import { useCart } from "@/contexts/cart-context"
 import { toast } from "sonner"
+import { QuantityModal } from "@/components/cart/quantity-modal"
 
 export function PopularItems() {
+  const [quantityModalOpen, setQuantityModalOpen] = useState(false)
+  const [selectedItem, setSelectedItem] = useState<{ id: string; name: string; price: string; image: string } | null>(null)
   const { styles: styleData } = useComponentStyle("popular", {
     title: "Lo más vendido",
     priceLabel: "Desde $29",
@@ -177,16 +180,13 @@ export function PopularItems() {
                         }}
                         onClick={(e) => {
                           e.stopPropagation()
-                          addToCart({
+                          setSelectedItem({
                             id: `popular-${index}`,
                             name: item.title,
                             price: item.price,
                             image: item.image,
                           })
-                          toast.success("Producto agregado al carrito", {
-                            description: `${item.title} ha sido agregado exitosamente`,
-                            duration: 3000,
-                          })
+                          setQuantityModalOpen(true)
                         }}
                       >
                         Agregar al carrito
@@ -220,6 +220,26 @@ export function PopularItems() {
           </Carousel>
         </div>
       </div>
+
+      {/* Modal de cantidad */}
+      {selectedItem && (
+        <QuantityModal
+          open={quantityModalOpen}
+          onOpenChange={setQuantityModalOpen}
+          onConfirm={(quantity) => {
+            addToCart(selectedItem, quantity)
+            toast.success("Producto agregado al carrito", {
+              description: `${quantity} ${quantity === 1 ? "unidad" : "unidades"} de ${selectedItem.name} ${quantity === 1 ? "ha sido" : "han sido"} agregada${quantity === 1 ? "" : "s"} exitosamente`,
+              duration: 3000,
+            })
+            setSelectedItem(null)
+          }}
+          productName={selectedItem.name}
+          productImage={selectedItem.image}
+          maxQuantity={99}
+          initialQuantity={1}
+        />
+      )}
     </section>
   )
 }

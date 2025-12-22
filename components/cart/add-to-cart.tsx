@@ -2,7 +2,7 @@
 
 import { PlusCircleIcon } from 'lucide-react';
 import { Product, ProductVariant } from '@/lib/shopify/types';
-import { useMemo, useTransition } from 'react';
+import { useMemo, useTransition, useState } from 'react';
 import { useCart } from './cart-context';
 import { Button, ButtonProps } from '../ui/button';
 import { useSelectedVariant } from '@/components/products/variant-selector';
@@ -11,6 +11,7 @@ import { ReactNode } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Loader } from '../ui/loader';
 import { getShopifyProductId } from '@/lib/shopify/utils';
+import { QuantityModal } from './quantity-modal';
 
 interface AddToCartProps extends ButtonProps {
   product: Product;
@@ -46,6 +47,7 @@ export function AddToCartButton({
 }: AddToCartButtonProps) {
   const { addItem } = useCart();
   const [isLoading, startTransition] = useTransition();
+  const [showQuantityModal, setShowQuantityModal] = useState(false);
 
   // Resolve variant locally only for variantless products (purely synchronous)
   const resolvedVariant = useMemo(() => {
@@ -71,26 +73,33 @@ export function AddToCartButton({
     return 'default';
   };
 
-  return (
-    <form
-      onSubmit={e => {
-        e.preventDefault();
+  const handleAddToCart = (quantity: number) => {
+    if (resolvedVariant) {
+      startTransition(async () => {
+        // Agregar la cantidad especificada directamente
+        await addItem(resolvedVariant, product, quantity);
+      });
+    }
+  };
 
-        if (resolvedVariant) {
-          startTransition(async () => {
-            addItem(resolvedVariant, product);
-          });
-        }
-      }}
-      className={className}
-    >
-      <Button
-        type="submit"
-        aria-label={!resolvedVariant ? 'Select one' : 'Add to cart'}
-        disabled={isDisabled}
-        className={iconOnly ? undefined : 'flex relative justify-between items-center w-full'}
-        {...buttonProps}
+  return (
+    <>
+      <form
+        onSubmit={e => {
+          e.preventDefault();
+          if (resolvedVariant) {
+            setShowQuantityModal(true);
+          }
+        }}
+        className={className}
       >
+        <Button
+          type="submit"
+          aria-label={!resolvedVariant ? 'Select one' : 'Add to cart'}
+          disabled={isDisabled}
+          className={iconOnly ? undefined : 'flex relative justify-between items-center w-full'}
+          {...buttonProps}
+        >
         <AnimatePresence initial={false} mode="wait">
           {iconOnly ? (
             <motion.div
@@ -125,6 +134,17 @@ export function AddToCartButton({
         </AnimatePresence>
       </Button>
     </form>
+
+    <QuantityModal
+      open={showQuantityModal}
+      onOpenChange={setShowQuantityModal}
+      onConfirm={handleAddToCart}
+      productName={product.title}
+      productImage={product.featuredImage?.url || product.images?.[0]?.url}
+      maxQuantity={99}
+      initialQuantity={1}
+    />
+    </>
   );
 }
 

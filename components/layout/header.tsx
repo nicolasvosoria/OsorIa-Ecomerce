@@ -76,10 +76,24 @@ export function Header() {
   const { user, isAuthenticated, login, register, logout, refreshUser } = useAuth()
   const { styles: styleData } = useComponentStyle("header", {
     brandName: "Osoria",
+    logoImage: "/logo-osoria.png",
+    logoImageDark: "/logo-osoria-blanco.svg",
+    searchPlaceholder: "Buscar...",
     tagline: "Big Sale! Hurry up! Sale ends in 2025",
+    bgColor: "#ffffff",
     bannerBgColor: "#c4faff",
     bannerTextColor: "#005aa1",
-    searchPlaceholder: "Buscar...",
+    menuButtonColor: "#1a1a1a",
+    menuButtonHoverBg: "#f5f5f5",
+    loginButtonColor: "#1a1a1a",
+    loginButtonHoverBg: "#f5f5f5",
+    iconColor: "#1a1a1a",
+    iconHoverBg: "#f5f5f5",
+    searchIconColor: "#737373",
+    searchBgColor: "#f5f5f5",
+    searchTextColor: "#1a1a1a",
+    searchBorderColor: "#e5e5e5",
+    linkColor: "#005aa1",
   })
 
   // Determinar si el tema es oscuro
@@ -102,13 +116,22 @@ export function Header() {
     return false
   }, [activeTheme])
 
-  const logoSrc = isDarkTheme ? "/logo-osoria-blanco.svg" : "/logo-osoria.png"
+  // Usar logo desde configuración o valores por defecto
+  const logoSrc = isDarkTheme 
+    ? (styleData.logoImageDark || "/logo-osoria-blanco.svg")
+    : (styleData.logoImage || "/logo-osoria.png")
   const pathname = usePathname()
 
   // Removido console.log para evitar spam en consola y rate limiting
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b" style={{ backgroundColor: "var(--background)", borderColor: "var(--border)" }}>
+    <header 
+      className="sticky top-0 z-50 w-full border-b" 
+      style={{ 
+        backgroundColor: styleData.bgColor || "var(--background)", 
+        borderColor: "var(--border)" 
+      }}
+    >
       <div className="container mx-auto px-4 py-3 md:py-6">
         {/* Banner - Oculto en móvil */}
         <div className="hidden md:flex items-center justify-between gap-6 mb-4 relative">
@@ -128,26 +151,26 @@ export function Header() {
             variant="ghost"
             className="h-10 pl-2 pr-4 rounded-full gap-1"
             style={{ backgroundColor: "transparent" }}
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "var(--muted)"}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = styleData.menuButtonHoverBg || "var(--muted)"}
             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
             onClick={() => setMenuOpen(true)}
             title="Abrir menú"
           >
-            <Menu className="h-5 w-5" style={{ color: "var(--foreground)" }} />
-            <span className="text-[15px] font-medium" style={{ color: "var(--foreground)" }}>Menú</span>
+            <Menu className="h-5 w-5" style={{ color: styleData.menuButtonColor || "var(--foreground)" }} />
+            <span className="text-[15px] font-medium" style={{ color: styleData.menuButtonColor || "var(--foreground)" }}>Menú</span>
           </Button>
 
           <div className="absolute left-1/2 -translate-x-1/2 max-w-xl w-full">
             <div className="relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: "var(--muted-foreground)" }} />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: styleData.searchIconColor || "var(--muted-foreground)" }} />
               <Input
                 type="search"
                 placeholder={styleData.searchPlaceholder || "Buscar..."}
                 className="pl-12 pr-4 h-10 rounded-full w-full font-inter font-medium"
                 style={{
-                  backgroundColor: "var(--muted)",
-                  borderColor: "var(--border)",
-                  color: "var(--foreground)",
+                  backgroundColor: styleData.searchBgColor || "var(--muted)",
+                  borderColor: styleData.searchBorderColor || "var(--border)",
+                  color: styleData.searchTextColor || "var(--foreground)",
                 }}
               />
             </div>
@@ -161,11 +184,11 @@ export function Header() {
                     variant="ghost"
                     className="h-10 px-3 md:px-4 rounded-full gap-2"
                     style={{ backgroundColor: "transparent" }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "var(--muted)"}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = styleData.loginButtonHoverBg || "var(--muted)"}
                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
                   >
-                    <User className="h-4 w-4 md:h-5 md:w-5" style={{ color: "var(--foreground)" }} />
-                    <span className="text-sm md:text-base font-medium" style={{ color: "var(--foreground)" }}>
+                    <User className="h-4 w-4 md:h-5 md:w-5" style={{ color: styleData.loginButtonColor || "var(--foreground)" }} />
+                    <span className="text-sm md:text-base font-medium" style={{ color: styleData.loginButtonColor || "var(--foreground)" }}>
                       {user?.role === 'admin' 
                         ? "Administrador"
                         : user?.first_name && user?.last_name 
@@ -213,13 +236,13 @@ export function Header() {
                 variant="ghost" 
                 className="h-10 px-3 md:px-4 rounded-full gap-2"
                 style={{ backgroundColor: "transparent" }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "var(--muted)"}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = styleData.loginButtonHoverBg || "var(--muted)"}
                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
                 onClick={() => setLoginModalOpen(true)}
                 title="Iniciar sesión"
               >
-                <LogIn className="h-4 w-4 md:h-5 md:w-5" style={{ color: "var(--foreground)" }} />
-                <span className="text-sm md:text-base font-medium hidden sm:inline" style={{ color: "var(--foreground)" }}>Iniciar sesión</span>
+                <LogIn className="h-4 w-4 md:h-5 md:w-5" style={{ color: styleData.loginButtonColor || "var(--foreground)" }} />
+                <span className="text-sm md:text-base font-medium hidden sm:inline" style={{ color: styleData.loginButtonColor || "var(--foreground)" }}>Iniciar sesión</span>
               </Button>
             )}
             <Button
@@ -229,10 +252,10 @@ export function Header() {
               style={{ 
                 backgroundColor: "transparent",
               }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "var(--muted)"}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = styleData.iconHoverBg || "var(--muted)"}
               onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
             >
-              <Heart className="h-5 w-5" style={{ color: "var(--foreground)" }} />
+              <Heart className="h-5 w-5" style={{ color: styleData.iconColor || "var(--foreground)" }} />
             </Button>
             <Button 
               variant="ghost" 
@@ -241,12 +264,12 @@ export function Header() {
               style={{ 
                 backgroundColor: "transparent",
               }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "var(--muted)"}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = styleData.iconHoverBg || "var(--muted)"}
               onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
               onClick={() => setCartOpen(true)}
               title="Ver carrito"
             >
-              <ShoppingCart className="h-5 w-5" style={{ color: "var(--foreground)" }} />
+              <ShoppingCart className="h-5 w-5" style={{ color: styleData.iconColor || "var(--foreground)" }} />
             </Button>
           </div>
         </div>
@@ -264,15 +287,15 @@ export function Header() {
             />
           </Link>
           <div className="flex-1 relative max-w-xs mx-2">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: "var(--muted-foreground)" }} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: styleData.searchIconColor || "var(--muted-foreground)" }} />
             <Input
               type="search"
               placeholder={styleData.searchPlaceholder || "Search..."}
               className="pl-10 pr-4 h-9 rounded-full w-full text-sm"
               style={{
-                backgroundColor: "var(--muted)",
-                borderColor: "var(--border)",
-                color: "var(--foreground)",
+                backgroundColor: styleData.searchBgColor || "var(--muted)",
+                borderColor: styleData.searchBorderColor || "var(--border)",
+                color: styleData.searchTextColor || "var(--foreground)",
               }}
             />
           </div>
@@ -285,11 +308,11 @@ export function Header() {
                     size="icon"
                     className="h-11 w-11 md:h-9 md:w-9 rounded-full touch-manipulation"
                     style={{ backgroundColor: "transparent" }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "var(--muted)"}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = styleData.loginButtonHoverBg || "var(--muted)"}
                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
                     title={user?.role === 'admin' ? "Administrador" : "Usuario"}
                   >
-                    <User className="h-4 w-4" style={{ color: "var(--foreground)" }} />
+                    <User className="h-4 w-4" style={{ color: styleData.loginButtonColor || "var(--foreground)" }} />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" style={{ backgroundColor: "var(--background)", borderColor: "var(--border)" }}>
@@ -330,12 +353,12 @@ export function Header() {
                 size="icon"
                 className="h-11 w-11 md:h-9 md:w-9 rounded-full touch-manipulation"
                 style={{ backgroundColor: "transparent" }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "var(--muted)"}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = styleData.loginButtonHoverBg || "var(--muted)"}
                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
                 onClick={() => setLoginModalOpen(true)}
                 title="Iniciar sesión"
               >
-                <LogIn className="h-4 w-4" style={{ color: "var(--foreground)" }} />
+                <LogIn className="h-4 w-4" style={{ color: styleData.loginButtonColor || "var(--foreground)" }} />
               </Button>
             )}
             <Button
@@ -343,24 +366,24 @@ export function Header() {
               size="icon"
               className="h-11 w-11 md:h-9 md:w-9 rounded-full touch-manipulation"
               style={{ backgroundColor: "transparent" }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "var(--muted)"}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = styleData.menuButtonHoverBg || "var(--muted)"}
               onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
               onClick={() => setMenuOpen(true)}
               title="Abrir menú"
             >
-              <Menu className="h-4 w-4" style={{ color: "var(--foreground)" }} />
+              <Menu className="h-4 w-4" style={{ color: styleData.menuButtonColor || "var(--foreground)" }} />
             </Button>
             <Button 
               variant="ghost" 
               size="icon" 
               className="h-11 w-11 md:h-9 md:w-9 rounded-full relative touch-manipulation"
               style={{ backgroundColor: "transparent" }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "var(--muted)"}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = styleData.iconHoverBg || "var(--muted)"}
               onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
               onClick={() => setCartOpen(true)}
               title="Ver carrito"
             >
-              <ShoppingCart className="h-4 w-4" style={{ color: "var(--foreground)" }} />
+              <ShoppingCart className="h-4 w-4" style={{ color: styleData.iconColor || "var(--foreground)" }} />
               {getTotalItems() > 0 && (
                 <span
                   className="absolute -top-1 -right-1 h-5 w-5 rounded-full flex items-center justify-center text-xs font-bold text-white"
@@ -394,7 +417,7 @@ export function Header() {
               <Link
                 href="/catalog/speakers"
                 className="text-sm md:text-[16px] font-inter font-medium transition-colors"
-                style={{ color: "var(--primary)" }}
+                style={{ color: styleData.linkColor || "var(--primary)" }}
                 onMouseEnter={(e) => e.currentTarget.style.opacity = "0.8"}
                 onMouseLeave={(e) => e.currentTarget.style.opacity = "1"}
               >
@@ -403,7 +426,7 @@ export function Header() {
               <Link
                 href="/catalog/earphones"
                 className="text-sm md:text-[16px] font-inter font-medium transition-colors"
-                style={{ color: "var(--primary)" }}
+                style={{ color: styleData.linkColor || "var(--primary)" }}
                 onMouseEnter={(e) => e.currentTarget.style.opacity = "0.8"}
                 onMouseLeave={(e) => e.currentTarget.style.opacity = "1"}
               >
@@ -412,7 +435,7 @@ export function Header() {
               <Link
                 href="/catalog/projectors"
                 className="text-sm md:text-[16px] font-inter font-medium transition-colors"
-                style={{ color: "var(--primary)" }}
+                style={{ color: styleData.linkColor || "var(--primary)" }}
                 onMouseEnter={(e) => e.currentTarget.style.opacity = "0.8"}
                 onMouseLeave={(e) => e.currentTarget.style.opacity = "1"}
               >
@@ -421,7 +444,7 @@ export function Header() {
               <Link
                 href="/catalog/stands"
                 className="text-sm md:text-[16px] font-inter font-medium transition-colors"
-                style={{ color: "var(--primary)" }}
+                style={{ color: styleData.linkColor || "var(--primary)" }}
                 onMouseEnter={(e) => e.currentTarget.style.opacity = "0.8"}
                 onMouseLeave={(e) => e.currentTarget.style.opacity = "1"}
               >
