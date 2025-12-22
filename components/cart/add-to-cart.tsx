@@ -3,7 +3,8 @@
 import { PlusCircleIcon } from 'lucide-react';
 import { Product, ProductVariant } from '@/lib/shopify/types';
 import { useMemo, useTransition, useState } from 'react';
-import { useCart } from './cart-context';
+import { useCart as useShopifyCart } from './cart-context';
+import { useCart as useLocalCart } from '@/contexts/cart-context';
 import { Button, ButtonProps } from '../ui/button';
 import { useSelectedVariant } from '@/components/products/variant-selector';
 import { useParams, useSearchParams } from 'next/navigation';
@@ -12,6 +13,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Loader } from '../ui/loader';
 import { getShopifyProductId } from '@/lib/shopify/utils';
 import { QuantityModal } from './quantity-modal';
+import { formatPrice } from '@/lib/shopify/utils';
 
 interface AddToCartProps extends ButtonProps {
   product: Product;
@@ -37,6 +39,13 @@ const getBaseProductVariant = (product: Product): ProductVariant => {
   };
 };
 
+// Función para detectar si es un producto de Supabase (no Shopify)
+function isSupabaseProduct(productId: string): boolean {
+  // Los IDs de Shopify tienen formato "gid://shopify/Product/..." o "gid://shopify/ProductVariant/..."
+  // Los IDs de Supabase son UUIDs o números simples, no tienen ese formato
+  return !productId.startsWith('gid://shopify/');
+}
+
 export function AddToCartButton({
   product,
   selectedVariant,
@@ -45,7 +54,8 @@ export function AddToCartButton({
   icon = <PlusCircleIcon />,
   ...buttonProps
 }: AddToCartButtonProps) {
-  const { addItem } = useCart();
+  const shopifyCart = useShopifyCart();
+  const localCart = useLocalCart();
   const [isLoading, startTransition] = useTransition();
   const [showQuantityModal, setShowQuantityModal] = useState(false);
 
@@ -74,12 +84,39 @@ export function AddToCartButton({
   };
 
   const handleAddToCart = (quantity: number) => {
-    if (resolvedVariant) {
-      startTransition(async () => {
-        // Agregar la cantidad especificada directamente
-        await addItem(resolvedVariant, product, quantity);
-      });
-    }
+    if (!resolvedVariant) return;
+
+    startTransition(async () => {
+      // Detectar si es producto de Supabase
+      if (isSupabaseProduct(product.id)) {
+        // Usar el carrito local para productos de Supabase
+        const variantPrice = resolvedVariant.price.amount;
+        const formattedPrice = formatPrice(variantPrice, resolvedVariant.price.currencyCode);
+        
+        // Obtener precio original si existe (compareAtPrice)
+        let originalPrice: string | undefined;
+        let salePrice: string | undefined;
+        
+        if (product.compareAtPrice && parseFloat(product.compareAtPrice.amount) > parseFloat(variantPrice)) {
+          // Hay descuento
+          originalPrice = formatPrice(product.compareAtPrice.amount, product.compareAtPrice.currencyCode);
+          salePrice = formattedPrice; // Precio con descuento
+        }
+
+        localCart.addToCart({
+          id: resolvedVariant.id,
+          name: product.title,
+          price: formattedPrice, // Precio base
+          image: product.featuredImage?.url || product.images?.[0]?.url || '/placeholder.jpg',
+          category: product.categoryId,
+          originalPrice: originalPrice,
+          salePrice: salePrice,
+        }, quantity);
+      } else {
+        // Usar el carrito de Shopify para productos de Shopify
+        await shopifyCart.addItem(resolvedVariant, product, quantity);
+      }
+    });
   };
 
   return (
