@@ -34,7 +34,7 @@ export async function signUp(
       }
     }
 
-    const { data, error } = await withTimeout(
+    const result = await withTimeout(
       supabase.auth.signUp({
         email,
         password,
@@ -48,7 +48,8 @@ export async function signUp(
       }),
       15000,
       'signUp'
-    )
+    ) as { data: { user: any; session: any } | null; error: any }
+    const { data, error } = result
 
     if (error) {
       console.error('[Auth] Error al registrar usuario:', error)
@@ -61,11 +62,11 @@ export async function signUp(
     // El perfil se crea automáticamente con el trigger
     // Intentar obtener el perfil después de un breve delay
     let userProfile: UserProfile | undefined
-    if (data.user) {
+    if (data?.user) {
       // Esperar un momento para que el trigger se ejecute
       await new Promise((resolve) => setTimeout(resolve, 1000))
 
-      const profileResult = await getUserProfile(data.user.id)
+      const profileResult = await getUserProfile(data.user!.id)
       if (profileResult.success && profileResult.user) {
         userProfile = profileResult.user
       } else {
@@ -73,16 +74,16 @@ export async function signUp(
         const { error: insertError } = await supabase
           .from('user_profiles')
           .insert({
-            id: data.user.id,
-            email: data.user.email || email,
+            id: data.user!.id,
+            email: data.user!.email || email,
             first_name: firstName || null,
             last_name: lastName || null,
           })
 
         if (!insertError) {
           userProfile = {
-            id: data.user.id,
-            email: data.user.email || email,
+            id: data.user!.id,
+            email: data.user!.email || email,
             first_name: firstName || null,
             last_name: lastName || null,
           }
@@ -93,7 +94,7 @@ export async function signUp(
     return {
       success: true,
       user: userProfile,
-      emailSent: data.session === null, // Si no hay sesión, se envió email de confirmación
+      emailSent: data?.session === null, // Si no hay sesión, se envió email de confirmación
     }
   } catch (error: any) {
     console.error('[Auth] Error inesperado al registrar:', error)
@@ -117,14 +118,15 @@ export async function signIn(email: string, password: string): Promise<AuthResul
       }
     }
 
-    const { data, error } = await withTimeout(
+    const result = await withTimeout(
       supabase.auth.signInWithPassword({
         email,
         password,
       }),
       15000,
       'signIn'
-    )
+    ) as { data: { user: any; session: any } | null; error: any }
+    const { data, error } = result
 
     if (error) {
       console.error('[Auth] Error al iniciar sesión:', error)
@@ -134,7 +136,7 @@ export async function signIn(email: string, password: string): Promise<AuthResul
       }
     }
 
-    if (!data.user) {
+    if (!data?.user) {
       return {
         success: false,
         error: 'No se pudo obtener la información del usuario',
@@ -142,14 +144,14 @@ export async function signIn(email: string, password: string): Promise<AuthResul
     }
 
     // Obtener el perfil del usuario
-    const profileResult = await getUserProfile(data.user.id)
+    const profileResult = await getUserProfile(data.user!.id)
     if (!profileResult.success || !profileResult.user) {
       // Si no existe perfil, crearlo
       const { error: insertError } = await supabase
         .from('user_profiles')
         .insert({
-          id: data.user.id,
-          email: data.user.email || email,
+          id: data.user!.id,
+          email: data.user!.email || email,
           first_name: null,
           last_name: null,
         })
@@ -161,8 +163,8 @@ export async function signIn(email: string, password: string): Promise<AuthResul
       return {
         success: true,
         user: {
-          id: data.user.id,
-          email: data.user.email || email,
+          id: data.user!.id,
+          email: data.user!.email || email,
           first_name: null,
           last_name: null,
         },
@@ -194,11 +196,12 @@ export async function signOut(): Promise<{ success: boolean; error?: string }> {
         error: 'Supabase no configurado',
       }
     }
-    const { error } = await withTimeout(
+    const result = await withTimeout(
       supabase.auth.signOut(),
       10000,
       'signOut'
-    )
+    ) as { error: any }
+    const { error } = result
 
     if (error) {
       console.error('[Auth] Error al cerrar sesión:', error)
@@ -230,11 +233,14 @@ export async function getCurrentUser(): Promise<AuthResult> {
         error: 'Supabase no configurado',
       }
     }
-    const { data: { user }, error } = await withTimeout(
+    const result = await withTimeout(
       supabase.auth.getUser(),
       10000,
       'getCurrentUser'
-    )
+    ) as { data: { user: any } | null; error: any }
+    const resultData = result.data
+    const user = resultData?.user || null
+    const { error } = result
 
     if (error || !user) {
       return {
@@ -294,7 +300,7 @@ export async function getUserProfile(userId: string): Promise<AuthResult> {
           await new Promise(resolve => setTimeout(resolve, 500 * attempt))
         }
 
-        const { data, error } = await withTimeout(
+        const result = await withTimeout(
           supabase
             .from('user_profiles')
             .select('*')
@@ -302,8 +308,9 @@ export async function getUserProfile(userId: string): Promise<AuthResult> {
             .single(),
           timeoutMs,
           `getUserProfile (intento ${attempt + 1})`
-        )
+        ) as { data: any; error: any }
 
+        const { data, error } = result
         const elapsedTime = Date.now() - startTime
         console.log(`[Auth] Consulta de perfil completada en ${elapsedTime}ms`)
 
@@ -434,7 +441,7 @@ export async function updateUserProfile(
         error: 'Supabase no configurado',
       }
     }
-    const { data, error } = await withTimeout(
+    const result = await withTimeout(
       supabase
         .from('user_profiles')
         .update({
@@ -446,7 +453,8 @@ export async function updateUserProfile(
         .single(),
       10000,
       'updateUserProfile'
-    )
+    ) as { data: any; error: any }
+    const { data, error } = result
 
     if (error || !data) {
       return {
@@ -480,7 +488,7 @@ export async function resendConfirmationEmail(email: string): Promise<{ success:
         error: 'Supabase no configurado',
       }
     }
-    const { error } = await withTimeout(
+    const result = await withTimeout(
       supabase.auth.resend({
         type: 'signup',
         email,
@@ -490,7 +498,8 @@ export async function resendConfirmationEmail(email: string): Promise<{ success:
       }),
       10000,
       'resendConfirmationEmail'
-    )
+    ) as { error: any }
+    const { error } = result
 
     if (error) {
       return {
@@ -522,13 +531,14 @@ export async function resetPassword(email: string): Promise<{ success: boolean; 
       }
     }
 
-    const { error } = await withTimeout(
+    const result = await withTimeout(
       supabase.auth.resetPasswordForEmail(email, {
         emailRedirectTo: getUrl('/auth/reset-password'),
       }),
       10000,
       'resetPassword'
-    )
+    ) as { error: any }
+    const { error } = result
 
     if (error) {
       console.error('[Auth] Error al enviar email de recuperación:', error)
@@ -561,13 +571,14 @@ export async function updatePassword(newPassword: string): Promise<{ success: bo
       }
     }
 
-    const { error } = await withTimeout(
+    const result = await withTimeout(
       supabase.auth.updateUser({
         password: newPassword,
       }),
       10000,
       'updatePassword'
-    )
+    ) as { error: any }
+    const { error } = result
 
     if (error) {
       console.error('[Auth] Error al actualizar contraseña:', error)
@@ -607,7 +618,7 @@ export function onAuthStateChange(callback: (user: UserProfile | null) => void) 
   
   let isProcessing = false
   
-  return supabase.auth.onAuthStateChange(async (event, session) => {
+  return supabase.auth.onAuthStateChange(async (event: string, session: any) => {
     // Evitar procesar múltiples eventos simultáneamente
     if (isProcessing) {
       console.log("[Auth] Evento de autenticación ignorado (ya procesando):", event)

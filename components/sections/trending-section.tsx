@@ -35,11 +35,12 @@ export function TrendingSection() {
   const { componentEdits } = useAdmin()
   
   const edits = componentEdits.get("trending") || {}
-  const title = edits.title || style.title || "TENDENCIAS"
-  const products = edits.products || style.products || defaultProducts
+  const styleData = style as any
+  const title = edits.title || styleData.title || "TENDENCIAS"
+  const products = edits.products || styleData.products || defaultProducts
   
-  const bgColor = edits.bgColor || style.bgColor
-  const textColor = edits.textColor || style.textColor
+  const bgColor = edits.bgColor || styleData.bgColor
+  const textColor = edits.textColor || styleData.textColor
 
   return (
     <section 

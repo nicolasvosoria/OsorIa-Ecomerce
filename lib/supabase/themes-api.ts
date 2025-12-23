@@ -48,7 +48,8 @@ export async function getThemes(): Promise<AppTheme[]> {
       .order("theme_name")
     
     console.log("[Theme] Enviando consulta completa...")
-    const { data, error } = await withTimeout(queryPromise, 20000)
+    const result = await withTimeout(queryPromise, 20000) as { data: any; error: any }
+    const { data, error } = result
     const elapsedTime = Date.now() - startTime
     console.log("[Theme] Consulta completada en", elapsedTime, "ms. Error:", error ? "Sí" : "No")
 
@@ -75,7 +76,7 @@ export async function getThemes(): Promise<AppTheme[]> {
     }
 
     console.log("[Theme] ✅ Temas cargados exitosamente:", data.length)
-    const themes = data.map((theme) => ({
+    const themes = data.map((theme: any) => ({
       ...theme,
       colors: typeof theme.colors === "string" ? JSON.parse(theme.colors) : theme.colors,
     })) as AppTheme[]

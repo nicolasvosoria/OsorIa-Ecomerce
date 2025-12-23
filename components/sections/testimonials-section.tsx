@@ -36,12 +36,13 @@ export function TestimonialsSection() {
   const { componentEdits } = useAdmin()
   
   const edits = componentEdits.get("testimonials") || {}
-  const title = edits.title || style.title || "\"Clientes Felices, Tazas Llenas de Gratitud\""
-  const description = edits.description || style.description || "Cada taza de Highlands Café cuenta una historia, y nuestros clientes son los protagonistas. Desde apasionados del café hasta baristas, tiendas gourmet y cafeterías en Colombia y el mundo, todos coinciden en algo: el sabor auténtico del Huila no se olvida. Gracias por confiar en nosotros, ¡su felicidad es nuestro mejor sello de calidad!"
-  const testimonials = edits.testimonials || style.testimonials || defaultTestimonials
+  const styleData = style as any
+  const title = edits.title || styleData.title || "\"Clientes Felices, Tazas Llenas de Gratitud\""
+  const description = edits.description || styleData.description || "Cada taza de Highlands Café cuenta una historia, y nuestros clientes son los protagonistas. Desde apasionados del café hasta baristas, tiendas gourmet y cafeterías en Colombia y el mundo, todos coinciden en algo: el sabor auténtico del Huila no se olvida. Gracias por confiar en nosotros, ¡su felicidad es nuestro mejor sello de calidad!"
+  const testimonials = edits.testimonials || styleData.testimonials || defaultTestimonials
   
-  const bgColor = edits.bgColor || style.bgColor
-  const textColor = edits.textColor || style.textColor
+  const bgColor = edits.bgColor || styleData.bgColor
+  const textColor = edits.textColor || styleData.textColor
 
   return (
     <section 

@@ -45,12 +45,13 @@ export function ProductsSection() {
   const { componentEdits } = useAdmin()
   
   const edits = componentEdits.get("products") || {}
-  const title = edits.title || style.title || "\"Los Favoritos de Nuestros Clientes\""
-  const description = edits.description || style.description || "Descubre los cafés que enamoran a quienes buscan calidad, aroma y sabor auténtico. Estos son nuestros productos más pedidos, elegidos por amantes del café en Colombia y el mundo. Si no sabes por dónde empezar... empieza por lo que todos aman."
-  const products = edits.products || style.products || defaultProducts
+  const styleData = style as any
+  const title = edits.title || styleData.title || "\"Los Favoritos de Nuestros Clientes\""
+  const description = edits.description || styleData.description || "Descubre los cafés que enamoran a quienes buscan calidad, aroma y sabor auténtico. Estos son nuestros productos más pedidos, elegidos por amantes del café en Colombia y el mundo. Si no sabes por dónde empezar... empieza por lo que todos aman."
+  const products = edits.products || styleData.products || defaultProducts
   
-  const bgColor = edits.bgColor || style.bgColor
-  const textColor = edits.textColor || style.textColor
+  const bgColor = edits.bgColor || styleData.bgColor
+  const textColor = edits.textColor || styleData.textColor
 
   return (
     <section 

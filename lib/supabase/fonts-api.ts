@@ -48,7 +48,8 @@ export async function getFonts(): Promise<AppFont[]> {
       .order("font_name")
     
     console.log("[Font] Enviando consulta completa...")
-    const { data, error } = await withTimeout(queryPromise, 20000)
+    const result = await withTimeout(queryPromise, 20000) as { data: any; error: any }
+    const { data, error } = result
     const elapsedTime = Date.now() - startTime
     console.log("[Font] Consulta completada en", elapsedTime, "ms. Error:", error ? "Sí" : "No")
 

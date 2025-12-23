@@ -178,7 +178,7 @@ export function PopularItems({ initialProducts }: PopularItemsProps = {}) {
             className="w-full"
           >
             <CarouselContent className="-ml-2 md:-ml-4">
-              {items.map((item, index) => {
+              {items.map((item: any, index: number) => {
                 const itemSlug = item.slug || generateSlug(item.title)
                 const itemId = initialProducts?.[index]?.id || `popular-${index}`
                 return (

@@ -76,7 +76,7 @@ export function HeroBanner() {
       {
         title: "Sonido de Alta Fidelidad",
         description: "Drivers de 40mm con respuesta de frecuencia optimizada para reproducir cada detalle del audio con claridad cristalina.",
-        position: { bottom: "30%", right: "20%" }
+        position: { top: "auto", bottom: "30%", right: "20%" }
       }
     ],
     "BALFE": [
@@ -93,7 +93,7 @@ export function HeroBanner() {
       {
         title: "Diseño Moderno",
         description: "Estética minimalista que se adapta a cualquier espacio, con acabados premium y materiales de alta calidad.",
-        position: { bottom: "30%", right: "20%" }
+        position: { top: "auto", bottom: "30%", right: "20%" }
       }
     ],
     "LAPTOP STAND": [
@@ -110,7 +110,7 @@ export function HeroBanner() {
       {
         title: "Material Durable",
         description: "Construido en aluminio anodizado de alta calidad, resistente y ligero para uso diario profesional.",
-        position: { bottom: "30%", right: "20%" }
+        position: { top: "auto", bottom: "30%", right: "20%" }
       }
     ],
     "MINI PROJECTOR": [
@@ -127,7 +127,7 @@ export function HeroBanner() {
       {
         title: "Conectividad Inalámbrica",
         description: "Conexión WiFi y Bluetooth para transmitir contenido desde cualquier dispositivo sin cables.",
-        position: { bottom: "30%", right: "20%" }
+        position: { top: "auto", bottom: "30%", right: "20%" }
       }
     ]
   }
@@ -251,7 +251,7 @@ export function HeroBanner() {
         className="w-full"
       >
         <CarouselContent>
-          {heroProducts.map((product, index) => {
+          {heroProducts.map((product: { label?: string; title?: string; subtitle?: string; description?: string; buttonText?: string; image?: string }, index: number) => {
             // Usar valores del producto directamente (ya vienen editados)
             const displayLabel = product.label || ""
             const displayTitle = product.title || ""

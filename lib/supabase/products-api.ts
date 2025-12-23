@@ -10,6 +10,9 @@ import type {
   GetItemsResult,
 } from '@/lib/types/products'
 
+// Re-exportar GetItemsParams para uso externo
+export type { GetItemsParams, GetItemsResult }
+
 // Helper para manejar timeouts
 async function withTimeout<T>(
   promise: Promise<T>,
@@ -41,7 +44,8 @@ export async function getCategories(includeInactive: boolean = false): Promise<I
       query = query.eq('is_active', true)
     }
 
-    const { data, error } = await withTimeout(query, 15000, 'getCategories')
+    const result = await withTimeout(query, 15000, 'getCategories') as { data: any; error: any }
+    const { data, error } = result
 
     if (error) {
       console.error('[Products] Error al obtener categorías:', error)
@@ -65,11 +69,12 @@ export async function getCategoryById(categoryId: string): Promise<ItemCategory 
       return null
     }
 
-    const { data, error } = await withTimeout(
+    const result = await withTimeout(
       supabase.from('item_categories').select('*').eq('id', categoryId).single(),
       15000,
       'getCategoryById'
-    )
+    ) as { data: any; error: any }
+    const { data, error } = result
 
     if (error) {
       console.error('[Products] Error al obtener categoría:', error)
@@ -135,7 +140,8 @@ export async function getItems(params: GetItemsParams = {}): Promise<GetItemsRes
     // Paginación
     query = query.range(offset, offset + limit - 1)
 
-    const { data, error, count } = await withTimeout(query, 20000, 'getItems')
+    const result = await withTimeout(query, 20000, 'getItems') as { data: any; error: any; count: number | null }
+    const { data, error, count } = result
 
     if (error) {
       console.error('[Products] Error al obtener productos:', error)
@@ -174,28 +180,49 @@ export async function getItemBySlug(slug: string): Promise<StoreItemWithDetails 
     }
 
     // Obtener el producto con su categoría
-    const { data: itemData, error: itemError } = await withTimeout(
+    const result = await withTimeout(
       supabase.from('store_items').select('*, item_categories(*)').eq('item_slug', slug).single(),
       15000,
       'getItemBySlug'
-    )
+    ) as { data: any; error: any }
+    const { data: itemData, error: itemError } = result
 
-    if (itemError || !itemData) {
-      console.error('[Products] Error al obtener producto:', itemError)
+    // Verificar si hay un error real (con propiedades) o si no se encontró el producto
+    if (itemError) {
+      // Verificar si el error tiene información útil
+      const hasErrorInfo = itemError && typeof itemError === 'object' && Object.keys(itemError).length > 0
+      if (hasErrorInfo) {
+        console.error('[Products] Error al obtener producto:', {
+          message: itemError.message || 'Error desconocido',
+          code: itemError.code,
+          details: itemError.details,
+          hint: itemError.hint,
+          slug,
+        })
+      } else {
+        // Si el error está vacío, probablemente el producto no existe
+        console.log(`[Products] Producto no encontrado con slug: "${slug}"`)
+      }
+      return null
+    }
+
+    if (!itemData) {
+      console.log(`[Products] No se encontró producto con slug: "${slug}"`)
       return null
     }
 
     const item = itemData as any
 
     // Obtener variantes
-    const { data: variantsData } = await withTimeout(
+    const variantsResult = await withTimeout(
       supabase.from('item_variants').select('*').eq('item_id', item.id).order('display_order', { ascending: true }),
       15000,
       'getItemVariants'
-    )
+    ) as { data: any; error: any }
+    const { data: variantsData } = variantsResult
 
     // Obtener imágenes
-    const { data: imagesData } = await withTimeout(
+    const imagesResult = await withTimeout(
       supabase
         .from('item_images')
         .select('*')
@@ -203,14 +230,16 @@ export async function getItemBySlug(slug: string): Promise<StoreItemWithDetails 
         .order('display_order', { ascending: true }),
       15000,
       'getItemImages'
-    )
+    ) as { data: any; error: any }
+    const { data: imagesData } = imagesResult
 
     // Obtener opciones
-    const { data: optionsData } = await withTimeout(
+    const optionsResult = await withTimeout(
       supabase.from('item_options').select('*').eq('item_id', item.id).order('display_order', { ascending: true }),
       15000,
       'getItemOptions'
-    )
+    ) as { data: any; error: any }
+    const { data: optionsData } = optionsResult
 
     return {
       ...item,
@@ -235,14 +264,34 @@ export async function getItemById(itemId: string): Promise<StoreItemWithDetails 
       return null
     }
 
-    const { data: itemData, error: itemError } = await withTimeout(
+    const result = await withTimeout(
       supabase.from('store_items').select('*, item_categories(*)').eq('id', itemId).single(),
       15000,
       'getItemById'
-    )
+    ) as { data: any; error: any }
+    const { data: itemData, error: itemError } = result
 
-    if (itemError || !itemData) {
-      console.error('[Products] Error al obtener producto:', itemError)
+    // Verificar si hay un error real (con propiedades) o si no se encontró el producto
+    if (itemError) {
+      // Verificar si el error tiene información útil
+      const hasErrorInfo = itemError && typeof itemError === 'object' && Object.keys(itemError).length > 0
+      if (hasErrorInfo) {
+        console.error('[Products] Error al obtener producto por ID:', {
+          message: itemError.message || 'Error desconocido',
+          code: itemError.code,
+          details: itemError.details,
+          hint: itemError.hint,
+          itemId,
+        })
+      } else {
+        // Si el error está vacío, probablemente el producto no existe
+        console.log(`[Products] Producto no encontrado con ID: "${itemId}"`)
+      }
+      return null
+    }
+
+    if (!itemData) {
+      console.log(`[Products] No se encontró producto con ID: "${itemId}"`)
       return null
     }
 
@@ -320,11 +369,12 @@ export async function incrementItemViewCount(itemId: string): Promise<boolean> {
       return false
     }
 
-    const { error } = await withTimeout(
+    const result = await withTimeout(
       supabase.rpc('increment_item_views', { item_id: itemId }),
       10000,
       'incrementItemViewCount'
-    )
+    ) as { error: any }
+    const { error } = result
 
     if (error) {
       // Si la función RPC no existe, hacer update manual

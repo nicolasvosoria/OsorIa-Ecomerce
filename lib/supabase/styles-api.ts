@@ -123,7 +123,7 @@ export async function subscribeToStyleChanges(componentName: string, callback: (
           table: "component_styles",
           filter: `component_name=eq.${componentName}`,
         },
-        (payload) => {
+        (payload: any) => {
           if (payload.new) {
             callback(payload.new as ComponentStyle)
           }

@@ -49,6 +49,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { CheckoutOptionsDialog } from "@/components/cart/checkout-options-dialog"
 
 export function Header() {
   const router = useRouter()
@@ -58,6 +59,7 @@ export function Header() {
   const [cartOpen, setCartOpen] = useState(false)
   const [loginModalOpen, setLoginModalOpen] = useState(false)
   const [loginRequiredDialogOpen, setLoginRequiredDialogOpen] = useState(false)
+  const [showCheckoutOptionsDialog, setShowCheckoutOptionsDialog] = useState(false)
   const [paymentModalOpen, setPaymentModalOpen] = useState(false)
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string | null>(null)
   const [isRegisterMode, setIsRegisterMode] = useState(false)
@@ -832,14 +834,8 @@ export function Header() {
                     e.currentTarget.style.opacity = "1"
                   }}
                   onClick={() => {
-                    // Verificar si el usuario está autenticado
-                    if (!isAuthenticated) {
-                      // Mostrar diálogo que obliga a iniciar sesión
-                      setLoginRequiredDialogOpen(true)
-                    } else {
-                      // Mostrar modal de medios de pago
-                      setPaymentModalOpen(true)
-                    }
+                    // Mostrar diálogo de opciones de checkout (invitado o crear cuenta)
+                    setShowCheckoutOptionsDialog(true)
                   }}
                 >
                   Finalizar compra
@@ -1705,6 +1701,13 @@ export function Header() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Diálogo de opciones de checkout */}
+      <CheckoutOptionsDialog
+        open={showCheckoutOptionsDialog}
+        onOpenChange={setShowCheckoutOptionsDialog}
+        onCloseCart={() => setCartOpen(false)}
+      />
     </header>
   )
 }

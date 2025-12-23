@@ -3,7 +3,7 @@ import { getItems } from "@/lib/supabase/products-api"
 
 export async function ProductsGridWrapper() {
   // Obtener productos de la base de datos
-  let products = []
+  let products: Array<{ id: string; name: string; category: string; price: string; image: string; slug: string }> = []
   
   try {
     const result = await getItems({

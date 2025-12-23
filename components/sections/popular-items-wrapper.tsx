@@ -3,7 +3,7 @@ import { getFeaturedItems } from "@/lib/supabase/products-api"
 
 export async function PopularItemsWrapper() {
   // Obtener productos destacados de la base de datos
-  let featuredProducts = []
+  let featuredProducts: Array<{ id: string; title: string; price: string; image: string; slug: string }> = []
   
   try {
     const items = await getFeaturedItems(10)

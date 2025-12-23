@@ -19,7 +19,7 @@ const COMPONENT_FIELDS: Record<
   string,
   {
     content: Array<{ key: string; label: string; type: string; isArray?: boolean; arrayFields?: any[] }>
-    styles: Array<{ key: string; label: string; type: string }>
+    styles: Array<{ key: string; label: string; type: string; options?: Array<{ value: string; label: string }> }>
     defaults?: Record<string, any>
   }
 > = {
@@ -609,7 +609,8 @@ export function EditorPanel() {
           }
         } else if (key === "backgroundPosition" || key === "backgroundRepeat" || key === "backgroundSize") {
           if (type === "image" && localValues.backgroundImage) {
-            body.style[key.replace(/([A-Z])/g, "-$1").toLowerCase()] = value
+            const styleKey = key.replace(/([A-Z])/g, "-$1").toLowerCase()
+            body.style.setProperty(styleKey, value as string)
           }
         }
       }

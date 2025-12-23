@@ -48,7 +48,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         themeToUse = defaultTheme
       }
       
-      setActiveThemeState(themeToUse)
+      setActiveThemeState(themeToUse || null)
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Error al cargar temas"
       setError(errorMessage)

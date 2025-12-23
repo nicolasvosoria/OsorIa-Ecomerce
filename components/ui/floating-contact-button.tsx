@@ -99,7 +99,7 @@ export function FloatingContactButton() {
             e.currentTarget.style.backgroundColor = "var(--card)"
           }}
         >
-          <WhatsAppIcon className="h-5 w-5" style={{ color: "#25D366" }} />
+          <WhatsAppIcon className="h-5 w-5 text-[#25D366]" />
           <span className="font-semibold text-sm whitespace-nowrap">WhatsApp</span>
         </Link>
 

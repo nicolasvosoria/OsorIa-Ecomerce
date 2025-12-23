@@ -119,7 +119,7 @@ export async function addItem(variantId: string | undefined, quantity: number = 
     }
     await addCartLines(cartId, [{ merchandiseId: variantId, quantity }]);
     const fresh = await getShopifyCart(cartId);
-    revalidateTag(TAGS.cart);
+    (revalidateTag as any)(TAGS.cart);
     return adaptCart(fresh);
   } catch (error) {
     console.error('[Cart] ❌ Error agregando item al carrito:', error);
@@ -141,7 +141,7 @@ export async function updateItem({ lineId, quantity }: { lineId: string; quantit
     }
 
     const fresh = await getShopifyCart(cartId);
-    revalidateTag(TAGS.cart);
+    (revalidateTag as any)(TAGS.cart);
     return adaptCart(fresh);
   } catch (error) {
     console.error('Error updating item:', error);

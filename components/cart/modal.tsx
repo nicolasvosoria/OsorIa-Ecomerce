@@ -14,6 +14,7 @@ import { useBodyScrollLock } from '@/lib/hooks/use-body-scroll-lock';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { Cart } from '../../lib/shopify/types';
+import { CheckoutOptionsDialog } from './checkout-options-dialog';
 
 const CartContainer = ({ children, className }: { children: React.ReactNode; className?: string }) => {
   return <div className={cn('px-3 md:px-4', className)}>{children}</div>;
@@ -21,51 +22,59 @@ const CartContainer = ({ children, className }: { children: React.ReactNode; cla
 
 const CartItems = ({ closeCart }: { closeCart: () => void }) => {
   const { cart } = useCart();
+  const [showCheckoutDialog, setShowCheckoutDialog] = useState(false);
 
   if (!cart) return <></>;
 
   return (
-    <div className="flex flex-col justify-between h-full overflow-hidden">
-      <CartContainer className="flex justify-between text-sm text-muted-foreground">
-        <span>Products</span>
-        <span>{cart.lines.length} items</span>
-      </CartContainer>
-      <div className="relative flex-1 min-h-0 py-4 overflow-x-hidden">
-        <CartContainer className="overflow-y-auto flex flex-col gap-y-3 h-full scrollbar-hide">
-          <AnimatePresence>
-            {cart.lines.map(item => (
-              <motion.div
-                key={item.merchandise.id}
-                layout
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.3, ease: 'easeOut' }}
-              >
-                <CartItemCard item={item} onCloseCart={closeCart} />
-              </motion.div>
-            ))}
-          </AnimatePresence>
+    <>
+      <div className="flex flex-col justify-between h-full overflow-hidden">
+        <CartContainer className="flex justify-between text-sm text-muted-foreground">
+          <span>Products</span>
+          <span>{cart.lines.length} items</span>
+        </CartContainer>
+        <div className="relative flex-1 min-h-0 py-4 overflow-x-hidden">
+          <CartContainer className="overflow-y-auto flex flex-col gap-y-3 h-full scrollbar-hide">
+            <AnimatePresence>
+              {cart.lines.map(item => (
+                <motion.div
+                  key={item.merchandise.id}
+                  layout
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.3, ease: 'easeOut' }}
+                >
+                  <CartItemCard item={item} onCloseCart={closeCart} />
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </CartContainer>
+        </div>
+        <CartContainer>
+          <div className="py-4 text-sm text-foreground/50 shrink-0">
+            <div className="flex justify-between items-center pb-1 mb-3 border-b border-muted-foreground/20">
+              <p>Taxes</p>
+              <p className="text-right">Calculated at checkout</p>
+            </div>
+            <div className="flex justify-between items-center pt-1 pb-1 mb-3 border-b border-muted-foreground/20">
+              <p>Shipping</p>
+              <p className="text-right">Calculated at checkout</p>
+            </div>
+            <div className="flex justify-between items-center pt-1 pb-1 mb-1.5 text-lg font-semibold">
+              <p>Total</p>
+              <p className="text-base text-right text-foreground">
+                {formatPrice(cart.cost.totalAmount.amount, cart.cost.totalAmount.currencyCode)}
+              </p>
+            </div>
+          </div>
+          <CheckoutButton onCheckoutClick={() => setShowCheckoutDialog(true)} />
         </CartContainer>
       </div>
-      <CartContainer>
-        <div className="py-4 text-sm text-foreground/50 shrink-0">
-          <div className="flex justify-between items-center pb-1 mb-3 border-b border-muted-foreground/20">
-            <p>Taxes</p>
-            <p className="text-right">Calculated at checkout</p>
-          </div>
-          <div className="flex justify-between items-center pt-1 pb-1 mb-3 border-b border-muted-foreground/20">
-            <p>Shipping</p>
-            <p className="text-right">Calculated at checkout</p>
-          </div>
-          <div className="flex justify-between items-center pt-1 pb-1 mb-1.5 text-lg font-semibold">
-            <p>Total</p>
-            <p className="text-base text-right text-foreground">
-              {formatPrice(cart.cost.totalAmount.amount, cart.cost.totalAmount.currencyCode)}
-            </p>
-          </div>
-        </div>
-        <CheckoutButton />
-      </CartContainer>
-    </div>
+      <CheckoutOptionsDialog
+        open={showCheckoutDialog}
+        onOpenChange={setShowCheckoutDialog}
+        onCloseCart={closeCart}
+      />
+    </>
   );
 };
 
@@ -193,27 +202,20 @@ export default function CartModal() {
   );
 }
 
-function CheckoutButton() {
+function CheckoutButton({ onCheckoutClick }: { onCheckoutClick: () => void }) {
   const { pending } = useFormStatus();
   const { cart, isPending } = useCart();
-  const router = useRouter();
-
-  const checkoutUrl = cart?.checkoutUrl;
 
   const isLoading = pending;
-  const isDisabled = !checkoutUrl || isPending;
+  const isDisabled = !cart || cart.lines.length === 0 || isPending;
 
   return (
     <Button
-      type="submit"
+      type="button"
       disabled={isDisabled}
       size="lg"
       className="flex relative gap-3 justify-between items-center w-full"
-      onClick={() => {
-        if (checkoutUrl) {
-          router.push(checkoutUrl);
-        }
-      }}
+      onClick={onCheckoutClick}
     >
       <AnimatePresence initial={false} mode="wait">
         <motion.div
@@ -228,7 +230,7 @@ function CheckoutButton() {
             <Loader size="default" />
           ) : (
             <div className="flex justify-between items-center w-full">
-              <span>Proceed to Checkout</span>
+              <span>Finalizar Compra</span>
               <ArrowRight className="size-6" />
             </div>
           )}

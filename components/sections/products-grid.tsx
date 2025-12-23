@@ -83,7 +83,7 @@ export function ProductsGrid({ initialProducts }: ProductsGridProps = {}) {
         </h2>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
-          {products.map((product, index) => {
+          {products.map((product: any, index: number) => {
             const productSlug = product.slug || generateSlug(product.name)
             const productId = initialProducts?.[index]?.id || `product-${index}`
             return (
