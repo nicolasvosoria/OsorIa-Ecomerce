@@ -17,9 +17,9 @@ export interface GuestCustomerData {
   email: string
   phone: string
   address: string
-  city: string
-  postalCode: string
-  country: string
+  city?: string
+  postalCode?: string
+  country?: string
   notes?: string
 }
 
@@ -68,20 +68,21 @@ export function GuestCheckoutForm({ onComplete, isLoading = false }: GuestChecko
       newErrors.address = "La dirección es requerida"
     }
 
-    if (!formData.city.trim()) {
-      newErrors.city = "La ciudad es requerida"
-    }
-
-    if (!formData.postalCode.trim()) {
-      newErrors.postalCode = "El código postal es requerido"
-    }
-
-    if (!formData.country.trim()) {
-      newErrors.country = "El país es requerido"
-    }
-
     setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
+    const isValid = Object.keys(newErrors).length === 0
+
+    // Aplicar valores por defecto para campos opcionales antes de enviar
+    if (isValid) {
+      const dataToSubmit = {
+        ...formData,
+        city: formData.city?.trim() || "N/A",
+        postalCode: formData.postalCode?.trim() || "N/A",
+        country: formData.country?.trim() || "Colombia",
+      }
+      setFormData(dataToSubmit)
+    }
+
+    return isValid
   }
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -92,7 +93,15 @@ export function GuestCheckoutForm({ onComplete, isLoading = false }: GuestChecko
       return
     }
 
-    onComplete(formData)
+    // Asegurar valores por defecto antes de enviar
+    const dataToSubmit: GuestCustomerData = {
+      ...formData,
+      city: formData.city?.trim() || "N/A",
+      postalCode: formData.postalCode?.trim() || "N/A",
+      country: formData.country?.trim() || "Colombia",
+    }
+
+    onComplete(dataToSubmit)
   }
 
   const handleChange = (field: keyof GuestCustomerData, value: string) => {
@@ -218,68 +227,44 @@ export function GuestCheckoutForm({ onComplete, isLoading = false }: GuestChecko
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="city">
-                Ciudad <span className="text-destructive">*</span>
+                Ciudad (opcional)
               </Label>
               <Input
                 id="city"
                 type="text"
-                value={formData.city}
+                value={formData.city || ""}
                 onChange={(e) => handleChange("city", e.target.value)}
                 placeholder="Bogotá"
                 disabled={isLoading}
-                className={errors.city ? "border-destructive" : ""}
               />
-              {errors.city && (
-                <p className="text-sm text-destructive">{errors.city}</p>
-              )}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="postalCode">
-                Código Postal <span className="text-destructive">*</span>
+                Código Postal (opcional)
               </Label>
               <Input
                 id="postalCode"
                 type="text"
-                value={formData.postalCode}
+                value={formData.postalCode || ""}
                 onChange={(e) => handleChange("postalCode", e.target.value)}
                 placeholder="110111"
                 disabled={isLoading}
-                className={errors.postalCode ? "border-destructive" : ""}
               />
-              {errors.postalCode && (
-                <p className="text-sm text-destructive">{errors.postalCode}</p>
-              )}
             </div>
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="country">
-              País <span className="text-destructive">*</span>
+              País (opcional)
             </Label>
             <Input
               id="country"
               type="text"
-              value={formData.country}
+              value={formData.country || "Colombia"}
               onChange={(e) => handleChange("country", e.target.value)}
               placeholder="Colombia"
               disabled={isLoading}
-              className={errors.country ? "border-destructive" : ""}
-            />
-            {errors.country && (
-              <p className="text-sm text-destructive">{errors.country}</p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="notes">Notas adicionales (opcional)</Label>
-            <Textarea
-              id="notes"
-              value={formData.notes}
-              onChange={(e) => handleChange("notes", e.target.value)}
-              placeholder="Instrucciones especiales para la entrega..."
-              disabled={isLoading}
-              rows={3}
             />
           </div>
         </CardContent>

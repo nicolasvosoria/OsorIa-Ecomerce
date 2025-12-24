@@ -61,6 +61,7 @@
     "motion": "latest",
     "next": "^16.0.8",
     "next-themes": "latest",
+    "nodemailer": "^7.0.12",
     "nuqs": "latest",
     "path": "latest",
     "prettier": "latest",
