@@ -38,7 +38,7 @@ SMTP_FROM="Tu Tienda <tu-email@gmail.com>"
    SMTP_USER=tu-email@gmail.com
    SMTP_PASS=xxxx xxxx xxxx xxxx  # La contraseña de aplicación de 16 caracteres (sin espacios)
    SMTP_FROM="Tu Tienda <tu-email@gmail.com>"
-   ```olwb yicr ljex gyeo
+   
 
 ### 3. Configurar con Zoho Mail (Recomendado para negocios)
 
