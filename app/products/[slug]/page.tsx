@@ -18,6 +18,7 @@ import { ShoppingCart, Heart, Check, AlertCircle } from 'lucide-react';
 import { AddToCart } from '@/components/cart/add-to-cart';
 import { adaptSupabaseProduct } from '@/lib/products/adapter';
 import { cn } from '@/lib/utils';
+import { ProductImageGallery } from './components/product-image-gallery';
 
 // Generar parámetros estáticos para productos
 // Con cacheComponents habilitado, debe retornar al menos un resultado
@@ -98,7 +99,7 @@ async function ProductContent({ slug }: { slug: string }) {
   // Adaptar producto para usar con componentes existentes
   const adaptedProduct = adaptSupabaseProduct(product);
 
-  // Obtener todas las imágenes del producto
+  // Obtener todas las imágenes del producto (primary + imágenes de item_images)
   const allImages = [
     ...(product.primary_image_url ? [{
       url: product.primary_image_url,
@@ -152,50 +153,10 @@ async function ProductContent({ slug }: { slug: string }) {
       <div className="container mx-auto px-4 pb-12">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
           {/* Galería de imágenes - Móvil y Desktop */}
-          <div className="space-y-4">
-            {/* Imagen principal */}
-            <div className="relative aspect-square w-full overflow-hidden rounded-lg bg-muted">
-              {allImages.length > 0 ? (
-                <Image
-                  src={allImages[0].url}
-                  alt={allImages[0].alt}
-                  fill
-                  className="object-contain"
-                  priority
-                  sizes="(max-width: 1024px) 100vw, 50vw"
-                />
-              ) : (
-                <div className="flex items-center justify-center h-full text-muted-foreground">
-                  Sin imagen
-                </div>
-              )}
-              {hasDiscount && (
-                <div className="absolute top-4 left-4 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-semibold">
-                  -{discountPercentage}%
-                </div>
-              )}
-            </div>
-
-            {/* Miniaturas de imágenes adicionales */}
-            {allImages.length > 1 && (
-              <div className="grid grid-cols-4 gap-2">
-                {allImages.slice(1, 5).map((img, index) => (
-                  <div
-                    key={index}
-                    className="relative aspect-square overflow-hidden rounded-lg bg-muted cursor-pointer hover:opacity-80 transition-opacity"
-                  >
-                    <Image
-                      src={img.url}
-                      alt={img.alt}
-                      fill
-                      className="object-cover"
-                      sizes="(max-width: 1024px) 25vw, 12.5vw"
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <ProductImageGallery 
+            images={allImages} 
+            discountPercentage={hasDiscount ? discountPercentage : undefined}
+          />
 
           {/* Información del producto */}
           <div className="space-y-6">
