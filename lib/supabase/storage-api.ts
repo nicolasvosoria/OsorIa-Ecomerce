@@ -2,7 +2,8 @@ import { getSupabaseBrowserClient } from "./client"
 import { isCurrentUserAdmin } from "./permissions-api"
 
 const BUCKET_NAME = "component-images"
-const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
+const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB por defecto
+const MAX_PRODUCT_IMAGE_SIZE = 1 * 1024 * 1024 // 1MB para imágenes de productos
 const ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"]
 
 export interface UploadImageResult {
@@ -41,11 +42,19 @@ export async function uploadImage(
       }
     }
 
-    // Validar tamaño
-    if (file.size > MAX_FILE_SIZE) {
+    // Validar tamaño - Si es contexto de productos, usar límite de 1MB
+    const isProductContext = context && (
+      context.includes("product") || 
+      context.includes("item") ||
+      context === "product-images"
+    )
+    const maxSize = isProductContext ? MAX_PRODUCT_IMAGE_SIZE : MAX_FILE_SIZE
+    const maxSizeMB = isProductContext ? 1 : 5
+
+    if (file.size > maxSize) {
       return {
         success: false,
-        error: `El archivo es demasiado grande. Tamaño máximo: ${MAX_FILE_SIZE / 1024 / 1024}MB`,
+        error: `El archivo es demasiado grande. Tamaño máximo permitido: ${maxSizeMB}MB (${(file.size / 1024 / 1024).toFixed(2)}MB seleccionado)`,
       }
     }
 

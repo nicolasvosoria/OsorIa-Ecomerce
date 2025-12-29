@@ -24,7 +24,7 @@ export function MultiImageUpload({
   label = "Imágenes",
   maxImages = 3,
   context,
-  maxSizeMB = 5,
+  maxSizeMB = 1, // Por defecto 1 MB para imágenes de productos
   accept = "image/jpeg,image/jpg,image/png,image/webp,image/gif",
 }: MultiImageUploadProps) {
   const [uploading, setUploading] = useState<number | null>(null)
@@ -40,10 +40,15 @@ export function MultiImageUpload({
       return
     }
 
-    // Validar tamaño
+    // Validar tamaño - Para productos, máximo 1 MB
     const maxSize = maxSizeMB * 1024 * 1024
+    const fileSizeMB = (file.size / 1024 / 1024).toFixed(2)
+    
     if (file.size > maxSize) {
-      toast.error(`El archivo es demasiado grande. Tamaño máximo: ${maxSizeMB}MB`)
+      toast.error(
+        `El archivo es demasiado grande. Tamaño máximo permitido: ${maxSizeMB}MB. Tu archivo: ${fileSizeMB}MB`,
+        { duration: 5000 }
+      )
       return
     }
 

@@ -31,6 +31,12 @@ export function ImageUpload({
   recommendedHeight,
   fileTypes,
 }: ImageUploadProps) {
+  // Si el contexto es de productos, usar 1 MB como límite
+  const isProductContext = context && (
+    context.includes("product") || 
+    context.includes("item")
+  )
+  const effectiveMaxSizeMB = isProductContext ? 1 : maxSizeMB
   const [uploading, setUploading] = useState(false)
   const [preview, setPreview] = useState<string | null>(value || null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -45,10 +51,15 @@ export function ImageUpload({
       return
     }
 
-    // Validar tamaño
-    const maxSize = maxSizeMB * 1024 * 1024
+    // Validar tamaño - Para productos, máximo 1 MB
+    const maxSize = effectiveMaxSizeMB * 1024 * 1024
+    const fileSizeMB = (file.size / 1024 / 1024).toFixed(2)
+    
     if (file.size > maxSize) {
-      toast.error(`El archivo es demasiado grande. Tamaño máximo: ${maxSizeMB}MB`)
+      toast.error(
+        `El archivo es demasiado grande. Tamaño máximo permitido: ${effectiveMaxSizeMB}MB. Tu archivo: ${fileSizeMB}MB`,
+        { duration: 5000 }
+      )
       return
     }
 
@@ -187,7 +198,10 @@ export function ImageUpload({
           </p>
         )}
         <p className="text-xs text-muted-foreground">
-          Tamaño máximo: {maxSizeMB}MB
+          Tamaño máximo: {effectiveMaxSizeMB}MB
+          {isProductContext && (
+            <span className="text-orange-600 font-medium ml-1">(Límite para productos)</span>
+          )}
         </p>
       </div>
     </div>
