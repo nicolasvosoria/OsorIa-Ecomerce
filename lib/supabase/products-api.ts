@@ -488,6 +488,226 @@ export async function getItemsByCategory(categoryId: string, limit: number = 20)
 }
 
 /**
+ * Crear un nuevo producto
+ */
+export interface CreateItemData {
+  item_code?: string
+  item_name: string
+  item_description?: string
+  item_description_html?: string
+  category_id?: string
+  base_price: number
+  compare_at_price?: number
+  currency_code?: string
+  is_active?: boolean
+  is_featured?: boolean
+  is_available_for_sale?: boolean
+  track_inventory?: boolean
+  inventory_quantity?: number
+  low_stock_threshold?: number
+  item_slug?: string
+  seo_title?: string
+  seo_description?: string
+  metadata?: Record<string, any>
+  tags?: string[]
+  primary_image_url?: string
+  primary_image_alt?: string
+  display_order?: number
+  store_id?: string
+}
+
+export interface CreateItemResult {
+  success: boolean
+  error?: string
+  item?: StoreItemWithDetails
+}
+
+export async function createItem(
+  data: CreateItemData,
+  additionalImages: string[] = []
+): Promise<CreateItemResult> {
+  try {
+    const supabase = getSupabaseBrowserClient()
+    if (!supabase) {
+      return {
+        success: false,
+        error: 'Supabase no configurado',
+      }
+    }
+
+    // Validar que solo haya máximo 3 imágenes en total (primary + additional)
+    const totalImagesCount = (data.primary_image_url ? 1 : 0) + additionalImages.length
+    if (totalImagesCount > 3) {
+      return {
+        success: false,
+        error: 'Solo se permiten máximo 3 imágenes por producto (1 principal + 2 adicionales)',
+      }
+    }
+
+    // Obtener store_id
+    let storeId = data.store_id || await getStoreId()
+    
+    // Si no hay store_id, obtener el UUID de la tienda por defecto
+    if (!storeId) {
+      try {
+        const { data: defaultStore } = await supabase
+          .from('stores')
+          .select('id')
+          .eq('subdomain', 'default')
+          .eq('is_active', true)
+          .is('deleted_at', null)
+          .single()
+        
+        if (defaultStore?.id) {
+          storeId = defaultStore.id
+        } else {
+          return {
+            success: false,
+            error: 'No se pudo obtener el ID de la tienda',
+          }
+        }
+      } catch (error) {
+        console.error('[Products] Error al obtener tienda por defecto:', error)
+        return {
+          success: false,
+          error: 'No se pudo obtener el ID de la tienda',
+        }
+      }
+    }
+
+    // Generar slug si no se proporciona
+    let slug = data.item_slug
+    if (!slug && data.item_name) {
+      slug = data.item_name
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+    }
+
+    // Verificar que el slug sea único
+    if (slug) {
+      const { data: existingItem } = await supabase
+        .from('store_items')
+        .select('id')
+        .eq('item_slug', slug)
+        .eq('store_id', storeId)
+        .single()
+
+      if (existingItem) {
+        // Si el slug ya existe, agregar un número al final
+        let counter = 1
+        let uniqueSlug = `${slug}-${counter}`
+        let exists = true
+
+        while (exists) {
+          const { data: checkItem } = await supabase
+            .from('store_items')
+            .select('id')
+            .eq('item_slug', uniqueSlug)
+            .eq('store_id', storeId)
+            .single()
+
+          if (!checkItem) {
+            exists = false
+            slug = uniqueSlug
+          } else {
+            counter++
+            uniqueSlug = `${slug}-${counter}`
+          }
+        }
+      }
+    }
+
+    // Preparar datos del producto
+    const itemData: any = {
+      item_code: data.item_code || null,
+      item_name: data.item_name,
+      item_description: data.item_description || null,
+      item_description_html: data.item_description_html || null,
+      category_id: data.category_id || null,
+      base_price: data.base_price,
+      compare_at_price: data.compare_at_price || null,
+      currency_code: data.currency_code || 'COP',
+      is_active: data.is_active !== undefined ? data.is_active : true,
+      is_featured: data.is_featured !== undefined ? data.is_featured : false,
+      is_available_for_sale: data.is_available_for_sale !== undefined ? data.is_available_for_sale : true,
+      track_inventory: data.track_inventory !== undefined ? data.track_inventory : false,
+      inventory_quantity: data.inventory_quantity || 0,
+      low_stock_threshold: data.low_stock_threshold || 10,
+      item_slug: slug || null,
+      seo_title: data.seo_title || null,
+      seo_description: data.seo_description || null,
+      metadata: data.metadata || {},
+      tags: data.tags || [],
+      primary_image_url: data.primary_image_url || null,
+      primary_image_alt: data.primary_image_alt || null,
+      display_order: data.display_order || 0,
+      store_id: storeId,
+    }
+
+    // Crear el producto
+    const result = await withTimeout(
+      supabase.from('store_items').insert(itemData).select('*, item_categories(*)').single(),
+      20000,
+      'createItem'
+    ) as { data: any; error: any }
+
+    if (result.error) {
+      console.error('[Products] Error al crear producto:', result.error)
+      return {
+        success: false,
+        error: result.error.message || 'Error al crear el producto',
+      }
+    }
+
+    const item = result.data as any
+
+    // Insertar imágenes adicionales en la tabla item_images
+    if (additionalImages.length > 0) {
+      const imagesToInsert = additionalImages.map((url, index) => ({
+        item_id: item.id,
+        image_url: url,
+        image_alt: `${item.item_name} - Imagen ${index + 2}`, // Alt text for additional images
+        display_order: index + 2, // Start from 2 for additional images
+        image_type: 'product',
+      }))
+
+      const imagesResult = await withTimeout(
+        supabase.from('item_images').insert(imagesToInsert),
+        15000,
+        'insertAdditionalImages'
+      ) as { error: any }
+      
+      const imagesError = imagesResult.error
+
+      if (imagesError) {
+        console.error('[Products] Error al insertar imágenes adicionales:', imagesError)
+        // No se retorna error fatal, el producto ya fue creado
+      }
+    }
+
+    return {
+      success: true,
+      item: {
+        ...item,
+        category: item.item_categories ? (item.item_categories as ItemCategory) : undefined,
+        variants: [],
+        images: [], // These will be fetched separately by getItemBySlug
+        options: [],
+      } as StoreItemWithDetails,
+    }
+  } catch (error: any) {
+    console.error('[Products] Error inesperado al crear producto:', error)
+    return {
+      success: false,
+      error: error.message || 'Error inesperado al crear el producto',
+    }
+  }
+}
+
+/**
  * Incrementar contador de vistas de un producto
  */
 export async function incrementItemViewCount(itemId: string): Promise<boolean> {

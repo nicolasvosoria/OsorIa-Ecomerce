@@ -1,9 +1,10 @@
 import { AdminPermissionsProvider } from "@/contexts/admin-permissions-context"
+import type { ReactNode } from "react"
 
 export default function DashboardLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: ReactNode
 }) {
   return (
     <AdminPermissionsProvider>

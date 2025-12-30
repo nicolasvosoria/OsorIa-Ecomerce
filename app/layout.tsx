@@ -1,4 +1,5 @@
 import type React from "react"
+import { Suspense } from "react"
 import type { Metadata } from "next"
 // Importación alternativa de fuentes para evitar problemas con Turbopack
 import { Geist, Geist_Mono } from "next/font/google"
@@ -98,7 +99,9 @@ export default async function RootLayout({
                       <AdminProvider>
                         <NuqsAdapter>
                         <StylesLoader>
-                          <AdminRedirect />
+                          <Suspense fallback={null}>
+                            <AdminRedirect />
+                          </Suspense>
                           <MainContentWrapper>
                             <main data-vaul-drawer-wrapper="true">
                               <EditableWrapper componentName="header" label="Header">

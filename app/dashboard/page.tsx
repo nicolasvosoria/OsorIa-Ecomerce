@@ -1,6 +1,6 @@
 "use client"
 
-import { Suspense, useEffect } from "react"
+import { Suspense, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAdminPermissions } from "@/contexts/admin-permissions-context"
 import { useAuth } from "@/contexts/auth-context"
@@ -12,29 +12,52 @@ import {
   Package, 
   ShoppingCart, 
   Users, 
-  Settings, 
-  BarChart3,
-  FileText,
-  Image as ImageIcon,
-  Palette,
-  Type,
-  Store,
   ArrowRight,
   Eye,
   Edit
 } from "lucide-react"
 import Link from "next/link"
+import { getDashboardStats } from "@/lib/supabase/stats-api"
+import { formatPrice } from "@/lib/shopify/utils"
 
 function DashboardContent() {
   const { isAdmin, loading } = useAdminPermissions()
   const { user } = useAuth()
   const router = useRouter()
+  const [stats, setStats] = useState({
+    totalProducts: 0,
+    ordersToday: 0,
+    totalUsers: 0,
+    monthlySales: 0,
+  })
+  const [loadingStats, setLoadingStats] = useState(true)
 
   useEffect(() => {
     if (!loading && !isAdmin) {
       router.push("/")
     }
   }, [isAdmin, loading, router])
+
+  // Cargar estadísticas desde la BD
+  useEffect(() => {
+    const loadStats = async () => {
+      if (!isAdmin) return
+      
+      setLoadingStats(true)
+      try {
+        const dashboardStats = await getDashboardStats()
+        setStats(dashboardStats)
+      } catch (error) {
+        console.error("[Dashboard] Error al cargar estadísticas:", error)
+      } finally {
+        setLoadingStats(false)
+      }
+    }
+
+    if (isAdmin) {
+      loadStats()
+    }
+  }, [isAdmin])
 
   if (loading) {
     return (
@@ -67,6 +90,7 @@ function DashboardContent() {
     )
   }
 
+  // Solo mostrar opciones de productos, pedidos y usuarios
   const dashboardCards = [
     {
       title: "Productos",
@@ -74,6 +98,7 @@ function DashboardContent() {
       icon: Package,
       href: "/admin/products",
       color: "bg-blue-500",
+      count: stats.totalProducts,
     },
     {
       title: "Pedidos",
@@ -81,6 +106,7 @@ function DashboardContent() {
       icon: ShoppingCart,
       href: "/admin/orders",
       color: "bg-green-500",
+      count: stats.ordersToday,
     },
     {
       title: "Usuarios",
@@ -88,6 +114,7 @@ function DashboardContent() {
       icon: Users,
       href: "/admin/users",
       color: "bg-purple-500",
+      count: stats.totalUsers,
     },
     {
       title: "Editor de Página",
@@ -95,48 +122,6 @@ function DashboardContent() {
       icon: Edit,
       href: "/admin",
       color: "bg-orange-500",
-    },
-    {
-      title: "Estilos",
-      description: "Personaliza estilos de componentes",
-      icon: Palette,
-      href: "/admin/styles",
-      color: "bg-pink-500",
-    },
-    {
-      title: "Temas",
-      description: "Gestiona temas de la tienda",
-      icon: ImageIcon,
-      href: "/admin/themes",
-      color: "bg-indigo-500",
-    },
-    {
-      title: "Fuentes",
-      description: "Configura fuentes personalizadas",
-      icon: Type,
-      href: "/admin/fonts",
-      color: "bg-teal-500",
-    },
-    {
-      title: "Tiendas",
-      description: "Gestiona múltiples tiendas",
-      icon: Store,
-      href: "/admin/stores",
-      color: "bg-cyan-500",
-    },
-    {
-      title: "Reportes",
-      description: "Ver estadísticas y reportes",
-      icon: BarChart3,
-      href: "/admin/reports",
-      color: "bg-yellow-500",
-    },
-    {
-      title: "Configuración",
-      description: "Ajustes generales del sistema",
-      icon: Settings,
-      href: "/admin/settings",
-      color: "bg-gray-500",
     },
   ]
 
@@ -179,8 +164,14 @@ function DashboardContent() {
               <CardDescription>Total Productos</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">-</div>
-              <p className="text-xs text-muted-foreground">En catálogo</p>
+              {loadingStats ? (
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              ) : (
+                <>
+                  <div className="text-2xl font-bold">{stats.totalProducts}</div>
+                  <p className="text-xs text-muted-foreground">En catálogo</p>
+                </>
+              )}
             </CardContent>
           </Card>
           <Card>
@@ -188,8 +179,14 @@ function DashboardContent() {
               <CardDescription>Pedidos Hoy</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">-</div>
-              <p className="text-xs text-muted-foreground">Nuevos pedidos</p>
+              {loadingStats ? (
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              ) : (
+                <>
+                  <div className="text-2xl font-bold">{stats.ordersToday}</div>
+                  <p className="text-xs text-muted-foreground">Nuevos pedidos</p>
+                </>
+              )}
             </CardContent>
           </Card>
           <Card>
@@ -197,8 +194,14 @@ function DashboardContent() {
               <CardDescription>Usuarios</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">-</div>
-              <p className="text-xs text-muted-foreground">Registrados</p>
+              {loadingStats ? (
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              ) : (
+                <>
+                  <div className="text-2xl font-bold">{stats.totalUsers}</div>
+                  <p className="text-xs text-muted-foreground">Registrados</p>
+                </>
+              )}
             </CardContent>
           </Card>
           <Card>
@@ -206,8 +209,16 @@ function DashboardContent() {
               <CardDescription>Ventas del Mes</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">-</div>
-              <p className="text-xs text-muted-foreground">Total</p>
+              {loadingStats ? (
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              ) : (
+                <>
+                  <div className="text-2xl font-bold">
+                    {formatPrice(stats.monthlySales.toString(), "COP")}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Total</p>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -228,6 +239,16 @@ function DashboardContent() {
                     </div>
                     <CardTitle className="mt-4">{card.title}</CardTitle>
                     <CardDescription>{card.description}</CardDescription>
+                    {card.count !== undefined && (
+                      <div className="mt-2">
+                        <span className="text-2xl font-bold text-primary">{card.count}</span>
+                        <span className="text-sm text-muted-foreground ml-2">
+                          {card.title === "Productos" && "productos"}
+                          {card.title === "Pedidos" && "hoy"}
+                          {card.title === "Usuarios" && "usuarios"}
+                        </span>
+                      </div>
+                    )}
                   </CardHeader>
                 </Link>
               </Card>

@@ -308,6 +308,79 @@ export async function getOrderByNumber(orderNumber: string): Promise<OrderWithIt
 }
 
 /**
+ * Obtener lista de pedidos
+ */
+export interface GetOrdersParams {
+  limit?: number
+  offset?: number
+  order_by?: 'created_at' | 'order_date' | 'total_amount'
+  order_direction?: 'asc' | 'desc'
+  status?: Order['status']
+  payment_status?: Order['payment_status']
+}
+
+export interface GetOrdersResult {
+  orders: Order[]
+  total: number
+}
+
+export async function getOrders(params: GetOrdersParams = {}): Promise<GetOrdersResult> {
+  try {
+    const supabase = getSupabaseBrowserClient()
+    if (!supabase) {
+      console.error('[Orders] Supabase no configurado')
+      return { orders: [], total: 0 }
+    }
+
+    const {
+      limit = 100,
+      offset = 0,
+      order_by = 'created_at',
+      order_direction = 'desc',
+      status,
+      payment_status,
+    } = params
+
+    let query = supabase
+      .from('orders')
+      .select('*', { count: 'exact' })
+
+    // Filtrar por estado si se especifica
+    if (status) {
+      query = query.eq('status', status)
+    }
+
+    // Filtrar por estado de pago si se especifica
+    if (payment_status) {
+      query = query.eq('payment_status', payment_status)
+    }
+
+    // Ordenar
+    query = query.order(order_by, { ascending: order_direction === 'asc' })
+      .range(offset, offset + limit - 1)
+
+    const result = await withTimeout(query, 15000, 'getOrders') as { 
+      data: any[] | null
+      error: any
+      count: number | null
+    }
+
+    if (result.error) {
+      console.error('[Orders] Error al obtener pedidos:', result.error)
+      return { orders: [], total: 0 }
+    }
+
+    return {
+      orders: (result.data || []) as Order[],
+      total: result.count || 0,
+    }
+  } catch (error: any) {
+    console.error('[Orders] Error inesperado al obtener pedidos:', error)
+    return { orders: [], total: 0 }
+  }
+}
+
+/**
  * Obtener pedidos por email del cliente
  */
 export async function getOrdersByEmail(email: string, limit: number = 50): Promise<OrderWithItems[]> {
