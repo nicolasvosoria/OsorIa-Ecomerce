@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import Link from "next/link"
-import { Search, Heart, ShoppingCart, Palette, AlignLeft, Menu, X, LogIn, LogOut, User, Eye, EyeOff, CreditCard, Building2, Wallet } from "lucide-react"
+import { Search, Heart, ShoppingCart, Palette, AlignLeft, Menu, X, LogIn, LogOut, User, Eye, EyeOff, CreditCard, Building2, Wallet, LayoutDashboard, Edit } from "lucide-react"
 import { VisaIcon, MasterCardIcon, AmexIcon } from "@/components/icons/cc-icons"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -211,11 +211,28 @@ export function Header() {
                         : user?.email || "Usuario"}
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator style={{ backgroundColor: "var(--border)" }} />
+                  {user?.role === 'admin' && (
+                    <>
+                      <DropdownMenuItem asChild style={{ color: "var(--foreground)" }}>
+                        <Link href="/dashboard">
+                          <LayoutDashboard className="mr-2 h-4 w-4" />
+                          Dashboard
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild style={{ color: "var(--foreground)" }}>
+                        <Link href="/admin">
+                          <Edit className="mr-2 h-4 w-4" />
+                          Editor de Página
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator style={{ backgroundColor: "var(--border)" }} />
+                    </>
+                  )}
                   <DropdownMenuItem
                     onClick={async () => {
                       // Guardar si el usuario es administrador antes de cerrar sesión
                       const wasAdmin = user?.role === 'admin'
-                      const wasOnAdminPage = pathname === '/admin'
+                      const wasOnAdminPage = pathname === '/admin' || pathname === '/dashboard'
                       
                       await logout()
                       
@@ -327,10 +344,27 @@ export function Header() {
                           : user?.email || "Usuario"}
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator style={{ backgroundColor: "var(--border)" }} />
+                    {user?.role === 'admin' && (
+                      <>
+                        <DropdownMenuItem asChild style={{ color: "var(--foreground)" }}>
+                          <Link href="/dashboard">
+                            <LayoutDashboard className="mr-2 h-4 w-4" />
+                            Dashboard
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild style={{ color: "var(--foreground)" }}>
+                          <Link href="/admin">
+                            <Edit className="mr-2 h-4 w-4" />
+                            Editor de Página
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator style={{ backgroundColor: "var(--border)" }} />
+                      </>
+                    )}
                     <DropdownMenuItem
                       onClick={async () => {
                         const wasAdmin = user?.role === 'admin'
-                        const wasOnAdminPage = pathname === '/admin'
+                        const wasOnAdminPage = pathname === '/admin' || pathname === '/dashboard'
                         
                         await logout()
                         
@@ -594,6 +628,46 @@ export function Header() {
               >
                 Stands
               </Link>
+              
+              {/* Sección de Administrador */}
+              {user?.role === 'admin' && (
+                <>
+                  <div className="my-2 border-t" style={{ borderColor: "var(--border)" }}></div>
+                  <div className="text-xs font-semibold uppercase tracking-wider px-4 py-2" style={{ color: "var(--muted-foreground)" }}>
+                    Administración
+                  </div>
+                  <Link
+                    href="/dashboard"
+                    className="text-base font-inter font-medium py-3 px-4 rounded-lg transition-colors flex items-center gap-2"
+                    style={{ color: "var(--primary)" }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = "var(--muted)"
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = "transparent"
+                    }}
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    <LayoutDashboard className="h-5 w-5" />
+                    Dashboard
+                  </Link>
+                  <Link
+                    href="/admin"
+                    className="text-base font-inter font-medium py-3 px-4 rounded-lg transition-colors flex items-center gap-2"
+                    style={{ color: "var(--foreground)" }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = "var(--muted)"
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = "transparent"
+                    }}
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    <Edit className="h-5 w-5" />
+                    Editor de Página
+                  </Link>
+                </>
+              )}
             </div>
             
             {/* Botones de tema y tipografía - Solo visibles para administradores */}

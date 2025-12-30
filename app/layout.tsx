@@ -1,5 +1,6 @@
 import type React from "react"
 import type { Metadata } from "next"
+// Importación alternativa de fuentes para evitar problemas con Turbopack
 import { Geist, Geist_Mono } from "next/font/google"
 import "./globals.css"
 import { Toaster } from "sonner"
@@ -28,21 +29,29 @@ import { FloatingContactButton } from "@/components/ui/floating-contact-button"
 import { ApplyStylesScript } from "@/components/apply-styles-script"
 import { StylesLoader } from "@/components/styles-loader"
 import { SiteBackground } from "@/components/site-background"
+import { StoreProvider } from "@/contexts/store-context"
+import { ReposteriaLayout } from "./reposteria-layout"
+import { AdminRedirect } from "@/components/admin/admin-redirect"
 
 const V0Setup = dynamic(() => import("@/components/v0-setup"))
 
 const isV0 = process.env["VERCEL_URL"]?.includes("vusercontent.net") ?? false
 
+// Configuración de fuentes con ajustes para evitar problemas con Turbopack
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
   display: "swap",
+  preload: true,
+  fallback: ["system-ui", "arial"],
 })
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
   display: "swap",
+  preload: true,
+  fallback: ["monospace"],
 })
 
 export const metadata: Metadata = {
@@ -76,9 +85,11 @@ export default async function RootLayout({
       >
         <ApplyStylesScript />
         <V0Provider isV0={isV0}>
-          <StylesProvider>
-            <SiteBackground />
-            <AuthProvider>
+          <StoreProvider>
+            <ReposteriaLayout>
+              <StylesProvider>
+                <SiteBackground />
+                <AuthProvider>
               <AdminPermissionsProvider>
                 <ThemeProvider>
                 <FontProvider>
@@ -87,6 +98,7 @@ export default async function RootLayout({
                       <AdminProvider>
                         <NuqsAdapter>
                         <StylesLoader>
+                          <AdminRedirect />
                           <MainContentWrapper>
                             <main data-vaul-drawer-wrapper="true">
                               <EditableWrapper componentName="header" label="Header">
@@ -110,6 +122,8 @@ export default async function RootLayout({
               </AdminPermissionsProvider>
             </AuthProvider>
           </StylesProvider>
+            </ReposteriaLayout>
+          </StoreProvider>
           {isV0 && <V0Setup />}
         </V0Provider>
       </body>

@@ -1,0 +1,199 @@
+/**
+ * Estilos globales específicos para la tienda de repostería
+ * Inspirado en el diseño de nicolukas.com
+ */
+
+/* Variables CSS para repostería */
+.reposteria-store {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background-color: #FFFBF9;
+  color: #2D1B1B;
+}
+
+.reposteria-store h1,
+.reposteria-store h2,
+.reposteria-store h3,
+.reposteria-store h4,
+.reposteria-store h5,
+.reposteria-store h6 {
+  font-family: 'Playfair Display', serif;
+  font-weight: 600;
+  color: #2D1B1B;
+  letter-spacing: -0.02em;
+}
+
+/* Header personalizado para repostería */
+.reposteria-store header {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid #F5E6E0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+/* Botones con estilo elegante */
+.reposteria-store button,
+.reposteria-store .btn {
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.reposteria-store button.primary,
+.reposteria-store .btn-primary {
+  background: linear-gradient(135deg, #FF6B9D 0%, #FFB6D9 100%);
+  color: white;
+  border: none;
+  box-shadow: 0 4px 14px rgba(255, 107, 157, 0.3);
+}
+
+.reposteria-store button.primary:hover,
+.reposteria-store .btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 107, 157, 0.4);
+}
+
+/* Cards de productos con estilo elegante */
+.reposteria-store .product-card {
+  background: white;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+  border: 1px solid #F5E6E0;
+}
+
+.reposteria-store .product-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.reposteria-store .product-card img {
+  transition: transform 0.5s ease;
+}
+
+.reposteria-store .product-card:hover img {
+  transform: scale(1.05);
+}
+
+/* Hero section con estilo elegante */
+.reposteria-store .hero-section {
+  background: linear-gradient(135deg, #FFFBF9 0%, #FFE5F1 100%);
+  padding: 80px 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.reposteria-store .hero-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23FFB6D9' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  opacity: 0.3;
+}
+
+/* Secciones con espaciado elegante */
+.reposteria-store section {
+  padding: 80px 0;
+}
+
+.reposteria-store .section-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 3rem;
+  font-weight: 600;
+  text-align: center;
+  margin-bottom: 3rem;
+  color: #2D1B1B;
+  position: relative;
+}
+
+.reposteria-store .section-title::after {
+  content: '';
+  position: absolute;
+  bottom: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60px;
+  height: 3px;
+  background: linear-gradient(90deg, #FF6B9D, #FFB6D9);
+  border-radius: 2px;
+}
+
+/* Grid de productos elegante */
+.reposteria-store .products-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 32px;
+  padding: 0 20px;
+}
+
+/* Footer elegante */
+.reposteria-store footer {
+  background: #2D1B1B;
+  color: #FFFBF9;
+  padding: 60px 0 30px;
+}
+
+.reposteria-store footer a {
+  color: #FFFBF9;
+  transition: color 0.3s ease;
+}
+
+.reposteria-store footer a:hover {
+  color: #FFB6D9;
+}
+
+/* Animaciones suaves */
+.reposteria-store * {
+  transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease;
+}
+
+/* Badges y etiquetas */
+.reposteria-store .badge {
+  background: linear-gradient(135deg, #FF6B9D, #FFB6D9);
+  color: white;
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  display: inline-block;
+}
+
+/* Inputs y formularios elegantes */
+.reposteria-store input,
+.reposteria-store textarea,
+.reposteria-store select {
+  border: 1px solid #F5E6E0;
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-family: 'Inter', sans-serif;
+  transition: all 0.3s ease;
+}
+
+.reposteria-store input:focus,
+.reposteria-store textarea:focus,
+.reposteria-store select:focus {
+  outline: none;
+  border-color: #FF6B9D;
+  box-shadow: 0 0 0 3px rgba(255, 107, 157, 0.1);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .reposteria-store .section-title {
+    font-size: 2rem;
+  }
+  
+  .reposteria-store .products-grid {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 20px;
+  }
+  
+  .reposteria-store section {
+    padding: 40px 0;
+  }
+}
+

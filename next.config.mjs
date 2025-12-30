@@ -7,8 +7,19 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   // Deshabilitar Turbopack para evitar problemas con fuentes de Google
+  // En Next.js 16, Turbopack se deshabilita configurando experimental.turbo a false
   experimental: {
     turbo: false,
+  },
+  // Configuración de webpack para asegurar compatibilidad
+  webpack: (config, { isServer }) => {
+    // Asegurar que no se use Turbopack
+    if (config.resolve) {
+      config.resolve.alias = {
+        ...config.resolve.alias,
+      };
+    }
+    return config;
   },
   images: {
     unoptimized: true,

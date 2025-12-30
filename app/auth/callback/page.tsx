@@ -41,7 +41,8 @@ function AuthCallbackContent() {
 
           if (data.session) {
             // Sesión creada exitosamente, redirigir a la página principal
-            router.push("/")
+            // Agregar parámetro para indicar que viene de autenticación
+            router.push("/?from=auth")
             return
           }
         }

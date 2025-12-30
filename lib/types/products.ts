@@ -92,6 +92,7 @@ export interface StoreItemWithDetails extends StoreItem {
 }
 
 export interface GetItemsParams {
+  store_id?: string // ID de la tienda para filtrar productos
   category_id?: string
   is_active?: boolean
   is_featured?: boolean
