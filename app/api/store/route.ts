@@ -5,6 +5,8 @@ import { getSupabaseBrowserClient } from '@/lib/supabase/client'
  * API Route para obtener información de una tienda
  * GET /api/store?subdomain=electronica
  * GET /api/store?id=uuid
+ * 
+ * Nota: Las rutas API son dinámicas por defecto en Next.js 16 con cacheComponents
  */
 export async function GET(request: NextRequest) {
   try {

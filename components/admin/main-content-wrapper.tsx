@@ -1,6 +1,5 @@
 "use client"
 
-import { useAdmin } from "@/contexts/admin-context"
 import { ReactNode, useEffect, useState } from "react"
 
 interface MainContentWrapperProps {
@@ -8,7 +7,6 @@ interface MainContentWrapperProps {
 }
 
 export function MainContentWrapper({ children }: MainContentWrapperProps) {
-  const { isEditMode, selectedComponent } = useAdmin()
   const [mounted, setMounted] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   
@@ -27,9 +25,9 @@ export function MainContentWrapper({ children }: MainContentWrapperProps) {
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
   
-  // Agregar padding derecho cuando el panel de edición está abierto solo en desktop (384px = w-96)
-  // En móviles, el panel es overlay completo, así que no agregamos padding
-  const paddingRight = mounted && !isMobile && isEditMode && selectedComponent ? "24rem" : "0" // 24rem = 384px
+  // Durante prerendering, no aplicar padding
+  // El padding se aplicará dinámicamente en el cliente si es necesario
+  const paddingRight = "0"
 
   return (
     <div 
@@ -43,4 +41,3 @@ export function MainContentWrapper({ children }: MainContentWrapperProps) {
     </div>
   )
 }
-

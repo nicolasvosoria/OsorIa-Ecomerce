@@ -107,7 +107,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
-    loadStore()
+    // Solo cargar en el cliente, no durante prerendering
+    if (typeof window !== 'undefined') {
+      loadStore()
+    } else {
+      // Durante SSR, usar valores por defecto
+      setStore({
+        id: 'default',
+        subdomain: 'default',
+        store_name: 'Tienda Principal',
+        domain: '',
+        is_active: true,
+        is_public: true,
+        currency_code: 'COP',
+      })
+      setIsLoading(false)
+    }
   }, [])
 
   const refreshStore = async () => {
