@@ -7,12 +7,16 @@ import { getSupabaseBrowserClient } from '@/lib/supabase/client'
  * GET /api/store?id=uuid
  * 
  * Nota: Las rutas API son dinámicas por defecto en Next.js 16 con cacheComponents
+ * Esta ruta no debe ser prerenderizada porque usa searchParams dinámicos
  */
+
 export async function GET(request: NextRequest) {
   try {
-    const searchParams = request.nextUrl.searchParams
-    const subdomain = searchParams.get('subdomain')
-    const storeId = searchParams.get('id')
+    // Usar request.url para obtener searchParams de forma compatible con prerendering
+    // Esto evita el error de "needs to bail out of prerendering"
+    const url = new URL(request.url)
+    const subdomain = url.searchParams.get('subdomain')
+    const storeId = url.searchParams.get('id')
 
     const supabase = getSupabaseBrowserClient()
     if (!supabase) {

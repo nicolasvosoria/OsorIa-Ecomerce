@@ -46,12 +46,11 @@ function mapSortKeyToOrderBy(sortKey?: ProductSortKey): {
  * Obtener todas las categorías
  */
 export async function getCollections(): Promise<Collection[]> {
-  'use cache';
-  cacheTag(TAGS.collections);
-  cacheLife('minutes');
-
+  // Removido 'use cache' para evitar problemas con headers() en getStoreId()
+  // El cache se manejará a nivel de Next.js con revalidateTag si es necesario
   try {
-    const categories = await getCategories();
+    // Pasar null como storeId para que getCategories maneje la obtención del storeId
+    const categories = await getCategories(false, null);
     return adaptSupabaseCategories(categories);
   } catch (error) {
     console.error('Error fetching collections from Supabase:', error);
@@ -63,12 +62,11 @@ export async function getCollections(): Promise<Collection[]> {
  * Obtener una categoría por handle
  */
 export async function getCollection(handle: string): Promise<Collection | null> {
-  'use cache';
-  cacheTag(TAGS.collections);
-  cacheLife('minutes');
-
+  // Removido 'use cache' para evitar problemas con headers() en getStoreId()
+  // El cache se manejará a nivel de Next.js con revalidateTag si es necesario
   try {
-    const categories = await getCategories();
+    // Pasar null como storeId para que getCategories maneje la obtención del storeId
+    const categories = await getCategories(false, null);
     const category = categories.find(
       cat => cat.category_name.toLowerCase().replace(/\s+/g, '-') === handle
     );
@@ -83,12 +81,11 @@ export async function getCollection(handle: string): Promise<Collection | null> 
  * Obtener un producto por handle (slug)
  */
 export async function getProduct(handle: string): Promise<Product | null> {
-  'use cache';
-  cacheTag(TAGS.products);
-  cacheLife('minutes');
-
+  // Removido 'use cache' para evitar problemas con headers() en getStoreId()
+  // El cache se manejará a nivel de Next.js con revalidateTag si es necesario
   try {
-    const item = await getItemBySlug(handle);
+    // Pasar null como storeId para que getItemBySlug obtenga la tienda por defecto
+    const item = await getItemBySlug(handle, null);
     if (!item) return null;
     return adaptSupabaseProduct(item);
   } catch (error) {
@@ -106,10 +103,8 @@ export async function getProducts(params: {
   reverse?: boolean;
   query?: string;
 }): Promise<Product[]> {
-  'use cache';
-  cacheTag(TAGS.products);
-  cacheLife('minutes');
-
+  // Removido 'use cache' para evitar problemas con headers() en getStoreId()
+  // El cache se manejará a nivel de Next.js con revalidateTag si es necesario
   try {
     const { order_by, order_direction } = mapSortKeyToOrderBy(params.sortKey);
     const direction = params.reverse
@@ -141,13 +136,12 @@ export async function getCollectionProducts(params: {
   reverse?: boolean;
   query?: string;
 }): Promise<Product[]> {
-  'use cache';
-  cacheTag(TAGS.collectionProducts);
-  cacheLife('minutes');
-
+  // Removido 'use cache' para evitar problemas con headers() en getStoreId()
+  // El cache se manejará a nivel de Next.js con revalidateTag si es necesario
   try {
     // Buscar la categoría por handle
-    const categories = await getCategories();
+    // Pasar null como storeId para que getCategories maneje la obtención del storeId
+    const categories = await getCategories(false, null);
     const category = categories.find(
       cat => cat.category_name.toLowerCase().replace(/\s+/g, '-') === params.collection
     );
@@ -182,10 +176,8 @@ export async function getCollectionProducts(params: {
  * Obtener productos destacados
  */
 export async function getFeaturedProducts(limit: number = 10): Promise<Product[]> {
-  'use cache';
-  cacheTag(TAGS.products);
-  cacheLife('minutes');
-
+  // Removido 'use cache' para evitar problemas con headers() en getStoreId()
+  // El cache se manejará a nivel de Next.js con revalidateTag si es necesario
   try {
     const items = await getFeaturedItems(limit);
     return adaptSupabaseProducts(items);
@@ -199,10 +191,8 @@ export async function getFeaturedProducts(limit: number = 10): Promise<Product[]
  * Buscar productos
  */
 export async function searchProducts(searchTerm: string, limit: number = 20): Promise<Product[]> {
-  'use cache';
-  cacheTag(TAGS.products);
-  cacheLife('minutes');
-
+  // Removido 'use cache' para evitar problemas con headers() en getStoreId()
+  // El cache se manejará a nivel de Next.js con revalidateTag si es necesario
   try {
     const items = await searchItems(searchTerm, limit);
     return adaptSupabaseProducts(items);

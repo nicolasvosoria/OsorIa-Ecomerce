@@ -36,7 +36,7 @@ async function withTimeout<T>(
 /**
  * Obtener todas las categorías activas
  */
-export async function getCategories(includeInactive: boolean = false, storeId?: string): Promise<ItemCategory[]> {
+export async function getCategories(includeInactive: boolean = false, storeId?: string | null): Promise<ItemCategory[]> {
   try {
     const supabase = getSupabaseBrowserClient()
     if (!supabase) {
@@ -45,7 +45,26 @@ export async function getCategories(includeInactive: boolean = false, storeId?: 
     }
 
     // Obtener store_id si no se proporciona
-    let currentStoreId = storeId || await getStoreId()
+    // Si storeId es null explícitamente, no llamar a getStoreId() (para evitar problemas con 'use cache')
+    let currentStoreId = storeId
+    
+    if (currentStoreId === undefined) {
+      try {
+        currentStoreId = await getStoreId()
+      } catch (error: any) {
+        // Si falla (por ejemplo, en build time o dentro de 'use cache'), usar null
+        if (
+          error?.message?.includes('cache scope') ||
+          error?.message?.includes('prerender') ||
+          error?.message?.includes('outside a request scope')
+        ) {
+          currentStoreId = null
+        } else {
+          // Si es otro error, intentar continuar
+          currentStoreId = null
+        }
+      }
+    }
     
     // Si no hay store_id (por ejemplo, durante build time), intentar obtener el UUID de la tienda por defecto
     if (!currentStoreId) {
@@ -149,7 +168,26 @@ export async function getItems(params: GetItemsParams = {}): Promise<GetItemsRes
     } = params
 
     // Obtener store_id si no se proporciona en params
-    let currentStoreId = store_id || await getStoreId()
+    // Si store_id es null explícitamente, no llamar a getStoreId() (para evitar problemas con 'use cache')
+    let currentStoreId: string | null = store_id || null
+    
+    if (currentStoreId === null && store_id === undefined) {
+      try {
+        currentStoreId = await getStoreId()
+      } catch (error: any) {
+        // Si falla (por ejemplo, en build time o dentro de 'use cache'), usar null
+        if (
+          error?.message?.includes('cache scope') ||
+          error?.message?.includes('prerender') ||
+          error?.message?.includes('outside a request scope')
+        ) {
+          currentStoreId = null
+        } else {
+          // Si es otro error, intentar continuar
+          currentStoreId = null
+        }
+      }
+    }
     
     // Si no hay store_id (por ejemplo, durante build time), intentar obtener el UUID de la tienda por defecto
     if (!currentStoreId) {
@@ -179,7 +217,7 @@ export async function getItems(params: GetItemsParams = {}): Promise<GetItemsRes
     let query = supabase
       .from('store_items')
       .select('*, item_categories(*)', { count: 'exact' })
-      .eq('store_id', currentStoreId) // Filtrar por tienda
+      .eq('store_id', currentStoreId!) // Filtrar por tienda (currentStoreId ya está validado)
       .eq('is_active', is_active)
       .eq('is_available_for_sale', is_available_for_sale)
 
@@ -238,17 +276,38 @@ export async function getItems(params: GetItemsParams = {}): Promise<GetItemsRes
 /**
  * Obtener un producto por slug (URL amigable)
  */
-export async function getItemBySlug(slug: string, storeId?: string): Promise<StoreItemWithDetails | null> {
+export async function getItemBySlug(slug: string, storeId?: string | null): Promise<StoreItemWithDetails | null> {
   try {
     const supabase = getSupabaseBrowserClient()
     if (!supabase) {
       return null
     }
 
-    // Obtener store_id si no se proporciona
-    let currentStoreId = storeId || await getStoreId()
+    // Obtener store_id
+    // Si storeId es null explícitamente, no llamar a getStoreId() (para evitar problemas con 'use cache')
+    // Si storeId es undefined, intentar obtenerlo (pero puede fallar en build time)
+    let currentStoreId = storeId
     
-    // Si no hay store_id (por ejemplo, durante build time), intentar obtener el UUID de la tienda por defecto
+    if (currentStoreId === undefined) {
+      try {
+        // Intentar obtener storeId, pero puede fallar en build time
+        currentStoreId = await getStoreId()
+      } catch (error: any) {
+        // Si falla (por ejemplo, en build time o dentro de 'use cache'), usar null
+        if (
+          error?.message?.includes('cache scope') ||
+          error?.message?.includes('prerender') ||
+          error?.message?.includes('outside a request scope')
+        ) {
+          currentStoreId = null
+        } else {
+          throw error
+        }
+      }
+    }
+    
+    // Si no hay store_id (por ejemplo, durante build time o dentro de 'use cache'), 
+    // intentar obtener el UUID de la tienda por defecto
     if (!currentStoreId) {
       try {
         const { data: defaultStore } = await supabase
@@ -703,6 +762,229 @@ export async function createItem(
     return {
       success: false,
       error: error.message || 'Error inesperado al crear el producto',
+    }
+  }
+}
+
+/**
+ * Actualizar un producto existente
+ */
+export interface UpdateItemData {
+  item_code?: string
+  item_name?: string
+  item_description?: string
+  item_description_html?: string
+  category_id?: string
+  base_price?: number
+  compare_at_price?: number
+  currency_code?: string
+  is_active?: boolean
+  is_featured?: boolean
+  is_available_for_sale?: boolean
+  track_inventory?: boolean
+  inventory_quantity?: number
+  low_stock_threshold?: number
+  item_slug?: string
+  seo_title?: string
+  seo_description?: string
+  metadata?: Record<string, any>
+  tags?: string[]
+  primary_image_url?: string
+  primary_image_alt?: string
+  display_order?: number
+}
+
+export interface UpdateItemResult {
+  success: boolean
+  error?: string
+  item?: StoreItemWithDetails
+}
+
+export async function updateItem(
+  itemId: string,
+  data: UpdateItemData,
+  additionalImages: string[] = []
+): Promise<UpdateItemResult> {
+  try {
+    const supabase = getSupabaseBrowserClient()
+    if (!supabase) {
+      return {
+        success: false,
+        error: 'Supabase no configurado',
+      }
+    }
+
+    // Validar que solo haya máximo 3 imágenes en total (primary + additional)
+    const totalImagesCount = (data.primary_image_url ? 1 : 0) + additionalImages.length
+    if (totalImagesCount > 3) {
+      return {
+        success: false,
+        error: 'Solo se permiten máximo 3 imágenes por producto (1 principal + 2 adicionales)',
+      }
+    }
+
+    // Obtener el producto actual para preservar valores no modificados
+    const currentItemResult = await withTimeout(
+      supabase.from('store_items').select('*').eq('id', itemId).single(),
+      15000,
+      'getCurrentItem'
+    ) as { data: any; error: any }
+
+    if (currentItemResult.error || !currentItemResult.data) {
+      return {
+        success: false,
+        error: 'Producto no encontrado',
+      }
+    }
+
+    const currentItem = currentItemResult.data
+
+    // Generar slug si se cambió el nombre y no se proporcionó slug
+    let slug = data.item_slug
+    if (!slug && data.item_name && data.item_name !== currentItem.item_name) {
+      slug = data.item_name
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+
+      // Verificar que el slug sea único (excepto para el producto actual)
+      const { data: existingItem } = await supabase
+        .from('store_items')
+        .select('id')
+        .eq('item_slug', slug)
+        .neq('id', itemId)
+        .single()
+
+      if (existingItem) {
+        // Si el slug ya existe, agregar un número al final
+        let counter = 1
+        let uniqueSlug = `${slug}-${counter}`
+        let exists = true
+
+        while (exists) {
+          const { data: checkItem } = await supabase
+            .from('store_items')
+            .select('id')
+            .eq('item_slug', uniqueSlug)
+            .neq('id', itemId)
+            .single()
+
+          if (!checkItem) {
+            exists = false
+            slug = uniqueSlug
+          } else {
+            counter++
+            uniqueSlug = `${slug}-${counter}`
+          }
+        }
+      }
+    }
+
+    // Preparar datos de actualización (solo campos que se proporcionaron)
+    const updateData: any = {}
+    
+    if (data.item_code !== undefined) updateData.item_code = data.item_code || null
+    if (data.item_name !== undefined) updateData.item_name = data.item_name
+    if (data.item_description !== undefined) updateData.item_description = data.item_description || null
+    if (data.item_description_html !== undefined) updateData.item_description_html = data.item_description_html || null
+    if (data.category_id !== undefined) updateData.category_id = data.category_id || null
+    if (data.base_price !== undefined) updateData.base_price = data.base_price
+    if (data.compare_at_price !== undefined) updateData.compare_at_price = data.compare_at_price || null
+    if (data.currency_code !== undefined) updateData.currency_code = data.currency_code
+    if (data.is_active !== undefined) updateData.is_active = data.is_active
+    if (data.is_featured !== undefined) updateData.is_featured = data.is_featured
+    if (data.is_available_for_sale !== undefined) updateData.is_available_for_sale = data.is_available_for_sale
+    if (data.track_inventory !== undefined) updateData.track_inventory = data.track_inventory
+    if (data.inventory_quantity !== undefined) updateData.inventory_quantity = data.inventory_quantity
+    if (data.low_stock_threshold !== undefined) updateData.low_stock_threshold = data.low_stock_threshold
+    if (slug !== undefined) updateData.item_slug = slug || null
+    if (data.seo_title !== undefined) updateData.seo_title = data.seo_title || null
+    if (data.seo_description !== undefined) updateData.seo_description = data.seo_description || null
+    if (data.metadata !== undefined) updateData.metadata = data.metadata || {}
+    if (data.tags !== undefined) updateData.tags = data.tags || []
+    if (data.primary_image_url !== undefined) updateData.primary_image_url = data.primary_image_url || null
+    if (data.primary_image_alt !== undefined) updateData.primary_image_alt = data.primary_image_alt || null
+    if (data.display_order !== undefined) updateData.display_order = data.display_order
+
+    // Actualizar el producto
+    const result = await withTimeout(
+      supabase
+        .from('store_items')
+        .update(updateData)
+        .eq('id', itemId)
+        .select('*, item_categories(*)')
+        .single(),
+      20000,
+      'updateItem'
+    ) as { data: any; error: any }
+
+    if (result.error) {
+      console.error('[Products] Error al actualizar producto:', result.error)
+      return {
+        success: false,
+        error: result.error.message || 'Error al actualizar el producto',
+      }
+    }
+
+    const item = result.data as any
+
+    // Si hay imágenes adicionales, actualizar la tabla item_images
+    if (additionalImages.length > 0) {
+      // Primero, eliminar las imágenes adicionales existentes (mantener solo las que coinciden)
+      const { data: existingImages } = await supabase
+        .from('item_images')
+        .select('*')
+        .eq('item_id', itemId)
+        .order('display_order', { ascending: true })
+
+      // Eliminar todas las imágenes adicionales existentes
+      if (existingImages && existingImages.length > 0) {
+        await supabase
+          .from('item_images')
+          .delete()
+          .eq('item_id', itemId)
+      }
+
+      // Insertar las nuevas imágenes adicionales
+      const imagesToInsert = additionalImages.map((url, index) => ({
+        item_id: item.id,
+        image_url: url,
+        image_alt: `${item.item_name} - Imagen ${index + 2}`,
+        display_order: index + 2,
+        image_type: 'product',
+      }))
+
+      const imagesResult = await withTimeout(
+        supabase.from('item_images').insert(imagesToInsert),
+        15000,
+        'updateAdditionalImages'
+      ) as { error: any }
+      
+      const imagesError = imagesResult.error
+
+      if (imagesError) {
+        console.error('[Products] Error al actualizar imágenes adicionales:', imagesError)
+        // No se retorna error fatal, el producto ya fue actualizado
+      }
+    }
+
+    return {
+      success: true,
+      item: {
+        ...item,
+        category: item.item_categories ? (item.item_categories as ItemCategory) : undefined,
+        variants: [],
+        images: [],
+        options: [],
+      } as StoreItemWithDetails,
+    }
+  } catch (error: any) {
+    console.error('[Products] Error inesperado al actualizar producto:', error)
+    return {
+      success: false,
+      error: error.message || 'Error inesperado al actualizar el producto',
     }
   }
 }
