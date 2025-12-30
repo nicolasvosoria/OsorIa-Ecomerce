@@ -98,24 +98,26 @@ export default async function RootLayout({
                     <CartProvider>
                       <AdminProvider>
                         <NuqsAdapter>
-                        <StylesLoader>
                           <Suspense fallback={null}>
-                            <AdminRedirect />
-                          </Suspense>
-                          <MainContentWrapper>
+                            <StylesLoader>
+                              <Suspense fallback={null}>
+                                <AdminRedirect />
+                              </Suspense>
+                              <MainContentWrapper>
                             <main data-vaul-drawer-wrapper="true">
                               <EditableWrapper componentName="header" label="Header">
                                 <Header />
                               </EditableWrapper>
                               {children}
                             </main>
-                          </MainContentWrapper>
-                          {isDevelopment && <DebugGrid />}
-                          <Toaster closeButton position="top-left" />
-                          <FloatingContactButton />
-                          <EditModeToggle />
-                          <EditorPanel />
-                        </StylesLoader>
+                              </MainContentWrapper>
+                              {isDevelopment && <DebugGrid />}
+                              <Toaster closeButton position="top-left" />
+                              <FloatingContactButton />
+                              <EditModeToggle />
+                              <EditorPanel />
+                            </StylesLoader>
+                          </Suspense>
                           </NuqsAdapter>
                         </AdminProvider>
                       </CartProvider>

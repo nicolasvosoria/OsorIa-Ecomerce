@@ -48,7 +48,13 @@ export function StylesProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
-    refreshStyles()
+    // Solo cargar en el cliente, no durante SSR/prerendering
+    if (typeof window !== 'undefined') {
+      refreshStyles()
+    } else {
+      // Durante SSR, usar valores por defecto
+      setLoading(false)
+    }
   }, [])
 
   return <StylesContext.Provider value={{ styles, loading, error, refreshStyles }}>{children}</StylesContext.Provider>

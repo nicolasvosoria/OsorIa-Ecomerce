@@ -132,8 +132,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
-    console.log("[Theme] Provider montado, iniciando carga de temas...")
-    refreshThemes()
+    // Solo cargar en el cliente, no durante SSR/prerendering
+    if (typeof window !== 'undefined') {
+      console.log("[Theme] Provider montado, iniciando carga de temas...")
+      refreshThemes()
+    } else {
+      // Durante SSR, usar valores por defecto
+      setLoading(false)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

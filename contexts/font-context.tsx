@@ -111,8 +111,14 @@ export function FontProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
-    console.log("[Font] Provider montado, iniciando carga de fuentes (independiente de autenticación)...")
-    refreshFonts()
+    // Solo cargar en el cliente, no durante SSR/prerendering
+    if (typeof window !== 'undefined') {
+      console.log("[Font] Provider montado, iniciando carga de fuentes (independiente de autenticación)...")
+      refreshFonts()
+    } else {
+      // Durante SSR, usar valores por defecto
+      setLoading(false)
+    }
   }, [])
 
   useEffect(() => {
