@@ -39,6 +39,13 @@ const COMPONENT_FIELDS: Record<
           { key: "image", label: "URL de la Imagen", type: "image" },
         ],
       },
+      { key: "title", label: "Título Principal (Repostería)", type: "textarea" },
+      { key: "description", label: "Descripción (Repostería)", type: "textarea" },
+      { key: "backgroundImage", label: "Imagen de Fondo (Repostería)", type: "image" },
+      { key: "primaryButtonText", label: "Texto Botón Primario (Repostería)", type: "text" },
+      { key: "primaryButtonLink", label: "Link Botón Primario (Repostería)", type: "text" },
+      { key: "secondaryButtonText", label: "Texto Botón Secundario (Repostería)", type: "text" },
+      { key: "secondaryButtonLink", label: "Link Botón Secundario (Repostería)", type: "text" },
     ],
     styles: [
       { key: "bgColor", label: "Color de Fondo", type: "color" },
@@ -46,6 +53,11 @@ const COMPONENT_FIELDS: Record<
       { key: "buttonColor", label: "Color del Botón", type: "color" },
       { key: "buttonTextColor", label: "Color del Texto del Botón", type: "color" },
       { key: "barColor", label: "Color de la Barra Inferior", type: "color" },
+      { key: "titleTextColor", label: "Color del Texto del Título (Repostería)", type: "color" },
+      { key: "descriptionTextColor", label: "Color del Texto de la Descripción (Repostería)", type: "color" },
+      { key: "titleBorderEnabled", label: "Activar Borde en el Título", type: "checkbox" },
+      { key: "titleBorderColor", label: "Color del Borde del Título", type: "color" },
+      { key: "titleBorderWidth", label: "Ancho del Borde del Título (px)", type: "text" },
     ],
     defaults: {
       products: [
@@ -87,6 +99,20 @@ const COMPONENT_FIELDS: Record<
       buttonColor: "#005aa1",
       buttonTextColor: "#ffffff",
       barColor: "#005aa1",
+      // Valores por defecto para hero de repostería
+      title: "",
+      description: "Deliciosos pasteles, postres y dulces artesanales\nHechos con amor y los mejores ingredientes",
+      backgroundImage: "/reposteria/pastel-boda.jpg",
+      primaryButtonText: "Explorar Productos",
+      primaryButtonLink: "/shop",
+      secondaryButtonText: "Ver Catálogo",
+      secondaryButtonLink: "/catalog",
+      // Valores por defecto para estilos de repostería
+      titleTextColor: "#ffffff",
+      descriptionTextColor: "rgba(255, 255, 255, 0.9)",
+      titleBorderEnabled: false,
+      titleBorderColor: "#ffffff",
+      titleBorderWidth: "2",
     },
   },
   popular: {
@@ -1056,6 +1082,17 @@ export function EditorPanel() {
                           label={field.label}
                           context={`${selectedComponent}-${field.key}`}
                         />
+                      ) : field.type === "checkbox" ? (
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`style-${field.key}`}
+                            checked={currentValue === "true" || currentValue === true || currentValue === "1"}
+                            onCheckedChange={(checked) => handleInputChange(field.key, checked ? "true" : "false")}
+                          />
+                          <Label htmlFor={`style-${field.key}`} className="text-sm font-normal cursor-pointer">
+                            {field.label}
+                          </Label>
+                        </div>
                       ) : (
                         <div className="flex gap-2 items-center">
                           <Input

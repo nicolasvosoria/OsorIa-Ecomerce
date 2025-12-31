@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { useComponentStyle } from "@/contexts/styles-context"
 import { useTheme } from "@/contexts/theme-context"
+import { useStore } from "@/contexts/store-context"
 import { ThemeSelectorModal } from "@/components/theme/theme-selector-modal"
 import { FontSelectorModal } from "@/components/font/font-selector-modal"
 import Image from "next/image"
@@ -76,6 +77,7 @@ export function Header() {
   const { activeTheme } = useTheme()
   const { items, removeFromCart, updateQuantity, getTotal, getTotalItems } = useCart()
   const { user, isAuthenticated, login, register, logout, refreshUser } = useAuth()
+  const { store } = useStore()
   const { styles: styleData } = useComponentStyle("header", {
     brandName: "Osoria",
     logoImage: "/logo-osoria.png",
@@ -166,15 +168,16 @@ export function Header() {
           {/* Barra de búsqueda - Centro (responsive) */}
           <div className="flex-1 max-w-md lg:max-w-xl mx-2 lg:mx-4 relative">
             <div className="relative">
-              <Search className="absolute left-3 lg:left-4 top-1/2 -translate-y-1/2 h-3.5 w-3.5 lg:h-4 lg:w-4" style={{ color: styleData.searchIconColor || "var(--muted-foreground)" }} />
+              <Search className="absolute left-3 lg:left-4 top-1/2 -translate-y-1/2 h-3.5 w-3.5 lg:h-4 lg:w-4 z-10 pointer-events-none" style={{ color: styleData.searchIconColor || "var(--muted-foreground)" }} />
               <Input
                 type="search"
                 placeholder={styleData.searchPlaceholder || "Buscar..."}
-                className="pl-9 lg:pl-12 pr-4 h-9 lg:h-10 rounded-full w-full font-inter font-medium text-sm lg:text-base"
+                className="pl-10 lg:pl-14 pr-4 h-9 lg:h-10 rounded-full w-full font-inter font-medium text-sm lg:text-base border"
                 style={{
                   backgroundColor: styleData.searchBgColor || "var(--muted)",
                   borderColor: styleData.searchBorderColor || "var(--border)",
                   color: styleData.searchTextColor || "var(--foreground)",
+                  paddingLeft: "2.5rem",
                 }}
               />
             </div>
@@ -446,77 +449,22 @@ export function Header() {
           
           {/* Segunda fila: Barra de búsqueda */}
           <div className="relative w-full">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: styleData.searchIconColor || "var(--muted-foreground)" }} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 z-10 pointer-events-none" style={{ color: styleData.searchIconColor || "var(--muted-foreground)" }} />
             <Input
               type="search"
               placeholder={styleData.searchPlaceholder || "Buscar..."}
-              className="pl-10 pr-4 h-10 rounded-full w-full text-sm"
+              className="pl-10 pr-4 h-10 rounded-full w-full text-sm border"
               style={{
                 backgroundColor: styleData.searchBgColor || "var(--muted)",
                 borderColor: styleData.searchBorderColor || "var(--border)",
                 color: styleData.searchTextColor || "var(--foreground)",
+                paddingLeft: "2.5rem",
               }}
             />
           </div>
         </div>
 
-        {/* Ocultar barra de navegación para administradores */}
-        {user?.role !== 'admin' && (
-          <nav className="flex items-center gap-4 md:gap-8 pt-3 md:pt-4 border-t -mx-4 md:-mx-4 px-4 md:px-0" style={{ borderColor: "var(--border)" }}>
-            <Link
-              href="/sale"
-              className="text-sm md:text-[16px] font-inter whitespace-nowrap rounded-lg py-1 px-3 md:px-5 cursor-pointer transition-all duration-200 hover:opacity-90 hover:scale-105"
-              style={{ backgroundColor: styleData.bannerBgColor || "#c4faff" }}
-            >
-              <span className="font-bold" style={{ color: styleData.bannerTextColor || "#005aa1" }}>
-                {styleData.tagline?.split("!")[0] || "Big Sale"}!
-              </span>
-              <span className="font-medium hidden sm:inline" style={{ color: styleData.bannerTextColor || "#005aa1" }}>
-                {" "}
-                {styleData.tagline?.split("!").slice(1).join("!") || "Hurry up! Sale ends in 2025"}
-              </span>
-            </Link>
-
-            <div className="flex items-center gap-2 md:gap-4 lg:gap-8 ml-auto flex-wrap">
-              <Link
-                href="/catalog/speakers"
-                className="text-sm md:text-[16px] font-inter font-medium transition-colors"
-                style={{ color: styleData.linkColor || "var(--primary)" }}
-                onMouseEnter={(e) => e.currentTarget.style.opacity = "0.8"}
-                onMouseLeave={(e) => e.currentTarget.style.opacity = "1"}
-              >
-                Speakers
-              </Link>
-              <Link
-                href="/catalog/earphones"
-                className="text-sm md:text-[16px] font-inter font-medium transition-colors"
-                style={{ color: styleData.linkColor || "var(--primary)" }}
-                onMouseEnter={(e) => e.currentTarget.style.opacity = "0.8"}
-                onMouseLeave={(e) => e.currentTarget.style.opacity = "1"}
-              >
-                Earphones
-              </Link>
-              <Link
-                href="/catalog/projectors"
-                className="text-sm md:text-[16px] font-inter font-medium transition-colors"
-                style={{ color: styleData.linkColor || "var(--primary)" }}
-                onMouseEnter={(e) => e.currentTarget.style.opacity = "0.8"}
-                onMouseLeave={(e) => e.currentTarget.style.opacity = "1"}
-              >
-                Projectors
-              </Link>
-              <Link
-                href="/catalog/stands"
-                className="text-sm md:text-[16px] font-inter font-medium transition-colors"
-                style={{ color: styleData.linkColor || "var(--primary)" }}
-                onMouseEnter={(e) => e.currentTarget.style.opacity = "0.8"}
-                onMouseLeave={(e) => e.currentTarget.style.opacity = "1"}
-              >
-                Stands
-              </Link>
-            </div>
-          </nav>
-        )}
+        {/* Navegación eliminada - categorías y banner Big Sale removidos */}
       </div>
       <ThemeSelectorModal open={themeModalOpen} onOpenChange={setThemeModalOpen} />
       <FontSelectorModal open={fontModalOpen} onOpenChange={setFontModalOpen} />
@@ -572,62 +520,125 @@ export function Header() {
               >
                 Ofertas
               </Link>
-              <Link
-                href="/catalog/speakers"
-                className="text-base font-inter font-medium py-3 px-4 rounded-lg transition-colors"
-                style={{ color: "var(--foreground)" }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = "var(--muted)"
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "transparent"
-                }}
-                onClick={() => setMenuOpen(false)}
-              >
-                Speakers
-              </Link>
-              <Link
-                href="/catalog/earphones"
-                className="text-base font-inter font-medium py-3 px-4 rounded-lg transition-colors"
-                style={{ color: "var(--foreground)" }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = "var(--muted)"
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "transparent"
-                }}
-                onClick={() => setMenuOpen(false)}
-              >
-                Earphones
-              </Link>
-              <Link
-                href="/catalog/projectors"
-                className="text-base font-inter font-medium py-3 px-4 rounded-lg transition-colors"
-                style={{ color: "var(--foreground)" }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = "var(--muted)"
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "transparent"
-                }}
-                onClick={() => setMenuOpen(false)}
-              >
-                Projectors
-              </Link>
-              <Link
-                href="/catalog/stands"
-                className="text-base font-inter font-medium py-3 px-4 rounded-lg transition-colors"
-                style={{ color: "var(--foreground)" }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = "var(--muted)"
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "transparent"
-                }}
-                onClick={() => setMenuOpen(false)}
-              >
-                Stands
-              </Link>
+              {store?.subdomain === 'reposteria' ? (
+                <>
+                  <Link
+                    href="/catalog/cupcakes"
+                    className="text-base font-inter font-medium py-3 px-4 rounded-lg transition-colors"
+                    style={{ color: "var(--foreground)" }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = "var(--muted)"
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = "transparent"
+                    }}
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    Cupcakes
+                  </Link>
+                  <Link
+                    href="/catalog/tartas"
+                    className="text-base font-inter font-medium py-3 px-4 rounded-lg transition-colors"
+                    style={{ color: "var(--foreground)" }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = "var(--muted)"
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = "transparent"
+                    }}
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    Tartas
+                  </Link>
+                  <Link
+                    href="/catalog/macarons"
+                    className="text-base font-inter font-medium py-3 px-4 rounded-lg transition-colors"
+                    style={{ color: "var(--foreground)" }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = "var(--muted)"
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = "transparent"
+                    }}
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    Macarons
+                  </Link>
+                  <Link
+                    href="/catalog/pasteles"
+                    className="text-base font-inter font-medium py-3 px-4 rounded-lg transition-colors"
+                    style={{ color: "var(--foreground)" }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = "var(--muted)"
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = "transparent"
+                    }}
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    Pasteles
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <Link
+                    href="/catalog/speakers"
+                    className="text-base font-inter font-medium py-3 px-4 rounded-lg transition-colors"
+                    style={{ color: "var(--foreground)" }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = "var(--muted)"
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = "transparent"
+                    }}
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    Speakers
+                  </Link>
+                  <Link
+                    href="/catalog/earphones"
+                    className="text-base font-inter font-medium py-3 px-4 rounded-lg transition-colors"
+                    style={{ color: "var(--foreground)" }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = "var(--muted)"
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = "transparent"
+                    }}
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    Earphones
+                  </Link>
+                  <Link
+                    href="/catalog/projectors"
+                    className="text-base font-inter font-medium py-3 px-4 rounded-lg transition-colors"
+                    style={{ color: "var(--foreground)" }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = "var(--muted)"
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = "transparent"
+                    }}
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    Projectors
+                  </Link>
+                  <Link
+                    href="/catalog/stands"
+                    className="text-base font-inter font-medium py-3 px-4 rounded-lg transition-colors"
+                    style={{ color: "var(--foreground)" }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = "var(--muted)"
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = "transparent"
+                    }}
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    Stands
+                  </Link>
+                </>
+              )}
               
               {/* Sección de Administrador */}
               {user?.role === 'admin' && (
