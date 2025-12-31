@@ -1,0 +1,30 @@
+═══════════════════════════════════════════════════════════════
+INSTRUCCIONES PARA AGREGAR IMÁGENES A LA GALERÍA
+═══════════════════════════════════════════════════════════════
+
+1. Guarda las siguientes imágenes en este directorio (public/reposteria/):
+
+   ✓ cupcakes-decorados.jpg
+     - Cupcakes decorados (unicornio, arcoíris, fresa)
+   
+   ✓ herramientas-decoracion.jpg
+     - Herramientas de decoración (boquillas, pinceles, fondant)
+   
+   ✓ chocolates-truffles.jpg
+     - Chocolates y truffles artesanales
+   
+   ✓ sprinkles-candies.jpg
+     - Sprinkles y candies coloridos
+   
+   ✓ empaque-presentacion.jpg
+     - Elementos de empaque y presentación
+
+2. Formatos recomendados:
+   - Formato: JPG o WebP
+   - Tamaño: Mínimo 1200x1200px (preferiblemente cuadradas)
+   - Peso: Optimizadas (< 500KB si es posible)
+
+3. Una vez agregadas las imágenes, aparecerán automáticamente 
+   en la galería de la página de repostería.
+
+═══════════════════════════════════════════════════════════════

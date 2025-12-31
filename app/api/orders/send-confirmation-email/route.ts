@@ -299,15 +299,22 @@ async function sendEmail({
     }
 
     // Intentar importar nodemailer dinámicamente
-    let nodemailer
+    let nodemailer: typeof import("nodemailer") | null = null
     try {
       nodemailer = await import("nodemailer")
     } catch (importError) {
       console.error("❌ nodemailer no está instalado. Ejecuta: npm install nodemailer @types/nodemailer")
-      return {
+      return NextResponse.json({
         success: false,
         error: "nodemailer no está instalado. Por favor instala las dependencias necesarias.",
-      }
+      }, { status: 500 })
+    }
+
+    if (!nodemailer) {
+      return NextResponse.json({
+        success: false,
+        error: "nodemailer no está disponible.",
+      }, { status: 500 })
     }
 
     // Crear transporter

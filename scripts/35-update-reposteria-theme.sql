@@ -29,3 +29,5 @@ SELECT
 FROM public.stores
 WHERE subdomain = 'reposteria';
 
+
+

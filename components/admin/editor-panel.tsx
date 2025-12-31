@@ -268,6 +268,104 @@ const COMPONENT_FIELDS: Record<
       { key: "bgColor", label: "Color de Fondo", type: "color" },
       { key: "textColor", label: "Color de Texto", type: "color" },
     ],
+    defaults: {
+      title: "Sobre Nosotros",
+      description: "Somos una pastelería artesanal dedicada a crear los más deliciosos pasteles, postres y dulces. Cada producto está hecho con ingredientes de la más alta calidad y mucho amor, para que puedas disfrutar de momentos especiales con cada bocado.",
+    },
+  },
+  gallery: {
+    content: [
+      { key: "title", label: "Título de la Galería", type: "text" },
+      { key: "description", label: "Descripción", type: "textarea" },
+      {
+        key: "images",
+        label: "Imágenes de la Galería",
+        type: "array",
+        isArray: true,
+        arrayFields: [
+          { key: "src", label: "URL de la Imagen", type: "image" },
+          { key: "alt", label: "Texto Alternativo (Alt)", type: "text" },
+          { key: "title", label: "Título de la Imagen", type: "text" },
+          { key: "category", label: "Categoría", type: "text" },
+        ],
+      },
+    ],
+    styles: [
+      { key: "bgColor", label: "Color de Fondo", type: "color" },
+      { key: "textColor", label: "Color de Texto", type: "color" },
+    ],
+    defaults: {
+      title: "Nuestro Mundo Dulce",
+      description: "Descubre la creatividad y el arte detrás de cada producto que preparamos con amor",
+      images: [
+        {
+          src: "/reposteria/cupcakes-decorados.jpg",
+          alt: "Cupcakes decorados con sprinkles en colores pastel - azul, amarillo y rosa",
+          title: "Cupcakes Decorados",
+          category: "Productos"
+        },
+        {
+          src: "/reposteria/tarta-berries.jpg",
+          alt: "Tarta de frutas con berries frescos, azúcar glass y menta",
+          title: "Tarta de Berries",
+          category: "Productos"
+        },
+        {
+          src: "/reposteria/macarons-colores.jpg",
+          alt: "Macarons en colores pastel - verde, rosa, amarillo y blanco",
+          title: "Macarons Artesanales",
+          category: "Productos"
+        },
+        {
+          src: "/reposteria/mini-cakes-cheesecakes.jpg",
+          alt: "Mini cakes y cheesecakes decorados con berries, chocolate y caramelo",
+          title: "Mini Cakes y Cheesecakes",
+          category: "Productos"
+        },
+        {
+          src: "/reposteria/galletas-chocolate.jpg",
+          alt: "Galletas de chocolate chip caseras",
+          title: "Galletas de Chocolate",
+          category: "Productos"
+        },
+        {
+          src: "/reposteria/pastel-cumpleanos.jpg",
+          alt: "Pastel de cumpleaños decorado con temática festiva y colorida",
+          title: "Pasteles de Cumpleaños",
+          category: "Productos"
+        },
+        {
+          src: "/reposteria/pastel-boda.jpg",
+          alt: "Pastel de boda estilo naked cake decorado con flores frescas",
+          title: "Pasteles de Boda",
+          category: "Productos"
+        },
+        {
+          src: "/reposteria/herramientas-decoracion.jpg",
+          alt: "Herramientas de decoración de pasteles - boquillas, pinceles y fondant",
+          title: "Herramientas de Decoración",
+          category: "Accesorios"
+        },
+        {
+          src: "/reposteria/sprinkles-candies.jpg",
+          alt: "Sprinkles y candies coloridos para decorar postres",
+          title: "Sprinkles y Candies",
+          category: "Decoraciones"
+        },
+        {
+          src: "/reposteria/chocolates-truffles.jpg",
+          alt: "Deliciosos chocolates y truffles artesanales",
+          title: "Chocolates Artesanales",
+          category: "Productos"
+        },
+        {
+          src: "/reposteria/empaque-presentacion.jpg",
+          alt: "Elementos de empaque y presentación para productos de repostería",
+          title: "Empaque y Presentación",
+          category: "Accesorios"
+        }
+      ],
+    },
   },
   story: {
     content: [

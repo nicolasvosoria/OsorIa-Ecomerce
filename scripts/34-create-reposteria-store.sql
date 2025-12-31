@@ -91,3 +91,5 @@ ORDER BY ic.display_order;
 -- Comentario final
 COMMENT ON TABLE public.stores IS 'Tienda de repostería creada. Accesible en: reposteria.tudominio.com';
 
+
+

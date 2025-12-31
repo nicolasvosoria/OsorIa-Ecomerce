@@ -32,3 +32,5 @@ echo "🚀 Siguiente paso:"
 echo "   1. Inicia el servidor: pnpm dev"
 echo "   2. Accede a: http://reposteria.localhost:3000"
 
+
+

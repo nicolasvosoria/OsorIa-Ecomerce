@@ -1,6 +1,7 @@
 import { getSupabaseBrowserClient } from "./client"
 import type { AppTheme } from "@/lib/types/theme"
 import { requireAdmin } from "./permissions-api"
+import { getStoreId } from "@/lib/utils/store"
 
 // Helper para agregar timeout a las promesas
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number = 10000): Promise<T> {
@@ -22,30 +23,42 @@ export async function getThemes(): Promise<AppTheme[]> {
   console.log("[Theme] ✅ Cliente Supabase obtenido")
 
   try {
-    // Las peticiones de temas son independientes de la autenticación
-    // No verificamos sesión para evitar bloqueos
-    console.log("[Theme] Ejecutando consulta a app_themes (sin verificar sesión)...")
-    console.log("[Theme] URL de Supabase:", process.env.NEXT_PUBLIC_SUPABASE_URL)
-    const startTime = Date.now()
+    // Obtener store_id actual
+    let storeId = await getStoreId()
     
-    // Primero hacer una consulta simple para verificar conectividad
-    try {
-      console.log("[Theme] Probando conectividad con Supabase...")
-      const testQuery = supabase.from("app_themes").select("id").limit(1)
-      const testResult = await Promise.race([
-        testQuery,
-        new Promise((_, reject) => setTimeout(() => reject(new Error("Test timeout")), 5000))
-      ])
-      console.log("[Theme] Test de conectividad:", testResult ? "✅ OK" : "❌ Falló")
-    } catch (testError) {
-      console.error("[Theme] ❌ Error en test de conectividad:", testError)
-      console.error("[Theme] Esto sugiere un problema de red o que RLS está bloqueando completamente las consultas")
+    // Si no hay store_id, intentar obtener el UUID de la tienda por defecto
+    if (!storeId) {
+      console.log("[Theme] No hay store_id disponible, obteniendo tienda por defecto...")
+      const { data: defaultStore } = await supabase
+        .from("stores")
+        .select("id")
+        .eq("subdomain", "default")
+        .maybeSingle()
+      
+      if (defaultStore?.id) {
+        storeId = defaultStore.id
+        console.log("[Theme] ✅ Usando tienda por defecto:", storeId)
+      } else {
+        console.warn("[Theme] ⚠️ No se encontró tienda por defecto, consultando sin filtro store_id")
+      }
     }
     
-    const queryPromise = supabase
+    console.log("[Theme] Ejecutando consulta a app_themes...")
+    const startTime = Date.now()
+    
+    // Construir query con filtro de store_id si está disponible
+    let queryPromise = supabase
       .from("app_themes")
       .select("*")
       .order("theme_name")
+    
+    if (storeId) {
+      queryPromise = queryPromise.eq("store_id", storeId)
+    } else {
+      // Si no hay store_id, intentar consultar temas sin store_id (NULL) o todos
+      // Esto permite compatibilidad con instalaciones anteriores
+      queryPromise = queryPromise.is("store_id", null)
+    }
     
     console.log("[Theme] Enviando consulta completa...")
     const result = await withTimeout(queryPromise, 20000) as { data: any; error: any }
@@ -59,7 +72,7 @@ export async function getThemes(): Promise<AppTheme[]> {
         code: error.code,
         details: error.details,
         hint: error.hint,
-        fullError: JSON.stringify(error, null, 2),
+        storeId,
       })
       
       // Si el error es de permisos o RLS, dar más información
@@ -71,7 +84,7 @@ export async function getThemes(): Promise<AppTheme[]> {
     }
 
     if (!data || data.length === 0) {
-      console.warn("[Theme] ⚠️ No se encontraron temas en la base de datos")
+      console.warn("[Theme] ⚠️ No se encontraron temas en la base de datos para store_id:", storeId)
       return []
     }
 
@@ -98,11 +111,35 @@ export async function getActiveTheme(): Promise<AppTheme | null> {
     return null
   }
 
-  const { data, error } = await supabase
+  // Obtener store_id actual
+  let storeId = await getStoreId()
+  
+  // Si no hay store_id, intentar obtener el UUID de la tienda por defecto
+  if (!storeId) {
+    const { data: defaultStore } = await supabase
+      .from("stores")
+      .select("id")
+      .eq("subdomain", "default")
+      .maybeSingle()
+    
+    if (defaultStore?.id) {
+      storeId = defaultStore.id
+    }
+  }
+
+  let query = supabase
     .from("app_themes")
     .select("*")
     .eq("is_active", true)
-    .single()
+  
+  if (storeId) {
+    query = query.eq("store_id", storeId)
+  } else {
+    // Si no hay store_id, buscar temas sin store_id (NULL) o todos
+    query = query.is("store_id", null)
+  }
+
+  const { data, error } = await query.single()
 
   if (error) {
     console.error("[Theme] Error fetching active theme:", error)

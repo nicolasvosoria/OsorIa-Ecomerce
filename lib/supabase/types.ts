@@ -1,6 +1,7 @@
 export interface ComponentStyle {
   id: number
   component_name: string
+  store_id?: string
   variables: Record<string, any>
   updated_at: string
 }

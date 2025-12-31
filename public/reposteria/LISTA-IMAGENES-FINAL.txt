@@ -1,0 +1,33 @@
+═══════════════════════════════════════════════════════════════
+IMÁGENES REQUERIDAS PARA LA TIENDA DE REPOSTERÍA
+═══════════════════════════════════════════════════════════════
+
+IMÁGENES PARA HERO/BANNER:
+1. pastel-boda.jpg - Pastel de boda estilo naked cake (usado en hero)
+
+IMÁGENES PARA PRODUCTOS DESTACADOS Y GALERÍA:
+2. cupcakes-decorados.jpg - Cupcakes con sprinkles en colores pastel
+3. tarta-berries.jpg - Tarta de frutas con berries y azúcar glass
+4. macarons-colores.jpg - Macarons en colores pastel (verde, rosa, amarillo)
+5. mini-cakes-cheesecakes.jpg - Mini cakes y cheesecakes decorados
+6. galletas-chocolate.jpg - Galletas de chocolate chip
+7. pastel-cumpleanos.jpg - Pastel de cumpleaños decorado
+8. pastel-boda.jpg - Pastel de boda estilo naked cake
+
+IMÁGENES PARA GALERÍA ADICIONAL:
+9. herramientas-decoracion.jpg - Herramientas de decoración (boquillas, pinceles)
+10. sprinkles-candies.jpg - Sprinkles y candies coloridos
+11. chocolates-truffles.jpg - Chocolates y truffles artesanales
+12. empaque-presentacion.jpg - Elementos de empaque y presentación
+
+═══════════════════════════════════════════════════════════════
+CAMBIOS REALIZADOS:
+═══════════════════════════════════════════════════════════════
+
+✅ Hero de repostería ahora usa pastel-boda.jpg como fondo
+✅ Productos destacados muestran imágenes de repostería
+✅ Grid de productos muestra imágenes de repostería
+✅ Galería actualizada con 11 imágenes de repostería
+✅ Todos los componentes detectan automáticamente si es tienda de repostería
+
+═══════════════════════════════════════════════════════════════

@@ -1,10 +1,10 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import Image from "next/image"
 import Link from "next/link"
 import { useComponentStyle } from "@/contexts/styles-context"
 import { useAdmin } from "@/contexts/admin-context"
+import { useStore } from "@/contexts/store-context"
 import {
   Carousel,
   CarouselContent,
@@ -28,6 +28,43 @@ function generateSlug(title: string): string {
     .replace(/(^-|-$)/g, "")
 }
 
+// Componente Image con fallback automático a placeholder
+function ItemImageWithFallback({ src, alt }: { src: string; alt: string }) {
+  const [imgSrc, setImgSrc] = useState(src)
+  const [hasError, setHasError] = useState(false)
+
+  const handleError = () => {
+    if (!hasError && imgSrc !== "/placeholder.svg") {
+      setHasError(true)
+      setImgSrc("/placeholder.svg")
+    }
+  }
+
+  // Si ya hubo error, mostrar placeholder directamente
+  if (hasError || imgSrc === "/placeholder.svg") {
+    return (
+      <img
+        src="/placeholder.svg"
+        alt={alt}
+        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+        onError={(e) => {
+          // Prevenir loops infinitos
+          e.currentTarget.src = "/placeholder.svg"
+        }}
+      />
+    )
+  }
+
+  return (
+    <img
+      src={imgSrc}
+      alt={alt}
+      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+      onError={handleError}
+    />
+  )
+}
+
 interface PopularItemsProps {
   initialProducts?: Array<{
     id: string
@@ -41,6 +78,7 @@ interface PopularItemsProps {
 export function PopularItems({ initialProducts }: PopularItemsProps = {}) {
   const [quantityModalOpen, setQuantityModalOpen] = useState(false)
   const [selectedItem, setSelectedItem] = useState<{ id: string; name: string; price: string; image: string } | null>(null)
+  const { store } = useStore()
   const { styles: styleData } = useComponentStyle("popular", {
     title: "Lo más vendido",
     priceLabel: "Desde $29",
@@ -54,8 +92,48 @@ export function PopularItems({ initialProducts }: PopularItemsProps = {}) {
   const bgColor = edits.bgColor ?? styleData.bgColor
   const textColor = edits.textColor ?? styleData.textColor
   
+  // Detectar si es tienda de repostería
+  const isReposteria = store?.subdomain === 'reposteria'
+  
   // Obtener items editables desde estilos o ediciones locales, o usar productos de BD
-  const defaultItems = [
+  // Si es repostería, usar imágenes de repostería, si no, usar imágenes de tecnología
+  const defaultItems = isReposteria ? [
+    {
+      title: "Cupcakes Decorados",
+      price: "Desde $25",
+      image: "/reposteria/cupcakes-decorados.jpg",
+    },
+    {
+      title: "Tarta de Berries",
+      price: "Desde $45",
+      image: "/reposteria/tarta-berries.jpg",
+    },
+    {
+      title: "Macarons Artesanales",
+      price: "Desde $18",
+      image: "/reposteria/macarons-colores.jpg",
+    },
+    {
+      title: "Mini Cakes y Cheesecakes",
+      price: "Desde $35",
+      image: "/reposteria/mini-cakes-cheesecakes.jpg",
+    },
+    {
+      title: "Galletas de Chocolate",
+      price: "Desde $15",
+      image: "/reposteria/galletas-chocolate.jpg",
+    },
+    {
+      title: "Pasteles de Cumpleaños",
+      price: "Desde $60",
+      image: "/reposteria/pastel-cumpleanos.jpg",
+    },
+    {
+      title: "Pasteles de Boda",
+      price: "Desde $150",
+      image: "/reposteria/pastel-boda.jpg",
+    },
+  ] : [
     {
       title: "Bocinas Bluetooth",
       price: "Desde $356",
@@ -93,12 +171,26 @@ export function PopularItems({ initialProducts }: PopularItemsProps = {}) {
     },
   ]
   
+  // Imágenes de repostería para reemplazar cuando hay productos de BD
+  const reposteriaImages = [
+    "/reposteria/cupcakes-decorados.jpg",
+    "/reposteria/tarta-berries.jpg",
+    "/reposteria/macarons-colores.jpg",
+    "/reposteria/mini-cakes-cheesecakes.jpg",
+    "/reposteria/galletas-chocolate.jpg",
+    "/reposteria/pastel-cumpleanos.jpg",
+    "/reposteria/pastel-boda.jpg",
+  ]
+
   // Priorizar: productos de BD > ediciones > estilos > default
+  // Si es repostería y hay productos de BD, reemplazar sus imágenes con imágenes de repostería
   const items = initialProducts && initialProducts.length > 0
-    ? initialProducts.map(p => ({
+    ? initialProducts.map((p, index) => ({
         title: p.title,
         price: p.price,
-        image: p.image,
+        image: isReposteria 
+          ? (reposteriaImages[index % reposteriaImages.length] || p.image)
+          : p.image,
         slug: p.slug,
       }))
     : (edits.items ?? styleData.items ?? defaultItems)
@@ -185,13 +277,9 @@ export function PopularItems({ initialProducts }: PopularItemsProps = {}) {
                   <CarouselItem key={itemId} className="pl-2 md:pl-4 basis-full md:basis-1/2 lg:basis-1/3">
                     <div className="relative group overflow-hidden rounded-2xl aspect-[4/3] bg-gray-100">
                       <Link href={`/products/${itemSlug}`} className="block w-full h-full">
-                        <Image
+                        <ItemImageWithFallback
                           src={item.image || "/placeholder.svg"}
                           alt={item.title}
-                          width={600}
-                          height={450}
-                          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
-                          sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
                         />
                       </Link>
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent pointer-events-none" />

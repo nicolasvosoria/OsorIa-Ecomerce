@@ -6,6 +6,7 @@ import { DEFAULT_PAGE_SIZE, DEFAULT_SORT_KEY } from './constants';
 const rawStoreDomain = process.env.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN;
 const fallbackStoreDomain = 'v0-template.myshopify.com';
 const SHOPIFY_STORE_DOMAIN = rawStoreDomain ? parseShopifyDomain(rawStoreDomain) : fallbackStoreDomain;
+const SHOPIFY_ENABLED = !!rawStoreDomain && rawStoreDomain.trim() !== '';
 
 const SHOPIFY_STOREFRONT_API_URL = `https://${SHOPIFY_STORE_DOMAIN}/api/2025-07/graphql.json`;
 
@@ -17,9 +18,11 @@ async function shopifyFetch<T>({
   query: string;
   variables?: Record<string, any>;
 }): Promise<{ data: T; errors?: any[] }> {
-  // Verificar si Shopify está configurado
-  if (!rawStoreDomain || SHOPIFY_STORE_DOMAIN === fallbackStoreDomain) {
-    console.warn('[Shopify] ⚠️ Shopify no está configurado. Usando dominio por defecto que puede no existir.');
+  // Si Shopify no está configurado, retornar datos vacíos en lugar de fallar
+  if (!SHOPIFY_ENABLED) {
+    console.warn('[Shopify] ⚠️ Shopify no está configurado. NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN no está definido. Retornando datos vacíos.');
+    // Retornar estructura vacía según el tipo esperado
+    return { data: {} as T };
   }
 
   try {
@@ -33,6 +36,8 @@ async function shopifyFetch<T>({
         variables,
       }),
       cache: 'no-store', // Ensure fresh data for cart operations
+      // Agregar timeout para evitar que se quede colgado
+      signal: AbortSignal.timeout(10000), // 10 segundos timeout
     });
 
     if (!response.ok) {
@@ -40,7 +45,8 @@ async function shopifyFetch<T>({
       // Si es un error 404 o de conexión, puede ser que Shopify no esté configurado
       if (response.status === 404 || response.status === 0) {
         console.warn('[Shopify] ⚠️ No se pudo conectar a Shopify. Verifica que NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN esté configurado correctamente.');
-        throw new Error(`Shopify no configurado o dominio inválido: ${SHOPIFY_STORE_DOMAIN}`);
+        // Retornar datos vacíos en lugar de lanzar error
+        return { data: {} as T };
       }
       throw new Error(`Shopify API HTTP error! Status: ${response.status}, Body: ${errorBody}`);
     }
@@ -49,19 +55,34 @@ async function shopifyFetch<T>({
 
     if (json.errors) {
       console.error('Shopify API errors:', json.errors);
+      // Si hay errores pero no son críticos, retornar datos vacíos
+      if (json.errors.some((err: any) => err.message?.includes('not found') || err.message?.includes('does not exist'))) {
+        console.warn('[Shopify] ⚠️ Recurso no encontrado en Shopify. Retornando datos vacíos.');
+        return { data: {} as T };
+      }
       throw new Error(`Shopify GraphQL errors: ${JSON.stringify(json.errors)}`);
     }
 
     return json;
   } catch (error) {
-    // Si es un error de red o conexión, proporcionar un mensaje más útil
+    // Si es un error de red, conexión o timeout, retornar datos vacíos en lugar de fallar
     if (error instanceof TypeError && error.message.includes('fetch')) {
-      console.error('[Shopify] ❌ Error de conexión:', error.message);
-      console.warn('[Shopify] 💡 Sugerencia: Verifica que NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN esté configurado en .env.local');
-      throw new Error(`No se pudo conectar a Shopify. Verifica la configuración de NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN`);
+      console.warn('[Shopify] ⚠️ Error de conexión con Shopify. Shopify no está disponible o no está configurado correctamente.');
+      console.warn('[Shopify] 💡 Si no usas Shopify, puedes ignorar este mensaje. La aplicación funcionará con Supabase.');
+      // Retornar datos vacíos en lugar de lanzar error
+      return { data: {} as T };
     }
-    console.error('Shopify fetch error:', error);
-    throw error;
+    
+    // Si es un error de AbortSignal (timeout)
+    if (error instanceof Error && error.name === 'AbortError') {
+      console.warn('[Shopify] ⚠️ Timeout al conectar con Shopify. Retornando datos vacíos.');
+      return { data: {} as T };
+    }
+    
+    // Para otros errores, loguear pero retornar datos vacíos
+    console.warn('[Shopify] ⚠️ Error al conectar con Shopify:', error);
+    console.warn('[Shopify] 💡 Si no usas Shopify, puedes ignorar este mensaje.');
+    return { data: {} as T };
   }
 }
 
@@ -146,6 +167,11 @@ export async function getProducts({
     variables: { first, sortKey, reverse, query: searchQuery },
   });
 
+  // Si no hay datos o productos, retornar array vacío
+  if (!data || !data.products || !data.products.edges) {
+    return [];
+  }
+
   return data.products.edges.map(edge => edge.node);
 }
 
@@ -218,6 +244,11 @@ export async function getProduct(handle: string): Promise<ShopifyProduct | null>
     variables: { handle },
   });
 
+  // Si no hay datos, retornar null
+  if (!data || !data.product) {
+    return null;
+  }
+
   return data.product;
 }
 
@@ -251,6 +282,11 @@ export async function getCollections(first = 10): Promise<ShopifyCollection[]> {
     query,
     variables: { first },
   });
+
+  // Si no hay datos o colecciones, retornar array vacío
+  if (!data || !data.collections || !data.collections.edges) {
+    return [];
+  }
 
   return data.collections.edges.map(edge => edge.node);
 }
@@ -346,7 +382,8 @@ export async function getCollectionProducts({
     variables: { handle: collection, first: limit, sortKey, query: searchQuery, reverse },
   });
 
-  if (!data.collection) {
+  // Si no hay datos, colección o productos, retornar array vacío
+  if (!data || !data.collection || !data.collection.products || !data.collection.products.edges) {
     return [];
   }
 
@@ -413,7 +450,12 @@ export async function createCart(): Promise<ShopifyCart | null> {
     };
   }>({ query });
 
-  if (data.cartCreate.userErrors.length > 0) {
+  // Si no hay datos o Shopify no está configurado, retornar null
+  if (!data || !data.cartCreate) {
+    return null;
+  }
+
+  if (data.cartCreate.userErrors && data.cartCreate.userErrors.length > 0) {
     console.error('[Shopify] ❌ Error creando carrito:', data.cartCreate.userErrors);
     return null;
   }
@@ -490,7 +532,12 @@ export async function addCartLines(
     },
   });
 
-  if (data.cartLinesAdd.userErrors.length > 0) {
+  // Si no hay datos o Shopify no está configurado, lanzar error descriptivo
+  if (!data || !data.cartLinesAdd) {
+    throw new Error('Shopify no está configurado. No se puede agregar items al carrito.');
+  }
+
+  if (data.cartLinesAdd.userErrors && data.cartLinesAdd.userErrors.length > 0) {
     throw new Error(data.cartLinesAdd.userErrors[0].message);
   }
 
@@ -566,7 +613,12 @@ export async function updateCartLines(
     },
   });
 
-  if (data.cartLinesUpdate.userErrors.length > 0) {
+  // Si no hay datos o Shopify no está configurado, lanzar error descriptivo
+  if (!data || !data.cartLinesUpdate) {
+    throw new Error('Shopify no está configurado. No se puede actualizar el carrito.');
+  }
+
+  if (data.cartLinesUpdate.userErrors && data.cartLinesUpdate.userErrors.length > 0) {
     throw new Error(data.cartLinesUpdate.userErrors[0].message);
   }
 
@@ -639,7 +691,12 @@ export async function removeCartLines(cartId: string, lineIds: string[]): Promis
     },
   });
 
-  if (data.cartLinesRemove.userErrors.length > 0) {
+  // Si no hay datos o Shopify no está configurado, lanzar error descriptivo
+  if (!data || !data.cartLinesRemove) {
+    throw new Error('Shopify no está configurado. No se puede eliminar items del carrito.');
+  }
+
+  if (data.cartLinesRemove.userErrors && data.cartLinesRemove.userErrors.length > 0) {
     throw new Error(data.cartLinesRemove.userErrors[0].message);
   }
 
@@ -712,6 +769,11 @@ export async function getCart(cartId: string): Promise<ShopifyCart | null> {
     query,
     variables: { cartId },
   });
+
+  // Si no hay datos o Shopify no está configurado, retornar null
+  if (!data || !data.cart) {
+    return null;
+  }
 
   return data.cart;
 }

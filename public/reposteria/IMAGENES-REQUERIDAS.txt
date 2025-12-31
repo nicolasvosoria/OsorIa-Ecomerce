@@ -1,0 +1,13 @@
+Imágenes requeridas para la tienda de repostería:
+
+1. cupcakes-decorados.jpg - Cupcakes decorados con sprinkles (colores pastel)
+2. tarta-berries.jpg - Tarta de frutas con berries y azúcar glass
+3. macarons-colores.jpg - Macarons en colores pastel
+4. mini-cakes-cheesecakes.jpg - Mini cakes y cheesecakes decorados
+5. galletas-chocolate.jpg - Galletas de chocolate chip
+6. pastel-cumpleanos.jpg - Pastel de cumpleaños decorado
+7. pastel-boda.jpg - Pastel de boda estilo naked cake
+8. herramientas-decoracion.jpg - Herramientas de decoración (boquillas, pinceles)
+9. sprinkles-candies.jpg - Sprinkles y candies coloridos
+10. chocolates-truffles.jpg - Chocolates y truffles artesanales
+11. empaque-presentacion.jpg - Elementos de empaque y presentación

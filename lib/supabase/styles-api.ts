@@ -1,6 +1,7 @@
 import { getSupabaseBrowserClient } from "./client"
 import type { ComponentStyle } from "./types"
 import { requireAdmin } from "./permissions-api"
+import { getStoreId } from "@/lib/utils/store"
 
 export async function getComponentStyles() {
   const supabase = getSupabaseBrowserClient()
@@ -8,7 +9,18 @@ export async function getComponentStyles() {
     return []
   }
 
-  const { data, error } = await supabase.from("component_styles").select("*").order("component_name")
+  // Obtener store_id actual
+  const storeId = await getStoreId()
+  if (!storeId) {
+    console.warn("[v0] No store_id available, returning empty array")
+    return []
+  }
+
+  const { data, error } = await supabase
+    .from("component_styles")
+    .select("*")
+    .eq("store_id", storeId)
+    .order("component_name")
 
   if (error) {
     console.error("[v0] Error fetching component styles:", error)
@@ -24,10 +36,18 @@ export async function getComponentStyleByName(componentName: string) {
     return null
   }
 
+  // Obtener store_id actual
+  const storeId = await getStoreId()
+  if (!storeId) {
+    console.warn(`[v0] No store_id available for ${componentName}`)
+    return null
+  }
+
   const { data, error } = await supabase
     .from("component_styles")
     .select("*")
     .eq("component_name", componentName)
+    .eq("store_id", storeId)
     .single()
 
   if (error) {
@@ -47,22 +67,85 @@ export async function updateComponentStyle(componentName: string, variables: Rec
     throw new Error("Supabase is not configured")
   }
 
+  // Obtener store_id actual
+  const storeId = await getStoreId()
+  if (!storeId) {
+    // Si no hay store_id, intentar obtener el UUID de la tienda por defecto
+    const { data: defaultStore } = await supabase
+      .from("stores")
+      .select("id")
+      .eq("subdomain", "default")
+      .single()
+    
+    if (!defaultStore?.id) {
+      throw new Error("No store_id available and default store not found")
+    }
+    
+    const finalStoreId = storeId || defaultStore.id
+    return await updateComponentStyleWithStoreId(componentName, variables, finalStoreId, supabase)
+  }
+
+  return await updateComponentStyleWithStoreId(componentName, variables, storeId, supabase)
+}
+
+async function updateComponentStyleWithStoreId(
+  componentName: string,
+  variables: Record<string, any>,
+  storeId: string,
+  supabase: ReturnType<typeof getSupabaseBrowserClient>
+) {
+  if (!supabase) {
+    throw new Error("Supabase is not configured")
+  }
+
   try {
-    // Usar upsert con onConflict especificado para la columna única
-    const { data, error } = await supabase
+    // Primero verificar si el registro existe
+    const { data: existing, error: checkError } = await supabase
       .from("component_styles")
-      .upsert(
-        {
-          component_name: componentName,
+      .select("id")
+      .eq("component_name", componentName)
+      .eq("store_id", storeId)
+      .maybeSingle()
+
+    if (checkError && checkError.code !== "PGRST116") {
+      // PGRST116 es "no rows returned", que es esperado si no existe
+      console.error(`[v0] Error checking existing style for ${componentName}:`, checkError)
+    }
+
+    let data: ComponentStyle | null = null
+    let error: any = null
+
+    if (existing) {
+      // Si existe, hacer UPDATE
+      const result = await supabase
+        .from("component_styles")
+        .update({
           variables,
           updated_at: new Date().toISOString(),
-        },
-        {
-          onConflict: "component_name", // Especificar la columna única para el conflicto
-        }
-      )
-      .select()
-      .single()
+        })
+        .eq("component_name", componentName)
+        .eq("store_id", storeId)
+        .select()
+        .single()
+      
+      data = result.data as ComponentStyle | null
+      error = result.error
+    } else {
+      // Si no existe, hacer INSERT
+      const result = await supabase
+        .from("component_styles")
+        .insert({
+          component_name: componentName,
+          store_id: storeId,
+          variables,
+          updated_at: new Date().toISOString(),
+        })
+        .select()
+        .single()
+      
+      data = result.data as ComponentStyle | null
+      error = result.error
+    }
 
     if (error) {
       console.error(`[v0] Error updating style for ${componentName}:`, error)
@@ -71,33 +154,17 @@ export async function updateComponentStyle(componentName: string, variables: Rec
         code: error.code,
         details: error.details,
         hint: error.hint,
+        storeId,
+        exists: !!existing,
       })
-      
-      // Si el error es 409, intentar con UPDATE directo
-      if (error.code === "409" || error.message?.includes("409")) {
-        console.log(`[v0] Retrying with direct UPDATE for ${componentName}`)
-        const { data: updateData, error: updateError } = await supabase
-          .from("component_styles")
-          .update({
-            variables,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("component_name", componentName)
-          .select()
-          .single()
-
-        if (updateError) {
-          console.error(`[v0] Error in UPDATE retry for ${componentName}:`, updateError)
-          throw updateError
-        }
-
-        return updateData as ComponentStyle
-      }
-
       throw error
     }
 
-    return data as ComponentStyle
+    if (!data) {
+      throw new Error(`Failed to update style for ${componentName}: no data returned`)
+    }
+
+    return data
   } catch (err) {
     console.error(`[v0] Unexpected error updating style for ${componentName}:`, err)
     throw err
@@ -113,8 +180,16 @@ export async function subscribeToStyleChanges(componentName: string, callback: (
   }
 
   try {
+    // Obtener store_id actual
+    const storeId = await getStoreId()
+    if (!storeId) {
+      return {
+        unsubscribe: () => {},
+      }
+    }
+
     const channel = supabase
-      .channel(`component_styles:${componentName}`)
+      .channel(`component_styles:${componentName}:${storeId}`)
       .on(
         "postgres_changes",
         {
@@ -124,7 +199,8 @@ export async function subscribeToStyleChanges(componentName: string, callback: (
           filter: `component_name=eq.${componentName}`,
         },
         (payload: any) => {
-          if (payload.new) {
+          // Solo procesar si el store_id coincide
+          if (payload.new && payload.new.store_id === storeId) {
             callback(payload.new as ComponentStyle)
           }
         },
