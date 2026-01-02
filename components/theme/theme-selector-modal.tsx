@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useTheme } from "@/contexts/theme-context"
+import { useStore } from "@/contexts/store-context"
 import {
   Dialog,
   DialogContent,
@@ -11,6 +12,7 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Loader2 } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 interface ThemeSelectorModalProps {
   open: boolean
@@ -19,10 +21,15 @@ interface ThemeSelectorModalProps {
 
 export function ThemeSelectorModal({ open, onOpenChange }: ThemeSelectorModalProps) {
   const { themes, activeTheme, loading, changeTheme } = useTheme()
+  const { store } = useStore()
   const [changing, setChanging] = useState<string | null>(null)
+
+  // Verificar si el cambio de tema está deshabilitado para este subdominio
+  const isThemeChangeDisabled = store?.subdomain === 'reposteria'
 
   const handleThemeChange = async (themeName: string) => {
     if (changing) return
+    if (isThemeChangeDisabled) return // No permitir cambios si está deshabilitado
 
     setChanging(themeName)
     const result = await changeTheme(themeName)
@@ -39,9 +46,19 @@ export function ThemeSelectorModal({ open, onOpenChange }: ThemeSelectorModalPro
         <DialogHeader>
           <DialogTitle className="text-lg md:text-xl">Seleccionar Tema</DialogTitle>
           <DialogDescription className="text-sm">
-            Elige un tema para personalizar los colores de la página
+            {isThemeChangeDisabled 
+              ? "Los temas solo pueden ser modificados desde el panel de administración"
+              : "Elige un tema para personalizar los colores de la página"}
           </DialogDescription>
         </DialogHeader>
+
+        {isThemeChangeDisabled && (
+          <Alert className="mb-4">
+            <AlertDescription className="text-sm">
+              En esta tienda, los temas solo pueden ser modificados desde el panel de administración.
+            </AlertDescription>
+          </Alert>
+        )}
 
         {loading ? (
           <div className="flex items-center justify-center py-8">
@@ -63,7 +80,7 @@ export function ThemeSelectorModal({ open, onOpenChange }: ThemeSelectorModalPro
                   variant={isActive ? "default" : "outline"}
                   className="w-full justify-start h-auto p-3 md:p-4 text-sm md:text-base"
                   onClick={() => handleThemeChange(theme.theme_name)}
-                  disabled={isChanging || isActive}
+                  disabled={isChanging || isActive || isThemeChangeDisabled}
                 >
                   <div className="flex items-center gap-2 md:gap-3 w-full">
                     <div

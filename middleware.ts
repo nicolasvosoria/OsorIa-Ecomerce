@@ -26,17 +26,30 @@ function getSubdomain(hostname: string): string | null {
     return 'default'
   }
 
+  // En Vercel, los dominios pueden ser:
+  // - tudominio.com (sin subdominio)
+  // - subdominio.tudominio.com (con subdominio)
+  // - proyecto.vercel.app (dominio de Vercel)
+  // - subdominio.proyecto.vercel.app (subdominio en Vercel)
+  
   const parts = hostname.split('.')
   
   // Si tiene al menos 3 partes (subdomain.domain.com) o 2 partes (subdomain.com)
   if (parts.length >= 2) {
-    // Si es un dominio con TLD (ej: subdomain.com, subdomain.co.uk)
-    // El subdominio es la primera parte
+    // Si es un dominio de Vercel (ej: proyecto.vercel.app)
+    // o un dominio personalizado (ej: tudominio.com)
     const subdomain = parts[0]
     
     // Ignorar 'www'
     if (subdomain === 'www') {
       return parts.length > 2 ? parts[1] : null
+    }
+    
+    // Si es un dominio de Vercel sin subdominio (ej: proyecto.vercel.app)
+    // o un dominio personalizado sin subdominio (ej: tudominio.com)
+    // retornar null para usar 'default' en el middleware
+    if (parts.length === 2 && (parts[1] === 'vercel.app' || parts[1] === 'vercel-dns.com')) {
+      return null // Se manejará como 'default' más abajo
     }
     
     return subdomain

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, useMemo } from "react"
 import Link from "next/link"
 import { useComponentStyle } from "@/contexts/styles-context"
 import { useAdmin } from "@/contexts/admin-context"
@@ -33,6 +33,14 @@ function ItemImageWithFallback({ src, alt }: { src: string; alt: string }) {
   const [imgSrc, setImgSrc] = useState(src)
   const [hasError, setHasError] = useState(false)
 
+  // Actualizar imgSrc cuando cambia src (importante para evitar imágenes antiguas)
+  useEffect(() => {
+    if (src !== imgSrc && !hasError) {
+      setImgSrc(src)
+      setHasError(false) // Resetear error cuando cambia la fuente
+    }
+  }, [src])
+
   const handleError = () => {
     if (!hasError && imgSrc !== "/placeholder.svg") {
       setHasError(true)
@@ -61,6 +69,7 @@ function ItemImageWithFallback({ src, alt }: { src: string; alt: string }) {
       alt={alt}
       className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
       onError={handleError}
+      key={src} // Forzar re-render cuando cambia src
     />
   )
 }
@@ -79,7 +88,7 @@ export function PopularItems({ initialProducts }: PopularItemsProps = {}) {
   const [quantityModalOpen, setQuantityModalOpen] = useState(false)
   const [selectedItem, setSelectedItem] = useState<{ id: string; name: string; price: string; image: string } | null>(null)
   const { store } = useStore()
-  const { styles: styleData } = useComponentStyle("popular", {
+  const { styles: styleData, loading: stylesLoading } = useComponentStyle("popular", {
     title: "Lo más vendido",
     priceLabel: "Desde $29",
   })
@@ -91,6 +100,15 @@ export function PopularItems({ initialProducts }: PopularItemsProps = {}) {
   const title = edits.title ?? styleData.title ?? "Lo más vendido"
   const bgColor = edits.bgColor ?? styleData.bgColor
   const textColor = edits.textColor ?? styleData.textColor
+  
+  // Debug: Log para ver qué datos se están cargando
+  useEffect(() => {
+    console.log('[PopularItems] styleData:', styleData)
+    console.log('[PopularItems] edits:', edits)
+    console.log('[PopularItems] styleData.items:', styleData.items)
+    console.log('[PopularItems] edits.items:', edits.items)
+    console.log('[PopularItems] initialProducts:', initialProducts)
+  }, [styleData, edits, initialProducts])
   
   // Detectar si es tienda de repostería
   const isReposteria = store?.subdomain === 'reposteria'
@@ -182,18 +200,37 @@ export function PopularItems({ initialProducts }: PopularItemsProps = {}) {
     "/reposteria/pastel-boda.jpg",
   ]
 
-  // Priorizar: productos de BD > ediciones > estilos > default
-  // Si es repostería y hay productos de BD, reemplazar sus imágenes con imágenes de repostería
-  const items = initialProducts && initialProducts.length > 0
-    ? initialProducts.map((p, index) => ({
+  // Priorizar: ediciones locales > estilos guardados > productos de BD > defaults
+  // Los items guardados tienen prioridad sobre los productos de BD
+  const items = useMemo(() => {
+    // Primero verificar si hay items editados o guardados en estilos
+    const savedItems = edits.items ?? styleData.items
+    
+    if (savedItems && Array.isArray(savedItems) && savedItems.length > 0) {
+      console.log('[PopularItems] Usando items guardados:', savedItems.length, 'items')
+      return savedItems
+    }
+    
+    // Si no hay items guardados, usar productos de BD si existen
+    if (initialProducts && initialProducts.length > 0) {
+      console.log('[PopularItems] Usando productos de BD:', initialProducts.length, 'productos')
+      return initialProducts.map((p, index) => ({
         title: p.title,
         price: p.price,
-        image: isReposteria 
-          ? (reposteriaImages[index % reposteriaImages.length] || p.image)
-          : p.image,
+        // Usar la imagen del producto de BD si existe, solo usar imagen de repostería como fallback
+        image: p.image && p.image !== "/placeholder.svg" 
+          ? p.image 
+          : (isReposteria 
+              ? (reposteriaImages[index % reposteriaImages.length] || "/placeholder.svg")
+              : "/placeholder.svg"),
         slug: p.slug,
       }))
-    : (edits.items ?? styleData.items ?? defaultItems)
+    }
+    
+    // Si no hay productos de BD ni items guardados, usar defaults
+    console.log('[PopularItems] Usando items por defecto')
+    return defaultItems
+  }, [initialProducts, edits.items, styleData.items, isReposteria])
   
   const [api, setApi] = useState<CarouselApi>()
   const autoplayRef = useRef<NodeJS.Timeout | null>(null)
@@ -273,11 +310,14 @@ export function PopularItems({ initialProducts }: PopularItemsProps = {}) {
               {items.map((item: any, index: number) => {
                 const itemSlug = item.slug || generateSlug(item.title)
                 const itemId = initialProducts?.[index]?.id || `popular-${index}`
+                // Usar una key única que incluya la imagen para forzar re-render cuando cambia
+                const imageKey = `${itemId}-${item.image || 'no-image'}`
                 return (
                   <CarouselItem key={itemId} className="pl-2 md:pl-4 basis-full md:basis-1/2 lg:basis-1/3">
                     <div className="relative group overflow-hidden rounded-2xl aspect-[4/3] bg-gray-100">
                       <Link href={`/products/${itemSlug}`} className="block w-full h-full">
                         <ItemImageWithFallback
+                          key={imageKey}
                           src={item.image || "/placeholder.svg"}
                           alt={item.title}
                         />

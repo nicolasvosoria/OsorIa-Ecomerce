@@ -68,6 +68,32 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const changeTheme = async (themeName: string): Promise<{ success: boolean; error?: string }> => {
     try {
+      // Verificar si el cambio de tema está deshabilitado para el subdominio actual
+      // Esto se verifica en el cliente, pero también se puede verificar en el servidor
+      if (typeof window !== 'undefined') {
+        const hostname = window.location.hostname
+        let subdomain = 'default'
+        
+        if (hostname.includes('localhost') || hostname.includes('127.0.0.1')) {
+          const parts = hostname.split('.')
+          if (parts.length > 1 && parts[0] !== 'localhost' && parts[0] !== '127') {
+            subdomain = parts[0]
+          }
+        } else {
+          const parts = hostname.split('.')
+          if (parts.length >= 2) {
+            subdomain = parts[0] === 'www' ? (parts.length > 2 ? parts[1] : 'default') : parts[0]
+          }
+        }
+        
+        if (subdomain === 'reposteria') {
+          return { 
+            success: false, 
+            error: "Los temas solo pueden ser modificados desde el panel de administración" 
+          }
+        }
+      }
+      
       const result = await setActiveTheme(themeName)
       if (result.success) {
         // Aplicar tema inmediatamente desde la lista actual (forzar aplicación)

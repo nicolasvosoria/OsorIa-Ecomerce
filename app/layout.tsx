@@ -34,6 +34,7 @@ import { StoreProvider } from "@/contexts/store-context"
 import { ReposteriaLayout } from "./reposteria-layout"
 import { AdminRedirect } from "@/components/admin/admin-redirect"
 import { DynamicTitle } from "@/components/dynamic-title"
+import { DynamicFavicon } from "@/components/dynamic-favicon"
 
 const V0Setup = dynamic(() => import("@/components/v0-setup"))
 
@@ -89,6 +90,7 @@ export default async function RootLayout({
         <V0Provider isV0={isV0}>
           <StoreProvider>
             <DynamicTitle />
+            <DynamicFavicon />
             <ReposteriaLayout>
               <StylesProvider>
                 <SiteBackground />

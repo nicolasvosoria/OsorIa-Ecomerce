@@ -1,6 +1,10 @@
 import { PopularItems } from "./popular-items"
 import { getFeaturedItems } from "@/lib/supabase/products-api"
 
+// Deshabilitar caché para asegurar que siempre se obtengan los productos más recientes
+export const revalidate = 0
+export const dynamic = 'force-dynamic'
+
 export async function PopularItemsWrapper() {
   // Obtener productos destacados de la base de datos
   let featuredProducts: Array<{ id: string; title: string; price: string; image: string; slug: string }> = []
@@ -13,9 +17,15 @@ export async function PopularItemsWrapper() {
       price: item.compare_at_price && parseFloat(String(item.compare_at_price)) > parseFloat(String(item.base_price))
         ? `Desde ${formatPrice(item.base_price, item.currency_code)}`
         : `${formatPrice(item.base_price, item.currency_code)}`,
-      image: item.primary_image_url || "/placeholder.svg",
+      // Asegurar que siempre se use la URL completa de la imagen
+      image: item.primary_image_url && item.primary_image_url.trim() !== "" 
+        ? item.primary_image_url 
+        : "/placeholder.svg",
       slug: item.item_slug || item.id,
     }))
+    
+    console.log('[PopularItemsWrapper] Productos obtenidos:', featuredProducts.length, 'productos')
+    console.log('[PopularItemsWrapper] Primer producto:', featuredProducts[0]?.title, featuredProducts[0]?.image)
   } catch (error) {
     console.error('Error fetching featured products:', error)
   }

@@ -10,10 +10,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { X, Save, RotateCcw, Type, Palette, Plus, Trash2 } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Checkbox } from "@/components/ui/checkbox"
 import { useState, useEffect } from "react"
 import { updateComponentStyle } from "@/lib/supabase/styles-api"
 import { toast } from "sonner"
 import { ImageUpload } from "./image-upload"
+import { getStoreId } from "@/lib/utils/store"
 
 const COMPONENT_FIELDS: Record<
   string,
@@ -780,12 +782,14 @@ export function EditorPanel() {
       const currentStyles = globalStyles.get(selectedComponent) || {}
       
       // Combinar estilos actuales con las ediciones
+      // Los edits tienen prioridad sobre los estilos actuales
       const mergedStyles = {
         ...currentStyles,
         ...edits,
       }
       
       console.log("[Editor] Estilos combinados a guardar:", mergedStyles)
+      console.log("[Editor] Campos a guardar:", Object.keys(mergedStyles))
       
       // Guardar en Supabase
       const result = await updateComponentStyle(selectedComponent, mergedStyles)
@@ -795,12 +799,18 @@ export function EditorPanel() {
       // Refrescar estilos desde Supabase para asegurar sincronización
       await refreshStyles()
       
-      // Actualizar localStorage inmediatamente
+      // Actualizar localStorage inmediatamente (con store_id)
       try {
-        const savedStyles = localStorage.getItem("osoria_component_styles")
-        const styles = savedStyles ? JSON.parse(savedStyles) : {}
-        styles[selectedComponent] = mergedStyles
-        localStorage.setItem("osoria_component_styles", JSON.stringify(styles))
+        // Obtener store_id actual
+        const storeId = await getStoreId()
+        if (storeId) {
+          const storageKey = `osoria_component_styles_${storeId}`
+          const savedStyles = localStorage.getItem(storageKey)
+          const styles = savedStyles ? JSON.parse(savedStyles) : {}
+          styles[selectedComponent] = mergedStyles
+          localStorage.setItem(storageKey, JSON.stringify(styles))
+          localStorage.setItem("osoria_current_store_id", storeId)
+        }
         
         // Aplicar estilos inmediatamente al DOM
         if (typeof document !== "undefined") {
@@ -1087,7 +1097,7 @@ export function EditorPanel() {
                           <Checkbox
                             id={`style-${field.key}`}
                             checked={currentValue === "true" || currentValue === true || currentValue === "1"}
-                            onCheckedChange={(checked) => handleInputChange(field.key, checked ? "true" : "false")}
+                            onCheckedChange={(checked: boolean) => handleInputChange(field.key, checked ? "true" : "false")}
                           />
                           <Label htmlFor={`style-${field.key}`} className="text-sm font-normal cursor-pointer">
                             {field.label}
