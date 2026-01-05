@@ -278,3 +278,5 @@ Si tienes problemas:
 - [Documentación de Supabase](https://supabase.com/docs)
 - [Guía de DNS de Vercel](https://vercel.com/docs/concepts/projects/domains)
 
+
+

@@ -8,6 +8,7 @@ import { Toaster } from "sonner"
 import { NuqsAdapter } from "nuqs/adapters/next/app"
 import { CartProvider as ShopifyCartProvider } from "@/components/cart/cart-context"
 import { CartProvider } from "@/contexts/cart-context"
+import { WishlistProvider } from "@/contexts/wishlist-context"
 import { DebugGrid } from "@/components/debug-grid"
 import { isDevelopment } from "@/lib/constants"
 import { getCollections } from "@/lib/shopify"
@@ -100,7 +101,8 @@ export default async function RootLayout({
                 <FontProvider>
                   <ShopifyCartProvider>
                     <CartProvider>
-                      <AdminProvider>
+                      <WishlistProvider>
+                        <AdminProvider>
                         <NuqsAdapter>
                           <Suspense fallback={null}>
                             <StylesLoader>
@@ -124,8 +126,9 @@ export default async function RootLayout({
                           </Suspense>
                           </NuqsAdapter>
                         </AdminProvider>
-                      </CartProvider>
-                    </ShopifyCartProvider>
+                      </WishlistProvider>
+                    </CartProvider>
+                  </ShopifyCartProvider>
                   </FontProvider>
                 </ThemeProvider>
               </AdminPermissionsProvider>

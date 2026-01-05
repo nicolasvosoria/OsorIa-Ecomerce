@@ -166,3 +166,5 @@ const faviconPath = subdomain === 'default'
 
 4. **Fallback automático**: Si un favicon específico no existe, el sistema usa automáticamente el favicon por defecto.
 
+
+

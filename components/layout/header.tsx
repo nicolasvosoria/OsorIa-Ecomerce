@@ -14,6 +14,7 @@ import { ThemeSelectorModal } from "@/components/theme/theme-selector-modal"
 import { FontSelectorModal } from "@/components/font/font-selector-modal"
 import Image from "next/image"
 import { useCart } from "@/contexts/cart-context"
+import { useWishlist } from "@/contexts/wishlist-context"
 import { useAuth } from "@/contexts/auth-context"
 import { Trash2, Plus, Minus } from "lucide-react"
 import { toast } from "sonner"
@@ -74,8 +75,13 @@ export function Header() {
   const [forgotPasswordModalOpen, setForgotPasswordModalOpen] = useState(false)
   const [resetEmail, setResetEmail] = useState("")
   const [resetEmailSent, setResetEmailSent] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [searchSuggestions, setSearchSuggestions] = useState<Array<{ id: string; title: string; slug: string; image?: string }>>([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [isSearching, setIsSearching] = useState(false)
   const { activeTheme } = useTheme()
   const { items, removeFromCart, updateQuantity, getTotal, getTotalItems } = useCart()
+  const { getTotalItems: getWishlistTotalItems } = useWishlist()
   const { user, isAuthenticated, login, register, logout, refreshUser } = useAuth()
   const { store } = useStore()
   const { styles: styleData } = useComponentStyle("header", {
@@ -126,7 +132,99 @@ export function Header() {
     : (styleData.logoImage || "/logo-osoria.png")
   const pathname = usePathname()
 
+  // Sincronizar el query de búsqueda con la URL cuando esté en /shop
+  useEffect(() => {
+    if (pathname === '/shop') {
+      const params = new URLSearchParams(window.location.search)
+      const queryParam = params.get('q')
+      if (queryParam) {
+        setSearchQuery(queryParam)
+      }
+    }
+  }, [pathname])
+
+  // Buscar sugerencias mientras el usuario escribe (con debounce)
+  useEffect(() => {
+    const query = searchQuery.trim()
+    
+    // Si el query está vacío, ocultar sugerencias
+    if (!query || query.length < 2) {
+      setSearchSuggestions([])
+      setShowSuggestions(false)
+      return
+    }
+
+    // Debounce: esperar 300ms después de que el usuario deje de escribir
+    const timeoutId = setTimeout(async () => {
+      setIsSearching(true)
+      try {
+        // Usar directamente searchItems de Supabase (funciona en cliente)
+        const { searchItems } = await import('@/lib/supabase/products-api')
+        const items = await searchItems(query, 5) // Limitar a 5 sugerencias
+        setSearchSuggestions(
+          items.map(item => ({
+            id: item.id,
+            title: item.item_name,
+            slug: item.item_slug || item.id,
+            image: item.primary_image_url,
+          }))
+        )
+        setShowSuggestions(items.length > 0)
+      } catch (error) {
+        console.error('Error fetching search suggestions:', error)
+        setSearchSuggestions([])
+        setShowSuggestions(false)
+      } finally {
+        setIsSearching(false)
+      }
+    }, 300)
+
+    return () => clearTimeout(timeoutId)
+  }, [searchQuery])
+
+  // Ocultar sugerencias al hacer clic fuera
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (!target.closest('.search-container')) {
+        setShowSuggestions(false)
+      }
+    }
+
+    if (showSuggestions) {
+      document.addEventListener('click', handleClickOutside)
+      return () => document.removeEventListener('click', handleClickOutside)
+    }
+  }, [showSuggestions])
+
   // Removido console.log para evitar spam en consola y rate limiting
+
+  // Handler para búsqueda
+  const handleSearch = (e?: React.FormEvent) => {
+    e?.preventDefault()
+    setShowSuggestions(false)
+    const query = searchQuery.trim()
+    if (query) {
+      router.push(`/shop?q=${encodeURIComponent(query)}`)
+    } else {
+      router.push('/shop')
+    }
+  }
+
+  // Handler para Enter en el input
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleSearch()
+    } else if (e.key === 'Escape') {
+      setShowSuggestions(false)
+    }
+  }
+
+  // Handler para seleccionar una sugerencia
+  const handleSelectSuggestion = (slug: string) => {
+    setShowSuggestions(false)
+    router.push(`/products/${slug}`)
+  }
 
   return (
     <header 
@@ -166,12 +264,28 @@ export function Header() {
           </Button>
 
           {/* Barra de búsqueda - Centro (responsive) */}
-          <div className="flex-1 max-w-md lg:max-w-xl mx-2 lg:mx-4 relative">
+          <form 
+            className="flex-1 max-w-md lg:max-w-xl mx-2 lg:mx-4 relative search-container"
+            onSubmit={handleSearch}
+          >
             <div className="relative">
               <Search className="absolute left-3 lg:left-4 top-1/2 -translate-y-1/2 h-3.5 w-3.5 lg:h-4 lg:w-4 z-10 pointer-events-none" style={{ color: styleData.searchIconColor || "var(--muted-foreground)" }} />
               <Input
                 type="search"
                 placeholder={styleData.searchPlaceholder || "Buscar..."}
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value)
+                  if (e.target.value.trim().length >= 2) {
+                    setShowSuggestions(true)
+                  }
+                }}
+                onKeyDown={handleSearchKeyDown}
+                onFocus={() => {
+                  if (searchQuery.trim().length >= 2 && searchSuggestions.length > 0) {
+                    setShowSuggestions(true)
+                  }
+                }}
                 className="pl-10 lg:pl-14 pr-4 h-9 lg:h-10 rounded-full w-full font-inter font-medium text-sm lg:text-base border"
                 style={{
                   backgroundColor: styleData.searchBgColor || "var(--muted)",
@@ -180,8 +294,98 @@ export function Header() {
                   paddingLeft: "2.5rem",
                 }}
               />
+              <Button
+                type="submit"
+                variant="ghost"
+                size="icon"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 lg:h-8 lg:w-8 rounded-full hover:bg-transparent"
+                style={{ backgroundColor: "transparent" }}
+                onClick={handleSearch}
+                title="Buscar"
+              >
+                <Search className="h-3.5 w-3.5 lg:h-4 lg:w-4" style={{ color: styleData.searchIconColor || "var(--muted-foreground)" }} />
+              </Button>
+
+              {/* Dropdown de sugerencias */}
+              {showSuggestions && searchQuery.trim().length >= 2 && (
+                <div 
+                  className="absolute top-full left-0 right-0 mt-2 bg-background border rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto"
+                  style={{
+                    borderColor: "var(--border)",
+                    backgroundColor: "var(--background)",
+                  }}
+                >
+                  {isSearching ? (
+                    <div className="p-4 text-center text-sm" style={{ color: "var(--muted-foreground)" }}>
+                      Buscando...
+                    </div>
+                  ) : searchSuggestions.length > 0 ? (
+                    <>
+                      <div className="p-2 border-b" style={{ borderColor: "var(--border)" }}>
+                        <p className="text-xs font-medium px-2" style={{ color: "var(--muted-foreground)" }}>
+                          Productos sugeridos
+                        </p>
+                      </div>
+                      {searchSuggestions.map((suggestion) => (
+                        <button
+                          key={suggestion.id}
+                          type="button"
+                          onClick={() => handleSelectSuggestion(suggestion.slug)}
+                          className="w-full flex items-center gap-3 p-3 hover:bg-muted transition-colors text-left"
+                          style={{ 
+                            backgroundColor: "transparent",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = "var(--muted)"
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = "transparent"
+                          }}
+                        >
+                          {suggestion.image ? (
+                            <img 
+                              src={suggestion.image} 
+                              alt={suggestion.title}
+                              className="w-12 h-12 object-cover rounded"
+                              onError={(e) => {
+                                e.currentTarget.src = "/placeholder.svg"
+                              }}
+                            />
+                          ) : (
+                            <div 
+                              className="w-12 h-12 rounded flex items-center justify-center"
+                              style={{ backgroundColor: "var(--muted)" }}
+                            >
+                              <Search className="h-5 w-5" style={{ color: "var(--muted-foreground)" }} />
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate" style={{ color: "var(--foreground)" }}>
+                              {suggestion.title}
+                            </p>
+                          </div>
+                        </button>
+                      ))}
+                      <div className="p-2 border-t" style={{ borderColor: "var(--border)" }}>
+                        <button
+                          type="button"
+                          onClick={handleSearch}
+                          className="w-full text-sm font-medium text-center py-2 hover:underline"
+                          style={{ color: "var(--primary)" }}
+                        >
+                          Ver todos los resultados para "{searchQuery}"
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="p-4 text-center text-sm" style={{ color: "var(--muted-foreground)" }}>
+                      No se encontraron productos
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
-          </div>
+          </form>
 
           {/* Iconos de acción - Derecha */}
           <div className="flex items-center gap-1.5 lg:gap-2 flex-shrink-0 z-10">
@@ -273,15 +477,24 @@ export function Header() {
             <Button
               variant="ghost" 
               size="icon" 
-              className="h-9 w-9 lg:h-10 lg:w-10 rounded-full touch-manipulation flex-shrink-0"
+              className="h-9 w-9 lg:h-10 lg:w-10 rounded-full touch-manipulation relative flex-shrink-0"
               style={{ 
                 backgroundColor: "transparent",
               }}
               onMouseEnter={(e) => e.currentTarget.style.backgroundColor = styleData.iconHoverBg || "var(--muted)"}
               onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+              onClick={() => router.push('/wishlist')}
               title="Favoritos"
             >
               <Heart className="h-4 w-4 lg:h-5 lg:w-5" style={{ color: styleData.iconColor || "var(--foreground)" }} />
+              {getWishlistTotalItems() > 0 && (
+                <span
+                  className="absolute -top-1 -right-1 h-4 w-4 lg:h-5 lg:w-5 rounded-full flex items-center justify-center text-[10px] lg:text-xs font-bold text-white"
+                  style={{ backgroundColor: "var(--primary)" }}
+                >
+                  {getWishlistTotalItems() > 99 ? '99+' : getWishlistTotalItems()}
+                </span>
+              )}
             </Button>
             <Button 
               variant="ghost" 
@@ -404,13 +617,22 @@ export function Header() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-10 w-10 rounded-full touch-manipulation flex-shrink-0"
+                className="h-10 w-10 rounded-full touch-manipulation relative flex-shrink-0"
                 style={{ backgroundColor: "transparent" }}
                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = styleData.iconHoverBg || "var(--muted)"}
                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+                onClick={() => router.push('/wishlist')}
                 title="Favoritos"
               >
                 <Heart className="h-4 w-4" style={{ color: styleData.iconColor || "var(--foreground)" }} />
+                {getWishlistTotalItems() > 0 && (
+                  <span
+                    className="absolute -top-1 -right-1 h-4 w-4 rounded-full flex items-center justify-center text-[10px] font-bold text-white"
+                    style={{ backgroundColor: "var(--primary)" }}
+                  >
+                    {getWishlistTotalItems() > 99 ? '99+' : getWishlistTotalItems()}
+                  </span>
+                )}
               </Button>
               <Button 
                 variant="ghost" 
@@ -448,20 +670,128 @@ export function Header() {
           </div>
           
           {/* Segunda fila: Barra de búsqueda */}
-          <div className="relative w-full">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 z-10 pointer-events-none" style={{ color: styleData.searchIconColor || "var(--muted-foreground)" }} />
-            <Input
-              type="search"
-              placeholder={styleData.searchPlaceholder || "Buscar..."}
-              className="pl-10 pr-4 h-10 rounded-full w-full text-sm border"
-              style={{
-                backgroundColor: styleData.searchBgColor || "var(--muted)",
-                borderColor: styleData.searchBorderColor || "var(--border)",
-                color: styleData.searchTextColor || "var(--foreground)",
-                paddingLeft: "2.5rem",
-              }}
-            />
-          </div>
+          <form 
+            className="relative w-full search-container"
+            onSubmit={handleSearch}
+          >
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 z-10 pointer-events-none" style={{ color: styleData.searchIconColor || "var(--muted-foreground)" }} />
+              <Input
+                type="search"
+                placeholder={styleData.searchPlaceholder || "Buscar..."}
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value)
+                  if (e.target.value.trim().length >= 2) {
+                    setShowSuggestions(true)
+                  }
+                }}
+                onKeyDown={handleSearchKeyDown}
+                onFocus={() => {
+                  if (searchQuery.trim().length >= 2 && searchSuggestions.length > 0) {
+                    setShowSuggestions(true)
+                  }
+                }}
+                className="pl-10 pr-10 h-10 rounded-full w-full text-sm border"
+                style={{
+                  backgroundColor: styleData.searchBgColor || "var(--muted)",
+                  borderColor: styleData.searchBorderColor || "var(--border)",
+                  color: styleData.searchTextColor || "var(--foreground)",
+                  paddingLeft: "2.5rem",
+                }}
+              />
+              <Button
+                type="submit"
+                variant="ghost"
+                size="icon"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full hover:bg-transparent"
+                style={{ backgroundColor: "transparent" }}
+                onClick={handleSearch}
+                title="Buscar"
+              >
+                <Search className="h-4 w-4" style={{ color: styleData.searchIconColor || "var(--muted-foreground)" }} />
+              </Button>
+
+              {/* Dropdown de sugerencias - Móvil */}
+              {showSuggestions && searchQuery.trim().length >= 2 && (
+                <div 
+                  className="absolute top-full left-0 right-0 mt-2 bg-background border rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto"
+                  style={{
+                    borderColor: "var(--border)",
+                    backgroundColor: "var(--background)",
+                  }}
+                >
+                  {isSearching ? (
+                    <div className="p-4 text-center text-sm" style={{ color: "var(--muted-foreground)" }}>
+                      Buscando...
+                    </div>
+                  ) : searchSuggestions.length > 0 ? (
+                    <>
+                      <div className="p-2 border-b" style={{ borderColor: "var(--border)" }}>
+                        <p className="text-xs font-medium px-2" style={{ color: "var(--muted-foreground)" }}>
+                          Productos sugeridos
+                        </p>
+                      </div>
+                      {searchSuggestions.map((suggestion) => (
+                        <button
+                          key={suggestion.id}
+                          type="button"
+                          onClick={() => handleSelectSuggestion(suggestion.slug)}
+                          className="w-full flex items-center gap-3 p-3 hover:bg-muted transition-colors text-left"
+                          style={{ 
+                            backgroundColor: "transparent",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = "var(--muted)"
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = "transparent"
+                          }}
+                        >
+                          {suggestion.image ? (
+                            <img 
+                              src={suggestion.image} 
+                              alt={suggestion.title}
+                              className="w-12 h-12 object-cover rounded"
+                              onError={(e) => {
+                                e.currentTarget.src = "/placeholder.svg"
+                              }}
+                            />
+                          ) : (
+                            <div 
+                              className="w-12 h-12 rounded flex items-center justify-center"
+                              style={{ backgroundColor: "var(--muted)" }}
+                            >
+                              <Search className="h-5 w-5" style={{ color: "var(--muted-foreground)" }} />
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate" style={{ color: "var(--foreground)" }}>
+                              {suggestion.title}
+                            </p>
+                          </div>
+                        </button>
+                      ))}
+                      <div className="p-2 border-t" style={{ borderColor: "var(--border)" }}>
+                        <button
+                          type="button"
+                          onClick={handleSearch}
+                          className="w-full text-sm font-medium text-center py-2 hover:underline"
+                          style={{ color: "var(--primary)" }}
+                        >
+                          Ver todos los resultados para "{searchQuery}"
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="p-4 text-center text-sm" style={{ color: "var(--muted-foreground)" }}>
+                      No se encontraron productos
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </form>
         </div>
 
         {/* Navegación eliminada - categorías y banner Big Sale removidos */}

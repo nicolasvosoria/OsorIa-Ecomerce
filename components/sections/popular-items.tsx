@@ -156,36 +156,43 @@ export function PopularItems({ initialProducts }: PopularItemsProps = {}) {
       title: "Bocinas Bluetooth",
       price: "Desde $356",
       image: "/bluetooth-speaker-modern.jpg",
+      slug: "altavoz-bluetooth-moderno", // Slug real en la BD
     },
     {
       title: "Auriculares y Audífonos",
       price: "Desde $29",
       image: "/premium-headphones.png",
+      slug: "auriculares-premium", // Slug real en la BD
     },
     {
       title: "Soportes para Laptop",
       price: "Desde $82",
       image: "/laptop-stand.png",
+      slug: "soporte-laptop-aluminio", // Slug real en la BD
     },
     {
       title: "Proyectores",
       price: "Desde $199",
       image: "/mini-projector.jpg",
+      slug: "proyector-mini-portatil", // Slug real en la BD
     },
     {
       title: "Bocinas Inteligentes",
       price: "Desde $89",
       image: "/black-smart-speaker.jpg",
+      slug: "altavoz-bluetooth-moderno", // Usar el mismo slug de bocinas Bluetooth
     },
     {
       title: "Audífonos Inalámbricos",
       price: "Desde $45",
       image: "/green-earphones-product.jpg",
+      slug: "audifonos-inalambricos", // Slug real en la BD
     },
     {
       title: "Fundas para Teléfono",
       price: "Desde $25",
       image: "/modern-phone-case-product.jpg",
+      slug: "funda-telefono-moderna", // Slug real en la BD
     },
   ]
   
@@ -200,18 +207,10 @@ export function PopularItems({ initialProducts }: PopularItemsProps = {}) {
     "/reposteria/pastel-boda.jpg",
   ]
 
-  // Priorizar: ediciones locales > estilos guardados > productos de BD > defaults
-  // Los items guardados tienen prioridad sobre los productos de BD
+  // Priorizar: productos de BD > ediciones locales/estilos guardados > defaults
+  // SIEMPRE usar productos de BD cuando estén disponibles para asegurar que tengan página real
   const items = useMemo(() => {
-    // Primero verificar si hay items editados o guardados en estilos
-    const savedItems = edits.items ?? styleData.items
-    
-    if (savedItems && Array.isArray(savedItems) && savedItems.length > 0) {
-      console.log('[PopularItems] Usando items guardados:', savedItems.length, 'items')
-      return savedItems
-    }
-    
-    // Si no hay items guardados, usar productos de BD si existen
+    // PRIMERO: Usar productos de BD si existen (tienen prioridad para asegurar páginas reales)
     if (initialProducts && initialProducts.length > 0) {
       console.log('[PopularItems] Usando productos de BD:', initialProducts.length, 'productos')
       return initialProducts.map((p, index) => ({
@@ -223,12 +222,27 @@ export function PopularItems({ initialProducts }: PopularItemsProps = {}) {
           : (isReposteria 
               ? (reposteriaImages[index % reposteriaImages.length] || "/placeholder.svg")
               : "/placeholder.svg"),
-        slug: p.slug,
+        // Asegurar que siempre se use el slug de la BD (p.slug viene de item_slug o id)
+        slug: p.slug || p.id || generateSlug(p.title),
+        id: p.id,
       }))
     }
     
-    // Si no hay productos de BD ni items guardados, usar defaults
-    console.log('[PopularItems] Usando items por defecto')
+    // SEGUNDO: Si no hay productos de BD, verificar items editados o guardados en estilos
+    // (solo si tienen slug válido para asegurar que tengan página)
+    const savedItems = edits.items ?? styleData.items
+    if (savedItems && Array.isArray(savedItems) && savedItems.length > 0) {
+      // Filtrar items guardados que tengan slug o ID válido
+      const validSavedItems = savedItems.filter((item: any) => item.slug || item.id)
+      if (validSavedItems.length > 0) {
+        console.log('[PopularItems] Usando items guardados válidos:', validSavedItems.length, 'items')
+        return validSavedItems
+      }
+    }
+    
+    // TERCERO: Si no hay productos de BD ni items guardados válidos, usar defaults
+    // (solo como último recurso, pero estos también tienen slugs ahora)
+    console.log('[PopularItems] Usando items por defecto (último recurso)')
     return defaultItems
   }, [initialProducts, edits.items, styleData.items, isReposteria])
   
@@ -308,8 +322,9 @@ export function PopularItems({ initialProducts }: PopularItemsProps = {}) {
           >
             <CarouselContent className="-ml-2 md:-ml-4">
               {items.map((item: any, index: number) => {
-                const itemSlug = item.slug || generateSlug(item.title)
-                const itemId = initialProducts?.[index]?.id || `popular-${index}`
+                // Priorizar: slug de BD > id > slug generado desde título
+                const itemSlug = item.slug || item.id || generateSlug(item.title)
+                const itemId = item.id || initialProducts?.[index]?.id || `popular-${index}`
                 // Usar una key única que incluya la imagen para forzar re-render cuando cambia
                 const imageKey = `${itemId}-${item.image || 'no-image'}`
                 return (
@@ -324,10 +339,10 @@ export function PopularItems({ initialProducts }: PopularItemsProps = {}) {
                       </Link>
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent pointer-events-none" />
                       
-                      {/* Botones de acción - aparecen en hover */}
-                      <div className="absolute inset-0 flex items-center justify-center gap-3 opacity-0 group-hover:opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300 z-10">
+                      {/* Botones de acción - siempre visibles en móvil, aparecen en hover en desktop */}
+                      <div className="absolute inset-0 flex items-center justify-center gap-3 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300 z-10 pointer-events-none">
                         <Button
-                          className="px-6 py-3 text-sm md:text-base font-inter font-medium rounded-full shadow-lg min-h-[44px] min-w-[44px] touch-manipulation"
+                          className="px-6 py-3 text-sm md:text-base font-inter font-medium rounded-full shadow-lg min-h-[44px] min-w-[44px] touch-manipulation pointer-events-auto"
                           style={{
                             backgroundColor: "var(--accent)",
                             color: "var(--accent-foreground)",
@@ -356,7 +371,7 @@ export function PopularItems({ initialProducts }: PopularItemsProps = {}) {
                         </Button>
                         <Button
                           variant="outline"
-                          className="px-6 py-3 text-sm md:text-base font-inter font-medium rounded-full shadow-lg min-h-[44px] min-w-[44px] touch-manipulation"
+                          className="px-6 py-3 text-sm md:text-base font-inter font-medium rounded-full shadow-lg min-h-[44px] min-w-[44px] touch-manipulation pointer-events-auto"
                           style={{
                             backgroundColor: "var(--background)",
                             color: "var(--foreground)",
@@ -364,16 +379,19 @@ export function PopularItems({ initialProducts }: PopularItemsProps = {}) {
                           }}
                           asChild
                         >
-                          <Link href={`/products/${itemSlug}`}>
+                          <Link href={`/products/${itemSlug}`} onClick={(e) => e.stopPropagation()}>
                             Ver detalles
                           </Link>
                         </Button>
                       </div>
                       
-                      <Link href={`/products/${itemSlug}`} className="absolute bottom-0 left-0 right-0 p-4 md:p-6 text-center z-0 pointer-events-auto">
-                        <h3 className="text-white text-xl md:text-[31.1153px] font-inter font-medium mb-2 hover:underline">{item.title}</h3>
-                        <p className="text-white/90 text-sm md:text-[15.447px] font-inter font-medium">{item.price}</p>
-                      </Link>
+                      {/* Información del producto - siempre visible en la parte inferior */}
+                      <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6 text-center z-0 pointer-events-none">
+                        <Link href={`/products/${itemSlug}`} className="pointer-events-auto block">
+                          <h3 className="text-white text-xl md:text-[31.1153px] font-inter font-medium mb-2 hover:underline">{item.title}</h3>
+                          <p className="text-white/90 text-sm md:text-[15.447px] font-inter font-medium">{item.price}</p>
+                        </Link>
+                      </div>
                     </div>
                   </CarouselItem>
                 )

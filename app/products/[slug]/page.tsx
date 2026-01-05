@@ -16,6 +16,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { ShoppingCart, Heart, Check, AlertCircle } from 'lucide-react';
 import { AddToCart } from '@/components/cart/add-to-cart';
+import { WishlistButton } from '@/components/wishlist/wishlist-button';
 import { adaptSupabaseProduct } from '@/lib/products/adapter';
 import { cn } from '@/lib/utils';
 import { ProductImageGallery } from './components/product-image-gallery';
@@ -84,7 +85,18 @@ export async function generateMetadata(props: { params: Promise<{ slug: string }
 async function ProductContent({ slug }: { slug: string }) {
   let product;
   try {
+    // Primero intentar buscar por slug
     product = await getItemBySlug(slug);
+    
+    // Si no se encuentra por slug, intentar buscar por ID (en caso de que el slug sea un UUID)
+    if (!product) {
+      const { getItemById } = await import('@/lib/supabase/products-api');
+      // Solo intentar por ID si el slug parece ser un UUID
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (uuidRegex.test(slug)) {
+        product = await getItemById(slug);
+      }
+    }
   } catch (error) {
     if (process.env.NODE_ENV === 'development') {
       console.error('Error fetching product:', error);
@@ -287,14 +299,13 @@ async function ProductContent({ slug }: { slug: string }) {
                   No disponible
                 </Button>
               )}
-              <Button
+              <WishlistButton
+                product={adaptedProduct}
                 variant="outline"
                 size="lg"
+                iconOnly={false}
                 className="flex-1 sm:flex-initial"
-              >
-                <Heart className="h-5 w-5 mr-2" />
-                Favoritos
-              </Button>
+              />
             </div>
 
             {/* Información adicional */}

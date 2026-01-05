@@ -7,6 +7,7 @@ import { VariantSelector } from '../variant-selector';
 import { ProductImage } from './product-image';
 import { Button } from '@/components/ui/button';
 import { ArrowRightIcon } from 'lucide-react';
+import { WishlistButton } from '@/components/wishlist/wishlist-button';
 
 export const ProductCard = ({ product }: { product: Product }) => {
   const hasNoOptions = product.options.length === 0;
@@ -17,6 +18,11 @@ export const ProductCard = ({ product }: { product: Product }) => {
 
   return (
     <div className="relative w-full aspect-[3/4] md:aspect-square bg-muted group overflow-hidden">
+      {/* Botón de wishlist en la esquina superior derecha */}
+      <div className="absolute top-3 right-3 z-20 pointer-events-auto">
+        <WishlistButton product={product} />
+      </div>
+      
       <Link
         href={`/products/${product.handle}`}
         className="block size-full focus-visible:outline-none"
