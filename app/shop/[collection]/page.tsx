@@ -8,12 +8,19 @@ export async function generateStaticParams() {
   try {
     const collections = await getCollections();
 
+    // Next.js 16 with Cache Components requires at least one result
+    if (collections.length === 0) {
+      // Return a default collection to satisfy the requirement
+      return [{ collection: 'all' }];
+    }
+
     return collections.map(collection => ({
       collection: collection.handle,
     }));
   } catch (error) {
     console.error('Error generating static params:', error);
-    return [];
+    // Return a default collection to satisfy Next.js requirement
+    return [{ collection: 'all' }];
   }
 }
 

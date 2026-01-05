@@ -14,7 +14,8 @@ import {
   Users, 
   ArrowRight,
   Eye,
-  Edit
+  Edit,
+  BarChart3
 } from "lucide-react"
 import Link from "next/link"
 import { getDashboardStats } from "@/lib/supabase/stats-api"
@@ -115,6 +116,13 @@ function DashboardContent() {
       href: "/admin/users",
       color: "bg-purple-500",
       count: stats.totalUsers,
+    },
+    {
+      title: "Estadísticas y Reportes",
+      description: "Visualiza análisis detallados",
+      icon: BarChart3,
+      href: "/admin/stats",
+      color: "bg-indigo-500",
     },
     {
       title: "Editor de Página",

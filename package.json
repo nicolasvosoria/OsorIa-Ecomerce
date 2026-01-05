@@ -80,6 +80,7 @@
     "tw-animate-css": "latest",
     "url": "latest",
     "vaul": "latest",
+    "xlsx": "^0.18.5",
     "zod": "^3.24.1"
   },
   "devDependencies": {
@@ -88,6 +89,7 @@
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/xlsx": "^0.0.36",
     "postcss": "^8.5",
     "tailwindcss": "^4.1.13",
     "typescript": "^5"
