@@ -24,7 +24,7 @@ export default function WishlistPage() {
       description: "",
       descriptionHtml: "",
       categoryId: "",
-      featuredImage: item.image ? { url: item.image, alt: item.title } : undefined,
+      featuredImage: item.image ? { url: item.image, altText: item.title, width: 400, height: 400 } : { url: "/placeholder.svg", altText: item.title, width: 400, height: 400 },
       currencyCode: item.currencyCode || "COP",
       priceRange: {
         minVariantPrice: {
@@ -88,7 +88,7 @@ export default function WishlistPage() {
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8 md:py-16">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold mb-2">Mis Favoritos</h1>
             <p className="text-muted-foreground">
@@ -102,6 +102,7 @@ export default function WishlistPage() {
                 clearWishlist()
                 toast.success("Lista de favoritos vaciada")
               }}
+              className="w-full sm:w-auto"
             >
               <Trash2 className="h-4 w-4 mr-2" />
               Limpiar todo

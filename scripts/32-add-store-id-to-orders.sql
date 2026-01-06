@@ -30,3 +30,4 @@ COMMENT ON COLUMN public.orders.store_id IS 'ID de la tienda donde se realizó e
 
 
 
+

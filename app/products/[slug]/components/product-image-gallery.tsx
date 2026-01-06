@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import useEmblaCarousel from 'embla-carousel-react';
@@ -19,6 +19,10 @@ interface ProductImageGalleryProps {
 
 export function ProductImageGallery({ images, discountPercentage }: ProductImageGalleryProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const [isHovering, setIsHovering] = useState(false);
+  const [zoomEnabled, setZoomEnabled] = useState(true);
+  const imageContainerRef = useRef<HTMLDivElement>(null);
   const [emblaRef, emblaApi] = useEmblaCarousel({
     align: 'start',
     loop: true,
@@ -56,6 +60,35 @@ export function ProductImageGallery({ images, discountPercentage }: ProductImage
     };
   }, [emblaApi, onSelect]);
 
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (!imageContainerRef.current) return;
+    
+    const rect = imageContainerRef.current.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    
+    // Limitar los valores entre 0 y 100
+    const clampedX = Math.max(0, Math.min(100, x));
+    const clampedY = Math.max(0, Math.min(100, y));
+    
+    setMousePosition({ x: clampedX, y: clampedY });
+  }, []);
+
+  const handleMouseEnter = useCallback(() => {
+    setIsHovering(true);
+    setZoomEnabled(true); // Reactivar zoom al entrar
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    setIsHovering(false);
+  }, []);
+
+  const handleClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setZoomEnabled(false); // Desactivar zoom al hacer click
+    setIsHovering(false);
+  }, []);
+
   if (images.length === 0) {
     return (
       <div className="space-y-4">
@@ -71,19 +104,33 @@ export function ProductImageGallery({ images, discountPercentage }: ProductImage
   return (
     <div className="space-y-4">
       {/* Slider principal */}
-      <div className="relative aspect-square w-full overflow-hidden rounded-lg bg-muted group">
+      <div 
+        className="relative aspect-square w-full overflow-hidden rounded-lg bg-muted group"
+        onMouseMove={handleMouseMove}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        onClick={handleClick}
+        ref={imageContainerRef}
+      >
         <div className="overflow-hidden h-full" ref={emblaRef}>
           <div className="flex h-full">
             {images.map((img, index) => (
               <div
                 key={index}
-                className="flex-shrink-0 w-full h-full relative"
+                className="flex-shrink-0 w-full h-full relative overflow-hidden"
               >
                 <Image
                   src={img.url}
                   alt={img.alt}
                   fill
                   className="object-contain"
+                  style={{
+                    transform: isHovering && zoomEnabled
+                      ? `scale(2.5) translate(${(50 - mousePosition.x) / 2.5}%, ${(50 - mousePosition.y) / 2.5}%)`
+                      : 'scale(1)',
+                    transformOrigin: 'center center',
+                    cursor: isHovering && zoomEnabled ? 'zoom-in' : 'default',
+                  }}
                   priority={index === 0}
                   sizes="(max-width: 1024px) 100vw, 50vw"
                 />

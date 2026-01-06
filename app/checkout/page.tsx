@@ -274,7 +274,7 @@ export default function CheckoutPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-6xl">
+    <div className="container mx-auto px-4 py-4 md:py-8 max-w-6xl">
       <div className="mb-6">
         <Link href="/shop">
           <Button variant="ghost" size="sm" className="mb-4">
@@ -282,8 +282,8 @@ export default function CheckoutPage() {
             Volver a la tienda
           </Button>
         </Link>
-        <h1 className="text-3xl font-bold mb-2">Finalizar Compra</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-2xl md:text-3xl font-bold mb-2">Finalizar Compra</h1>
+        <p className="text-sm md:text-base text-muted-foreground">
           Completa tus datos para procesar tu pedido
         </p>
       </div>
@@ -339,7 +339,7 @@ export default function CheckoutPage() {
 
         {/* Resumen del Pedido */}
         <div className="lg:col-span-1">
-          <Card className="sticky top-4">
+          <Card className="lg:sticky lg:top-4">
             <CardHeader>
               <CardTitle>Resumen del Pedido</CardTitle>
             </CardHeader>

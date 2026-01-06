@@ -145,7 +145,7 @@ async function ProductContent({ slug }: { slug: string }) {
   return (
     <div className="min-h-screen bg-background">
       {/* Breadcrumbs */}
-      <div className="container mx-auto px-4 py-4 md:py-6">
+      <div className="container mx-auto px-4 py-3 md:py-4 lg:py-6">
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>
@@ -155,15 +155,15 @@ async function ProductContent({ slug }: { slug: string }) {
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
-              <BreadcrumbPage>{product.item_name}</BreadcrumbPage>
+              <BreadcrumbPage className="truncate max-w-[200px] md:max-w-none">{product.item_name}</BreadcrumbPage>
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
       </div>
 
       {/* Contenido principal */}
-      <div className="container mx-auto px-4 pb-12">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
+      <div className="container mx-auto px-4 pb-6 md:pb-12">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 lg:gap-12">
           {/* Galería de imágenes - Móvil y Desktop */}
           <ProductImageGallery 
             images={allImages} 
