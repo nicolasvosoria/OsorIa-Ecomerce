@@ -42,8 +42,9 @@ export async function getFonts(): Promise<AppFont[]> {
       console.error("[Font] Esto sugiere un problema de red o que RLS está bloqueando completamente las consultas")
     }
     
-    const queryPromise = supabase
-      .from("app_fonts")
+    const ecommerce = supabase.schema("ecommerce")
+    const queryPromise = ecommerce
+      .from("app_fonts_legacy")
       .select("*")
       .order("font_name")
     
@@ -94,11 +95,12 @@ export async function getActiveFont(): Promise<AppFont | null> {
     return null
   }
 
-  const { data, error } = await supabase
-    .from("app_fonts")
-    .select("*")
-    .eq("is_active", true)
-    .single()
+  const ecommerce = supabase.schema("ecommerce")
+  const { data, error } = await ecommerce
+      .from("app_fonts_legacy")
+      .select("*")
+      .eq("is_active", true)
+      .maybeSingle()
 
   if (error) {
     console.error("[Font] Error fetching active font:", error)
@@ -127,8 +129,9 @@ export async function setActiveFont(fontName: string): Promise<{ success: boolea
   }
 
   try {
+    const ecommerce = supabase.schema("ecommerce")
     // Primero desactivar todas las fuentes
-    const { error: deactivateError } = await supabase
+    const { error: deactivateError } = await ecommerce
       .from("app_fonts")
       .update({ is_active: false })
       .neq("is_active", false)
@@ -139,7 +142,7 @@ export async function setActiveFont(fontName: string): Promise<{ success: boolea
     }
 
     // Luego activar la fuente seleccionada
-    const { error: activateError } = await supabase
+    const { error: activateError } = await ecommerce
       .from("app_fonts")
       .update({ is_active: true, updated_at: new Date().toISOString() })
       .eq("font_name", fontName)

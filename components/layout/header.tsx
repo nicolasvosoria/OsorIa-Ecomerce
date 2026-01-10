@@ -110,12 +110,15 @@ export function Header() {
   const isDarkTheme = useMemo(() => {
     if (!activeTheme) return false
     // Verificar si el nombre del tema contiene "Oscuro"
-    if (activeTheme.theme_name.toLowerCase().includes("oscuro")) {
+    if (activeTheme.theme_name?.toLowerCase().includes("oscuro")) {
       return true
     }
     // También verificar si el background es oscuro (RGB bajo)
+    if (!activeTheme.colors || !activeTheme.colors.background) {
+      return false
+    }
     const bgColor = activeTheme.colors.background
-    if (bgColor.startsWith("#")) {
+    if (typeof bgColor === "string" && bgColor.startsWith("#")) {
       const r = parseInt(bgColor.slice(1, 3), 16)
       const g = parseInt(bgColor.slice(3, 5), 16)
       const b = parseInt(bgColor.slice(5, 7), 16)

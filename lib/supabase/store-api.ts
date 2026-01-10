@@ -78,8 +78,9 @@ export async function getStoreFromServer(): Promise<{ id: string; subdomain: str
     }
 
     // Si storeId es 'default' (string), buscar por subdomain en lugar de por ID
-    let query = supabase
-      .from('stores')
+    const ecommerce = supabase.schema('ecommerce')
+    let query = ecommerce
+      .from('stores_legacy')
       .select('id, subdomain, store_name, primary_color, secondary_color')
       .eq('is_active', true)
       .is('deleted_at', null)

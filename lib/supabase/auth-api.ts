@@ -71,7 +71,8 @@ export async function signUp(
         userProfile = profileResult.user
       } else {
         // Si el trigger no funcionó, crear el perfil manualmente
-        const { error: insertError } = await supabase
+        const ecommerce = supabase.schema('ecommerce')
+        const { error: insertError } = await ecommerce
           .from('user_profiles')
           .insert({
             id: data.user!.id,
@@ -147,7 +148,8 @@ export async function signIn(email: string, password: string): Promise<AuthResul
     const profileResult = await getUserProfile(data.user!.id)
     if (!profileResult.success || !profileResult.user) {
       // Si no existe perfil, crearlo
-      const { error: insertError } = await supabase
+      const ecommerce = supabase.schema('ecommerce')
+      const { error: insertError } = await ecommerce
         .from('user_profiles')
         .insert({
           id: data.user!.id,
@@ -300,12 +302,13 @@ export async function getUserProfile(userId: string): Promise<AuthResult> {
           await new Promise(resolve => setTimeout(resolve, 500 * attempt))
         }
 
+        const ecommerce = supabase.schema('ecommerce')
         const result = await withTimeout(
-          supabase
+          ecommerce
             .from('user_profiles')
             .select('*')
             .eq('id', userId)
-            .single(),
+            .maybeSingle(),
           timeoutMs,
           `getUserProfile (intento ${attempt + 1})`
         ) as { data: any; error: any }
@@ -331,7 +334,8 @@ export async function getUserProfile(userId: string): Promise<AuthResult> {
             
             if (authUser && authUser.id === userId) {
               // Intentar crear el perfil
-              const { data: newProfile, error: insertError } = await supabase
+              const ecommerce = supabase.schema('ecommerce')
+              const { data: newProfile, error: insertError } = await ecommerce
                 .from('user_profiles')
                 .insert({
                   id: userId,
@@ -441,8 +445,9 @@ export async function updateUserProfile(
         error: 'Supabase no configurado',
       }
     }
+    const ecommerce = supabase.schema('ecommerce')
     const result = await withTimeout(
-      supabase
+      ecommerce
         .from('user_profiles')
         .update({
           ...updates,

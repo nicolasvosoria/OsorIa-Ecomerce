@@ -18,7 +18,8 @@ export async function isCurrentUserAdmin(): Promise<boolean> {
       return false
     }
 
-    const { data, error } = await supabase
+    const ecommerce = supabase.schema("ecommerce")
+    const { data, error } = await ecommerce
       .from("user_profiles")
       .select("role")
       .eq("id", user.id)
@@ -53,7 +54,8 @@ export async function getCurrentUserRole(): Promise<UserRole | null> {
       return null
     }
 
-    const { data, error } = await supabase
+    const ecommerce = supabase.schema("ecommerce")
+    const { data, error } = await ecommerce
       .from("user_profiles")
       .select("role")
       .eq("id", user.id)

@@ -47,7 +47,8 @@ export async function getUsers(params: GetUsersParams = {}): Promise<GetUsersRes
       role,
     } = params
 
-    let query = supabase
+    const ecommerce = supabase.schema('ecommerce')
+    let query = ecommerce
       .from('user_profiles')
       .select('*', { count: 'exact' })
 
@@ -92,8 +93,9 @@ export async function getUserById(userId: string): Promise<UserProfile | null> {
       return null
     }
 
+    const ecommerce = supabase.schema('ecommerce')
     const result = await withTimeout(
-      supabase
+      ecommerce
         .from('user_profiles')
         .select('*')
         .eq('id', userId)
@@ -113,5 +115,7 @@ export async function getUserById(userId: string): Promise<UserProfile | null> {
     return null
   }
 }
+
+
 
 

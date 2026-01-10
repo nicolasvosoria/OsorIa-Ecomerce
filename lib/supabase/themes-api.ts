@@ -29,8 +29,9 @@ export async function getThemes(): Promise<AppTheme[]> {
     // Si no hay store_id, intentar obtener el UUID de la tienda por defecto
     if (!storeId) {
       console.log("[Theme] No hay store_id disponible, obteniendo tienda por defecto...")
-      const { data: defaultStore } = await supabase
-        .from("stores")
+      const ecommerce = supabase.schema("ecommerce")
+      const { data: defaultStore } = await ecommerce
+        .from("stores_legacy")
         .select("id")
         .eq("subdomain", "default")
         .maybeSingle()
@@ -47,8 +48,9 @@ export async function getThemes(): Promise<AppTheme[]> {
     const startTime = Date.now()
     
     // Construir query con filtro de store_id si está disponible
-    let queryPromise = supabase
-      .from("app_themes")
+    const ecommerce = supabase.schema("ecommerce")
+    let queryPromise = ecommerce
+      .from("app_themes_legacy")
       .select("*")
       .order("theme_name")
     
@@ -89,10 +91,27 @@ export async function getThemes(): Promise<AppTheme[]> {
     }
 
     console.log("[Theme] ✅ Temas cargados exitosamente:", data.length)
-    const themes = data.map((theme: any) => ({
-      ...theme,
-      colors: typeof theme.colors === "string" ? JSON.parse(theme.colors) : theme.colors,
-    })) as AppTheme[]
+    const themes = data.map((theme: any) => {
+      // La vista legacy expone 'colors' como 'theme_config'
+      const themeColors = theme.theme_config || theme.colors || null
+      let parsedColors: any = null
+      if (themeColors) {
+        if (typeof themeColors === "string") {
+          try {
+            parsedColors = JSON.parse(themeColors)
+          } catch (e) {
+            console.error("[Theme] Error parsing theme colors:", e)
+            parsedColors = null
+          }
+        } else {
+          parsedColors = themeColors
+        }
+      }
+      return {
+        ...theme,
+        colors: parsedColors,
+      }
+    }) as AppTheme[]
     console.log("[Theme] === FINALIZANDO getThemes ===")
     return themes
   } catch (err) {
@@ -116,8 +135,9 @@ export async function getActiveTheme(): Promise<AppTheme | null> {
   
   // Si no hay store_id, intentar obtener el UUID de la tienda por defecto
   if (!storeId) {
-    const { data: defaultStore } = await supabase
-      .from("stores")
+    const ecommerce = supabase.schema("ecommerce")
+    const { data: defaultStore } = await ecommerce
+      .from("stores_legacy")
       .select("id")
       .eq("subdomain", "default")
       .maybeSingle()
@@ -127,8 +147,9 @@ export async function getActiveTheme(): Promise<AppTheme | null> {
     }
   }
 
-  let query = supabase
-    .from("app_themes")
+  const ecommerce = supabase.schema("ecommerce")
+  let query = ecommerce
+    .from("app_themes_legacy")
     .select("*")
     .eq("is_active", true)
   
@@ -203,9 +224,27 @@ export async function getActiveTheme(): Promise<AppTheme | null> {
 
   if (!data) return null
 
+  // La vista legacy expone 'colors' como 'theme_config'
+  const themeColors = data.theme_config || data.colors || null
+  
+  // Parsear colors si es un string
+  let parsedColors: any = null
+  if (themeColors) {
+    if (typeof themeColors === "string") {
+      try {
+        parsedColors = JSON.parse(themeColors)
+      } catch (e) {
+        console.error("[Theme] Error parsing theme colors:", e)
+        parsedColors = null
+      }
+    } else {
+      parsedColors = themeColors
+    }
+  }
+
   return {
     ...data,
-    colors: typeof data.colors === "string" ? JSON.parse(data.colors) : data.colors,
+    colors: parsedColors,
   } as AppTheme
 }
 
@@ -231,8 +270,9 @@ export async function setActiveTheme(themeName: string): Promise<{ success: bool
     
     // Si no hay store_id, intentar obtener el UUID de la tienda por defecto
     if (!storeId) {
-      const { data: defaultStore } = await supabase
-        .from("stores")
+      const ecommerce = supabase.schema("ecommerce")
+      const { data: defaultStore } = await ecommerce
+        .from("stores_legacy")
         .select("id")
         .eq("subdomain", "default")
         .maybeSingle()
@@ -242,42 +282,98 @@ export async function setActiveTheme(themeName: string): Promise<{ success: bool
       }
     }
 
-    // Construir query para desactivar todos los temas de la tienda actual
-    let deactivateQuery = supabase
+    // Obtener el theme_id del tema por nombre
+    const ecommerce = supabase.schema("ecommerce")
+    const { data: themeData } = await ecommerce
       .from("app_themes")
-      .update({ is_active: false })
-      .neq("is_active", false)
-
-    if (storeId) {
-      deactivateQuery = deactivateQuery.eq("store_id", storeId)
-    } else {
-      deactivateQuery = deactivateQuery.is("store_id", null)
-    }
-
-    const { error: deactivateError } = await deactivateQuery
-
-    if (deactivateError) {
-      console.error("[Theme] Error deactivating themes:", deactivateError)
-      return { success: false, error: "Error al desactivar temas" }
-    }
-
-    // Construir query para activar el tema seleccionado de la tienda actual
-    let activateQuery = supabase
-      .from("app_themes")
-      .update({ is_active: true, updated_at: new Date().toISOString() })
+      .select("id")
       .eq("theme_name", themeName)
+      .maybeSingle()
 
-    if (storeId) {
-      activateQuery = activateQuery.eq("store_id", storeId)
-    } else {
-      activateQuery = activateQuery.is("store_id", null)
+    if (!themeData?.id) {
+      return { success: false, error: "Tema no encontrado" }
     }
 
-    const { error: activateError } = await activateQuery
+    const themeId = themeData.id
 
-    if (activateError) {
-      console.error("[Theme] Error activating theme:", activateError)
-      return { success: false, error: "Error al activar tema" }
+    // Si hay store_id, usar app_theme_versions para gestionar temas por tienda
+    if (storeId) {
+      // Desactivar todos los temas de la tienda actual
+      await ecommerce
+        .from("app_theme_versions")
+        .update({ is_current: false })
+        .eq("store_id", storeId)
+        .catch(err => console.error("[Theme] Error al desactivar temas:", err))
+
+      // Activar o crear el tema seleccionado para la tienda
+      const { data: existingVersion } = await ecommerce
+        .from("app_theme_versions")
+        .select("id")
+        .eq("store_id", storeId)
+        .eq("theme_id", themeId)
+        .maybeSingle()
+
+      if (existingVersion) {
+        await ecommerce
+          .from("app_theme_versions")
+          .update({ is_current: true })
+          .eq("id", existingVersion.id)
+          .catch(err => console.error("[Theme] Error al activar tema:", err))
+      } else {
+        // Crear nueva versión de tema
+        // Generar UUID usando función RPC de Supabase o función nativa
+        let versionId: string
+        try {
+          const { data: uuidData } = await supabase.rpc('gen_random_uuid').single()
+          versionId = uuidData || self.crypto?.randomUUID() || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        } catch {
+          // Si RPC no funciona, usar crypto nativo o generar UUID manual
+          versionId = typeof crypto !== 'undefined' && 'randomUUID' in crypto 
+            ? crypto.randomUUID() 
+            : `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        }
+
+        const { error: insertError } = await ecommerce
+          .from("app_theme_versions")
+          .insert({
+            id: versionId,
+            store_id: storeId,
+            theme_id: themeId,
+            is_current: true,
+          })
+
+        if (insertError) {
+          console.error("[Theme] Error al crear versión de tema:", insertError)
+          // Intentar sin especificar ID si el schema tiene DEFAULT
+          const { error: retryError } = await ecommerce
+            .from("app_theme_versions")
+            .insert({
+              store_id: storeId,
+              theme_id: themeId,
+              is_current: true,
+            })
+
+          if (retryError) {
+            return { success: false, error: "Error al activar tema" }
+          }
+        }
+      }
+    } else {
+      // Si no hay store_id, actualizar app_themes directamente (tema global)
+      await ecommerce
+        .from("app_themes")
+        .update({ is_active: false })
+        .neq("is_active", false)
+        .catch(err => console.error("[Theme] Error al desactivar temas:", err))
+
+      await ecommerce
+        .from("app_themes")
+        .update({ is_active: true, updated_at: new Date().toISOString() })
+        .eq("theme_name", themeName)
+        .catch(err => {
+          console.error("[Theme] Error al activar tema:", err)
+          return { success: false, error: "Error al activar tema" }
+        })
     }
 
     return { success: true }

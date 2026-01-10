@@ -1,5 +1,47 @@
 import { getSupabaseBrowserClient } from './client'
 
+// Helper para obtener store_id
+async function getStoreId(): Promise<string | null> {
+  try {
+    const { getStoreId: getStoreIdFn } = await import('@/lib/utils/store')
+    return await getStoreIdFn()
+  } catch (error) {
+    console.warn('[Orders] Error al obtener store_id:', error)
+    return null
+  }
+}
+
+// Helper para generar order_number
+async function generateOrderNumber(storeId: string): Promise<string> {
+  const supabase = getSupabaseBrowserClient()
+  if (!supabase) {
+    throw new Error('Supabase no configurado')
+  }
+
+  const year = new Date().getFullYear()
+  
+  // Obtener el último número de pedido para este año y tienda
+  const ecommerce = supabase.schema('ecommerce')
+  const { data: lastOrder } = await ecommerce
+    .from('orders')
+    .select('order_number')
+    .eq('store_id', storeId)
+    .like('order_number', `ORD-${year}-%`)
+    .order('order_number', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  let sequenceNum = 1
+  if (lastOrder?.order_number) {
+    const match = lastOrder.order_number.match(/\d+$/)
+    if (match) {
+      sequenceNum = parseInt(match[0], 10) + 1
+    }
+  }
+
+  return `ORD-${year}-${sequenceNum.toString().padStart(6, '0')}`
+}
+
 // Tipos para pedidos
 export interface Order {
   id: string
@@ -57,6 +99,7 @@ export interface OrderItem {
 }
 
 export interface CreateOrderData {
+  store_id?: string | null // Si no se proporciona, se obtiene automáticamente
   customer_type: 'guest' | 'user'
   user_id?: string | null
   customer_email: string
@@ -125,25 +168,57 @@ export async function createOrder(orderData: CreateOrderData): Promise<OrderWith
       return null
     }
 
-    // Crear el pedido
+    // Obtener store_id
+    let storeId = orderData.store_id
+    if (!storeId) {
+      storeId = await getStoreId()
+      if (!storeId) {
+        // Intentar obtener la tienda por defecto
+        const ecommerce = supabase.schema('ecommerce')
+        const { data: defaultStore } = await ecommerce
+          .from('stores_legacy')
+          .select('id')
+          .eq('subdomain', 'default')
+          .eq('is_active', true)
+          .is('deleted_at', null)
+          .maybeSingle()
+        
+        if (!defaultStore?.id) {
+          console.error('[Orders] No se pudo obtener store_id')
+          return null
+        }
+        storeId = defaultStore.id
+      }
+    }
+
+    if (!storeId) {
+      console.error('[Orders] store_id es requerido')
+      return null
+    }
+
+    // Generar order_number
+    const orderNumber = await generateOrderNumber(storeId)
+
+    // Mapear payment_status al enum del schema
+    const paymentStatusMap: Record<string, string> = {
+      'pending': 'pending',
+      'paid': 'paid',
+      'failed': 'failed',
+      'refunded': 'refunded'
+    }
+    const mappedPaymentStatus = paymentStatusMap[orderData.payment_status || 'pending'] || 'pending'
+
+    // Crear el pedido en la tabla real
+    const ecommerce = supabase.schema('ecommerce')
     const orderResult = await withTimeout(
-      supabase
+      ecommerce
         .from('orders')
         .insert({
-          customer_type: orderData.customer_type,
+          store_id: storeId,
+          order_number: orderNumber,
+          status: 'pending', // Usa el enum ecommerce.order_status
           user_id: orderData.user_id || null,
           customer_email: orderData.customer_email,
-          customer_first_name: orderData.customer_first_name,
-          customer_last_name: orderData.customer_last_name,
-          customer_phone: orderData.customer_phone || null,
-          shipping_address: orderData.shipping_address,
-          shipping_city: orderData.shipping_city,
-          shipping_postal_code: orderData.shipping_postal_code,
-          shipping_country: orderData.shipping_country || 'Colombia',
-          shipping_notes: orderData.shipping_notes || null,
-          payment_method: orderData.payment_method || null,
-          payment_status: orderData.payment_status || 'pending',
-          payment_reference: orderData.payment_reference || null,
           subtotal: orderData.subtotal,
           shipping_cost: orderData.shipping_cost || 0,
           tax_amount: orderData.tax_amount || 0,
@@ -164,7 +239,60 @@ export async function createOrder(orderData: CreateOrderData): Promise<OrderWith
       return null
     }
 
-    const order = orderResult.data as Order
+    const order = orderResult.data
+
+    // Crear la dirección de envío
+    const addressResult = await withTimeout(
+      ecommerce
+        .from('order_addresses')
+        .insert({
+          order_id: order.id,
+          addr_type: 'shipping',
+          first_name: orderData.customer_first_name,
+          last_name: orderData.customer_last_name,
+          email: orderData.customer_email,
+          phone: orderData.customer_phone || null,
+          address_line1: orderData.shipping_address,
+          city: orderData.shipping_city,
+          postal_code: orderData.shipping_postal_code,
+          country: orderData.shipping_country || 'Colombia',
+          notes: orderData.shipping_notes || null,
+        })
+        .select()
+        .single(),
+      15000,
+      'createOrderAddress'
+    ) as { data: any; error: any }
+
+    if (addressResult.error) {
+      console.error('[Orders] Error al crear dirección de envío:', addressResult.error)
+      // Continuar aunque falle la dirección
+    }
+
+    // Crear la transacción de pago si hay información
+    if (orderData.payment_method || orderData.payment_reference) {
+      const paymentResult = await withTimeout(
+        ecommerce
+          .from('payment_transactions')
+          .insert({
+            order_id: order.id,
+            provider: orderData.payment_method || 'unknown',
+            provider_txn_id: orderData.payment_reference || null,
+            status: mappedPaymentStatus as any, // Usa el enum ecommerce.payment_status
+            amount: orderData.total_amount,
+            currency_code: orderData.currency_code || 'COP',
+          })
+          .select()
+          .single(),
+        15000,
+        'createPaymentTransaction'
+      ) as { data: any; error: any }
+
+      if (paymentResult.error) {
+        console.error('[Orders] Error al crear transacción de pago:', paymentResult.error)
+        // Continuar aunque falle el pago
+      }
+    }
 
     // Crear los items del pedido
     const itemsToInsert = orderData.items.map(item => ({
@@ -185,7 +313,7 @@ export async function createOrder(orderData: CreateOrderData): Promise<OrderWith
     }))
 
     const itemsResult = await withTimeout(
-      supabase
+      ecommerce
         .from('order_items')
         .insert(itemsToInsert)
         .select(),
@@ -196,12 +324,27 @@ export async function createOrder(orderData: CreateOrderData): Promise<OrderWith
     if (itemsResult.error) {
       console.error('[Orders] Error al crear items del pedido:', itemsResult.error)
       // El pedido ya fue creado, pero los items fallaron
-      // Podríamos eliminar el pedido o dejarlo sin items
-      return { ...order, items: [] } as OrderWithItems
+      return null
+    }
+
+    // Obtener el pedido completo usando la vista legacy para mantener compatibilidad
+    const fullOrderResult = await withTimeout(
+      ecommerce
+        .from('orders_legacy')
+        .select('*')
+        .eq('id', order.id)
+        .single(),
+      15000,
+      'getFullOrder'
+    ) as { data: any; error: any }
+
+    if (fullOrderResult.error || !fullOrderResult.data) {
+      console.error('[Orders] Error al obtener pedido completo:', fullOrderResult.error)
+      return null
     }
 
     return {
-      ...order,
+      ...fullOrderResult.data as Order,
       items: itemsResult.data as OrderItem[],
     }
   } catch (error: any) {
@@ -222,9 +365,10 @@ export async function getOrderById(orderId: string): Promise<OrderWithItems | nu
     }
 
     // Obtener el pedido
+    const ecommerce = supabase.schema('ecommerce')
     const orderResult = await withTimeout(
-      supabase
-        .from('orders')
+      ecommerce
+        .from('orders_legacy')
         .select('*')
         .eq('id', orderId)
         .single(),
@@ -239,7 +383,7 @@ export async function getOrderById(orderId: string): Promise<OrderWithItems | nu
 
     // Obtener los items del pedido
     const itemsResult = await withTimeout(
-      supabase
+      ecommerce
         .from('order_items')
         .select('*')
         .eq('order_id', orderId)
@@ -269,9 +413,10 @@ export async function getOrderByNumber(orderNumber: string): Promise<OrderWithIt
       return null
     }
 
+    const ecommerce = supabase.schema('ecommerce')
     const orderResult = await withTimeout(
-      supabase
-        .from('orders')
+      ecommerce
+        .from('orders_legacy')
         .select('*')
         .eq('order_number', orderNumber)
         .single(),
@@ -288,7 +433,7 @@ export async function getOrderByNumber(orderNumber: string): Promise<OrderWithIt
 
     // Obtener los items del pedido
     const itemsResult = await withTimeout(
-      supabase
+      ecommerce
         .from('order_items')
         .select('*')
         .eq('order_id', order.id)
@@ -341,8 +486,9 @@ export async function getOrders(params: GetOrdersParams = {}): Promise<GetOrders
       payment_status,
     } = params
 
-    let query = supabase
-      .from('orders')
+    const ecommerce = supabase.schema('ecommerce')
+    let query = ecommerce
+      .from('orders_legacy')
       .select('*', { count: 'exact' })
 
     // Filtrar por estado si se especifica
@@ -391,9 +537,10 @@ export async function getOrdersByEmail(email: string, limit: number = 50): Promi
       return []
     }
 
+    const ecommerce = supabase.schema('ecommerce')
     const ordersResult = await withTimeout(
-      supabase
-        .from('orders')
+      ecommerce
+        .from('orders_legacy')
         .select('*')
         .eq('customer_email', email)
         .order('order_date', { ascending: false })
@@ -413,7 +560,7 @@ export async function getOrdersByEmail(email: string, limit: number = 50): Promi
     const ordersWithItems: OrderWithItems[] = await Promise.all(
       orders.map(async (order) => {
         const itemsResult = await withTimeout(
-          supabase
+          ecommerce
             .from('order_items')
             .select('*')
             .eq('order_id', order.id)
@@ -475,14 +622,69 @@ export async function updateOrderStatus(
       updateData.payment_status = additionalData.payment_status
     }
 
+    // Mapear status al enum del schema
+    const statusMap: Record<string, string> = {
+      'pending': 'pending',
+      'confirmed': 'confirmed',
+      'processing': 'confirmed', // En el nuevo schema no hay 'processing', usar 'confirmed'
+      'shipped': 'shipped',
+      'delivered': 'delivered',
+      'cancelled': 'cancelled'
+    }
+    const mappedStatus = statusMap[status] || status
+
+    // Actualizar en la tabla real
+    const updateDataReal: any = { status: mappedStatus }
+
+    if (mappedStatus === 'confirmed' && !additionalData?.shipped_at) {
+      updateDataReal.confirmed_at = new Date().toISOString()
+    }
+    if (mappedStatus === 'shipped') {
+      updateDataReal.shipped_at = additionalData?.shipped_at || new Date().toISOString()
+    }
+    if (mappedStatus === 'delivered') {
+      updateDataReal.delivered_at = additionalData?.delivered_at || new Date().toISOString()
+    }
+    if (mappedStatus === 'cancelled') {
+      updateDataReal.cancelled_at = additionalData?.cancelled_at || new Date().toISOString()
+    }
+
+    const ecommerce = supabase.schema('ecommerce')
     const result = await withTimeout(
-      supabase
+      ecommerce
         .from('orders')
-        .update(updateData)
+        .update(updateDataReal)
         .eq('id', orderId),
       10000,
       'updateOrderStatus'
     ) as { error: any }
+
+    // Si hay payment_status, actualizar también en payment_transactions
+    if (additionalData?.payment_status) {
+      const paymentStatusMap: Record<string, string> = {
+        'pending': 'pending',
+        'paid': 'paid',
+        'failed': 'failed',
+        'refunded': 'refunded'
+      }
+      const mappedPaymentStatus = paymentStatusMap[additionalData.payment_status] || additionalData.payment_status
+      
+      // Obtener la última transacción de pago
+      const { data: lastPayment } = await ecommerce
+        .from('payment_transactions')
+        .select('id')
+        .eq('order_id', orderId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      
+      if (lastPayment?.id) {
+        await ecommerce
+          .from('payment_transactions')
+          .update({ status: mappedPaymentStatus as any })
+          .eq('id', lastPayment.id)
+      }
+    }
 
     if (result.error) {
       console.error('[Orders] Error al actualizar estado del pedido:', result.error)

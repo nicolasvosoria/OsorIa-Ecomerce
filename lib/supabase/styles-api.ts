@@ -16,8 +16,9 @@ export async function getComponentStyles() {
     return []
   }
 
-  const { data, error } = await supabase
-    .from("component_styles")
+  const ecommerce = supabase.schema("ecommerce")
+  const { data, error } = await ecommerce
+    .from("component_styles_legacy")
     .select("*")
     .eq("store_id", storeId)
     .order("component_name")
@@ -43,12 +44,13 @@ export async function getComponentStyleByName(componentName: string) {
     return null
   }
 
-  const { data, error } = await supabase
-    .from("component_styles")
+  const ecommerce = supabase.schema("ecommerce")
+  const { data, error } = await ecommerce
+    .from("component_styles_legacy")
     .select("*")
     .eq("component_name", componentName)
     .eq("store_id", storeId)
-    .single()
+    .maybeSingle()
 
   if (error) {
     console.error(`[v0] Error fetching style for ${componentName}:`, error)
@@ -71,11 +73,12 @@ export async function updateComponentStyle(componentName: string, variables: Rec
   const storeId = await getStoreId()
   if (!storeId) {
     // Si no hay store_id, intentar obtener el UUID de la tienda por defecto
-    const { data: defaultStore } = await supabase
-      .from("stores")
+    const ecommerce = supabase.schema("ecommerce")
+    const { data: defaultStore } = await ecommerce
+      .from("stores_legacy")
       .select("id")
       .eq("subdomain", "default")
-      .single()
+      .maybeSingle()
     
     if (!defaultStore?.id) {
       throw new Error("No store_id available and default store not found")
@@ -99,13 +102,14 @@ async function updateComponentStyleWithStoreId(
   }
 
   try {
+    const ecommerce = supabase.schema("ecommerce")
     // Primero verificar si el registro existe
-    const { data: existing, error: checkError } = await supabase
-      .from("component_styles")
-      .select("id")
-      .eq("component_name", componentName)
-      .eq("store_id", storeId)
-      .maybeSingle()
+    const { data: existing, error: checkError } = await ecommerce
+        .from("component_styles")
+        .select("id")
+        .eq("component_name", componentName)
+        .eq("store_id", storeId)
+        .maybeSingle()
 
     if (checkError && checkError.code !== "PGRST116") {
       // PGRST116 es "no rows returned", que es esperado si no existe
@@ -117,7 +121,7 @@ async function updateComponentStyleWithStoreId(
 
     if (existing) {
       // Si existe, hacer UPDATE
-      const result = await supabase
+      const result = await ecommerce
         .from("component_styles")
         .update({
           variables,
@@ -126,13 +130,13 @@ async function updateComponentStyleWithStoreId(
         .eq("component_name", componentName)
         .eq("store_id", storeId)
         .select()
-        .single()
+        .maybeSingle()
       
       data = result.data as ComponentStyle | null
       error = result.error
     } else {
       // Si no existe, hacer INSERT
-      const result = await supabase
+      const result = await ecommerce
         .from("component_styles")
         .insert({
           component_name: componentName,
@@ -141,7 +145,7 @@ async function updateComponentStyleWithStoreId(
           updated_at: new Date().toISOString(),
         })
         .select()
-        .single()
+        .maybeSingle()
       
       data = result.data as ComponentStyle | null
       error = result.error
