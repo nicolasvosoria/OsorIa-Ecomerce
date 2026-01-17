@@ -98,6 +98,13 @@ export default function CreateProductPage() {
       return
     }
 
+    // Validar cantidad de stock
+    const stockQuantity = parseInt(formData.inventory_quantity) || 0
+    if (stockQuantity < 0) {
+      toast.error("La cantidad de stock no puede ser negativa")
+      return
+    }
+
     // Validar imágenes: máximo 3
     if (images.length > 3) {
       toast.error("Solo se permiten máximo 3 imágenes")
@@ -344,6 +351,22 @@ export default function CreateProductPage() {
                   <CardTitle>Inventario</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="inventory_quantity">Cantidad en Stock *</Label>
+                    <Input
+                      id="inventory_quantity"
+                      type="number"
+                      min="0"
+                      value={formData.inventory_quantity}
+                      onChange={(e) => setFormData({ ...formData, inventory_quantity: e.target.value })}
+                      placeholder="0"
+                      required
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Ingresa la cantidad disponible del producto en stock
+                    </p>
+                  </div>
+
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="track_inventory"
@@ -353,33 +376,24 @@ export default function CreateProductPage() {
                       }
                     />
                     <Label htmlFor="track_inventory" className="cursor-pointer">
-                      Rastrear inventario
+                      Rastrear inventario automáticamente
                     </Label>
                   </div>
 
                   {formData.track_inventory && (
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="inventory_quantity">Cantidad en Stock</Label>
-                        <Input
-                          id="inventory_quantity"
-                          type="number"
-                          min="0"
-                          value={formData.inventory_quantity}
-                          onChange={(e) => setFormData({ ...formData, inventory_quantity: e.target.value })}
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="low_stock_threshold">Umbral de Stock Bajo</Label>
-                        <Input
-                          id="low_stock_threshold"
-                          type="number"
-                          min="0"
-                          value={formData.low_stock_threshold}
-                          onChange={(e) => setFormData({ ...formData, low_stock_threshold: e.target.value })}
-                        />
-                      </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="low_stock_threshold">Umbral de Stock Bajo</Label>
+                      <Input
+                        id="low_stock_threshold"
+                        type="number"
+                        min="0"
+                        value={formData.low_stock_threshold}
+                        onChange={(e) => setFormData({ ...formData, low_stock_threshold: e.target.value })}
+                        placeholder="10"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Se enviará una alerta cuando el stock esté por debajo de este valor
+                      </p>
                     </div>
                   )}
                 </CardContent>
