@@ -176,13 +176,44 @@ function getSubdomain(hostname: string): string | null {
     return 'default'
   }
 
+  // En Vercel, los dominios pueden ser:
+  // - proyecto.vercel.app (dominio de Vercel sin subdominio - 3 partes)
+  // - subdominio.proyecto.vercel.app (subdominio en Vercel - 4 partes)
+  // - tudominio.com (sin subdominio)
+  // - subdominio.tudominio.com (con subdominio)
+  
   const parts = hostname.split('.')
   
+  // Detectar dominios de Vercel: tienen 'vercel.app' al final
+  const isVercelDomain = parts.length >= 2 && 
+    (parts[parts.length - 2] === 'vercel' && parts[parts.length - 1] === 'app')
+  
+  if (isVercelDomain) {
+    // Si tiene exactamente 3 partes (proyecto.vercel.app), no hay subdominio real
+    if (parts.length === 3) {
+      return null // Se usará 'default'
+    }
+    // Si tiene 4 o más partes (subdominio.proyecto.vercel.app), hay subdominio real
+    if (parts.length >= 4) {
+      return parts[0] // Retornar el subdominio (ej: 'reposteria')
+    }
+  }
+  
+  // Para dominios personalizados o otros casos
   if (parts.length >= 2) {
     const subdomain = parts[0]
+    
+    // Ignorar 'www'
     if (subdomain === 'www') {
       return parts.length > 2 ? parts[1] : null
     }
+    
+    // Si es un dominio de 2 partes (ej: tudominio.com), no hay subdominio
+    if (parts.length === 2) {
+      return null
+    }
+    
+    // Si tiene 3 o más partes (subdominio.tudominio.com), retornar el subdominio
     return subdomain
   }
   

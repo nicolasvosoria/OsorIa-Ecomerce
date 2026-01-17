@@ -34,15 +34,28 @@ function getSubdomain(hostname: string): string | null {
   // En Vercel, los dominios pueden ser:
   // - tudominio.com (sin subdominio)
   // - subdominio.tudominio.com (con subdominio)
-  // - proyecto.vercel.app (dominio de Vercel)
-  // - subdominio.proyecto.vercel.app (subdominio en Vercel)
+  // - proyecto.vercel.app (dominio de Vercel sin subdominio - 3 partes)
+  // - subdominio.proyecto.vercel.app (subdominio en Vercel - 4 partes)
   
   const parts = hostname.split('.')
   
-  // Si tiene al menos 3 partes (subdomain.domain.com) o 2 partes (subdomain.com)
+  // Detectar dominios de Vercel: tienen 'vercel.app' al final
+  const isVercelDomain = parts.length >= 2 && 
+    (parts[parts.length - 2] === 'vercel' && parts[parts.length - 1] === 'app')
+  
+  if (isVercelDomain) {
+    // Si tiene exactamente 3 partes (proyecto.vercel.app), no hay subdominio real
+    if (parts.length === 3) {
+      return null // Se manejará como 'default' más abajo
+    }
+    // Si tiene 4 o más partes (subdominio.proyecto.vercel.app), hay subdominio real
+    if (parts.length >= 4) {
+      return parts[0] // Retornar el subdominio (ej: 'reposteria')
+    }
+  }
+  
+  // Para dominios personalizados o otros casos
   if (parts.length >= 2) {
-    // Si es un dominio de Vercel (ej: proyecto.vercel.app)
-    // o un dominio personalizado (ej: tudominio.com)
     const subdomain = parts[0]
     
     // Ignorar 'www'
@@ -50,13 +63,12 @@ function getSubdomain(hostname: string): string | null {
       return parts.length > 2 ? parts[1] : null
     }
     
-    // Si es un dominio de Vercel sin subdominio (ej: proyecto.vercel.app)
-    // o un dominio personalizado sin subdominio (ej: tudominio.com)
-    // retornar null para usar 'default' en el proxy
-    if (parts.length === 2 && (parts[1] === 'vercel.app' || parts[1] === 'vercel-dns.com')) {
-      return null // Se manejará como 'default' más abajo
+    // Si es un dominio de 2 partes (ej: tudominio.com), no hay subdominio
+    if (parts.length === 2) {
+      return null
     }
     
+    // Si tiene 3 o más partes (subdominio.tudominio.com), retornar el subdominio
     return subdomain
   }
   
@@ -144,21 +156,41 @@ export async function proxy(request: NextRequest) {
   // Extraer subdominio
   const subdomain = getSubdomain(hostname)
 
-  // Si no hay subdominio, usar 'default' o redirigir
+  // Si no hay subdominio, usar tienda por defecto
   if (!subdomain) {
-    // En desarrollo, permitir continuar sin subdominio
-    if (hostname.includes('localhost') || hostname.includes('127.0.0.1')) {
+    // Obtener tienda por defecto desde Supabase
+    const defaultStore = await getStoreBySubdomain('default')
+    
+    if (defaultStore && defaultStore.is_active) {
+      // Usar tienda por defecto si existe
       const response = NextResponse.next()
-      // Establecer header para desarrollo
-      response.headers.set('x-store-id', 'default')
+      response.headers.set('x-store-id', defaultStore.id)
+      response.headers.set('x-store-subdomain', 'default')
+      response.headers.set('x-store-name', defaultStore.store_name)
+      
+      response.cookies.set('store_id', defaultStore.id, {
+        path: '/',
+        maxAge: 60 * 60 * 24 * 7, // 7 días
+        sameSite: 'lax',
+      })
+      
       return response
     }
-
-    // En producción, redirigir a un subdominio por defecto o mostrar error
-    // Puedes redirigir a 'www' o a un subdominio específico
-    const url = request.nextUrl.clone()
-    url.hostname = `www.${hostname}`
-    return NextResponse.redirect(url)
+    
+    // Si no existe tienda por defecto, permitir continuar con valores por defecto
+    // (esto permite que la aplicación funcione incluso sin configuración)
+    const response = NextResponse.next()
+    response.headers.set('x-store-id', 'default')
+    response.headers.set('x-store-subdomain', 'default')
+    response.headers.set('x-store-name', 'Tienda Principal')
+    
+    response.cookies.set('store_id', 'default', {
+      path: '/',
+      maxAge: 60 * 60 * 24 * 7, // 7 días
+      sameSite: 'lax',
+    })
+    
+    return response
   }
 
   // Obtener información de la tienda
