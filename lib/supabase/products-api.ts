@@ -189,7 +189,80 @@ export async function getItems(params: GetItemsParams = {}): Promise<GetItemsRes
       }
     }
     
-    // Si no hay store_id (por ejemplo, durante build time), intentar obtener el UUID de la tienda por defecto
+    // Si no hay store_id, intentar obtenerlo del subdominio (solo en servidor)
+    if (!currentStoreId && typeof window === 'undefined') {
+      try {
+        // Importación dinámica solo en servidor
+        const { headers, cookies } = await import('next/headers')
+        const { createServerClient } = await import('@supabase/ssr')
+        const headersList = await headers()
+        const hostname = headersList.get('host') || ''
+        
+        // Extraer subdominio del hostname
+        let subdomain: string | null = null
+        if (hostname.includes('localhost') || hostname.includes('127.0.0.1')) {
+          const parts = hostname.split('.')
+          if (parts.length > 1 && parts[0] !== 'localhost' && parts[0] !== '127') {
+            subdomain = parts[0]
+          } else {
+            subdomain = 'default'
+          }
+        } else {
+          const parts = hostname.split('.')
+          if (parts.length >= 2) {
+            const subdomainPart = parts[0]
+            if (subdomainPart === 'www') {
+              subdomain = parts.length > 2 ? parts[1] : null
+            } else {
+              subdomain = subdomainPart
+            }
+          }
+        }
+        
+        if (subdomain) {
+          // Usar cliente de servidor para consultar Supabase
+          const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+          const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+          
+          if (supabaseUrl && supabaseKey) {
+            const cookieStore = await cookies()
+            const serverSupabase = createServerClient(supabaseUrl, supabaseKey, {
+              cookies: {
+                get(name: string) {
+                  return cookieStore.get(name)?.value
+                },
+                set() {
+                  // No hacer nada en lectura
+                },
+                remove() {
+                  // No hacer nada en lectura
+                },
+              },
+            })
+            
+            const { data: store } = await serverSupabase
+              .from('stores')
+              .select('id')
+              .eq('subdomain', subdomain)
+              .eq('is_active', true)
+              .is('deleted_at', null)
+              .single()
+            
+            if (store?.id) {
+              console.log('[Products] Store ID obtenido de subdominio:', subdomain, '->', store.id)
+              currentStoreId = store.id
+            }
+          }
+        }
+      } catch (error: any) {
+        // Si falla al obtener del subdominio, continuar con el fallback
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('[Products] No se pudo obtener store_id del subdominio:', error?.message)
+        }
+      }
+    }
+    
+    // Si aún no hay store_id (por ejemplo, durante build time), intentar obtener el UUID de la tienda por defecto
     if (!currentStoreId) {
       try {
         const { data: defaultStore } = await supabase
@@ -201,6 +274,9 @@ export async function getItems(params: GetItemsParams = {}): Promise<GetItemsRes
           .single()
         
         if (defaultStore?.id) {
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('[Products] Usando tienda por defecto como fallback')
+          }
           currentStoreId = defaultStore.id
         } else {
           // Si no hay tienda por defecto, retornar vacío
@@ -306,8 +382,80 @@ export async function getItemBySlug(slug: string, storeId?: string | null): Prom
       }
     }
     
-    // Si no hay store_id (por ejemplo, durante build time o dentro de 'use cache'), 
-    // intentar obtener el UUID de la tienda por defecto
+    // Si no hay store_id, intentar obtenerlo del subdominio (solo en servidor)
+    if (!currentStoreId && typeof window === 'undefined') {
+      try {
+        // Importación dinámica solo en servidor
+        const { headers, cookies } = await import('next/headers')
+        const { createServerClient } = await import('@supabase/ssr')
+        const headersList = await headers()
+        const hostname = headersList.get('host') || ''
+        
+        // Extraer subdominio del hostname
+        let subdomain: string | null = null
+        if (hostname.includes('localhost') || hostname.includes('127.0.0.1')) {
+          const parts = hostname.split('.')
+          if (parts.length > 1 && parts[0] !== 'localhost' && parts[0] !== '127') {
+            subdomain = parts[0]
+          } else {
+            subdomain = 'default'
+          }
+        } else {
+          const parts = hostname.split('.')
+          if (parts.length >= 2) {
+            const subdomainPart = parts[0]
+            if (subdomainPart === 'www') {
+              subdomain = parts.length > 2 ? parts[1] : null
+            } else {
+              subdomain = subdomainPart
+            }
+          }
+        }
+        
+        if (subdomain) {
+          // Usar cliente de servidor para consultar Supabase
+          const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+          const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+          
+          if (supabaseUrl && supabaseKey) {
+            const cookieStore = await cookies()
+            const serverSupabase = createServerClient(supabaseUrl, supabaseKey, {
+              cookies: {
+                get(name: string) {
+                  return cookieStore.get(name)?.value
+                },
+                set() {
+                  // No hacer nada en lectura
+                },
+                remove() {
+                  // No hacer nada en lectura
+                },
+              },
+            })
+            
+            const { data: store } = await serverSupabase
+              .from('stores')
+              .select('id')
+              .eq('subdomain', subdomain)
+              .eq('is_active', true)
+              .is('deleted_at', null)
+              .single()
+            
+            if (store?.id) {
+              console.log('[Products] Store ID obtenido de subdominio para getItemBySlug:', subdomain, '->', store.id)
+              currentStoreId = store.id
+            }
+          }
+        }
+      } catch (error: any) {
+        // Si falla al obtener del subdominio, continuar con el fallback
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('[Products] No se pudo obtener store_id del subdominio en getItemBySlug:', error?.message)
+        }
+      }
+    }
+    
+    // Si aún no hay store_id (por ejemplo, durante build time), intentar obtener el UUID de la tienda por defecto
     if (!currentStoreId) {
       try {
         const { data: defaultStore } = await supabase
@@ -319,6 +467,9 @@ export async function getItemBySlug(slug: string, storeId?: string | null): Prom
           .single()
         
         if (defaultStore?.id) {
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('[Products] Usando tienda por defecto como fallback en getItemBySlug')
+          }
           currentStoreId = defaultStore.id
         } else {
           console.warn('[Products] No se pudo obtener store_id para getItemBySlug y no hay tienda por defecto')

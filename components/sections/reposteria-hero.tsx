@@ -19,9 +19,9 @@ export function ReposteriaHero() {
     description: "Deliciosos pasteles, postres y dulces artesanales\nHechos con amor y los mejores ingredientes",
     backgroundImage: "/reposteria/pastel-boda.jpg",
     primaryButtonText: "Explorar Productos",
-    primaryButtonLink: "/shop",
-    secondaryButtonText: "Ver Catálogo",
-    secondaryButtonLink: "/catalog",
+    primaryButtonLink: "/catalog",
+    secondaryButtonText: "Ver Tienda",
+    secondaryButtonLink: "/shop",
   })
   const { componentEdits } = useAdmin()
 
@@ -47,9 +47,9 @@ export function ReposteriaHero() {
   
   // Obtener textos y links de botones
   const primaryButtonText = edits.primaryButtonText ?? styleData.primaryButtonText ?? "Explorar Productos"
-  const primaryButtonLink = edits.primaryButtonLink ?? styleData.primaryButtonLink ?? "/shop"
-  const secondaryButtonText = edits.secondaryButtonText ?? styleData.secondaryButtonText ?? "Ver Catálogo"
-  const secondaryButtonLink = edits.secondaryButtonLink ?? styleData.secondaryButtonLink ?? "/catalog"
+  const primaryButtonLink = edits.primaryButtonLink ?? styleData.primaryButtonLink ?? "/catalog"
+  const secondaryButtonText = edits.secondaryButtonText ?? styleData.secondaryButtonText ?? "Ver Tienda"
+  const secondaryButtonLink = edits.secondaryButtonLink ?? styleData.secondaryButtonLink ?? "/shop"
 
   // Obtener estilos de texto y borde
   const titleTextColor = edits.titleTextColor ?? styleData.titleTextColor ?? "#ffffff"

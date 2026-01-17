@@ -28,18 +28,27 @@ export async function getFonts(): Promise<AppFont[]> {
     console.log("[Font] URL de Supabase:", process.env.NEXT_PUBLIC_SUPABASE_URL)
     const startTime = Date.now()
     
-    // Primero hacer una consulta simple para verificar conectividad
-    try {
-      console.log("[Font] Probando conectividad con Supabase...")
-      const testQuery = supabase.from("app_fonts").select("id").limit(1)
-      const testResult = await Promise.race([
-        testQuery,
-        new Promise((_, reject) => setTimeout(() => reject(new Error("Test timeout")), 5000))
-      ])
-      console.log("[Font] Test de conectividad:", testResult ? "✅ OK" : "❌ Falló")
-    } catch (testError) {
-      console.error("[Font] ❌ Error en test de conectividad:", testError)
-      console.error("[Font] Esto sugiere un problema de red o que RLS está bloqueando completamente las consultas")
+    // Test de conectividad opcional (solo en desarrollo y no bloquea el flujo)
+    if (process.env.NODE_ENV === 'development') {
+      try {
+        console.log("[Font] Probando conectividad con Supabase...")
+        const testQuery = supabase.from("app_fonts").select("id").limit(1)
+        const testResult = await Promise.race([
+          testQuery,
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error("Test timeout")), 3000)
+          )
+        ]).catch(() => null) // No propagar el error del test
+        
+        if (testResult) {
+          console.log("[Font] Test de conectividad: ✅ OK")
+        } else {
+          console.warn("[Font] ⚠️ Test de conectividad falló o timeout (continuando de todas formas)")
+        }
+      } catch (testError) {
+        // Ignorar errores del test, no afectan la funcionalidad principal
+        console.warn("[Font] ⚠️ Test de conectividad no pudo completarse (continuando):", testError instanceof Error ? testError.message : testError)
+      }
     }
     
     const queryPromise = supabase

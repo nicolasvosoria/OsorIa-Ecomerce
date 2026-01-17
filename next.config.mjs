@@ -6,9 +6,9 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  // Configuración de Turbopack (Next.js 16 usa Turbopack por defecto)
-  // Agregar configuración vacía para silenciar el error
-  turbopack: {},
+  // Deshabilitar Turbopack temporalmente para evitar problemas con fuentes de Google
+  // Puedes habilitarlo de nuevo cuando se solucione el bug
+  // turbopack: {},
   images: {
     unoptimized: true,
     formats: ['image/avif', 'image/webp'],

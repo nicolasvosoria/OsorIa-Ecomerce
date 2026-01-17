@@ -2,7 +2,7 @@ import type React from "react"
 import { Suspense } from "react"
 import type { Metadata } from "next"
 // Importación alternativa de fuentes para evitar problemas con Turbopack
-import { Geist, Geist_Mono } from "next/font/google"
+// Usando CSS directo en lugar de next/font/google para evitar errores con Turbopack
 import "./globals.css"
 import { Toaster } from "sonner"
 import { NuqsAdapter } from "nuqs/adapters/next/app"
@@ -41,28 +41,17 @@ const V0Setup = dynamic(() => import("@/components/v0-setup"))
 
 const isV0 = process.env["VERCEL_URL"]?.includes("vusercontent.net") ?? false
 
-// Configuración de fuentes con ajustes para evitar problemas con Turbopack
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-  display: "swap",
-  preload: true,
-  fallback: ["system-ui", "arial"],
-})
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-  display: "swap",
-  preload: true,
-  fallback: ["monospace"],
-})
+// Variables CSS para fuentes (definidas en globals.css)
+// Ya no usamos next/font/google para evitar problemas con Turbopack
 
 export const metadata: Metadata = {
   title: "Ecommerce",
   description:
     "Ecommerce parametrizable.",
   generator: "v0.app",
+  other: {
+    // Fuentes Geist cargadas directamente para evitar problemas con Turbopack
+  },
 }
 
 export { viewport }
@@ -83,8 +72,23 @@ export default async function RootLayout({
 
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <link
+          rel="preconnect"
+          href="https://fonts.googleapis.com"
+        />
+        <link
+          rel="preconnect"
+          href="https://fonts.gstatic.com"
+          crossOrigin="anonymous"
+        />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Geist+Mono:wght@100..900&display=swap"
+          rel="stylesheet"
+        />
+      </head>
       <body
-        className={cn(geistSans.variable, geistMono.variable, "antialiased min-h-screen", { "is-v0": isV0 })}
+        className={cn("antialiased min-h-screen", { "is-v0": isV0 })}
         suppressHydrationWarning
       >
         <ApplyStylesScript />

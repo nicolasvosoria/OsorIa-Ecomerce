@@ -4,6 +4,12 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Variables de fuentes Geist (cargadas directamente para evitar problemas con Turbopack) */
+:root {
+  --font-geist-sans: 'Geist', system-ui, arial, sans-serif;
+  --font-geist-mono: 'Geist Mono', monospace;
+}
+
 :root {
   /* Updated to modern e-commerce color scheme */
   --background: #ffffff;

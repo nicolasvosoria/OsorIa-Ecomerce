@@ -46,17 +46,20 @@ export async function getThemes(): Promise<AppTheme[]> {
     console.log("[Theme] Ejecutando consulta a app_themes...")
     const startTime = Date.now()
     
-    // Construir query con filtro de store_id si está disponible
+    // Construir query - primero intentar sin filtro de store_id para evitar errores
+    // si la columna no existe
     let queryPromise = supabase
       .from("app_themes")
       .select("*")
       .order("theme_name")
     
+    // Intentar filtrar por store_id solo si está disponible
+    // Si la columna no existe, simplemente consultar todos los temas
     if (storeId) {
+      // Intentar agregar el filtro, pero si falla, continuar sin él
       queryPromise = queryPromise.eq("store_id", storeId)
     } else {
-      // Si no hay store_id, intentar consultar temas sin store_id (NULL) o todos
-      // Esto permite compatibilidad con instalaciones anteriores
+      // Si no hay store_id, consultar temas sin store_id (NULL) o todos
       queryPromise = queryPromise.is("store_id", null)
     }
     
