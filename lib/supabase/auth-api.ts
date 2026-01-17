@@ -287,10 +287,10 @@ export async function getUserProfile(userId: string): Promise<AuthResult> {
     console.log('[Auth] Obteniendo perfil para usuario:', userId)
     const startTime = Date.now()
 
-    // Reducir reintentos y timeout para evitar esperas largas
+    // Configuración de reintentos y timeout
     let lastError: any = null
     const maxRetries = 1 // Solo 1 reintento
-    const timeoutMs = 8000 // Reducido a 8 segundos
+    const timeoutMs = 10000 // 10 segundos para dar más tiempo a la conexión
     
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
@@ -300,12 +300,15 @@ export async function getUserProfile(userId: string): Promise<AuthResult> {
           await new Promise(resolve => setTimeout(resolve, 500 * attempt))
         }
 
+        // Usar una consulta más simple y directa sin timeout adicional si es posible
+        const queryPromise = supabase
+          .from('user_profiles')
+          .select('*')
+          .eq('id', userId)
+          .single()
+
         const result = await withTimeout(
-          supabase
-            .from('user_profiles')
-            .select('*')
-            .eq('id', userId)
-            .single(),
+          queryPromise,
           timeoutMs,
           `getUserProfile (intento ${attempt + 1})`
         ) as { data: any; error: any }
@@ -390,7 +393,8 @@ export async function getUserProfile(userId: string): Promise<AuthResult> {
         }
       } catch (timeoutError: any) {
         const elapsedTime = Date.now() - startTime
-        console.error(`[Auth] Timeout después de ${elapsedTime}ms en intento ${attempt + 1}:`, timeoutError.message)
+        // Usar console.warn en lugar de console.error para timeouts, ya que es un error esperado y manejado
+        console.warn(`[Auth] Timeout después de ${elapsedTime}ms en intento ${attempt + 1}:`, timeoutError.message)
         lastError = timeoutError
         
         // Si es el último intento, retornar error
@@ -401,18 +405,24 @@ export async function getUserProfile(userId: string): Promise<AuthResult> {
     }
 
     // Si llegamos aquí, todos los intentos fallaron
-    console.error('[Auth] Todos los intentos de obtener perfil fallaron. Último error:', lastError?.message)
+    // Usar console.warn para timeouts, ya que la aplicación puede continuar funcionando
+    if (lastError?.message?.includes('timeout') || lastError?.message?.includes('Timeout')) {
+      console.warn('[Auth] Timeout al obtener perfil después de todos los intentos. La aplicación continuará funcionando sin el perfil completo.')
+    } else {
+      console.error('[Auth] Todos los intentos de obtener perfil fallaron. Último error:', lastError?.message)
+    }
     
     // Proporcionar un mensaje más útil
     let errorMessage = 'Error al obtener perfil: timeout o error de conexión'
     if (lastError?.message) {
       if (lastError.message.includes('timeout') || lastError.message.includes('Timeout')) {
-        errorMessage = 'Timeout al conectar con Supabase. Verifica tu conexión a internet y que Supabase esté disponible.'
+        errorMessage = 'Timeout al conectar con Supabase. La aplicación continuará funcionando, pero algunas funciones pueden estar limitadas.'
       } else {
         errorMessage = lastError.message
       }
     }
     
+    // Retornar error pero permitir que la aplicación continúe
     return {
       success: false,
       error: errorMessage,
@@ -629,13 +639,32 @@ export function onAuthStateChange(callback: (user: UserProfile | null) => void) 
     
     try {
       if (session?.user) {
-        const profileResult = await getUserProfile(session.user.id)
-        callback(profileResult.success && profileResult.user ? profileResult.user : null)
+        // Usar un timeout adicional para evitar que el callback se bloquee indefinidamente
+        const profilePromise = getUserProfile(session.user.id)
+        const timeoutPromise = new Promise<AuthResult>((resolve) => {
+          setTimeout(() => {
+            resolve({
+              success: false,
+              error: 'Timeout en onAuthStateChange',
+            })
+          }, 12000) // 12 segundos máximo para el callback completo
+        })
+        
+        const profileResult = await Promise.race([profilePromise, timeoutPromise])
+        
+        // Si hay un error (incluyendo timeout), continuar sin perfil pero no bloquear
+        if (profileResult.success && profileResult.user) {
+          callback(profileResult.user)
+        } else {
+          // En caso de error o timeout, llamar callback con null para permitir que la app continúe
+          console.warn("[Auth] No se pudo obtener perfil en onAuthStateChange, continuando sin perfil:", profileResult.error)
+          callback(null)
+        }
       } else {
         callback(null)
       }
     } catch (error) {
-      console.error("[Auth] Error en onAuthStateChange:", error)
+      console.warn("[Auth] Error en onAuthStateChange (no crítico):", error)
       callback(null)
     } finally {
       // Permitir procesar el siguiente evento después de un breve delay

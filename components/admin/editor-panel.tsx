@@ -2,13 +2,14 @@
 
 import { useAdmin } from "@/contexts/admin-context"
 import { useStyles } from "@/contexts/styles-context"
+import { useStore } from "@/contexts/store-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
-import { X, Save, RotateCcw, Type, Palette, Plus, Trash2 } from "lucide-react"
+import { X, Save, RotateCcw, Type, Palette, Plus, Trash2, Info } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useState, useEffect } from "react"
@@ -16,6 +17,7 @@ import { updateComponentStyle } from "@/lib/supabase/styles-api"
 import { toast } from "sonner"
 import { ImageUpload } from "./image-upload"
 import { getStoreId } from "@/lib/utils/store"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 const COMPONENT_FIELDS: Record<
   string,
@@ -41,13 +43,6 @@ const COMPONENT_FIELDS: Record<
           { key: "image", label: "URL de la Imagen", type: "image" },
         ],
       },
-      { key: "title", label: "Título Principal (Repostería)", type: "textarea" },
-      { key: "description", label: "Descripción (Repostería)", type: "textarea" },
-      { key: "backgroundImage", label: "Imagen de Fondo (Repostería)", type: "image" },
-      { key: "primaryButtonText", label: "Texto Botón Primario (Repostería)", type: "text" },
-      { key: "primaryButtonLink", label: "Link Botón Primario (Repostería)", type: "text" },
-      { key: "secondaryButtonText", label: "Texto Botón Secundario (Repostería)", type: "text" },
-      { key: "secondaryButtonLink", label: "Link Botón Secundario (Repostería)", type: "text" },
     ],
     styles: [
       { key: "bgColor", label: "Color de Fondo", type: "color" },
@@ -55,11 +50,6 @@ const COMPONENT_FIELDS: Record<
       { key: "buttonColor", label: "Color del Botón", type: "color" },
       { key: "buttonTextColor", label: "Color del Texto del Botón", type: "color" },
       { key: "barColor", label: "Color de la Barra Inferior", type: "color" },
-      { key: "titleTextColor", label: "Color del Texto del Título (Repostería)", type: "color" },
-      { key: "descriptionTextColor", label: "Color del Texto de la Descripción (Repostería)", type: "color" },
-      { key: "titleBorderEnabled", label: "Activar Borde en el Título", type: "checkbox" },
-      { key: "titleBorderColor", label: "Color del Borde del Título", type: "color" },
-      { key: "titleBorderWidth", label: "Ancho del Borde del Título (px)", type: "text" },
     ],
     defaults: {
       products: [
@@ -101,20 +91,6 @@ const COMPONENT_FIELDS: Record<
       buttonColor: "#005aa1",
       buttonTextColor: "#ffffff",
       barColor: "#005aa1",
-      // Valores por defecto para hero de repostería
-      title: "",
-      description: "Deliciosos pasteles, postres y dulces artesanales\nHechos con amor y los mejores ingredientes",
-      backgroundImage: "/reposteria/pastel-boda.jpg",
-      primaryButtonText: "Explorar Productos",
-      primaryButtonLink: "/shop",
-      secondaryButtonText: "Ver Catálogo",
-      secondaryButtonLink: "/catalog",
-      // Valores por defecto para estilos de repostería
-      titleTextColor: "#ffffff",
-      descriptionTextColor: "rgba(255, 255, 255, 0.9)",
-      titleBorderEnabled: false,
-      titleBorderColor: "#ffffff",
-      titleBorderWidth: "2",
     },
   },
   popular: {
@@ -529,9 +505,13 @@ const COMPONENT_FIELDS: Record<
 export function EditorPanel() {
   const { selectedComponent, selectComponent, componentEdits, updateComponentEdit, clearComponentEdits, isEditMode, toggleEditMode } = useAdmin()
   const { styles: globalStyles, refreshStyles } = useStyles()
+  const { store } = useStore()
   const [saving, setSaving] = useState(false)
   const [localValues, setLocalValues] = useState<Record<string, any>>({})
   const [activeTab, setActiveTab] = useState("content")
+  
+  // Verificar si estamos editando Hero desde un subdominio que no sea default
+  const isEditingHeroFromSubdomain = selectedComponent === "hero" && store?.subdomain && store.subdomain !== "default"
 
   // Función para cerrar completamente el panel
   // Siempre cierra el modo de edición completamente, no solo deselecciona el componente
@@ -801,15 +781,37 @@ export function EditorPanel() {
       
       // Actualizar localStorage inmediatamente (con store_id)
       try {
-        // Obtener store_id actual
-        const storeId = await getStoreId()
+        // Para Hero, siempre usar el store_id del store por defecto
+        let storeId: string | null = null
+        if (selectedComponent === "hero") {
+          // Obtener el store_id del store por defecto desde Supabase
+          const supabase = (await import("@/lib/supabase/client")).getSupabaseBrowserClient()
+          if (supabase) {
+            const { data: defaultStore } = await supabase
+              .from("stores")
+              .select("id")
+              .eq("subdomain", "default")
+              .single()
+            
+            if (defaultStore?.id) {
+              storeId = defaultStore.id
+            }
+          }
+        } else {
+          // Para otros componentes, usar el store_id actual
+          storeId = await getStoreId()
+        }
+        
         if (storeId) {
           const storageKey = `osoria_component_styles_${storeId}`
           const savedStyles = localStorage.getItem(storageKey)
           const styles = savedStyles ? JSON.parse(savedStyles) : {}
           styles[selectedComponent] = mergedStyles
           localStorage.setItem(storageKey, JSON.stringify(styles))
-          localStorage.setItem("osoria_current_store_id", storeId)
+          // Solo actualizar osoria_current_store_id si no es Hero
+          if (selectedComponent !== "hero") {
+            localStorage.setItem("osoria_current_store_id", storeId)
+          }
         }
         
         // Aplicar estilos inmediatamente al DOM
@@ -896,6 +898,18 @@ export function EditorPanel() {
             <X className="h-5 w-5" />
           </Button>
         </div>
+
+        {/* Mensaje informativo para Hero en subdominios */}
+        {isEditingHeroFromSubdomain && (
+          <div className="p-4 border-b border-border">
+            <Alert className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+              <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              <AlertDescription className="text-sm text-blue-800 dark:text-blue-200">
+                El componente Hero solo se puede editar en la página por defecto. Los cambios se guardarán para la tienda principal, no para este subdominio ({store?.subdomain}).
+              </AlertDescription>
+            </Alert>
+          </div>
+        )}
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">

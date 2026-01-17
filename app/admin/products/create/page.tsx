@@ -40,7 +40,6 @@ export default function CreateProductPage() {
     item_name: "",
     item_code: "",
     item_description: "",
-    item_description_html: "",
     category_id: "",
     base_price: "",
     compare_at_price: "",
@@ -117,7 +116,6 @@ export default function CreateProductPage() {
           item_name: formData.item_name.trim(),
           item_code: formData.item_code.trim() || undefined,
           item_description: formData.item_description.trim() || undefined,
-          item_description_html: formData.item_description_html.trim() || undefined,
           category_id: formData.category_id || undefined,
           base_price: parseFloat(formData.base_price),
           compare_at_price: formData.compare_at_price ? parseFloat(formData.compare_at_price) : undefined,
@@ -280,18 +278,7 @@ export default function CreateProductPage() {
                       value={formData.item_description}
                       onChange={(e) => setFormData({ ...formData, item_description: e.target.value })}
                       placeholder="Descripción del producto..."
-                      rows={4}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="item_description_html">Descripción HTML</Label>
-                    <Textarea
-                      id="item_description_html"
-                      value={formData.item_description_html}
-                      onChange={(e) => setFormData({ ...formData, item_description_html: e.target.value })}
-                      placeholder="<p>Descripción con formato HTML...</p>"
-                      rows={4}
+                      rows={6}
                     />
                   </div>
                 </CardContent>

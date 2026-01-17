@@ -36,11 +36,28 @@ export async function getComponentStyleByName(componentName: string) {
     return null
   }
 
-  // Obtener store_id actual
-  const storeId = await getStoreId()
-  if (!storeId) {
-    console.warn(`[v0] No store_id available for ${componentName}`)
-    return null
+  // Para el componente Hero, siempre usar el store por defecto
+  let storeId: string | null = null
+  if (componentName === "hero") {
+    const { data: defaultStore } = await supabase
+      .from("stores")
+      .select("id")
+      .eq("subdomain", "default")
+      .single()
+    
+    if (!defaultStore?.id) {
+      console.warn(`[v0] Default store not found for ${componentName}`)
+      return null
+    }
+    
+    storeId = defaultStore.id
+  } else {
+    // Para otros componentes, usar el store_id actual
+    storeId = await getStoreId()
+    if (!storeId) {
+      console.warn(`[v0] No store_id available for ${componentName}`)
+      return null
+    }
   }
 
   const { data, error } = await supabase
@@ -67,7 +84,22 @@ export async function updateComponentStyle(componentName: string, variables: Rec
     throw new Error("Supabase is not configured")
   }
 
-  // Obtener store_id actual
+  // Para el componente Hero, siempre usar el store por defecto
+  if (componentName === "hero") {
+    const { data: defaultStore } = await supabase
+      .from("stores")
+      .select("id")
+      .eq("subdomain", "default")
+      .single()
+    
+    if (!defaultStore?.id) {
+      throw new Error("Default store not found. Hero component can only be edited for the default store.")
+    }
+    
+    return await updateComponentStyleWithStoreId(componentName, variables, defaultStore.id, supabase)
+  }
+
+  // Para otros componentes, usar el store_id actual
   const storeId = await getStoreId()
   if (!storeId) {
     // Si no hay store_id, intentar obtener el UUID de la tienda por defecto

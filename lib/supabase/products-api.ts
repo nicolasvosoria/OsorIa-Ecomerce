@@ -830,12 +830,20 @@ export async function createItem(
       }
     }
 
+    // Generar item_description_html automáticamente desde item_description
+    // Si hay item_description, envolverlo en <p> para item_description_html
+    const description = data.item_description?.trim() || null
+    // Convertir saltos de línea en <br> y envolver en <p>
+    const descriptionHtml = description 
+      ? `<p>${description.replace(/\n/g, '<br>')}</p>` 
+      : null
+
     // Preparar datos del producto
     const itemData: any = {
       item_code: data.item_code || null,
       item_name: data.item_name,
-      item_description: data.item_description || null,
-      item_description_html: data.item_description_html || null,
+      item_description: description,
+      item_description_html: descriptionHtml,
       category_id: data.category_id || null,
       base_price: data.base_price,
       compare_at_price: data.compare_at_price || null,
@@ -1038,8 +1046,16 @@ export async function updateItem(
     
     if (data.item_code !== undefined) updateData.item_code = data.item_code || null
     if (data.item_name !== undefined) updateData.item_name = data.item_name
-    if (data.item_description !== undefined) updateData.item_description = data.item_description || null
-    if (data.item_description_html !== undefined) updateData.item_description_html = data.item_description_html || null
+    if (data.item_description !== undefined) {
+      const description = data.item_description?.trim() || null
+      updateData.item_description = description
+      // Generar item_description_html automáticamente desde item_description
+      // Convertir saltos de línea en <br> y envolver en <p>
+      updateData.item_description_html = description 
+        ? `<p>${description.replace(/\n/g, '<br>')}</p>` 
+        : null
+    }
+    // No permitir actualizar item_description_html directamente, se genera automáticamente
     if (data.category_id !== undefined) updateData.category_id = data.category_id || null
     if (data.base_price !== undefined) updateData.base_price = data.base_price
     if (data.compare_at_price !== undefined) updateData.compare_at_price = data.compare_at_price || null
