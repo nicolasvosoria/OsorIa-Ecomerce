@@ -100,6 +100,20 @@ export interface OrderWithItems extends Order {
   items: OrderItem[]
 }
 
+// Resultado de validación de inventario
+export interface InventoryValidationResult {
+  isValid: boolean
+  errors: Array<{
+    product_name: string
+    product_id?: string
+    variant_id?: string
+    variant_title?: string
+    requested_quantity: number
+    available_quantity: number
+    message: string
+  }>
+}
+
 // Helper para manejar timeouts
 async function withTimeout<T>(
   promise: Promise<T>,
@@ -115,7 +129,257 @@ async function withTimeout<T>(
 }
 
 /**
+ * Validar inventario antes de crear una orden
+ * Verifica que todos los productos tengan suficiente stock disponible
+ */
+async function validateInventoryBeforeOrder(
+  items: CreateOrderData['items']
+): Promise<InventoryValidationResult> {
+  const result: InventoryValidationResult = {
+    isValid: true,
+    errors: [],
+  }
+
+  try {
+    const supabase = getSupabaseBrowserClient()
+    if (!supabase) {
+      // Si no hay supabase, permitir la orden (para productos externos como Shopify)
+      return result
+    }
+
+    // Validar cada item
+    for (const item of items) {
+      try {
+        // Si hay variant_id, validar inventario de la variante
+        if (item.variant_id) {
+          const variantResult = await withTimeout(
+            supabase
+              .from('item_variants')
+              .select('track_inventory, inventory_quantity, is_available')
+              .eq('id', item.variant_id)
+              .single(),
+            10000,
+            'validateVariantInventory'
+          ) as { data: any; error: any }
+
+          if (variantResult.error || !variantResult.data) {
+            // Si no se encuentra la variante, permitir la orden (puede ser producto externo)
+            continue
+          }
+
+          const variant = variantResult.data
+
+          // Si track_inventory es true, validar stock
+          if (variant.track_inventory) {
+            const availableQuantity = variant.inventory_quantity || 0
+
+            // Verificar si no está disponible
+            if (!variant.is_available) {
+              result.isValid = false
+              result.errors.push({
+                product_name: item.product_name,
+                product_id: item.product_id,
+                variant_id: item.variant_id,
+                variant_title: item.variant_title,
+                requested_quantity: item.quantity,
+                available_quantity: 0,
+                message: `${item.product_name}${item.variant_title ? ` - ${item.variant_title}` : ''} no está disponible`,
+              })
+              continue
+            }
+
+            // Verificar si hay suficiente stock
+            if (availableQuantity < item.quantity) {
+              result.isValid = false
+              result.errors.push({
+                product_name: item.product_name,
+                product_id: item.product_id,
+                variant_id: item.variant_id,
+                variant_title: item.variant_title,
+                requested_quantity: item.quantity,
+                available_quantity: availableQuantity,
+                message: availableQuantity === 0
+                  ? `${item.product_name}${item.variant_title ? ` - ${item.variant_title}` : ''} está agotado`
+                  : `Solo hay ${availableQuantity} unidad${availableQuantity !== 1 ? 'es' : ''} disponible${availableQuantity !== 1 ? 's' : ''} de ${item.product_name}${item.variant_title ? ` - ${item.variant_title}` : ''}. Solicitaste ${item.quantity}`,
+              })
+            }
+          }
+        }
+        // Si hay product_id pero no variant_id, validar inventario del producto
+        else if (item.product_id) {
+          const productResult = await withTimeout(
+            supabase
+              .from('store_items')
+              .select('track_inventory, inventory_quantity, is_available_for_sale, is_active')
+              .eq('id', item.product_id)
+              .single(),
+            10000,
+            'validateProductInventory'
+          ) as { data: any; error: any }
+
+          if (productResult.error || !productResult.data) {
+            // Si no se encuentra el producto, permitir la orden (puede ser producto externo)
+            continue
+          }
+
+          const product = productResult.data
+
+          // Si track_inventory es true, validar stock
+          if (product.track_inventory) {
+            const availableQuantity = product.inventory_quantity || 0
+
+            // Verificar si no está disponible para venta
+            if (!product.is_available_for_sale || !product.is_active) {
+              result.isValid = false
+              result.errors.push({
+                product_name: item.product_name,
+                product_id: item.product_id,
+                requested_quantity: item.quantity,
+                available_quantity: 0,
+                message: `${item.product_name} no está disponible`,
+              })
+              continue
+            }
+
+            // Verificar si hay suficiente stock
+            if (availableQuantity < item.quantity) {
+              result.isValid = false
+              result.errors.push({
+                product_name: item.product_name,
+                product_id: item.product_id,
+                requested_quantity: item.quantity,
+                available_quantity: availableQuantity,
+                message: availableQuantity === 0
+                  ? `${item.product_name} está agotado`
+                  : `Solo hay ${availableQuantity} unidad${availableQuantity !== 1 ? 'es' : ''} disponible${availableQuantity !== 1 ? 's' : ''} de ${item.product_name}. Solicitaste ${item.quantity}`,
+              })
+            }
+          }
+        }
+      } catch (error: any) {
+        // Continuar con el siguiente item si hay un error
+        console.error(`[Orders] Error al validar inventario para item ${item.product_name}:`, error)
+      }
+    }
+  } catch (error: any) {
+    console.error('[Orders] Error inesperado al validar inventario:', error)
+    // En caso de error, no bloquear la orden (permitir productos externos)
+  }
+
+  return result
+}
+
+/**
+ * Actualizar el inventario después de crear una orden
+ * Resta las cantidades vendidas del stock disponible
+ */
+async function updateInventoryAfterOrder(items: OrderItem[]): Promise<void> {
+  try {
+    const supabase = getSupabaseBrowserClient()
+    if (!supabase) {
+      console.error('[Orders] Supabase no configurado para actualizar inventario')
+      return
+    }
+
+    // Procesar cada item de la orden
+    for (const item of items) {
+      try {
+        // Si hay variant_id, actualizar inventario de la variante
+        if (item.variant_id) {
+          // Obtener la variante actual
+          const variantResult = await withTimeout(
+            supabase
+              .from('item_variants')
+              .select('track_inventory, inventory_quantity')
+              .eq('id', item.variant_id)
+              .single(),
+            10000,
+            'getVariantForInventory'
+          ) as { data: any; error: any }
+
+          if (variantResult.error || !variantResult.data) {
+            console.warn(`[Orders] No se pudo obtener variante ${item.variant_id} para actualizar inventario`)
+            continue
+          }
+
+          const variant = variantResult.data
+
+          // Solo actualizar si track_inventory es true
+          if (variant.track_inventory) {
+            const currentQuantity = variant.inventory_quantity || 0
+            const newQuantity = Math.max(0, currentQuantity - item.quantity)
+
+            const updateResult = await withTimeout(
+              supabase
+                .from('item_variants')
+                .update({ inventory_quantity: newQuantity })
+                .eq('id', item.variant_id),
+              10000,
+              'updateVariantInventory'
+            ) as { error: any }
+
+            if (updateResult.error) {
+              console.error(`[Orders] Error al actualizar inventario de variante ${item.variant_id}:`, updateResult.error)
+            } else {
+              console.log(`[Orders] Inventario de variante ${item.variant_id} actualizado: ${currentQuantity} -> ${newQuantity}`)
+            }
+          }
+        }
+        // Si hay product_id pero no variant_id, actualizar inventario del producto
+        else if (item.product_id) {
+          // Obtener el producto actual
+          const productResult = await withTimeout(
+            supabase
+              .from('store_items')
+              .select('track_inventory, inventory_quantity')
+              .eq('id', item.product_id)
+              .single(),
+            10000,
+            'getProductForInventory'
+          ) as { data: any; error: any }
+
+          if (productResult.error || !productResult.data) {
+            console.warn(`[Orders] No se pudo obtener producto ${item.product_id} para actualizar inventario`)
+            continue
+          }
+
+          const product = productResult.data
+
+          // Solo actualizar si track_inventory es true
+          if (product.track_inventory) {
+            const currentQuantity = product.inventory_quantity || 0
+            const newQuantity = Math.max(0, currentQuantity - item.quantity)
+
+            const updateResult = await withTimeout(
+              supabase
+                .from('store_items')
+                .update({ inventory_quantity: newQuantity })
+                .eq('id', item.product_id),
+              10000,
+              'updateProductInventory'
+            ) as { error: any }
+
+            if (updateResult.error) {
+              console.error(`[Orders] Error al actualizar inventario de producto ${item.product_id}:`, updateResult.error)
+            } else {
+              console.log(`[Orders] Inventario de producto ${item.product_id} actualizado: ${currentQuantity} -> ${newQuantity}`)
+            }
+          }
+        }
+      } catch (error: any) {
+        // Continuar con el siguiente item si hay un error
+        console.error(`[Orders] Error al procesar inventario para item ${item.id}:`, error)
+      }
+    }
+  } catch (error: any) {
+    // No lanzar error, solo registrar para no interrumpir el flujo de creación de orden
+    console.error('[Orders] Error inesperado al actualizar inventario:', error)
+  }
+}
+
+/**
  * Crear un nuevo pedido con sus items
+ * @throws {Error} Si el inventario no es suficiente, lanza un error con los detalles
  */
 export async function createOrder(orderData: CreateOrderData): Promise<OrderWithItems | null> {
   try {
@@ -123,6 +387,18 @@ export async function createOrder(orderData: CreateOrderData): Promise<OrderWith
     if (!supabase) {
       console.error('[Orders] Supabase no configurado')
       return null
+    }
+
+    // Validar inventario antes de crear la orden
+    const validationResult = await validateInventoryBeforeOrder(orderData.items)
+    
+    if (!validationResult.isValid) {
+      // Crear mensaje de error detallado
+      const errorMessages = validationResult.errors.map(err => err.message).join('\n')
+      const error = new Error(`No hay suficiente stock disponible:\n${errorMessages}`)
+      // Agregar información de validación al error para acceso programático
+      ;(error as any).validationResult = validationResult
+      throw error
     }
 
     // Crear el pedido
@@ -200,9 +476,22 @@ export async function createOrder(orderData: CreateOrderData): Promise<OrderWith
       return { ...order, items: [] } as OrderWithItems
     }
 
+    const orderItems = itemsResult.data as OrderItem[]
+
+    // Actualizar inventario después de crear la orden exitosamente
+    // Ejecutamos de forma síncrona para asegurar consistencia de datos
+    try {
+      await updateInventoryAfterOrder(orderItems)
+    } catch (error: any) {
+      // Si falla la actualización del inventario, registramos el error pero no fallamos la orden
+      // Esto permite que la orden se cree exitosamente y se pueda corregir el inventario manualmente después
+      console.error('[Orders] Error al actualizar inventario después de crear orden:', error)
+      console.warn('[Orders] ⚠️ La orden fue creada exitosamente, pero el inventario no se actualizó. Revisar manualmente.')
+    }
+
     return {
       ...order,
-      items: itemsResult.data as OrderItem[],
+      items: orderItems,
     }
   } catch (error: any) {
     console.error('[Orders] Error inesperado al crear pedido:', error)

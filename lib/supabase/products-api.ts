@@ -1197,6 +1197,94 @@ export async function incrementItemViewCount(itemId: string): Promise<boolean> {
   }
 }
 
+/**
+ * Obtener stock disponible de un producto
+ * Retorna null si el producto no rastrea inventario o no existe
+ */
+export async function getProductStock(productId: string): Promise<number | null> {
+  try {
+    const supabase = getSupabaseBrowserClient()
+    if (!supabase) {
+      return null
+    }
+
+    const result = await withTimeout(
+      supabase
+        .from('store_items')
+        .select('track_inventory, inventory_quantity, is_available_for_sale, is_active')
+        .eq('id', productId)
+        .single(),
+      10000,
+      'getProductStock'
+    ) as { data: any; error: any }
+
+    if (result.error || !result.data) {
+      return null
+    }
+
+    const product = result.data
+
+    // Si no rastrea inventario, retornar null (stock ilimitado)
+    if (!product.track_inventory) {
+      return null
+    }
+
+    // Si no está disponible, retornar 0
+    if (!product.is_available_for_sale || !product.is_active) {
+      return 0
+    }
+
+    return product.inventory_quantity || 0
+  } catch (error: any) {
+    console.error('[Products] Error al obtener stock del producto:', error)
+    return null
+  }
+}
+
+/**
+ * Obtener stock disponible de una variante
+ * Retorna null si la variante no rastrea inventario o no existe
+ */
+export async function getVariantStock(variantId: string): Promise<number | null> {
+  try {
+    const supabase = getSupabaseBrowserClient()
+    if (!supabase) {
+      return null
+    }
+
+    const result = await withTimeout(
+      supabase
+        .from('item_variants')
+        .select('track_inventory, inventory_quantity, is_available')
+        .eq('id', variantId)
+        .single(),
+      10000,
+      'getVariantStock'
+    ) as { data: any; error: any }
+
+    if (result.error || !result.data) {
+      return null
+    }
+
+    const variant = result.data
+
+    // Si no rastrea inventario, retornar null (stock ilimitado)
+    if (!variant.track_inventory) {
+      return null
+    }
+
+    // Si no está disponible, retornar 0
+    if (!variant.is_available) {
+      return 0
+    }
+
+    return variant.inventory_quantity || 0
+  } catch (error: any) {
+    console.error('[Products] Error al obtener stock de la variante:', error)
+    return null
+  }
+}
+
 
 
 

@@ -11,6 +11,8 @@ export interface CartItem {
   category?: string
   originalPrice?: string
   salePrice?: string
+  productId?: string  // ID del producto en Supabase (para validación de stock)
+  variantId?: string  // ID de la variante en Supabase (si aplica)
 }
 
 interface CartContextType {

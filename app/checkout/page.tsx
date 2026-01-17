@@ -74,9 +74,16 @@ export default function CheckoutPage() {
 
       // Crear el pedido con datos del usuario autenticado
       await processOrder(customerDataForOrder, user.id)
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error procesando checkout autenticado:", error)
-      toast.error("Hubo un error al procesar tu pedido. Por favor, intenta de nuevo.")
+      
+      // Si el error ya tiene un mensaje específico de stock, no mostrar mensaje genérico adicional
+      if (error.message && error.message.includes("stock")) {
+        // El mensaje ya fue mostrado en processOrder
+      } else {
+        toast.error(error.message || "Hubo un error al procesar tu pedido. Por favor, intenta de nuevo.")
+      }
+      
       setIsProcessing(false)
     }
   }
@@ -155,31 +162,60 @@ export default function CheckoutPage() {
     }
 
     // Crear el pedido
-    const order = await createOrder({
-      customer_type: userId ? "user" : "guest",
-      user_id: userId || null,
-      customer_email: data.email,
-      customer_first_name: data.firstName,
-      customer_last_name: data.lastName,
-      customer_phone: data.phone || undefined,
-      shipping_address: data.address,
-      shipping_city: data.city || "",
-      shipping_postal_code: data.postalCode || "",
-      shipping_country: data.country,
-      shipping_notes: data.notes || undefined,
-      payment_method: "cash_on_delivery", // Por defecto, se puede cambiar
-      payment_status: "pending",
-      subtotal: subtotal,
-      shipping_cost: 0, // Se puede calcular después
-      tax_amount: 0,
-      discount_amount: 0,
-      total_amount: total,
-      currency_code: currencyCode,
-      items: orderItems,
-    })
+    let order
+    try {
+      order = await createOrder({
+        customer_type: userId ? "user" : "guest",
+        user_id: userId || null,
+        customer_email: data.email,
+        customer_first_name: data.firstName,
+        customer_last_name: data.lastName,
+        customer_phone: data.phone || undefined,
+        shipping_address: data.address,
+        shipping_city: data.city || "",
+        shipping_postal_code: data.postalCode || "",
+        shipping_country: data.country,
+        shipping_notes: data.notes || undefined,
+        payment_method: "cash_on_delivery", // Por defecto, se puede cambiar
+        payment_status: "pending",
+        subtotal: subtotal,
+        shipping_cost: 0, // Se puede calcular después
+        tax_amount: 0,
+        discount_amount: 0,
+        total_amount: total,
+        currency_code: currencyCode,
+        items: orderItems,
+      })
 
-    if (!order) {
-      throw new Error("No se pudo crear el pedido")
+      if (!order) {
+        throw new Error("No se pudo crear el pedido")
+      }
+    } catch (error: any) {
+      // Manejar errores de validación de stock
+      if (error.message && error.message.includes("No hay suficiente stock disponible")) {
+        // Obtener información detallada del error
+        const validationResult = (error as any).validationResult
+        
+        if (validationResult && validationResult.errors) {
+          // Mostrar notificaciones individuales para cada producto con problemas
+          validationResult.errors.forEach((err: any) => {
+            toast.error(err.message, {
+              duration: 5000,
+            })
+          })
+        } else {
+          // Si no hay información detallada, mostrar el mensaje genérico
+          toast.error(error.message, {
+            duration: 5000,
+          })
+        }
+        
+        // Lanzar el error para que se maneje en el catch del componente
+        throw new Error("Algunos productos no tienen suficiente stock disponible. Por favor, revisa tu carrito y actualiza las cantidades.")
+      }
+      
+      // Re-lanzar otros errores
+      throw error
     }
 
     // Guardar el número de pedido en localStorage
@@ -233,9 +269,16 @@ export default function CheckoutPage() {
 
       // Procesar el pedido
       await processOrder(data, null)
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error procesando checkout:", error)
-      toast.error("Hubo un error al procesar tu pedido. Por favor, intenta de nuevo.")
+      
+      // Si el error ya tiene un mensaje específico de stock, no mostrar mensaje genérico adicional
+      if (error.message && error.message.includes("stock")) {
+        // El mensaje ya fue mostrado en processOrder
+      } else {
+        toast.error(error.message || "Hubo un error al procesar tu pedido. Por favor, intenta de nuevo.")
+      }
+      
       // Limpiar el estado si hay un error para que se muestre el formulario nuevamente
       setIsProcessing(false)
       setCustomerData(null)

@@ -89,6 +89,70 @@ export function AddToCartButton({
     startTransition(async () => {
       // Detectar si es producto de Supabase
       if (isSupabaseProduct(product.id)) {
+        const variantId = resolvedVariant.id;
+        const productId = product.id;
+        
+        // Determinar si es una variante o el producto base
+        // Si variantId !== productId, es una variante real
+        // Si variantId === productId, es el producto base o una variante por defecto
+        const isRealVariant = variantId !== productId && product.variants && product.variants.length > 1;
+        
+        // Validar stock antes de agregar al carrito
+        try {
+          const { getProductStock, getVariantStock } = await import('@/lib/supabase/products-api');
+          
+          let stock: number | null = null;
+          
+          // Si es una variante real, obtener stock de la variante
+          if (isRealVariant) {
+            stock = await getVariantStock(variantId);
+          } else {
+            // Es el producto base o variante por defecto, obtener stock del producto
+            stock = await getProductStock(productId);
+          }
+          
+          // Si el producto rastrea inventario y hay stock limitado
+          if (stock !== null) {
+            // Obtener cantidad actual en el carrito para este item
+            const existingItem = localCart.items.find(item => item.id === variantId);
+            const currentCartQuantity = existingItem?.quantity || 0;
+            const totalRequestedQuantity = currentCartQuantity + quantity;
+            
+            // Validar que haya suficiente stock
+            if (stock === 0) {
+              const { toast } = await import('sonner');
+              toast.error(`${product.title} está agotado`, {
+                duration: 4000,
+              });
+              return;
+            }
+            
+            if (totalRequestedQuantity > stock) {
+              const availableQuantity = stock - currentCartQuantity;
+              const { toast } = await import('sonner');
+              
+              if (availableQuantity <= 0) {
+                toast.error(`Ya tienes la cantidad máxima disponible de ${product.title} en tu carrito`, {
+                  duration: 4000,
+                });
+              } else {
+                toast.warning(`Solo hay ${availableQuantity} unidad${availableQuantity !== 1 ? 'es' : ''} disponible${availableQuantity !== 1 ? 's' : ''} de ${product.title}. Se agregará ${availableQuantity} ${availableQuantity === 1 ? 'unidad' : 'unidades'}`, {
+                  duration: 4000,
+                });
+                // Ajustar cantidad al stock disponible
+                quantity = availableQuantity;
+              }
+              
+              if (availableQuantity <= 0) {
+                return;
+              }
+            }
+          }
+        } catch (error: any) {
+          // Si falla la validación, registrar error pero permitir agregar (no bloquear)
+          console.error('[Cart] Error al validar stock:', error);
+        }
+        
         // Usar el carrito local para productos de Supabase
         const variantPrice = resolvedVariant.price.amount;
         const formattedPrice = formatPrice(variantPrice, resolvedVariant.price.currencyCode);
@@ -111,7 +175,15 @@ export function AddToCartButton({
           category: product.categoryId,
           originalPrice: originalPrice,
           salePrice: salePrice,
+          productId: product.id,
+          variantId: isRealVariant ? variantId : undefined,
         }, quantity);
+        
+        // Mostrar notificación de éxito
+        const { toast } = await import('sonner');
+        toast.success(`${quantity} ${quantity === 1 ? 'unidad' : 'unidades'} de ${product.title} agregada${quantity === 1 ? '' : 's'} al carrito`, {
+          duration: 3000,
+        });
       } else {
         // Usar el carrito de Shopify para productos de Shopify
         await shopifyCart.addItem(resolvedVariant, product, quantity);
