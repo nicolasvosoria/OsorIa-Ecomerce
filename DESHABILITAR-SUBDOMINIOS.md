@@ -129,3 +129,4 @@ Para reactivar la funcionalidad de subdominios:
   - Existe una tienda con `subdomain = 'default'` (si no especificas `DEFAULT_STORE_ID`)
   - O existe una tienda con el UUID especificado en `DEFAULT_STORE_ID`
 
+

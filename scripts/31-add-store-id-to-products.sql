@@ -58,3 +58,4 @@ COMMENT ON COLUMN public.item_categories.store_id IS 'ID de la tienda a la que p
 
 
 
+
