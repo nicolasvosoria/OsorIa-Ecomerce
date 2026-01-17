@@ -180,9 +180,23 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [optimisticCart, updateOptimisticCart] = useOptimistic<Cart | undefined, CartAction>(cart, cartReducer);
 
   useEffect(() => {
-    CartActions.getCart().then(cart => {
+    const loadCart = async () => {
+      const cart = await CartActions.getCart();
       if (cart) setCart(cart);
-    });
+    };
+    
+    loadCart();
+    
+    // Escuchar evento de limpieza del carrito para recargarlo
+    const handleCartCleared = () => {
+      loadCart();
+    };
+    
+    window.addEventListener('cart-cleared', handleCartCleared);
+    
+    return () => {
+      window.removeEventListener('cart-cleared', handleCartCleared);
+    };
   }, []);
 
   const update = useCallback(

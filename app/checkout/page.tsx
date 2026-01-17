@@ -22,6 +22,17 @@ export default function CheckoutPage() {
   const [customerData, setCustomerData] = useState<GuestCustomerData | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
 
+  // Limpiar datos previos del checkout al cargar la página
+  // Esto asegura que siempre se muestre el formulario para una nueva compra
+  useEffect(() => {
+    // Limpiar cualquier dato de cliente guardado previamente
+    // Esto es importante porque después de completar una compra y volver,
+    // no queremos mostrar datos de la compra anterior
+    localStorage.removeItem("guest_customer_data")
+    setCustomerData(null)
+    setIsProcessing(false)
+  }, [])
+
   // Determinar qué carrito usar (preferir Shopify, luego local)
   const cart = shopifyCart.cart
   const isPending = shopifyCart.isPending
@@ -225,7 +236,10 @@ export default function CheckoutPage() {
     } catch (error) {
       console.error("Error procesando checkout:", error)
       toast.error("Hubo un error al procesar tu pedido. Por favor, intenta de nuevo.")
+      // Limpiar el estado si hay un error para que se muestre el formulario nuevamente
       setIsProcessing(false)
+      setCustomerData(null)
+      localStorage.removeItem("guest_customer_data")
     }
   }
 
@@ -291,7 +305,7 @@ export default function CheckoutPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Formulario de Checkout */}
         <div className="lg:col-span-2">
-          {!customerData ? (
+          {!customerData && !isProcessing ? (
             isAuthenticated && user ? (
               <AuthenticatedCheckoutForm
                 user={user}
@@ -304,7 +318,7 @@ export default function CheckoutPage() {
                 isLoading={isProcessing}
               />
             )
-          ) : (
+          ) : customerData && isProcessing ? (
             <Card>
               <CardHeader>
                 <CardTitle>Procesando tu pedido...</CardTitle>
@@ -334,7 +348,7 @@ export default function CheckoutPage() {
                 </div>
               </CardContent>
             </Card>
-          )}
+          ) : null}
         </div>
 
         {/* Resumen del Pedido */}
