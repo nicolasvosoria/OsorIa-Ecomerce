@@ -13,6 +13,7 @@ import {
   PieChart,
   Package,
   ArrowLeft,
+  HelpCircle,
 } from "lucide-react"
 import Link from "next/link"
 import { getDetailedStats, type DetailedStats } from "@/lib/supabase/stats-api"
@@ -20,6 +21,7 @@ import { formatPrice } from "@/lib/shopify/utils"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { AreaChart, Area, LineChart, Line, PieChart as RechartsPieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from "recharts"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
 export default function AdminStatsPage() {
   const { isAdmin, loading } = useAdminPermissions()
@@ -269,7 +271,33 @@ export default function AdminStatsPage() {
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Tasa de Conversión</p>
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="text-sm text-muted-foreground">Tasa de Conversión</p>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            className="inline-flex items-center justify-center rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+                            aria-label="Información sobre tasa de conversión"
+                          >
+                            <HelpCircle className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent 
+                          side="right" 
+                          className="max-w-xs"
+                        >
+                          <p className="font-semibold mb-1">¿Qué es la Tasa de Conversión?</p>
+                          <p className="text-xs leading-relaxed">
+                            Porcentaje de pedidos que fueron pagados y confirmados exitosamente 
+                            respecto al total de pedidos creados en el período seleccionado.
+                          </p>
+                          <p className="text-xs mt-2 pt-2 border-t border-background/20">
+                            <strong>Fórmula:</strong> (Pedidos Pagados / Total de Pedidos) × 100
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
                     <p className="text-2xl font-bold">{detailedStats.conversionRate.toFixed(1)}%</p>
                   </div>
                 </>
