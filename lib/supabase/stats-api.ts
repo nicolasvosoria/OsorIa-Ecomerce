@@ -117,7 +117,8 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     let monthlySales = 0
     if (monthlySalesResult.data) {
       monthlySales = monthlySalesResult.data.reduce((sum, order) => {
-        return sum + (order.total_amount || 0)
+        // Convertir total_amount a número (viene como string desde Supabase)
+        return sum + (Number(order.total_amount) || 0)
       }, 0)
     }
 
@@ -204,8 +205,11 @@ export async function getDetailedStats(days: number = 30): Promise<DetailedStats
       salesByDayResult.data.forEach((order) => {
         const date = new Date(order.created_at).toISOString().split('T')[0]
         const existing = salesByDayMap.get(date) || { sales: 0, orders: 0 }
+        // Convertir total_amount a número (viene como string desde Supabase)
+        // Usar parseFloat para manejar decimales correctamente
+        const totalAmount = parseFloat(String(order.total_amount)) || 0
         salesByDayMap.set(date, {
-          sales: existing.sales + (order.total_amount || 0),
+          sales: existing.sales + totalAmount,
           orders: existing.orders + 1,
         })
       })
@@ -218,10 +222,11 @@ export async function getDetailedStats(days: number = 30): Promise<DetailedStats
       date.setDate(date.getDate() - i)
       const dateStr = date.toISOString().split('T')[0]
       const data = salesByDayMap.get(dateStr) || { sales: 0, orders: 0 }
+      // Asegurar que sales y orders sean números
       salesByDay.push({
         date: dateStr,
-        sales: data.sales,
-        orders: data.orders,
+        sales: Number(data.sales) || 0,
+        orders: Number(data.orders) || 0,
       })
     }
 
@@ -247,8 +252,10 @@ export async function getDetailedStats(days: number = 30): Promise<DetailedStats
       topProductsResult.data.forEach((item) => {
         const itemId = item.product_id || item.id || 'unknown'
         const productName = item.product_name || 'Producto desconocido'
-        const quantity = item.quantity || 0
-        const revenue = (item.unit_price || 0) * quantity
+        // Convertir valores a número (vienen como string desde Supabase)
+        const quantity = Number(item.quantity) || 0
+        const unitPrice = Number(item.unit_price) || 0
+        const revenue = unitPrice * quantity
 
         const existing = productsMap.get(itemId) || { name: productName, quantity: 0, revenue: 0 }
         productsMap.set(itemId, {
@@ -272,7 +279,8 @@ export async function getDetailedStats(days: number = 30): Promise<DetailedStats
 
     // Calcular estadísticas adicionales
     const totalOrders = ordersByStatusResult.data?.length || 0
-    const totalSales = salesByDay.reduce((sum, day) => sum + day.sales, 0)
+    // Asegurar que sales sea número en el reduce
+    const totalSales = salesByDay.reduce((sum, day) => sum + (Number(day.sales) || 0), 0)
     const averageOrderValue = totalOrders > 0 ? totalSales / totalOrders : 0
 
     // Calcular tasa de conversión (simplificado: pedidos pagados / total pedidos)

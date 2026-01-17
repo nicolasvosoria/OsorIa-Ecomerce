@@ -18,7 +18,7 @@ import Link from "next/link"
 import { getDetailedStats, type DetailedStats } from "@/lib/supabase/stats-api"
 import { formatPrice } from "@/lib/shopify/utils"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
-import { LineChart, Line, PieChart as RechartsPieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from "recharts"
+import { AreaChart, Area, LineChart, Line, PieChart as RechartsPieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from "recharts"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
 export default function AdminStatsPage() {
@@ -136,7 +136,13 @@ export default function AdminStatsPage() {
                   }}
                   className="h-64"
                 >
-                  <LineChart data={detailedStats.salesByDay}>
+                  <AreaChart data={detailedStats.salesByDay}>
+                    <defs>
+                      <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(var(--chart-1))" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="hsl(var(--chart-1))" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis 
                       dataKey="date" 
@@ -160,14 +166,16 @@ export default function AdminStatsPage() {
                       }}
                       formatter={(value: number) => formatPrice(value.toString(), "COP")}
                     />
-                    <Line 
+                    <Area 
                       type="monotone" 
                       dataKey="sales" 
                       stroke="hsl(var(--chart-1))" 
+                      fill="url(#colorSales)"
                       strokeWidth={2}
-                      dot={{ r: 4 }}
+                      dot={{ r: 3, fill: "hsl(var(--chart-1))", strokeWidth: 1, stroke: "#fff" }}
+                      activeDot={{ r: 5, fill: "hsl(var(--chart-1))", strokeWidth: 2, stroke: "#fff" }}
                     />
-                  </LineChart>
+                  </AreaChart>
                 </ChartContainer>
               ) : (
                 <div className="flex items-center justify-center h-64 text-muted-foreground">
