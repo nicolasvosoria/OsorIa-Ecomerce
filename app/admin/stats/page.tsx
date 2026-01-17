@@ -13,7 +13,6 @@ import {
   PieChart,
   Package,
   ArrowLeft,
-  Download,
 } from "lucide-react"
 import Link from "next/link"
 import { getDetailedStats, type DetailedStats } from "@/lib/supabase/stats-api"
@@ -21,27 +20,12 @@ import { formatPrice } from "@/lib/shopify/utils"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { LineChart, Line, PieChart as RechartsPieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from "recharts"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { exportStatsToExcel } from "@/lib/utils/export-excel"
 
 export default function AdminStatsPage() {
   const { isAdmin, loading } = useAdminPermissions()
   const router = useRouter()
   const [detailedStats, setDetailedStats] = useState<DetailedStats | null>(null)
   const [loadingDetailed, setLoadingDetailed] = useState(true)
-  const [exporting, setExporting] = useState(false)
-
-  const handleExportExcel = () => {
-    if (!detailedStats) return
-    
-    setExporting(true)
-    try {
-      exportStatsToExcel(detailedStats, 'estadisticas')
-    } catch (error) {
-      console.error("[Admin Stats] Error al exportar Excel:", error)
-    } finally {
-      setExporting(false)
-    }
-  }
 
   useEffect(() => {
     if (!loading && !isAdmin) {
@@ -118,25 +102,6 @@ export default function AdminStatsPage() {
                   Análisis detallado de ventas, pedidos y productos
                 </p>
               </div>
-            </div>
-            <div>
-              <Button 
-                onClick={handleExportExcel}
-                disabled={!detailedStats || loadingDetailed || exporting}
-                variant="default"
-              >
-                {exporting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Exportando...
-                  </>
-                ) : (
-                  <>
-                    <Download className="h-4 w-4 mr-2" />
-                    Descargar Excel
-                  </>
-                )}
-              </Button>
             </div>
           </div>
         </div>
