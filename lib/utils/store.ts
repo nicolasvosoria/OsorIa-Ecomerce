@@ -7,6 +7,12 @@
  * para evitar errores. Las funciones que usen esto deben manejar el caso null.
  */
 export async function getStoreId(): Promise<string | null> {
+  // Si multi-tenant está deshabilitado, retornar store_id por defecto
+  const disableMultiTenant = process.env.DISABLE_SUBDOMAIN_MULTI_TENANT === 'true'
+  if (disableMultiTenant) {
+    return process.env.DEFAULT_STORE_ID || 'default'
+  }
+
   // En el servidor, usar importación dinámica de next/headers
   if (typeof window === 'undefined') {
     try {
@@ -60,6 +66,12 @@ export async function getStoreId(): Promise<string | null> {
  * Obtiene el store_id de forma síncrona (solo cliente)
  */
 export function getStoreIdSync(): string | null {
+  // Si multi-tenant está deshabilitado, retornar store_id por defecto
+  const disableMultiTenant = process.env.NEXT_PUBLIC_DISABLE_SUBDOMAIN_MULTI_TENANT === 'true'
+  if (disableMultiTenant) {
+    return process.env.NEXT_PUBLIC_DEFAULT_STORE_ID || 'default'
+  }
+
   if (typeof window === 'undefined') {
     return null
   }

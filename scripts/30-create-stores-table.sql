@@ -191,3 +191,4 @@ COMMENT ON FUNCTION user_has_store_access IS 'Verifica si un usuario tiene acces
 
 
 
+

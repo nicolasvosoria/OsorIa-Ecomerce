@@ -36,6 +36,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setIsLoading(true)
       setError(null)
 
+      // Verificar si multi-tenant está deshabilitado
+      const disableMultiTenant = process.env.NEXT_PUBLIC_DISABLE_SUBDOMAIN_MULTI_TENANT === 'true'
+      const defaultStoreId = process.env.NEXT_PUBLIC_DEFAULT_STORE_ID || 'default'
+
       // Obtener store_id del header (establecido por middleware) o cookie
       let storeId: string | null = null
 
@@ -48,8 +52,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }
       }
 
+      // Si multi-tenant está deshabilitado, usar store_id por defecto
+      if (disableMultiTenant) {
+        storeId = defaultStoreId
+      }
+
       // Si no hay store_id, usar 'default' o obtener del subdominio
-      if (!storeId) {
+      if (!storeId && !disableMultiTenant) {
         // Obtener subdominio del hostname
         const hostname = typeof window !== 'undefined' ? window.location.hostname : ''
         const subdomain = getSubdomain(hostname) || 'default'
@@ -64,7 +73,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             return
           }
         }
-      } else {
+      } else if (storeId) {
         // Obtener tienda por ID
         const response = await fetch(`/api/store?id=${encodeURIComponent(storeId)}`)
         if (response.ok) {

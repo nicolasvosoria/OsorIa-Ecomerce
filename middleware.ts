@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
+// Variable de entorno para deshabilitar multi-tenant temporalmente
+const DISABLE_SUBDOMAIN_MULTI_TENANT = process.env.DISABLE_SUBDOMAIN_MULTI_TENANT === 'true'
+// Store ID por defecto cuando multi-tenant está deshabilitado (puede venir de variable de entorno)
+const DEFAULT_STORE_ID = process.env.DEFAULT_STORE_ID || null
+
 // Tipos para la tienda
 interface Store {
   id: string
@@ -115,6 +120,25 @@ export async function middleware(request: NextRequest) {
 
   if (publicPaths.some(path => pathname.startsWith(path))) {
     return NextResponse.next()
+  }
+
+  // Si multi-tenant está deshabilitado, usar store_id por defecto sin consultar BD
+  if (DISABLE_SUBDOMAIN_MULTI_TENANT) {
+    const response = NextResponse.next()
+    const storeId = DEFAULT_STORE_ID || 'default'
+    
+    response.headers.set('x-store-id', storeId)
+    response.headers.set('x-store-subdomain', 'default')
+    response.headers.set('x-store-name', 'Default Store')
+
+    // Agregar cookie para persistir la tienda
+    response.cookies.set('store_id', storeId, {
+      path: '/',
+      maxAge: 60 * 60 * 24 * 7, // 7 días
+      sameSite: 'lax',
+    })
+
+    return response
   }
 
   // Extraer subdominio

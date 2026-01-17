@@ -42,6 +42,12 @@ async function getSupabaseServerClient() {
  * Obtiene el store_id desde headers o cookies
  */
 async function getStoreIdFromServer(): Promise<string | null> {
+  // Si multi-tenant está deshabilitado, retornar store_id por defecto
+  const disableMultiTenant = process.env.DISABLE_SUBDOMAIN_MULTI_TENANT === 'true'
+  if (disableMultiTenant) {
+    return process.env.DEFAULT_STORE_ID || 'default'
+  }
+
   try {
     const headersList = await headers()
     const storeId = headersList.get('x-store-id')
