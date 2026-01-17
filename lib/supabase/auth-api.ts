@@ -638,6 +638,13 @@ export function onAuthStateChange(callback: (user: UserProfile | null) => void) 
     isProcessing = true
     
     try {
+      // Si el evento es SIGNED_OUT, siempre establecer usuario como null
+      if (event === 'SIGNED_OUT' || !session?.user) {
+        callback(null)
+        return
+      }
+
+      // Si hay una sesión activa, intentar obtener el perfil
       if (session?.user) {
         // Usar un timeout adicional para evitar que el callback se bloquee indefinidamente
         const profilePromise = getUserProfile(session.user.id)
@@ -652,20 +659,56 @@ export function onAuthStateChange(callback: (user: UserProfile | null) => void) 
         
         const profileResult = await Promise.race([profilePromise, timeoutPromise])
         
-        // Si hay un error (incluyendo timeout), continuar sin perfil pero no bloquear
+        // Si se obtuvo el perfil exitosamente, llamar callback con el usuario
         if (profileResult.success && profileResult.user) {
           callback(profileResult.user)
         } else {
-          // En caso de error o timeout, llamar callback con null para permitir que la app continúe
-          console.warn("[Auth] No se pudo obtener perfil en onAuthStateChange, continuando sin perfil:", profileResult.error)
-          callback(null)
+          // En caso de error o timeout, verificar si la sesión sigue activa
+          const isTimeout = profileResult.error?.includes('Timeout') || profileResult.error?.includes('timeout')
+          
+          if (isTimeout && session?.user) {
+            // Si es timeout pero hay sesión activa, NO llamar callback
+            // Esto evita que se "cierre" la sesión visualmente cuando hay un timeout
+            // La sesión de Supabase sigue activa, solo no se pudo obtener el perfil
+            // El contexto de autenticación mantendrá el usuario actual
+            console.warn("[Auth] Timeout al obtener perfil en onAuthStateChange, pero sesión sigue activa. Manteniendo estado actual del usuario.")
+            // No llamar callback - esto mantiene el estado actual del usuario en el contexto
+            return
+          }
+          
+          // Si no es timeout, verificar si realmente no hay sesión antes de llamar callback(null)
+          // Esto evita cerrar la sesión visualmente por errores temporales
+          try {
+            const { data: { session: currentSession } } = await supabase.auth.getSession()
+            if (!currentSession) {
+              // Solo llamar callback(null) si realmente no hay sesión
+              console.warn("[Auth] No hay sesión activa, cerrando sesión")
+              callback(null)
+            } else {
+              // Si hay sesión pero no se pudo obtener el perfil (error no timeout), mantener estado actual
+              console.warn("[Auth] Error al obtener perfil pero sesión sigue activa. Manteniendo estado actual:", profileResult.error)
+              // No llamar callback para mantener el estado actual
+            }
+          } catch (sessionError) {
+            // Si no se puede verificar la sesión, no cambiar el estado
+            console.warn("[Auth] No se pudo verificar sesión, manteniendo estado actual:", sessionError)
+          }
         }
-      } else {
-        callback(null)
       }
     } catch (error) {
       console.warn("[Auth] Error en onAuthStateChange (no crítico):", error)
-      callback(null)
+      // Solo establecer como null si realmente no hay sesión
+      // Verificar la sesión actual antes de establecer null
+      try {
+        const { data: { session: currentSession } } = await supabase.auth.getSession()
+        if (!currentSession) {
+          callback(null)
+        }
+        // Si hay sesión, no hacer nada para mantener el estado actual
+      } catch (sessionError) {
+        // Si no se puede verificar la sesión, no cambiar el estado
+        console.warn("[Auth] No se pudo verificar sesión actual:", sessionError)
+      }
     } finally {
       // Permitir procesar el siguiente evento después de un breve delay
       setTimeout(() => {

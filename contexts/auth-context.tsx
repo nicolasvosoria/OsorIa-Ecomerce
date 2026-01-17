@@ -57,8 +57,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
           const { data: { subscription: authSubscription } } = onAuthStateChange((updatedUser) => {
             if (mounted) {
-              setUser(updatedUser)
-              setIsLoading(false)
+              // Solo actualizar el usuario si se proporciona un valor explícito
+              // Si updatedUser es null, solo actualizar si realmente no hay sesión
+              if (updatedUser !== null) {
+                setUser(updatedUser)
+                setIsLoading(false)
+              } else {
+                // Si updatedUser es null, verificar si realmente no hay sesión antes de actualizar
+                // Esto evita que se "cierre" la sesión visualmente por timeouts
+                const checkSession = async () => {
+                  try {
+                    const supabase = (await import("@/lib/supabase/client")).getSupabaseBrowserClient()
+                    if (supabase) {
+                      const { data: { session } } = await supabase.auth.getSession()
+                      if (!session) {
+                        // Solo establecer null si realmente no hay sesión
+                        setUser(null)
+                      }
+                      // Si hay sesión pero updatedUser es null (por timeout), mantener el usuario actual
+                    }
+                  } catch (error) {
+                    console.warn("[Auth] Error al verificar sesión en callback:", error)
+                    // En caso de error, mantener el estado actual
+                  } finally {
+                    setIsLoading(false)
+                  }
+                }
+                checkSession()
+              }
             }
           })
           subscription = authSubscription
