@@ -53,6 +53,16 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { CheckoutOptionsDialog } from "@/components/cart/checkout-options-dialog"
 
+// Helper para generar slug desde el nombre de categoría
+function generateCategorySlug(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "")
+}
+
 export function Header() {
   const router = useRouter()
   const [themeModalOpen, setThemeModalOpen] = useState(false)
@@ -79,6 +89,7 @@ export function Header() {
   const [searchSuggestions, setSearchSuggestions] = useState<Array<{ id: string; title: string; slug: string; image?: string }>>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [isSearching, setIsSearching] = useState(false)
+  const [categories, setCategories] = useState<Array<{ id: string; category_name: string; display_order: number }>>([])
   const { activeTheme } = useTheme()
   const { items, removeFromCart, updateQuantity, getTotal, getTotalItems } = useCart()
   const { getTotalItems: getWishlistTotalItems } = useWishlist()
@@ -196,6 +207,31 @@ export function Header() {
       return () => document.removeEventListener('click', handleClickOutside)
     }
   }, [showSuggestions])
+
+  // Cargar categorías desde la API
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const response = await fetch('/api/categories')
+        if (response.ok) {
+          const data = await response.json()
+          // Filtrar categorías no deseadas (por si acaso)
+          const filtered = data.filter(
+            (cat: any) => 
+              cat.category_name?.toLowerCase() !== 'sin categoría' &&
+              cat.category_name?.toLowerCase() !== 'ropa'
+          )
+          // Ordenar por display_order
+          const sorted = filtered.sort((a: any, b: any) => (a.display_order || 0) - (b.display_order || 0))
+          setCategories(sorted)
+        }
+      } catch (error) {
+        console.error('Error loading categories:', error)
+      }
+    }
+
+    loadCategories()
+  }, [store?.id]) // Recargar cuando cambie la tienda
 
   // Removido console.log para evitar spam en consola y rate limiting
 
@@ -850,124 +886,33 @@ export function Header() {
               >
                 Ofertas
               </Link>
-              {store?.subdomain === 'reposteria' ? (
-                <>
-                  <Link
-                    href="/catalog/cupcakes"
-                    className="text-base font-inter font-medium py-3 px-4 rounded-lg transition-colors"
-                    style={{ color: "var(--foreground)" }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = "var(--muted)"
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = "transparent"
-                    }}
-                    onClick={() => setMenuOpen(false)}
-                  >
-                    Cupcakes
-                  </Link>
-                  <Link
-                    href="/catalog/tartas"
-                    className="text-base font-inter font-medium py-3 px-4 rounded-lg transition-colors"
-                    style={{ color: "var(--foreground)" }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = "var(--muted)"
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = "transparent"
-                    }}
-                    onClick={() => setMenuOpen(false)}
-                  >
-                    Tartas
-                  </Link>
-                  <Link
-                    href="/catalog/macarons"
-                    className="text-base font-inter font-medium py-3 px-4 rounded-lg transition-colors"
-                    style={{ color: "var(--foreground)" }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = "var(--muted)"
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = "transparent"
-                    }}
-                    onClick={() => setMenuOpen(false)}
-                  >
-                    Macarons
-                  </Link>
-                  <Link
-                    href="/catalog/pasteles"
-                    className="text-base font-inter font-medium py-3 px-4 rounded-lg transition-colors"
-                    style={{ color: "var(--foreground)" }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = "var(--muted)"
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = "transparent"
-                    }}
-                    onClick={() => setMenuOpen(false)}
-                  >
-                    Pasteles
-                  </Link>
-                </>
+              {/* Categorías dinámicas desde la BD */}
+              {categories.length > 0 ? (
+                categories.map((category) => {
+                  const categorySlug = generateCategorySlug(category.category_name)
+                  return (
+                    <Link
+                      key={category.id}
+                      href={`/catalog/${categorySlug}`}
+                      className="text-base font-inter font-medium py-3 px-4 rounded-lg transition-colors"
+                      style={{ color: "var(--foreground)" }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = "var(--muted)"
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = "transparent"
+                      }}
+                      onClick={() => setMenuOpen(false)}
+                    >
+                      {category.category_name}
+                    </Link>
+                  )
+                })
               ) : (
-                <>
-                  <Link
-                    href="/catalog/speakers"
-                    className="text-base font-inter font-medium py-3 px-4 rounded-lg transition-colors"
-                    style={{ color: "var(--foreground)" }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = "var(--muted)"
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = "transparent"
-                    }}
-                    onClick={() => setMenuOpen(false)}
-                  >
-                    Speakers
-                  </Link>
-                  <Link
-                    href="/catalog/earphones"
-                    className="text-base font-inter font-medium py-3 px-4 rounded-lg transition-colors"
-                    style={{ color: "var(--foreground)" }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = "var(--muted)"
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = "transparent"
-                    }}
-                    onClick={() => setMenuOpen(false)}
-                  >
-                    Earphones
-                  </Link>
-                  <Link
-                    href="/catalog/projectors"
-                    className="text-base font-inter font-medium py-3 px-4 rounded-lg transition-colors"
-                    style={{ color: "var(--foreground)" }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = "var(--muted)"
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = "transparent"
-                    }}
-                    onClick={() => setMenuOpen(false)}
-                  >
-                    Projectors
-                  </Link>
-                  <Link
-                    href="/catalog/stands"
-                    className="text-base font-inter font-medium py-3 px-4 rounded-lg transition-colors"
-                    style={{ color: "var(--foreground)" }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = "var(--muted)"
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = "transparent"
-                    }}
-                    onClick={() => setMenuOpen(false)}
-                  >
-                    Stands
-                  </Link>
-                </>
+                // Fallback mientras se cargan las categorías
+                <div className="text-sm text-muted-foreground px-4 py-2">
+                  Cargando categorías...
+                </div>
               )}
               
               {/* Sección de Administrador */}

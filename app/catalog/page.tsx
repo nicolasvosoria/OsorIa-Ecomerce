@@ -185,6 +185,13 @@ async function CatalogContent() {
     
     console.log('[Catalog] Categorías obtenidas:', categories.length)
     
+    // Filtrar categorías no deseadas
+    categories = categories.filter(
+      (cat: any) => 
+        cat.category_name?.toLowerCase() !== 'sin categoría' &&
+        cat.category_name?.toLowerCase() !== 'ropa'
+    )
+    
     // Ordenar por display_order
     categories.sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
   } catch (error) {
