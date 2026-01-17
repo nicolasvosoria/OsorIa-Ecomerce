@@ -18,8 +18,9 @@ import {
   BarChart3
 } from "lucide-react"
 import Link from "next/link"
-import { getDashboardStats } from "@/lib/supabase/stats-api"
+// getDashboardStats se importa dinámicamente para evitar problemas con Turbopack
 import { formatPrice } from "@/lib/shopify/utils"
+// Importación dinámica de getDashboardStats para evitar problemas con Turbopack
 
 function DashboardContent() {
   const { isAdmin, loading } = useAdminPermissions()
@@ -46,6 +47,8 @@ function DashboardContent() {
       
       setLoadingStats(true)
       try {
+        // Importación dinámica para evitar problemas con Turbopack durante el build
+        const { getDashboardStats } = await import("@/lib/supabase/stats-api")
         const dashboardStats = await getDashboardStats()
         setStats(dashboardStats)
       } catch (error) {

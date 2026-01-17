@@ -52,7 +52,7 @@ function getSubdomain(hostname: string): string | null {
     
     // Si es un dominio de Vercel sin subdominio (ej: proyecto.vercel.app)
     // o un dominio personalizado sin subdominio (ej: tudominio.com)
-    // retornar null para usar 'default' en el middleware
+    // retornar null para usar 'default' en el proxy
     if (parts.length === 2 && (parts[1] === 'vercel.app' || parts[1] === 'vercel-dns.com')) {
       return null // Se manejará como 'default' más abajo
     }
@@ -72,7 +72,7 @@ async function getStoreBySubdomain(subdomain: string): Promise<Store | null> {
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
     if (!supabaseUrl || !supabaseAnonKey) {
-      console.error('[Middleware] Supabase no configurado')
+      console.error('[Proxy] Supabase no configurado')
       return null
     }
 
@@ -89,7 +89,7 @@ async function getStoreBySubdomain(subdomain: string): Promise<Store | null> {
     )
 
     if (!response.ok) {
-      console.error('[Middleware] Error al obtener tienda:', response.statusText)
+      console.error('[Proxy] Error al obtener tienda:', response.statusText)
       return null
     }
 
@@ -101,12 +101,12 @@ async function getStoreBySubdomain(subdomain: string): Promise<Store | null> {
 
     return null
   } catch (error) {
-    console.error('[Middleware] Error al obtener tienda:', error)
+    console.error('[Proxy] Error al obtener tienda:', error)
     return null
   }
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
   const hostname = request.headers.get('host') || ''
 
@@ -194,7 +194,7 @@ export async function middleware(request: NextRequest) {
   return response
 }
 
-// Configurar qué rutas deben ejecutar el middleware
+// Configurar qué rutas deben ejecutar el proxy
 export const config = {
   matcher: [
     /*
@@ -207,6 +207,4 @@ export const config = {
     '/((?!api|_next/static|_next/image|favicon.ico).*)',
   ],
 }
-
-
 
