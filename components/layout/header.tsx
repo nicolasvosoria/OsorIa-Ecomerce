@@ -436,9 +436,9 @@ export function Header() {
                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
                   >
                     <User className="h-4 w-4 lg:h-5 lg:w-5" style={{ color: styleData.loginButtonColor || "var(--foreground)" }} />
-                    <span className="text-xs lg:text-sm xl:text-base font-medium hidden xl:inline truncate max-w-[120px]" style={{ color: styleData.loginButtonColor || "var(--foreground)" }}>
+                    <span className="text-xs lg:text-sm xl:text-base font-medium hidden xl:inline truncate max-w-[150px]" style={{ color: styleData.loginButtonColor || "var(--foreground)" }}>
                       {user?.role === 'admin' 
-                        ? "Admin"
+                        ? "Administrador"
                         : user?.first_name && user?.last_name 
                           ? `${user.first_name} ${user.last_name}`
                           : user?.email?.split('@')[0] || "Usuario"}
