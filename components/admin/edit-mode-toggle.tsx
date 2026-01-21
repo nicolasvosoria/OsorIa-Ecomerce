@@ -6,8 +6,9 @@ import { Edit, X } from "lucide-react"
 import { useState, useEffect } from "react"
 
 export function EditModeToggle() {
-  const { isAdmin, isEditMode, toggleEditMode, selectedComponent } = useAdmin()
+  // Llamar todos los hooks primero, antes de cualquier return condicional
   const [isMobile, setIsMobile] = useState(false)
+  const { isAdmin, isEditMode, toggleEditMode, selectedComponent } = useAdmin()
   
   useEffect(() => {
     const checkMobile = () => {
@@ -18,18 +19,19 @@ export function EditModeToggle() {
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
+  // Return condicional después de todos los hooks
   if (!isAdmin) {
     return null
   }
   
-  // Ajustar posición cuando el panel de edición está abierto solo en desktop
-  // En móviles, el panel es overlay completo, así que no necesitamos ajustar la posición
-  const rightOffset = !isMobile && isEditMode && selectedComponent ? "28rem" : "1rem" // 28rem = 448px (384px + 64px de margen)
+  // Posicionar el botón de modo edición en la esquina inferior izquierda
+  // Cuando el panel de edición está abierto, ajustar la posición para no quedar detrás del panel
+  const leftOffset = !isMobile && isEditMode && selectedComponent ? "28rem" : "1.5rem" // 28rem = 448px (384px + 64px de margen)
 
   return (
     <div 
-      className="fixed bottom-4 z-50 transition-all duration-300"
-      style={{ right: rightOffset }}
+      className="fixed bottom-6 z-50 transition-all duration-300"
+      style={{ left: leftOffset }}
     >
       <Button
         onClick={toggleEditMode}

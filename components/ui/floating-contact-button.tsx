@@ -20,11 +20,15 @@ const WhatsAppIcon = ({ className }: { className?: string }) => (
 )
 
 export function FloatingContactButton() {
+  // Llamar todos los hooks primero, antes de cualquier lógica condicional
   const [isOpen, setIsOpen] = useState(false)
   const [chatbotOpen, setChatbotOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
-  const { isEditMode, selectedComponent } = useAdmin()
+  
+  // useAdmin debe llamarse después de los useState pero antes de los useEffect
+  // para mantener el orden consistente de hooks
+  const { isAdmin, isEditMode, selectedComponent } = useAdmin()
   
   // Detectar si es móvil
   useEffect(() => {
@@ -59,6 +63,11 @@ export function FloatingContactButton() {
 
   const handleOptionClick = () => {
     setIsOpen(false)
+  }
+
+  // Ocultar el botón de contáctanos si el usuario es administrador
+  if (isAdmin) {
+    return null
   }
 
   // Ajustar posición cuando el panel de edición está abierto solo en desktop
