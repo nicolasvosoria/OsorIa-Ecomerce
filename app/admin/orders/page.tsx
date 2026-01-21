@@ -12,10 +12,10 @@ import {
   Eye,
   ArrowLeft,
   Package,
+  Download,
 } from "lucide-react"
 import Link from "next/link"
-import { getOrders } from "@/lib/supabase/orders-api"
-import type { Order } from "@/lib/supabase/orders-api"
+import { getOrders, getOrderById, type Order, type OrderWithItems } from "@/lib/supabase/orders-api"
 import { formatPrice } from "@/lib/shopify/utils"
 import {
   Table,
@@ -26,6 +26,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
+import * as XLSX from "xlsx"
 
 export default function AdminOrdersPage() {
   const { isAdmin, loading } = useAdminPermissions()
@@ -33,6 +34,7 @@ export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([])
   const [loadingOrders, setLoadingOrders] = useState(true)
   const [totalOrders, setTotalOrders] = useState(0)
+  const [downloadingExcel, setDownloadingExcel] = useState(false)
 
   useEffect(() => {
     if (!loading && !isAdmin) {
@@ -89,6 +91,191 @@ export default function AdminOrdersPage() {
     return <Badge variant={config.variant}>{config.label}</Badge>
   }
 
+  // Función para obtener el texto del estado
+  const getStatusText = (status: Order['status']): string => {
+    const statusMap: Record<Order['status'], string> = {
+      pending: "Pendiente",
+      confirmed: "Confirmado",
+      processing: "Procesando",
+      shipped: "Enviado",
+      delivered: "Entregado",
+      cancelled: "Cancelado",
+    }
+    return statusMap[status] || status
+  }
+
+  // Función para obtener el texto del estado de pago
+  const getPaymentStatusText = (status: Order['payment_status']): string => {
+    const statusMap: Record<Order['payment_status'], string> = {
+      pending: "Pendiente",
+      paid: "Pagado",
+      failed: "Fallido",
+      refunded: "Reembolsado",
+    }
+    return statusMap[status] || status
+  }
+
+  // Función para descargar todos los pedidos en Excel
+  const downloadOrdersToExcel = async () => {
+    if (!isAdmin) return
+
+    setDownloadingExcel(true)
+    try {
+      // Obtener todos los pedidos (sin límite)
+      const result = await getOrders({
+        limit: 10000, // Límite alto para obtener todos
+        order_by: 'created_at',
+        order_direction: 'desc',
+      })
+
+      // Obtener los items de cada pedido
+      const ordersWithItems: Array<OrderWithItems> = await Promise.all(
+        result.orders.map(async (order) => {
+          const orderWithItems = await getOrderById(order.id)
+          return orderWithItems || { ...order, items: [] }
+        })
+      )
+
+      // Preparar datos para Excel - Hoja 1: Resumen de Pedidos
+      const ordersData = ordersWithItems.map((order) => ({
+        'Número de Pedido': order.order_number,
+        'Fecha': new Date(order.order_date || order.created_at).toLocaleString('es-ES'),
+        'Cliente': `${order.customer_first_name} ${order.customer_last_name}`,
+        'Email': order.customer_email,
+        'Teléfono': order.customer_phone || '',
+        'Tipo Cliente': order.customer_type === 'guest' ? 'Invitado' : 'Usuario',
+        'Dirección': order.shipping_address,
+        'Ciudad': order.shipping_city,
+        'Código Postal': order.shipping_postal_code,
+        'País': order.shipping_country,
+        'Estado': getStatusText(order.status),
+        'Estado de Pago': getPaymentStatusText(order.payment_status),
+        'Método de Pago': order.payment_method || '',
+        'Referencia de Pago': order.payment_reference || '',
+        'Subtotal': order.subtotal,
+        'Envío': order.shipping_cost,
+        'Impuestos': order.tax_amount,
+        'Descuento': order.discount_amount,
+        'Total': order.total_amount,
+        'Moneda': order.currency_code,
+        'Notas': order.notes || '',
+        'Fecha Confirmación': order.confirmed_at ? new Date(order.confirmed_at).toLocaleString('es-ES') : '',
+        'Fecha Envío': order.shipped_at ? new Date(order.shipped_at).toLocaleString('es-ES') : '',
+        'Fecha Entrega': order.delivered_at ? new Date(order.delivered_at).toLocaleString('es-ES') : '',
+        'Fecha Cancelación': order.cancelled_at ? new Date(order.cancelled_at).toLocaleString('es-ES') : '',
+      }))
+
+      // Preparar datos para Excel - Hoja 2: Items de Pedidos
+      const itemsData: Array<{
+        'Número de Pedido': string
+        'Producto': string
+        'SKU': string
+        'Variante': string
+        'Cantidad': number
+        'Precio Unitario': number
+        'Total': number
+        'Moneda': string
+      }> = []
+
+      ordersWithItems.forEach((order) => {
+        if (order.items && order.items.length > 0) {
+          order.items.forEach((item) => {
+            itemsData.push({
+              'Número de Pedido': order.order_number,
+              'Producto': item.product_name,
+              'SKU': item.product_sku || '',
+              'Variante': item.variant_title || '',
+              'Cantidad': item.quantity,
+              'Precio Unitario': item.unit_price,
+              'Total': item.total_price,
+              'Moneda': item.currency_code,
+            })
+          })
+        } else {
+          // Si no hay items, agregar una fila indicando que no hay productos
+          itemsData.push({
+            'Número de Pedido': order.order_number,
+            'Producto': 'Sin productos',
+            'SKU': '',
+            'Variante': '',
+            'Cantidad': 0,
+            'Precio Unitario': 0,
+            'Total': 0,
+            'Moneda': order.currency_code,
+          })
+        }
+      })
+
+      // Crear workbook
+      const workbook = XLSX.utils.book_new()
+
+      // Crear hoja de resumen de pedidos
+      const ordersWorksheet = XLSX.utils.json_to_sheet(ordersData)
+      XLSX.utils.book_append_sheet(workbook, ordersWorksheet, 'Pedidos')
+
+      // Crear hoja de items
+      const itemsWorksheet = XLSX.utils.json_to_sheet(itemsData)
+      XLSX.utils.book_append_sheet(workbook, itemsWorksheet, 'Items de Pedidos')
+
+      // Ajustar ancho de columnas
+      const ordersColWidths = [
+        { wch: 18 }, // Número de Pedido
+        { wch: 20 }, // Fecha
+        { wch: 25 }, // Cliente
+        { wch: 30 }, // Email
+        { wch: 15 }, // Teléfono
+        { wch: 12 }, // Tipo Cliente
+        { wch: 40 }, // Dirección
+        { wch: 20 }, // Ciudad
+        { wch: 12 }, // Código Postal
+        { wch: 15 }, // País
+        { wch: 12 }, // Estado
+        { wch: 15 }, // Estado de Pago
+        { wch: 15 }, // Método de Pago
+        { wch: 20 }, // Referencia de Pago
+        { wch: 12 }, // Subtotal
+        { wch: 12 }, // Envío
+        { wch: 12 }, // Impuestos
+        { wch: 12 }, // Descuento
+        { wch: 12 }, // Total
+        { wch: 8 },  // Moneda
+        { wch: 30 }, // Notas
+        { wch: 20 }, // Fecha Confirmación
+        { wch: 20 }, // Fecha Envío
+        { wch: 20 }, // Fecha Entrega
+        { wch: 20 }, // Fecha Cancelación
+      ]
+      ordersWorksheet['!cols'] = ordersColWidths
+
+      const itemsColWidths = [
+        { wch: 18 }, // Número de Pedido
+        { wch: 30 }, // Producto
+        { wch: 15 }, // SKU
+        { wch: 20 }, // Variante
+        { wch: 10 }, // Cantidad
+        { wch: 15 }, // Precio Unitario
+        { wch: 15 }, // Total
+        { wch: 8 },  // Moneda
+      ]
+      itemsWorksheet['!cols'] = itemsColWidths
+
+      // Generar nombre del archivo con fecha
+      const date = new Date()
+      const dateStr = date.toISOString().split('T')[0]
+      const fileName = `pedidos_${dateStr}.xlsx`
+
+      // Descargar archivo
+      XLSX.writeFile(workbook, fileName)
+
+      console.log(`✅ Excel generado: ${fileName} con ${result.orders.length} pedidos`)
+    } catch (error) {
+      console.error("[Admin Orders] Error al generar Excel:", error)
+      alert("Error al generar el archivo Excel. Por favor, intenta nuevamente.")
+    } finally {
+      setDownloadingExcel(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -139,6 +326,23 @@ export default function AdminOrdersPage() {
                 </p>
               </div>
             </div>
+            <Button
+              onClick={downloadOrdersToExcel}
+              disabled={downloadingExcel || loadingOrders || orders.length === 0}
+              className="gap-2"
+            >
+              {downloadingExcel ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Generando Excel...
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4" />
+                  Descargar Excel
+                </>
+              )}
+            </Button>
           </div>
         </div>
       </header>
