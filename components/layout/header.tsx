@@ -52,6 +52,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { CheckoutOptionsDialog } from "@/components/cart/checkout-options-dialog"
+import { LanguageSelector } from "@/components/ui/language-selector"
+import { useLanguage } from "@/contexts/language-context"
 
 // Helper para generar slug desde el nombre de categoría
 function generateCategorySlug(name: string): string {
@@ -95,6 +97,7 @@ export function Header() {
   const { getTotalItems: getWishlistTotalItems } = useWishlist()
   const { user, isAuthenticated, login, register, logout, refreshUser } = useAuth()
   const { store } = useStore()
+  const { t } = useLanguage()
   const { styles: styleData } = useComponentStyle("header", {
     brandName: "Osoria",
     logoImage: "/logo-osoria.png",
@@ -293,10 +296,10 @@ export function Header() {
             onMouseEnter={(e) => e.currentTarget.style.backgroundColor = styleData.menuButtonHoverBg || "var(--muted)"}
             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
             onClick={() => setMenuOpen(true)}
-            title="Abrir menú"
+            title={t.header.menu}
           >
             <Menu className="h-4 w-4 lg:h-5 lg:w-5" style={{ color: styleData.menuButtonColor || "var(--foreground)" }} />
-            <span className="text-sm lg:text-[15px] font-medium hidden lg:inline" style={{ color: styleData.menuButtonColor || "var(--foreground)" }}>Menú</span>
+            <span className="text-sm lg:text-[15px] font-medium hidden lg:inline" style={{ color: styleData.menuButtonColor || "var(--foreground)" }}>{t.header.menu}</span>
           </Button>
 
           {/* Barra de búsqueda - Centro (responsive) */}
@@ -308,7 +311,7 @@ export function Header() {
               <Search className="absolute left-3 lg:left-4 top-1/2 -translate-y-1/2 h-3.5 w-3.5 lg:h-4 lg:w-4 z-10 pointer-events-none" style={{ color: styleData.searchIconColor || "var(--muted-foreground)" }} />
               <Input
                 type="search"
-                placeholder={styleData.searchPlaceholder || "Buscar..."}
+                placeholder={t.header.searchPlaceholder}
                 value={searchQuery}
                 onChange={(e) => {
                   setSearchQuery(e.target.value)
@@ -337,7 +340,7 @@ export function Header() {
                 className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 lg:h-8 lg:w-8 rounded-full hover:bg-transparent"
                 style={{ backgroundColor: "transparent" }}
                 onClick={handleSearch}
-                title="Buscar"
+                title={t.header.search}
               >
                 <Search className="h-3.5 w-3.5 lg:h-4 lg:w-4" style={{ color: styleData.searchIconColor || "var(--muted-foreground)" }} />
               </Button>
@@ -409,13 +412,13 @@ export function Header() {
                           className="w-full text-sm font-medium text-center py-2 hover:underline"
                           style={{ color: "var(--primary)" }}
                         >
-                          Ver todos los resultados para "{searchQuery}"
+                          {t.header.viewAllResults.replace('{query}', searchQuery)}
                         </button>
                       </div>
                     </>
                   ) : (
                     <div className="p-4 text-center text-sm" style={{ color: "var(--muted-foreground)" }}>
-                      No se encontraron productos
+                      {t.header.noProductsFound}
                     </div>
                   )}
                 </div>
@@ -438,10 +441,10 @@ export function Header() {
                     <User className="h-4 w-4 lg:h-5 lg:w-5" style={{ color: styleData.loginButtonColor || "var(--foreground)" }} />
                     <span className="text-xs lg:text-sm xl:text-base font-medium hidden xl:inline truncate max-w-[150px]" style={{ color: styleData.loginButtonColor || "var(--foreground)" }}>
                       {user?.role === 'admin' 
-                        ? "Administrador"
+                        ? t.nav.admin
                         : user?.first_name && user?.last_name 
                           ? `${user.first_name} ${user.last_name}`
-                          : user?.email?.split('@')[0] || "Usuario"}
+                          : user?.email?.split('@')[0] || t.nav.account}
                     </span>
                   </Button>
                 </DropdownMenuTrigger>
@@ -459,13 +462,13 @@ export function Header() {
                       <DropdownMenuItem asChild style={{ color: "var(--foreground)" }}>
                         <Link href="/dashboard">
                           <LayoutDashboard className="mr-2 h-4 w-4" />
-                          Dashboard
+                          {t.nav.dashboard}
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild style={{ color: "var(--foreground)" }}>
                         <Link href="/admin">
                           <Edit className="mr-2 h-4 w-4" />
-                          Editor de Página
+                          {t.admin.pageEditor}
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuSeparator style={{ backgroundColor: "var(--border)" }} />
@@ -484,15 +487,15 @@ export function Header() {
                         router.push('/')
                       }
                       
-                      toast.success("Sesión cerrada", {
-                        description: "Has cerrado sesión exitosamente",
+                      toast.success(t.header.sessionClosed, {
+                        description: t.header.sessionClosedDescription,
                         duration: 3000,
                       })
                     }}
                     style={{ color: "var(--foreground)" }}
                   >
                     <LogOut className="mr-2 h-4 w-4" />
-                    Cerrar sesión
+                    {t.auth.logout}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -504,10 +507,10 @@ export function Header() {
                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = styleData.loginButtonHoverBg || "var(--muted)"}
                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
                 onClick={() => setLoginModalOpen(true)}
-                title="Iniciar sesión"
+                title={t.auth.login}
               >
                 <LogIn className="h-4 w-4 lg:h-5 lg:w-5" style={{ color: styleData.loginButtonColor || "var(--foreground)" }} />
-                <span className="text-xs lg:text-sm xl:text-base font-medium hidden xl:inline" style={{ color: styleData.loginButtonColor || "var(--foreground)" }}>Iniciar sesión</span>
+                <span className="text-xs lg:text-sm xl:text-base font-medium hidden xl:inline" style={{ color: styleData.loginButtonColor || "var(--foreground)" }}>{t.auth.login}</span>
               </Button>
             )}
             <Button
@@ -520,7 +523,7 @@ export function Header() {
               onMouseEnter={(e) => e.currentTarget.style.backgroundColor = styleData.iconHoverBg || "var(--muted)"}
               onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
               onClick={() => router.push('/wishlist')}
-              title="Favoritos"
+              title={t.nav.wishlist}
             >
               <Heart className="h-4 w-4 lg:h-5 lg:w-5" style={{ color: styleData.iconColor || "var(--foreground)" }} />
               {getWishlistTotalItems() > 0 && (
@@ -542,7 +545,7 @@ export function Header() {
               onMouseEnter={(e) => e.currentTarget.style.backgroundColor = styleData.iconHoverBg || "var(--muted)"}
               onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
               onClick={() => setCartOpen(true)}
-              title="Ver carrito"
+              title={t.nav.cart}
             >
               <ShoppingCart className="h-4 w-4 lg:h-5 lg:w-5" style={{ color: styleData.iconColor || "var(--foreground)" }} />
               {getTotalItems() > 0 && (
@@ -554,6 +557,7 @@ export function Header() {
                 </span>
               )}
             </Button>
+            <LanguageSelector />
           </div>
         </div>
 
@@ -582,7 +586,7 @@ export function Header() {
                       style={{ backgroundColor: "transparent" }}
                       onMouseEnter={(e) => e.currentTarget.style.backgroundColor = styleData.loginButtonHoverBg || "var(--muted)"}
                       onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
-                      title={user?.role === 'admin' ? "Administrador" : "Usuario"}
+                      title={user?.role === 'admin' ? t.nav.admin : t.nav.account}
                     >
                       <User className="h-4 w-4" style={{ color: styleData.loginButtonColor || "var(--foreground)" }} />
                     </Button>
@@ -601,13 +605,13 @@ export function Header() {
                         <DropdownMenuItem asChild style={{ color: "var(--foreground)" }}>
                           <Link href="/dashboard">
                             <LayoutDashboard className="mr-2 h-4 w-4" />
-                            Dashboard
+                            {t.nav.dashboard}
                           </Link>
                         </DropdownMenuItem>
                         <DropdownMenuItem asChild style={{ color: "var(--foreground)" }}>
                           <Link href="/admin">
                             <Edit className="mr-2 h-4 w-4" />
-                            Editor de Página
+                            {t.admin.pageEditor}
                           </Link>
                         </DropdownMenuItem>
                         <DropdownMenuSeparator style={{ backgroundColor: "var(--border)" }} />
@@ -632,7 +636,7 @@ export function Header() {
                       style={{ color: "var(--foreground)" }}
                     >
                       <LogOut className="mr-2 h-4 w-4" />
-                      Cerrar sesión
+                      {t.auth.logout}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -645,7 +649,7 @@ export function Header() {
                   onMouseEnter={(e) => e.currentTarget.style.backgroundColor = styleData.loginButtonHoverBg || "var(--muted)"}
                   onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
                   onClick={() => setLoginModalOpen(true)}
-                  title="Iniciar sesión"
+                  title={t.auth.login}
                 >
                   <LogIn className="h-4.5 w-4.5" style={{ color: styleData.loginButtonColor || "var(--foreground)" }} />
                 </Button>
@@ -658,7 +662,7 @@ export function Header() {
                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = styleData.iconHoverBg || "var(--muted)"}
                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
                 onClick={() => router.push('/wishlist')}
-                title="Favoritos"
+                title={t.nav.wishlist}
               >
                 <Heart className="h-4 w-4" style={{ color: styleData.iconColor || "var(--foreground)" }} />
                 {getWishlistTotalItems() > 0 && (
@@ -678,7 +682,7 @@ export function Header() {
                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = styleData.iconHoverBg || "var(--muted)"}
                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
                 onClick={() => setCartOpen(true)}
-                title="Ver carrito"
+                title={t.nav.cart}
               >
                 <ShoppingCart className="h-4 w-4" style={{ color: styleData.iconColor || "var(--foreground)" }} />
                 {getTotalItems() > 0 && (
@@ -690,6 +694,7 @@ export function Header() {
                   </span>
                 )}
               </Button>
+              <LanguageSelector />
               <Button
                 variant="ghost"
                 size="icon"
@@ -698,7 +703,7 @@ export function Header() {
                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = styleData.menuButtonHoverBg || "var(--muted)"}
                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
                 onClick={() => setMenuOpen(true)}
-                title="Abrir menú"
+                title={t.header.menu}
               >
                 <Menu className="h-4 w-4" style={{ color: styleData.menuButtonColor || "var(--foreground)" }} />
               </Button>
@@ -714,7 +719,7 @@ export function Header() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 z-10 pointer-events-none" style={{ color: styleData.searchIconColor || "var(--muted-foreground)" }} />
               <Input
                 type="search"
-                placeholder={styleData.searchPlaceholder || "Buscar..."}
+                placeholder={t.header.searchPlaceholder}
                 value={searchQuery}
                 onChange={(e) => {
                   setSearchQuery(e.target.value)
@@ -743,7 +748,7 @@ export function Header() {
                 className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full hover:bg-transparent"
                 style={{ backgroundColor: "transparent" }}
                 onClick={handleSearch}
-                title="Buscar"
+                title={t.header.search}
               >
                 <Search className="h-4 w-4" style={{ color: styleData.searchIconColor || "var(--muted-foreground)" }} />
               </Button>
@@ -815,13 +820,13 @@ export function Header() {
                           className="w-full text-sm font-medium text-center py-2 hover:underline"
                           style={{ color: "var(--primary)" }}
                         >
-                          Ver todos los resultados para "{searchQuery}"
+                          {t.header.viewAllResults.replace('{query}', searchQuery)}
                         </button>
                       </div>
                     </>
                   ) : (
                     <div className="p-4 text-center text-sm" style={{ color: "var(--muted-foreground)" }}>
-                      No se encontraron productos
+                      {t.header.noProductsFound}
                     </div>
                   )}
                 </div>
@@ -844,14 +849,14 @@ export function Header() {
         >
           <SheetHeader className="p-6 border-b" style={{ borderColor: "var(--border)" }}>
             <SheetTitle className="text-xl font-inter font-semibold" style={{ color: "var(--foreground)" }}>
-              Menú
+              {t.header.menu}
             </SheetTitle>
             {/* Mensaje de bienvenida para usuarios autenticados - Solo en desktop */}
             {isAuthenticated && user && (
               <p className="hidden md:block text-base font-medium mt-4" style={{ color: "var(--foreground)" }}>
-                Hola {user?.role === 'admin' 
-                  ? "Administrador"
-                  : user.first_name || user.email.split('@')[0]}, bienvenido a la aplicación
+                {user?.role === 'admin' 
+                  ? t.header.welcomeAdmin
+                  : t.header.welcome.replace('{name}', user.first_name || user.email.split('@')[0])}
               </p>
             )}
           </SheetHeader>
@@ -870,7 +875,7 @@ export function Header() {
                 }}
                 onClick={() => setMenuOpen(false)}
               >
-                Inicio
+                {t.nav.home}
               </Link>
               <Link
                 href="/sale"
@@ -884,7 +889,7 @@ export function Header() {
                 }}
                 onClick={() => setMenuOpen(false)}
               >
-                Ofertas
+                {t.header.offers}
               </Link>
               {/* Categorías dinámicas desde la BD */}
               {categories.length > 0 ? (
@@ -911,7 +916,7 @@ export function Header() {
               ) : (
                 // Fallback mientras se cargan las categorías
                 <div className="text-sm text-muted-foreground px-4 py-2">
-                  Cargando categorías...
+                  {t.header.loadingCategories}
                 </div>
               )}
               
@@ -920,7 +925,7 @@ export function Header() {
                 <>
                   <div className="my-2 border-t" style={{ borderColor: "var(--border)" }}></div>
                   <div className="text-xs font-semibold uppercase tracking-wider px-4 py-2" style={{ color: "var(--muted-foreground)" }}>
-                    Administración
+                    {t.admin.administration}
                   </div>
                   <Link
                     href="/dashboard"
@@ -935,7 +940,7 @@ export function Header() {
                     onClick={() => setMenuOpen(false)}
                   >
                     <LayoutDashboard className="h-5 w-5" />
-                    Dashboard
+                    {t.nav.dashboard}
                   </Link>
                   <Link
                     href="/admin"
@@ -950,7 +955,7 @@ export function Header() {
                     onClick={() => setMenuOpen(false)}
                   >
                     <Edit className="h-5 w-5" />
-                    Editor de Página
+                    {t.admin.pageEditor}
                   </Link>
                 </>
               )}
@@ -977,7 +982,7 @@ export function Header() {
                     }}
                   >
                     <Palette className="h-4 w-4" />
-                    Cambiar tema
+                    {t.admin.changeTheme}
                   </Button>
                 )}
                 <Button
@@ -996,7 +1001,7 @@ export function Header() {
                   }}
                 >
                   <AlignLeft className="h-4 w-4" />
-                  Cambiar fuente
+                  {t.admin.changeFont}
                 </Button>
               </div>
             )}
@@ -1013,7 +1018,7 @@ export function Header() {
         >
           <SheetHeader className="p-6 border-b flex-shrink-0" style={{ borderColor: "var(--border)" }}>
             <SheetTitle className="text-xl font-inter font-semibold" style={{ color: "var(--foreground)" }}>
-              Carrito de compras
+              {t.cart.title}
             </SheetTitle>
           </SheetHeader>
           
@@ -1024,10 +1029,10 @@ export function Header() {
                 <div className="flex flex-col items-center justify-center h-full text-center">
                   <ShoppingCart className="h-16 w-16 mb-4" style={{ color: "var(--muted-foreground)", opacity: 0.5 }} />
                   <p className="text-base font-inter font-medium mb-2" style={{ color: "var(--foreground)" }}>
-                    Tu carrito está vacío
+                    {t.cart.empty}
                   </p>
                   <p className="text-sm font-inter" style={{ color: "var(--muted-foreground)" }}>
-                    Agrega productos desde la tienda
+                    {t.cart.emptyDescription}
                   </p>
                 </div>
               ) : (
@@ -1124,8 +1129,8 @@ export function Header() {
                             className="h-11 w-11 md:h-7 md:w-7 ml-auto touch-manipulation"
                             onClick={() => {
                               removeFromCart(item.id)
-                              toast.success("Producto eliminado", {
-                                description: `${item.name} ha sido eliminado del carrito`,
+                              toast.success(t.header.productRemoved, {
+                                description: t.header.productRemovedDescription.replace('{name}', item.name),
                                 duration: 3000,
                               })
                             }}
@@ -1178,7 +1183,7 @@ export function Header() {
                 {/* Total */}
                 <div className="flex items-center justify-between mb-4">
                   <span className="text-lg font-inter font-semibold" style={{ color: "var(--foreground)" }}>
-                    Total:
+                    {t.cart.total}:
                   </span>
                   <span className="text-2xl font-inter font-bold" style={{ color: "var(--primary)" }}>
                     ${getTotal().toFixed(2)}
@@ -1201,7 +1206,7 @@ export function Header() {
                     setShowCheckoutOptionsDialog(true)
                   }}
                 >
-                  Finalizar compra
+                  {t.cart.checkout}
                 </Button>
               </div>
             )}
@@ -1229,12 +1234,12 @@ export function Header() {
         <DialogContent className="w-[95vw] max-w-[450px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-xl font-inter font-semibold" style={{ color: "var(--foreground)" }}>
-              {isRegisterMode ? "Crear Cuenta" : "Iniciar Sesión"}
+              {isRegisterMode ? t.auth.createAccount : t.auth.login}
             </DialogTitle>
             <DialogDescription className="text-sm" style={{ color: "var(--muted-foreground)" }}>
               {isRegisterMode 
-                ? "Completa el formulario para crear tu cuenta" 
-                : "Ingresa tus credenciales para acceder a tu cuenta"}
+                ? t.auth.createAccount 
+                : t.auth.login}
             </DialogDescription>
           </DialogHeader>
 
@@ -1244,16 +1249,16 @@ export function Header() {
               if (isRegisterMode) {
                 // Validar que las contraseñas coincidan
                 if (password !== confirmPassword) {
-                  toast.error("Las contraseñas no coinciden", {
-                    description: "Por favor, verifica que ambas contraseñas sean iguales",
+                  toast.error(t.header.passwordsDoNotMatch, {
+                    description: t.header.passwordsDoNotMatchDescription,
                     duration: 3000,
                   })
                   return
                 }
                 // Validar que todos los campos estén completos
                 if (!firstName || !lastName || !email || !password) {
-                  toast.error("Campos incompletos", {
-                    description: "Por favor, completa todos los campos",
+                  toast.error(t.header.incompleteFields, {
+                    description: t.header.incompleteFieldsDescription,
                     duration: 3000,
                   })
                   return
@@ -1265,10 +1270,10 @@ export function Header() {
                   await refreshUser()
                   
                   // Todos los usuarios van a la página principal después del registro
-                  toast.success("Cuenta creada", {
+                  toast.success(t.header.accountCreated, {
                     description: result.user?.role === 'admin' 
-                      ? "Bienvenido, Administrador!" 
-                      : "Tu cuenta ha sido creada exitosamente",
+                      ? t.header.welcomeAdminMessage 
+                      : t.header.accountCreatedSuccess,
                     duration: 3000,
                   })
                   
@@ -1282,7 +1287,7 @@ export function Header() {
                   setShowConfirmPassword(false)
                   setIsRegisterMode(false)
                 } else {
-                  toast.error("Error al crear cuenta", {
+                  toast.error(t.header.errorCreatingAccount, {
                     description: result.error || "Por favor, intenta nuevamente",
                     duration: 3000,
                   })
@@ -1303,9 +1308,9 @@ export function Header() {
                   await refreshUser()
                   
                   // Todos los usuarios (admin y user) van a la página principal
-                  toast.success("Sesión iniciada", {
+                  toast.success(t.header.sessionStarted, {
                     description: result.user?.role === 'admin' 
-                      ? "Bienvenido, Administrador!" 
+                      ? t.header.welcomeAdminLogin 
                       : "Bienvenido de nuevo!",
                     duration: 3000,
                   })
@@ -1320,7 +1325,7 @@ export function Header() {
                   setShowConfirmPassword(false)
                   setIsRegisterMode(false)
                 } else {
-                  toast.error("Error al iniciar sesión", {
+                  toast.error(t.header.errorLoggingIn, {
                     description: result.error || "Verifica tus credenciales e intenta nuevamente",
                     duration: 5000,
                   })
@@ -1337,7 +1342,7 @@ export function Header() {
                     className="text-sm font-medium"
                     style={{ color: "var(--foreground)" }}
                   >
-                    Nombre
+                    {t.auth.firstName}
                   </label>
                   <Input
                     id="firstName"
@@ -1360,7 +1365,7 @@ export function Header() {
                     className="text-sm font-medium"
                     style={{ color: "var(--foreground)" }}
                   >
-                    Apellido
+                    {t.auth.lastName}
                   </label>
                   <Input
                     id="lastName"
@@ -1385,7 +1390,7 @@ export function Header() {
                 className="text-sm font-medium"
                 style={{ color: "var(--foreground)" }}
               >
-                Correo electrónico
+                {t.auth.email}
               </label>
               <Input
                 id="email"
@@ -1409,7 +1414,7 @@ export function Header() {
                 className="text-sm font-medium"
                 style={{ color: "var(--foreground)" }}
               >
-                Contraseña
+                {t.auth.password}
               </label>
               <div className="relative">
                 <Input
@@ -1432,7 +1437,7 @@ export function Header() {
                   size="icon"
                   className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
                   onClick={() => setShowPassword(!showPassword)}
-                  title={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                  title={showPassword ? t.header.hidePassword : t.header.showPassword}
                   style={{ color: "var(--muted-foreground)" }}
                 >
                   {showPassword ? (
@@ -1451,7 +1456,7 @@ export function Header() {
                   className="text-sm font-medium"
                   style={{ color: "var(--foreground)" }}
                 >
-                  Confirmar contraseña
+                  {t.auth.confirmPassword}
                 </label>
                 <div className="relative">
                   <Input
@@ -1474,7 +1479,7 @@ export function Header() {
                     size="icon"
                     className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    title={showConfirmPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                    title={showConfirmPassword ? t.header.hidePassword : t.header.showPassword}
                     style={{ color: "var(--muted-foreground)" }}
                   >
                     {showConfirmPassword ? (
@@ -1496,7 +1501,7 @@ export function Header() {
                   color: "var(--primary-foreground)",
                 }}
               >
-                {isRegisterMode ? "Crear cuenta" : "Iniciar sesión"}
+                {isRegisterMode ? t.auth.createAccount : t.auth.signIn}
               </Button>
               <Button
                 type="button"
@@ -1524,14 +1529,14 @@ export function Header() {
                       setForgotPasswordModalOpen(true)
                     }}
                   >
-                    ¿Olvidaste tu contraseña?
+                    {t.auth.forgotPassword}
                   </button>
                 </div>
               )}
               {isRegisterMode ? (
                 <>
                   <span style={{ color: "var(--muted-foreground)" }}>
-                    ¿Ya tienes una cuenta?{" "}
+                    {t.auth.alreadyHaveAccount}{" "}
                   </span>
                   <button
                     type="button"
@@ -1554,7 +1559,7 @@ export function Header() {
               ) : (
                 <>
                   <span style={{ color: "var(--muted-foreground)" }}>
-                    ¿No tienes una cuenta?{" "}
+                    {t.auth.dontHaveAccount}{" "}
                   </span>
                   <button
                     type="button"
@@ -1591,16 +1596,16 @@ export function Header() {
               className="text-3xl md:text-4xl font-inter font-bold text-center"
               style={{ color: "var(--foreground)" }}
             >
-              Inicio de sesión requerido
+              {t.header.loginRequired}
             </AlertDialogTitle>
             <AlertDialogDescription 
               className="text-lg md:text-xl text-center mt-4 leading-relaxed"
               style={{ color: "var(--muted-foreground)" }}
             >
-              Para continuar con tu compra, necesitas iniciar sesión en tu cuenta.
+              {t.header.loginRequiredDescription}
               <br />
               <br />
-              Si no tienes una cuenta, puedes crear una fácilmente.
+              {t.header.loginRequiredDescription2}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col sm:flex-row gap-3 mt-8">
@@ -1617,7 +1622,7 @@ export function Header() {
                 color: "var(--primary-foreground)",
               }}
             >
-              Iniciar sesión
+              {t.auth.login}
             </AlertDialogAction>
             <Button
               onClick={() => {
@@ -1842,13 +1847,13 @@ export function Header() {
           {/* Resumen de compra */}
           <div className="mt-6 p-4 rounded-lg" style={{ backgroundColor: "var(--muted)" }}>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm" style={{ color: "var(--muted-foreground)" }}>Subtotal:</span>
+              <span className="text-sm" style={{ color: "var(--muted-foreground)" }}>{t.cart.subtotal}:</span>
               <span className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>
                 ${getTotal().toFixed(2)}
               </span>
             </div>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm" style={{ color: "var(--muted-foreground)" }}>Envío:</span>
+              <span className="text-sm" style={{ color: "var(--muted-foreground)" }}>{t.cart.shipping}:</span>
               <span className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>
                 $0.00
               </span>
@@ -1868,15 +1873,15 @@ export function Header() {
             <Button
               onClick={() => {
                 if (!selectedPaymentMethod) {
-                  toast.error("Selecciona un medio de pago", {
-                    description: "Por favor, elige cómo deseas pagar",
+                  toast.error(t.cart.selectPaymentMethod, {
+                    description: t.cart.selectPaymentMethodDescription,
                     duration: 3000,
                   })
                   return
                 }
                 // Aquí iría la lógica para procesar el pago
-                toast.success("Compra procesada", {
-                  description: `Tu pedido ha sido procesado exitosamente con ${getPaymentMethodName(selectedPaymentMethod)}`,
+                toast.success(t.cart.purchaseProcessed, {
+                  description: t.cart.purchaseProcessedDescription.replace('{method}', getPaymentMethodName(selectedPaymentMethod)),
                   duration: 3000,
                 })
                 setPaymentModalOpen(false)
@@ -1890,7 +1895,7 @@ export function Header() {
               }}
               disabled={!selectedPaymentMethod}
             >
-              Confirmar Pago
+              {t.header.confirmPayment}
             </Button>
             <Button
               variant="outline"
@@ -1924,12 +1929,12 @@ export function Header() {
         <DialogContent className="w-[95vw] max-w-[450px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-xl font-inter font-semibold" style={{ color: "var(--foreground)" }}>
-              {resetEmailSent ? "Email Enviado" : "Recuperar Contraseña"}
+              {resetEmailSent ? t.header.emailSent : t.header.forgotPasswordTitle}
             </DialogTitle>
             <DialogDescription className="text-sm" style={{ color: "var(--muted-foreground)" }}>
               {resetEmailSent 
-                ? "Revisa tu correo electrónico para restablecer tu contraseña"
-                : "Ingresa tu correo electrónico y te enviaremos un link para restablecer tu contraseña"}
+                ? t.header.forgotPasswordDescription2
+                : t.header.forgotPasswordDescription}
             </DialogDescription>
           </DialogHeader>
 
@@ -1938,8 +1943,8 @@ export function Header() {
               onSubmit={async (e) => {
                 e.preventDefault()
                 if (!resetEmail) {
-                  toast.error("Correo requerido", {
-                    description: "Por favor, ingresa tu correo electrónico",
+                    toast.error(t.common.error, {
+                      description: t.header.enterEmail,
                     duration: 3000,
                   })
                   return
@@ -1949,7 +1954,7 @@ export function Header() {
                 if (result.success) {
                   setResetEmailSent(true)
                   toast.success("Email enviado", {
-                    description: "Revisa tu correo para restablecer tu contraseña",
+                    description: t.header.checkEmail,
                     duration: 5000,
                   })
                 } else {
@@ -1967,7 +1972,7 @@ export function Header() {
                   className="text-sm font-medium"
                   style={{ color: "var(--foreground)" }}
                 >
-                  Correo electrónico
+                  {t.auth.email}
                 </label>
                 <Input
                   id="resetEmail"
@@ -2043,7 +2048,7 @@ export function Header() {
                     color: "var(--foreground)",
                   }}
                 >
-                  Volver a iniciar sesión
+                  {t.header.backToLogin}
                 </Button>
                 <Button
                   type="button"
@@ -2057,7 +2062,7 @@ export function Header() {
                     color: "var(--primary)",
                   }}
                 >
-                  Enviar a otro correo
+                  {t.header.sendToAnotherEmail}
                 </Button>
               </div>
             </div>

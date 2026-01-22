@@ -36,6 +36,8 @@ import { ReposteriaLayout } from "./reposteria-layout"
 import { AdminRedirect } from "@/components/admin/admin-redirect"
 import { DynamicTitle } from "@/components/dynamic-title"
 import { DynamicFavicon } from "@/components/dynamic-favicon"
+import { DynamicLang } from "@/components/dynamic-lang"
+import { LanguageProvider } from "@/contexts/language-context"
 
 const V0Setup = dynamic(() => import("@/components/v0-setup"))
 
@@ -71,7 +73,7 @@ export default async function RootLayout({
   }
 
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="es" suppressHydrationWarning>
       <head>
         <link
           rel="preconnect"
@@ -93,53 +95,56 @@ export default async function RootLayout({
       >
         <ApplyStylesScript />
         <V0Provider isV0={isV0}>
-          <StoreProvider>
-            <DynamicTitle />
-            <DynamicFavicon />
-            <ReposteriaLayout>
-              <StylesProvider>
-                <SiteBackground />
-                <AuthProvider>
-              <AdminPermissionsProvider>
-                <ThemeProvider>
-                <FontProvider>
-                  <ShopifyCartProvider>
-                    <CartProvider>
-                      <WishlistProvider>
-                        <AdminProvider>
-                        <NuqsAdapter>
-                          <Suspense fallback={null}>
-                            <StylesLoader>
-                              <Suspense fallback={null}>
-                                <AdminRedirect />
-                              </Suspense>
-                              <MainContentWrapper>
-                            <main data-vaul-drawer-wrapper="true">
-                              <EditableWrapper componentName="header" label="Header">
-                                <Header />
-                              </EditableWrapper>
-                              {children}
-                            </main>
-                              </MainContentWrapper>
-                              {isDevelopment && <DebugGrid />}
-                              <Toaster closeButton position="top-left" />
-                              <FloatingContactButton />
-                              <EditModeToggle />
-                              <EditorPanel />
-                            </StylesLoader>
-                          </Suspense>
-                          </NuqsAdapter>
-                        </AdminProvider>
-                      </WishlistProvider>
-                    </CartProvider>
-                  </ShopifyCartProvider>
-                  </FontProvider>
-                </ThemeProvider>
-              </AdminPermissionsProvider>
-            </AuthProvider>
-          </StylesProvider>
-            </ReposteriaLayout>
-          </StoreProvider>
+          <LanguageProvider>
+            <StoreProvider>
+              <DynamicLang />
+              <DynamicTitle />
+              <DynamicFavicon />
+              <ReposteriaLayout>
+                <StylesProvider>
+                  <SiteBackground />
+                  <AuthProvider>
+                <AdminPermissionsProvider>
+                  <ThemeProvider>
+                  <FontProvider>
+                    <ShopifyCartProvider>
+                      <CartProvider>
+                        <WishlistProvider>
+                          <AdminProvider>
+                          <NuqsAdapter>
+                            <Suspense fallback={null}>
+                              <StylesLoader>
+                                <Suspense fallback={null}>
+                                  <AdminRedirect />
+                                </Suspense>
+                                <MainContentWrapper>
+                              <main data-vaul-drawer-wrapper="true">
+                                <EditableWrapper componentName="header" label="Header">
+                                  <Header />
+                                </EditableWrapper>
+                                {children}
+                              </main>
+                                </MainContentWrapper>
+                                {isDevelopment && <DebugGrid />}
+                                <Toaster closeButton position="top-left" />
+                                <FloatingContactButton />
+                                <EditModeToggle />
+                                <EditorPanel />
+                              </StylesLoader>
+                            </Suspense>
+                            </NuqsAdapter>
+                          </AdminProvider>
+                        </WishlistProvider>
+                      </CartProvider>
+                    </ShopifyCartProvider>
+                    </FontProvider>
+                  </ThemeProvider>
+                </AdminPermissionsProvider>
+              </AuthProvider>
+            </StylesProvider>
+              </ReposteriaLayout>
+            </StoreProvider>
+          </LanguageProvider>
           {isV0 && <V0Setup />}
         </V0Provider>
       </body>

@@ -10,10 +10,12 @@ import { toast } from "sonner"
 import { useCart } from "@/contexts/cart-context"
 import { AddToCartButton } from "@/components/cart/add-to-cart"
 import { Product } from "@/lib/shopify/types"
+import { useLanguage } from "@/contexts/language-context"
 
 export default function WishlistPage() {
   const { items, removeFromWishlist, clearWishlist } = useWishlist()
   const { addToCart } = useCart()
+  const { t } = useLanguage()
 
   const handleAddToCart = (item: typeof items[0]) => {
     // Crear un producto adaptado para AddToCartButton
@@ -59,7 +61,7 @@ export default function WishlistPage() {
       image: item.image || "/placeholder.svg",
     }, 1)
 
-    toast.success("Producto agregado al carrito")
+    toast.success(t.wishlist.addedToCart)
   }
 
   if (items.length === 0) {
@@ -68,14 +70,14 @@ export default function WishlistPage() {
         <div className="container mx-auto px-4 py-8 md:py-16">
           <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
             <Heart className="h-16 w-16 md:h-24 md:w-24 text-muted-foreground mb-4" />
-            <h1 className="text-2xl md:text-3xl font-bold mb-2">Tu lista de favoritos está vacía</h1>
+            <h1 className="text-2xl md:text-3xl font-bold mb-2">{t.wishlist.empty}</h1>
             <p className="text-muted-foreground mb-6 max-w-md">
-              Agrega productos a tus favoritos para encontrarlos fácilmente más tarde
+              {t.wishlist.emptyDescription}
             </p>
             <Button asChild>
               <Link href="/">
                 <ArrowLeft className="h-4 w-4 mr-2" />
-                Explorar productos
+                {t.wishlist.exploreProducts}
               </Link>
             </Button>
           </div>
@@ -90,9 +92,9 @@ export default function WishlistPage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold mb-2">Mis Favoritos</h1>
+            <h1 className="text-2xl md:text-3xl font-bold mb-2">{t.wishlist.myFavorites}</h1>
             <p className="text-muted-foreground">
-              {items.length} {items.length === 1 ? "producto" : "productos"} en tu lista
+              {items.length} {items.length === 1 ? t.wishlist.item : t.wishlist.items} {t.wishlist.itemsCount}
             </p>
           </div>
           {items.length > 0 && (
@@ -100,12 +102,12 @@ export default function WishlistPage() {
               variant="outline"
               onClick={() => {
                 clearWishlist()
-                toast.success("Lista de favoritos vaciada")
+                toast.success(t.wishlist.cleared)
               }}
               className="w-full sm:w-auto"
             >
               <Trash2 className="h-4 w-4 mr-2" />
-              Limpiar todo
+              {t.wishlist.clearAll}
             </Button>
           )}
         </div>
@@ -124,9 +126,9 @@ export default function WishlistPage() {
                 className="absolute top-2 right-2 z-10 bg-background/80 backdrop-blur-sm"
                 onClick={() => {
                   removeFromWishlist(item.id)
-                  toast.success("Producto eliminado de favoritos")
+                  toast.success(t.wishlist.removedFromFavorites)
                 }}
-                title="Eliminar de favoritos"
+                title={t.wishlist.removeFromFavorites}
               >
                 <Trash2 className="h-4 w-4 text-red-500" />
               </Button>
@@ -183,7 +185,7 @@ export default function WishlistPage() {
                     onClick={() => handleAddToCart(item)}
                   >
                     <ShoppingCart className="h-4 w-4 mr-2" />
-                    Agregar
+                    {t.wishlist.add}
                   </Button>
                   <Button
                     variant="default"
@@ -192,7 +194,7 @@ export default function WishlistPage() {
                     asChild
                   >
                     <Link href={`/products/${item.handle}`}>
-                      Ver detalles
+                      {t.wishlist.viewDetails}
                     </Link>
                   </Button>
                 </div>

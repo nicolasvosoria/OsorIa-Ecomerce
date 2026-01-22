@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { User, UserPlus, ArrowRight } from "lucide-react"
 import Link from "next/link"
+import { useLanguage } from "@/contexts/language-context"
 
 interface CheckoutOptionsDialogProps {
   open: boolean
@@ -25,6 +26,7 @@ export function CheckoutOptionsDialog({
   onCloseCart,
 }: CheckoutOptionsDialogProps) {
   const router = useRouter()
+  const { t } = useLanguage()
   const [isNavigating, setIsNavigating] = useState(false)
 
   const handleGuestCheckout = () => {
@@ -55,10 +57,10 @@ export function CheckoutOptionsDialog({
       <DialogContent className="!w-[92vw] !max-w-[48rem] !max-h-[92vh] overflow-y-auto overflow-x-hidden p-6 sm:p-8">
         <DialogHeader className="space-y-2 mb-5">
           <DialogTitle className="text-xl sm:text-2xl leading-tight break-words">
-            ¿Cómo deseas continuar?
+            {t.cart.howToContinue}
           </DialogTitle>
           <DialogDescription className="text-sm sm:text-base leading-relaxed break-words">
-            Elige una opción para finalizar tu compra
+            {t.cart.chooseOptionToFinish}
           </DialogDescription>
         </DialogHeader>
 
@@ -77,10 +79,10 @@ export function CheckoutOptionsDialog({
               </div>
               <div className="flex-1 min-w-0 pr-4">
                 <div className="font-semibold text-base sm:text-lg mb-2 leading-tight break-words">
-                  Continuar como Invitado
+                  {t.cart.continueAsGuest}
                 </div>
                 <div className="text-sm sm:text-base text-muted-foreground leading-relaxed break-words whitespace-normal">
-                  Completa tu compra sin crear una cuenta. Podrás crear una cuenta más tarde si lo deseas.
+                  {t.cart.continueAsGuestDescription}
                 </div>
               </div>
               <ArrowRight className="w-5 h-5 sm:w-6 sm:h-6 text-muted-foreground flex-shrink-0 mt-1" />
@@ -101,10 +103,10 @@ export function CheckoutOptionsDialog({
               </div>
               <div className="flex-1 min-w-0 pr-4">
                 <div className="font-semibold text-base sm:text-lg mb-2 leading-tight break-words">
-                  Crear Cuenta y Continuar
+                  {t.cart.createAccountAndContinue}
                 </div>
                 <div className="text-sm sm:text-base text-muted-foreground leading-relaxed break-words whitespace-normal">
-                  Crea una cuenta gratuita para guardar tus pedidos, recibir ofertas exclusivas y más.
+                  {t.cart.createAccountAndContinueDescription}
                 </div>
               </div>
               <ArrowRight className="w-5 h-5 sm:w-6 sm:h-6 text-primary flex-shrink-0 mt-1" />
@@ -114,7 +116,7 @@ export function CheckoutOptionsDialog({
 
         <div className="text-sm text-center text-muted-foreground pt-4 border-t leading-relaxed break-words">
           <p>
-            ¿Ya tienes una cuenta?{" "}
+            {t.cart.alreadyHaveAccount}{" "}
             <Link
               href="/checkout?login=true"
               className="text-primary hover:underline font-medium inline"
@@ -123,7 +125,7 @@ export function CheckoutOptionsDialog({
                 onOpenChange(false)
               }}
             >
-              Inicia sesión aquí
+              {t.cart.loginHere}
             </Link>
           </p>
         </div>

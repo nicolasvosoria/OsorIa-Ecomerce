@@ -6,6 +6,7 @@ import { MessageSquare, X, Bot } from "lucide-react"
 import Link from "next/link"
 import { Chatbot } from "@/components/chatbot/chatbot"
 import { useAdmin } from "@/contexts/admin-context"
+import { useLanguage } from "@/contexts/language-context"
 
 // Icono oficial de WhatsApp
 const WhatsAppIcon = ({ className }: { className?: string }) => (
@@ -29,6 +30,7 @@ export function FloatingContactButton() {
   // useAdmin debe llamarse después de los useState pero antes de los useEffect
   // para mantener el orden consistente de hooks
   const { isAdmin, isEditMode, selectedComponent } = useAdmin()
+  const { t } = useLanguage()
   
   // Detectar si es móvil
   useEffect(() => {
@@ -109,7 +111,7 @@ export function FloatingContactButton() {
           }}
         >
           <WhatsAppIcon className="h-5 w-5 text-[#25D366]" />
-          <span className="font-semibold text-sm whitespace-nowrap">WhatsApp</span>
+          <span className="font-semibold text-sm whitespace-nowrap">{t.contact.whatsapp}</span>
         </Link>
 
         {/* Opción Chatbot - posición superior izquierda */}
@@ -139,7 +141,7 @@ export function FloatingContactButton() {
           }}
         >
           <Bot className="h-5 w-5" />
-          <span className="font-semibold text-sm whitespace-nowrap">Chatbot</span>
+          <span className="font-semibold text-sm whitespace-nowrap">{t.contact.chatbot}</span>
         </button>
       </div>
 
@@ -169,12 +171,12 @@ export function FloatingContactButton() {
         {isOpen ? (
           <>
             <X className="h-5 w-5 transition-transform duration-300" style={{ color: "var(--accent-foreground)" }} />
-            <span className="font-semibold text-sm whitespace-nowrap">Cerrar</span>
+            <span className="font-semibold text-sm whitespace-nowrap">{t.contact.close}</span>
           </>
         ) : (
           <>
             <MessageSquare className="h-5 w-5 transition-transform duration-300" style={{ color: "var(--accent-foreground)" }} />
-            <span className="font-semibold text-sm whitespace-nowrap">Contáctanos</span>
+            <span className="font-semibold text-sm whitespace-nowrap">{t.contact.contactUs}</span>
           </>
         )}
       </Button>

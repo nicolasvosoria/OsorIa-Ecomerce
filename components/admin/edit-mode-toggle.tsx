@@ -5,12 +5,14 @@ import { Button } from "@/components/ui/button"
 import { Edit, X } from "lucide-react"
 import { useState, useEffect } from "react"
 import { usePathname } from "next/navigation"
+import { useLanguage } from "@/contexts/language-context"
 
 export function EditModeToggle() {
   // Llamar todos los hooks primero, antes de cualquier return condicional
   const [isMobile, setIsMobile] = useState(false)
   const pathname = usePathname()
   const { isAdmin, isEditMode, toggleEditMode, selectedComponent } = useAdmin()
+  const { t } = useLanguage()
   
   useEffect(() => {
     const checkMobile = () => {
@@ -29,14 +31,14 @@ export function EditModeToggle() {
     return null
   }
   
-  // Posicionar el botón de modo edición en la esquina inferior izquierda
+  // Posicionar el botón de modo edición en la esquina inferior derecha
   // Cuando el panel de edición está abierto, ajustar la posición para no quedar detrás del panel
-  const leftOffset = !isMobile && isEditMode && selectedComponent ? "28rem" : "1rem" // 28rem cuando el panel está abierto, 1rem para esquina con pequeño margen
+  const rightOffset = !isMobile && isEditMode && selectedComponent ? "28rem" : "1rem" // 28rem cuando el panel está abierto, 1rem para esquina con pequeño margen
 
   return (
     <div 
       className="fixed bottom-4 z-50 transition-all duration-300"
-      style={{ left: leftOffset }}
+      style={{ right: rightOffset }}
     >
       <Button
         onClick={toggleEditMode}
@@ -50,12 +52,12 @@ export function EditModeToggle() {
         {isEditMode ? (
           <>
             <X className="h-4 w-4 mr-2" />
-            Salir de Edición
+            {t.admin.exitEditMode}
           </>
         ) : (
           <>
             <Edit className="h-4 w-4 mr-2" />
-            Modo Edición
+            {t.admin.editMode}
           </>
         )}
       </Button>

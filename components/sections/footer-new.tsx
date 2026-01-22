@@ -6,10 +6,12 @@ import Image from "next/image"
 import { useComponentStyle } from "@/contexts/styles-context"
 import { useTheme } from "@/contexts/theme-context"
 import { useStore } from "@/contexts/store-context"
+import { useLanguage } from "@/contexts/language-context"
 
 export function FooterNew() {
   const { store } = useStore()
   const { activeTheme } = useTheme()
+  const { t } = useLanguage()
   const { styles: styleData } = useComponentStyle("footer", {
     brandName: "OSORIA"
   })
@@ -71,17 +73,17 @@ export function FooterNew() {
           {isReposteria ? (
             <>
               <div>
-                <h3 className="font-semibold text-foreground mb-3 md:mb-4 text-sm md:text-base">Navegación</h3>
+                <h3 className="font-semibold text-foreground mb-3 md:mb-4 text-sm md:text-base">{t.footer.navigation}</h3>
                 <ul className="space-y-1 md:space-y-2">
-                  <li><Link href="/shop" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">Tienda</Link></li>
-                  <li><Link href="/catalog" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">Catálogo</Link></li>
-                  <li><Link href="#about" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">Sobre Nosotros</Link></li>
-                  <li><Link href="#contact" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">Contacto</Link></li>
+                  <li><Link href="/shop" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">{t.footer.shop}</Link></li>
+                  <li><Link href="/catalog" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">{t.footer.catalog}</Link></li>
+                  <li><Link href="#about" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">{t.footer.about}</Link></li>
+                  <li><Link href="#contact" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">{t.footer.contact}</Link></li>
                 </ul>
               </div>
 
               <div>
-                <h3 className="font-semibold text-foreground mb-3 md:mb-4 text-sm md:text-base">Productos</h3>
+                <h3 className="font-semibold text-foreground mb-3 md:mb-4 text-sm md:text-base">{t.footer.products}</h3>
                 <ul className="space-y-1 md:space-y-2">
                   <li><Link href="/shop?category=Pasteles" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">Pasteles</Link></li>
                   <li><Link href="/shop?category=Cupcakes" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">Cupcakes</Link></li>
@@ -91,43 +93,43 @@ export function FooterNew() {
               </div>
 
               <div>
-                <h3 className="font-semibold text-foreground mb-3 md:mb-4 text-sm md:text-base">Información</h3>
+                <h3 className="font-semibold text-foreground mb-3 md:mb-4 text-sm md:text-base">{t.footer.information}</h3>
                 <ul className="space-y-1 md:space-y-2">
-                  <li><Link href="#shipping" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">Envíos y Entrega</Link></li>
-                  <li><Link href="#orders" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">Pedidos Personalizados</Link></li>
-                  <li><Link href="#faq" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">Preguntas Frecuentes</Link></li>
-                  <li><Link href="#terms" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">Términos y Condiciones</Link></li>
+                  <li><Link href="#shipping" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">{t.footer.shippingAndDelivery}</Link></li>
+                  <li><Link href="#orders" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">{t.footer.customOrders}</Link></li>
+                  <li><Link href="#faq" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">{t.footer.faq}</Link></li>
+                  <li><Link href="#terms" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">{t.footer.terms}</Link></li>
                 </ul>
               </div>
             </>
           ) : (
             <>
               <div>
-                <h3 className="font-semibold text-foreground mb-3 md:mb-4 text-sm md:text-base">Navegación</h3>
+                <h3 className="font-semibold text-foreground mb-3 md:mb-4 text-sm md:text-base">{t.footer.navigation}</h3>
                 <ul className="space-y-1 md:space-y-2">
-                  <li><Link href="#about" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">Acerca de</Link></li>
-                  <li><Link href="#terms" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">Términos y Condiciones</Link></li>
-                  <li><Link href="#contact" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">Contacto</Link></li>
-                  <li><Link href="#sales" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">Ventas</Link></li>
+                  <li><Link href="#about" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">{t.footer.about}</Link></li>
+                  <li><Link href="#terms" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">{t.footer.terms}</Link></li>
+                  <li><Link href="#contact" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">{t.footer.contact}</Link></li>
+                  <li><Link href="#sales" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">{t.footer.sales}</Link></li>
                 </ul>
               </div>
 
               <div>
-                <h3 className="font-semibold text-foreground mb-3 md:mb-4 text-sm md:text-base">Servicio al cliente</h3>
+                <h3 className="font-semibold text-foreground mb-3 md:mb-4 text-sm md:text-base">{t.footer.customerService}</h3>
                 <ul className="space-y-1 md:space-y-2">
-                  <li><Link href="#help" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">Ayuda y Preguntas Frecuentes</Link></li>
-                  <li><Link href="#track" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">Rastrear Pedido</Link></li>
-                  <li><Link href="#shipping" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">Envío y Entrega</Link></li>
-                  <li><Link href="#returns" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">Entrega y Devoluciones</Link></li>
+                  <li><Link href="#help" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">{t.footer.help}</Link></li>
+                  <li><Link href="#track" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">{t.footer.trackOrder}</Link></li>
+                  <li><Link href="#shipping" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">{t.footer.shipping}</Link></li>
+                  <li><Link href="#returns" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">{t.footer.returns}</Link></li>
                 </ul>
               </div>
 
               <div>
-                <h3 className="font-semibold text-foreground mb-3 md:mb-4 text-sm md:text-base">Nuestra Empresa</h3>
+                <h3 className="font-semibold text-foreground mb-3 md:mb-4 text-sm md:text-base">{t.footer.ourCompany}</h3>
                 <ul className="space-y-1 md:space-y-2">
-                  <li><Link href="#team" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">Nuestro equipo</Link></li>
-                  <li><Link href="#stationary" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">Tiendas Físicas</Link></li>
-                  <li><Link href="#cooperation" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">Cooperación de Marketing</Link></li>
+                  <li><Link href="#team" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">{t.footer.team}</Link></li>
+                  <li><Link href="#stationary" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">{t.footer.stores}</Link></li>
+                  <li><Link href="#cooperation" className="text-muted-foreground hover:text-foreground text-xs md:text-sm">{t.footer.marketing}</Link></li>
                 </ul>
               </div>
             </>
@@ -138,9 +140,9 @@ export function FooterNew() {
         <div className="pt-8 border-t" style={{ borderColor: "var(--border)" }}>
           <p className="text-sm text-center" style={{ color: "var(--muted-foreground)" }}>
             {isReposteria ? (
-              <>© 2025 {brandName} | Todos los Derechos Reservados | Hecho con ❤️ y mucho azúcar</>
+              <>© 2025 {brandName} | {t.footer.allRightsReserved} | {t.footer.madeWith}</>
             ) : (
-              <>© 2025 Electrónica por Muffin group | Todos los Derechos Reservados</>
+              <>© 2025 {t.footer.electronicsBy} | {t.footer.allRightsReserved}</>
             )}
           </p>
         </div>

@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button"
 import { useCart } from "@/contexts/cart-context"
 import { toast } from "sonner"
 import { QuantityModal } from "@/components/cart/quantity-modal"
+import { useLanguage } from "@/contexts/language-context"
 
 // Helper para generar slug desde el título
 function generateSlug(title: string): string {
@@ -94,6 +95,7 @@ export function PopularItems({ initialProducts }: PopularItemsProps = {}) {
   })
   const { componentEdits } = useAdmin()
   const { addToCart } = useCart()
+  const { t, language } = useLanguage()
   
   // Combinar estilos de BD con ediciones locales para mostrar cambios en tiempo real
   const edits = componentEdits.get("popular") || {}
@@ -367,7 +369,7 @@ export function PopularItems({ initialProducts }: PopularItemsProps = {}) {
                             setQuantityModalOpen(true)
                           }}
                         >
-                          Agregar al carrito
+                          {t.products.addToCart}
                         </Button>
                         <Button
                           variant="outline"
@@ -380,7 +382,7 @@ export function PopularItems({ initialProducts }: PopularItemsProps = {}) {
                           asChild
                         >
                           <Link href={`/products/${itemSlug}`} onClick={(e) => e.stopPropagation()}>
-                            Ver detalles
+                            {t.wishlist.viewDetails}
                           </Link>
                         </Button>
                       </div>
@@ -424,8 +426,21 @@ export function PopularItems({ initialProducts }: PopularItemsProps = {}) {
           onOpenChange={setQuantityModalOpen}
           onConfirm={(quantity) => {
             addToCart(selectedItem, quantity)
-            toast.success("Producto agregado al carrito", {
-              description: `${quantity} ${quantity === 1 ? "unidad" : "unidades"} de ${selectedItem.name} ${quantity === 1 ? "ha sido" : "han sido"} agregada${quantity === 1 ? "" : "s"} exitosamente`,
+            const unit = quantity === 1 
+              ? (language === 'es' ? 'unidad' : language === 'en' ? 'unit' : 'unidade')
+              : (language === 'es' ? 'unidades' : language === 'en' ? 'units' : 'unidades')
+            const verb = quantity === 1
+              ? (language === 'es' ? 'ha sido' : language === 'en' ? 'has been' : 'foi')
+              : (language === 'es' ? 'han sido' : language === 'en' ? 'have been' : 'foram')
+            const plural = quantity === 1 ? '' : (language === 'es' ? 's' : language === 'en' ? '' : 's')
+            const description = t.products.addToCartDescription
+              .replace('{quantity}', quantity.toString())
+              .replace('{unit}', unit)
+              .replace('{name}', selectedItem.name)
+              .replace('{verb}', verb)
+              .replace('{plural}', plural)
+            toast.success(t.wishlist.addedToCart, {
+              description,
               duration: 3000,
             })
             setSelectedItem(null)

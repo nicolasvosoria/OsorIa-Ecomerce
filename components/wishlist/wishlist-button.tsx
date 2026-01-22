@@ -6,6 +6,7 @@ import { useWishlist } from "@/contexts/wishlist-context"
 import { Product } from "@/lib/shopify/types"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
+import { useLanguage } from "@/contexts/language-context"
 
 interface WishlistButtonProps {
   product: Product
@@ -23,6 +24,7 @@ export function WishlistButton({
   iconOnly = true 
 }: WishlistButtonProps) {
   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist()
+  const { t } = useLanguage()
   const inWishlist = isInWishlist(product.id)
 
   const handleToggle = (e: React.MouseEvent) => {
@@ -31,7 +33,7 @@ export function WishlistButton({
 
     if (inWishlist) {
       removeFromWishlist(product.id)
-      toast.success("Producto eliminado de favoritos")
+      toast.success(t.wishlist.removedFromFavorites)
     } else {
       addToWishlist({
         id: product.id,
@@ -42,7 +44,7 @@ export function WishlistButton({
         compareAtPrice: product.compareAtPrice?.amount,
         currencyCode: product.priceRange.minVariantPrice.currencyCode,
       })
-      toast.success("Producto agregado a favoritos")
+      toast.success(t.wishlist.addToFavorites)
     }
   }
 
@@ -56,8 +58,8 @@ export function WishlistButton({
         className
       )}
       onClick={handleToggle}
-      aria-label={inWishlist ? "Eliminar de favoritos" : "Agregar a favoritos"}
-      title={inWishlist ? "Eliminar de favoritos" : "Agregar a favoritos"}
+      aria-label={inWishlist ? t.wishlist.removeFromFavorites : t.wishlist.addToFavorites}
+      title={inWishlist ? t.wishlist.removeFromFavorites : t.wishlist.addToFavorites}
     >
       <Heart 
         className={cn(
@@ -67,7 +69,7 @@ export function WishlistButton({
       />
       {!iconOnly && (
         <span className="ml-2">
-          {inWishlist ? "En favoritos" : "Agregar a favoritos"}
+          {inWishlist ? t.wishlist.inFavorites : t.wishlist.addToFavorites}
         </span>
       )}
     </Button>
