@@ -127,6 +127,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }
 
     const root = document.documentElement
+    const body = document.body
     const colors = theme.colors
 
     // Aplicar colores directamente a las variables CSS que usa Tailwind
@@ -145,6 +146,18 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     root.style.setProperty("--primary-foreground", colors.foreground)
     root.style.setProperty("--secondary-foreground", colors.foreground)
     root.style.setProperty("--accent-foreground", colors.foreground)
+    
+    // Aplicar color de fondo al body directamente para temas oscuros
+    // Esto asegura que el fondo cambie inmediatamente cuando se cambia el tema
+    // Solo si no hay configuración personalizada de fondo (SiteBackground lo manejará)
+    const hasCustomBackground = body.style.backgroundColor && 
+                                body.style.backgroundColor !== '' &&
+                                body.style.backgroundColor !== 'rgb(255, 255, 255)' &&
+                                body.style.backgroundColor !== '#ffffff'
+    
+    if (!hasCustomBackground) {
+      body.style.backgroundColor = colors.background
+    }
 
     // Marcar que este tema ya fue aplicado
     appliedThemeRef.current = theme.theme_name

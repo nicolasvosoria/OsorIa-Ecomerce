@@ -1,160 +1,154 @@
-# 🚀 Guía Completa de Despliegue Local
+# 🚀 Guía de Despliegue Local - OsorIa E-commerce
 
-Esta guía te ayudará a desplegar completamente el proyecto OsorIa E-commerce en tu máquina local.
+Esta guía te ayudará a configurar y ejecutar el proyecto en tu máquina local.
 
-## 📋 Requisitos Previos
+## 📋 Prerrequisitos
 
-### 1. Software Necesario
+Antes de comenzar, asegúrate de tener instalado:
 
-- **Node.js 18+**: [Descargar Node.js](https://nodejs.org/)
-- **pnpm** (recomendado) o **npm**: 
-  ```bash
-  # Instalar pnpm globalmente
-  npm install -g pnpm
-  ```
-- **Git**: Para clonar el repositorio (si no lo tienes)
-- **Editor de código**: VS Code, Cursor, etc.
+1. **Node.js 18 o superior**
+   - Verifica con: `node --version`
+   - Descarga desde: https://nodejs.org/
 
-### 2. Cuenta de Supabase
+2. **pnpm (recomendado) o npm**
+   - Instalar pnpm: `npm install -g pnpm`
+   - Verifica con: `pnpm --version`
 
-- Crea una cuenta en [Supabase](https://supabase.com)
-- Crea un nuevo proyecto
-- Obtén las credenciales:
-  - **URL del proyecto**: `https://tu-proyecto.supabase.co`
-  - **Anon Key**: Clave pública anónima
+3. **Cuenta de Supabase**
+   - Ya tienes las credenciales en `.env.local` ✅
 
-## 🔧 Paso 1: Configuración del Proyecto
+## 🔧 Pasos de Instalación
 
-### 1.1. Clonar/Verificar el Repositorio
-
-Si ya tienes el proyecto, salta este paso. Si no:
+### 1. Instalar Dependencias
 
 ```bash
-git clone <url-del-repositorio>
-cd OsorIa-Ecomerce
+pnpm install
 ```
 
-### 1.2. Crear Archivo de Variables de Entorno
+O si prefieres npm:
+```bash
+npm install
+```
 
-Crea un archivo `.env.local` en la raíz del proyecto con:
+### 2. Variables de Entorno ✅
 
+Ya tienes el archivo `.env.local` configurado con:
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+
+**Variables opcionales** (si las necesitas):
 ```env
-# Supabase (REQUERIDO)
-NEXT_PUBLIC_SUPABASE_URL=https://tu-proyecto.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=tu-anon-key-aqui
+# Shopify (opcional)
+NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN=tu-tienda.myshopify.com
 
-# URL del sitio (opcional, se detecta automáticamente en desarrollo)
+# URL del sitio (opcional, se auto-detecta en desarrollo)
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 
-# Shopify (OPCIONAL - solo si usas Shopify)
-# NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN=tu-tienda.myshopify.com
-
-# SMTP para Emails (OPCIONAL - solo si quieres enviar correos)
-# SMTP_HOST=smtp.gmail.com
-# SMTP_PORT=587
-# SMTP_USER=tu-email@gmail.com
-# SMTP_PASS=tu-contraseña-de-aplicación
-# SMTP_FROM="Tu Tienda <tu-email@gmail.com>"
+# Deshabilitar multi-tenant (opcional)
+DISABLE_SUBDOMAIN_MULTI_TENANT=false
+DEFAULT_STORE_ID=uuid-de-tu-tienda
 ```
 
-**Nota**: Ya tienes el `.env.local` creado con tus credenciales de Supabase.
+### 3. Configurar Base de Datos en Supabase
 
-### 1.3. Instalar Dependencias
+**IMPORTANTE:** Debes ejecutar los scripts SQL en el orden correcto en el SQL Editor de Supabase.
 
-```bash
-# Opción 1: Con pnpm (recomendado)
-pnpm install
+#### Orden de Ejecución de Scripts SQL:
 
-# Opción 2: Con npm (si no tienes pnpm)
-npm install --legacy-peer-deps
-```
+1. **Perfiles de Usuario**
+   ```sql
+   -- Ejecutar: scripts/19-create-user-profiles-table.sql
+   ```
 
-**Nota**: El flag `--legacy-peer-deps` es necesario porque el proyecto usa React 19 pero algunas dependencias requieren React 18.
+2. **Temas y Estilos**
+   ```sql
+   -- Ejecutar: scripts/01-create-themes-table.sql
+   -- Ejecutar: scripts/01-create-component-styles-table.sql
+   -- Ejecutar: scripts/04-create-fonts-table.sql
+   ```
 
-## 🗄️ Paso 2: Configuración de la Base de Datos (Supabase)
+3. **Productos**
+   ```sql
+   -- Ejecutar: scripts/20-create-products-tables.sql
+   ```
 
-### 2.1. Ejecutar Scripts SQL en Orden
+4. **Tiendas (Multi-tenant)**
+   ```sql
+   -- Ejecutar: scripts/30-create-stores-table.sql
+   ```
 
-Ve al **SQL Editor** en tu dashboard de Supabase y ejecuta los scripts en este orden:
+5. **Relacionar Productos con Tiendas**
+   ```sql
+   -- Ejecutar: scripts/31-add-store-id-to-products.sql
+   ```
 
-#### **Orden de Ejecución de Scripts:**
+6. **Pedidos**
+   ```sql
+   -- Ejecutar: scripts/29-create-orders-tables.sql
+   ```
 
-1. **`19-create-user-profiles-table.sql`** - Tabla de perfiles de usuario
-2. **`01-create-themes-table.sql`** - Tabla de temas
-3. **`01-create-component-styles-table.sql`** - Tabla de estilos de componentes
-4. **`04-create-fonts-table.sql`** - Tabla de fuentes
-5. **`20-create-products-tables.sql`** - Tablas de productos y categorías
-6. **`30-create-stores-table.sql`** - Tabla de tiendas (MULTI-TIENDA)
-7. **`31-add-store-id-to-products.sql`** - Relacionar productos con tiendas
-8. **`29-create-orders-tables.sql`** - Tablas de pedidos
-9. **`32-add-store-id-to-orders.sql`** - Relacionar pedidos con tiendas
-10. **`33-add-store-id-to-styles.sql`** - Relacionar estilos con tiendas
-11. **`18-fix-rls-y-datos-final.sql`** - Configurar RLS (Row Level Security)
-12. **`34-create-reposteria-store.sql`** - Crear tienda de ejemplo "reposteria"
-13. **`35-update-reposteria-theme.sql`** - Configurar tema para repostería
+7. **Relacionar Pedidos con Tiendas**
+   ```sql
+   -- Ejecutar: scripts/32-add-store-id-to-orders.sql
+   ```
 
-#### **Scripts Adicionales (Opcionales):**
+8. **Relacionar Estilos con Tiendas**
+   ```sql
+   -- Ejecutar: scripts/33-add-store-id-to-styles.sql
+   ```
 
-- **`21-add-user-roles.sql`** - Agregar roles de usuario
-- **`22-create-cart-tables.sql`** - Tabla de carritos (si no usas Shopify)
-- **`23-create-admin-user.sql`** - Crear usuario administrador
-- **`27-insert-sample-products.sql`** - Insertar productos de ejemplo
-- **`27-setup-storage-bucket.sql`** - Configurar bucket de almacenamiento
+9. **Configurar RLS (Row Level Security)**
+   ```sql
+   -- Ejecutar: scripts/18-fix-rls-y-datos-final.sql
+   ```
 
-### 2.2. Verificar Funciones RPC
+10. **Crear Tienda de Ejemplo (Opcional)**
+    ```sql
+    -- Ejecutar: scripts/34-create-reposteria-store.sql
+    -- Ejecutar: scripts/35-update-reposteria-theme.sql
+    ```
 
-Asegúrate de que la función `get_store_by_subdomain` esté creada. Debería estar en el script `30-create-stores-table.sql`.
+#### Scripts Opcionales:
 
-### 2.3. Configurar Row Level Security (RLS)
+- `21-add-user-roles.sql` - Agregar roles de usuario (user/admin)
+- `23-create-admin-user.sql` - Crear usuario administrador
+- `27-insert-sample-products.sql` - Insertar productos de ejemplo
+- `27-setup-storage-bucket.sql` - Configurar bucket de almacenamiento
 
-El script `18-fix-rls-y-datos-final.sql` debería configurar las políticas RLS. Verifica que:
+**💡 Tip:** Puedes ver el orden completo en `scripts/inicializar-base-datos.sql`
 
-- Las tablas `stores`, `user_profiles`, `store_items` tengan RLS habilitado
-- Las políticas permitan lectura pública de `stores` activas
-- Las políticas permitan escritura solo para usuarios autenticados donde corresponda
+### 4. Configurar URLs de Redirección en Supabase
 
-### 2.4. Crear Tienda por Defecto
+Para que la autenticación funcione correctamente:
 
-Si no ejecutaste el script `34-create-reposteria-store.sql`, crea al menos una tienda por defecto:
+1. Ve a tu **Supabase Dashboard** → **Authentication** → **URL Configuration**
 
-```sql
-INSERT INTO public.stores (
-  subdomain,
-  store_name,
-  domain,
-  is_active,
-  is_public,
-  currency_code
-) VALUES (
-  'default',
-  'Tienda Principal',
-  'localhost',
-  TRUE,
-  TRUE,
-  'COP'
-) ON CONFLICT (subdomain) DO NOTHING;
-```
+2. Configura las siguientes URLs:
 
-## 🌐 Paso 3: Configurar Subdominios Locales (Multi-Tienda)
+   **Site URL:**
+   ```
+   http://localhost:3000
+   ```
 
-Para probar la funcionalidad multi-tienda localmente, necesitas configurar el archivo `hosts` de Windows.
+   **Redirect URLs** (agregar cada una):
+   ```
+   http://localhost:3000/auth/callback
+   http://localhost:3000/auth/reset-password
+   ```
 
-### 3.1. Usar el Script PowerShell (Recomendado)
+3. Si vas a usar subdominios locales (ej: `reposteria.localhost:3000`), agrega también:
+   ```
+   http://reposteria.localhost:3000/auth/callback
+   http://reposteria.localhost:3000/auth/reset-password
+   ```
 
-Ejecuta el script `configurar-hosts.ps1` como administrador:
+### 5. Configurar Subdominios Locales (Opcional)
 
-```powershell
-# Abre PowerShell como Administrador y ejecuta:
-.\scripts\configurar-hosts.ps1
-```
+Si quieres probar el sistema multi-tienda con subdominios:
 
-### 3.2. Configuración Manual del Archivo Hosts
+#### En Windows (PowerShell como Administrador):
 
-Si prefieres hacerlo manualmente:
-
-1. Abre el **Bloc de notas como Administrador**
-2. Abre el archivo: `C:\Windows\System32\drivers\etc\hosts`
-3. Agrega estas líneas al final:
+Edita el archivo `C:\Windows\System32\drivers\etc\hosts` y agrega:
 
 ```
 127.0.0.1    localhost
@@ -162,159 +156,127 @@ Si prefieres hacerlo manualmente:
 127.0.0.1    default.localhost
 ```
 
-4. Guarda el archivo
-
-### 3.3. Verificar Configuración
-
-```bash
-# En PowerShell o CMD
-ping reposteria.localhost
+O ejecuta el script PowerShell:
+```powershell
+.\scripts\configurar-hosts.ps1
 ```
 
-Debería responder con `127.0.0.1`.
+#### En Linux/Mac:
 
-## 🚀 Paso 4: Iniciar el Servidor de Desarrollo
+Edita `/etc/hosts` y agrega:
 
-### 4.1. Iniciar el Servidor
+```
+127.0.0.1    localhost
+127.0.0.1    reposteria.localhost
+127.0.0.1    default.localhost
+```
+
+### 6. Ejecutar el Servidor de Desarrollo
 
 ```bash
-# Con pnpm
 pnpm dev
+```
 
-# Con npm
+O con npm:
+```bash
 npm run dev
 ```
 
-El servidor debería iniciar en `http://localhost:3000`
+El proyecto estará disponible en:
+- **URL principal:** http://localhost:3000
+- **Tienda repostería:** http://reposteria.localhost:3000 (si configuraste hosts)
 
-### 4.2. Probar las URLs
+## ✅ Verificación
 
-- **Tienda por defecto**: `http://localhost:3000`
-- **Tienda de repostería**: `http://reposteria.localhost:3000`
-- **Tienda por defecto (subdominio)**: `http://default.localhost:3000`
+### Verificar que todo funciona:
 
-## ✅ Paso 5: Verificación
+1. **Abrir el navegador:**
+   - http://localhost:3000
 
-### 5.1. Verificar que el Proyecto Funciona
+2. **Verificar autenticación:**
+   - Intenta registrarte o iniciar sesión
+   - Deberías poder crear una cuenta
 
-1. **Abre el navegador** en `http://localhost:3000`
-2. **Verifica la consola del navegador** (F12) - no debería haber errores críticos
-3. **Verifica la consola del servidor** - debería mostrar "Ready" sin errores
+3. **Verificar base de datos:**
+   - Ve a `/admin` (si tienes usuario admin)
+   - Verifica que puedes ver productos, pedidos, etc.
 
-### 5.2. Verificar Multi-Tienda
+4. **Verificar multi-tienda:**
+   - Accede a http://reposteria.localhost:3000 (si configuraste hosts)
+   - Deberías ver estilos personalizados
 
-1. Accede a `http://reposteria.localhost:3000`
-2. El middleware debería detectar el subdominio "reposteria"
-3. Debería cargar la tienda correspondiente desde Supabase
+## 🔍 Solución de Problemas
 
-### 5.3. Verificar Autenticación
+### Error: "Supabase no configurado"
+- Verifica que `.env.local` existe y tiene las variables correctas
+- Reinicia el servidor de desarrollo después de crear `.env.local`
 
-1. Intenta registrarte en `/auth` (si existe la ruta)
-2. Verifica que se cree el perfil en `user_profiles`
-3. Intenta iniciar sesión
+### Error: "No se pudo obtener store_id"
+- Verifica que ejecutaste `30-create-stores-table.sql`
+- Verifica que existe al menos una tienda en la tabla `stores`
+- Verifica que la función `get_store_by_subdomain` existe
 
-### 5.4. Verificar Base de Datos
+### Error: "Tabla no existe"
+- Verifica que ejecutaste todos los scripts SQL en orden
+- Revisa los logs en Supabase SQL Editor
 
-En Supabase, verifica que:
+### Error de autenticación
+- Verifica las URLs de redirección en Supabase Dashboard
+- Asegúrate de que `http://localhost:3000` está en Site URL
 
-- ✅ Existe al menos una tienda en la tabla `stores`
-- ✅ La función `get_store_by_subdomain` existe y funciona
-- ✅ Las políticas RLS están configuradas
-- ✅ Existen productos (si ejecutaste el script de productos de ejemplo)
+### Error: "Cannot find module"
+- Ejecuta `pnpm install` nuevamente
+- Elimina `node_modules` y `.next` y vuelve a instalar:
+  ```bash
+  rm -rf node_modules .next
+  pnpm install
+  ```
 
-## 🔍 Troubleshooting
+## 📝 Comandos Útiles
 
-### Problema: "Supabase no configurado"
-
-**Solución**: Verifica que el archivo `.env.local` existe y tiene las variables correctas:
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-
-### Problema: "Tienda no encontrada"
-
-**Solución**: 
-1. Verifica que existe una tienda con `subdomain = 'default'` en Supabase
-2. Verifica que la función `get_store_by_subdomain` existe
-3. Revisa los logs del middleware en la consola del servidor
-
-### Problema: "Error de dependencias"
-
-**Solución**:
 ```bash
-# Limpia e instala de nuevo
-rm -rf node_modules package-lock.json
-npm install --legacy-peer-deps
-# O con pnpm
-rm -rf node_modules pnpm-lock.yaml
-pnpm install
+# Desarrollo
+pnpm dev
+
+# Build de producción
+pnpm build
+
+# Ejecutar build de producción
+pnpm start
+
+# Linting
+pnpm lint
+
+# Tests
+pnpm test
+pnpm test:ui
+pnpm test:coverage
 ```
 
-### Problema: "Subdominio no funciona"
+## 🎯 Próximos Pasos
 
-**Solución**:
-1. Verifica que el archivo `hosts` tiene las entradas correctas
-2. Reinicia el navegador después de modificar `hosts`
-3. Prueba con `http://reposteria.localhost:3000` (no olvides el puerto)
+1. **Crear un usuario administrador:**
+   - Ejecuta `scripts/23-create-admin-user.sql` en Supabase
+   - O crea un usuario desde la app y cambia su rol a `admin` en Supabase
 
-### Problema: "Error de RLS en Supabase"
+2. **Agregar productos:**
+   - Ejecuta `scripts/27-insert-sample-products.sql` para datos de ejemplo
+   - O usa el panel de administración en `/admin/products`
 
-**Solución**:
-1. Ejecuta el script `18-fix-rls-y-datos-final.sql`
-2. Verifica que las políticas RLS permiten lectura pública de `stores`
-3. En desarrollo, puedes deshabilitar temporalmente RLS para debugging (no recomendado en producción)
+3. **Personalizar temas:**
+   - Ve a `/admin` y personaliza los temas
+   - O ejecuta los scripts de temas en Supabase
 
-### Problema: "El servidor no inicia"
+4. **Configurar email (opcional):**
+   - Configura nodemailer para envío de correos de confirmación
+   - Variables de entorno adicionales pueden ser necesarias
 
-**Solución**:
-1. Verifica que el puerto 3000 no está en uso:
-   ```bash
-   netstat -ano | findstr :3000
-   ```
-2. Usa otro puerto:
-   ```bash
-   pnpm dev -- -p 3001
-   ```
+## 📚 Recursos Adicionales
 
-## 📝 Checklist Final
+- **Documentación Next.js:** https://nextjs.org/docs
+- **Documentación Supabase:** https://supabase.com/docs
+- **Documentación del proyecto:** Ver `README.md` y archivos en `scripts/`
 
-Antes de considerar el despliegue completo:
+---
 
-- [ ] Node.js 18+ instalado
-- [ ] pnpm o npm instalado
-- [ ] Archivo `.env.local` creado con credenciales de Supabase
-- [ ] Dependencias instaladas (`node_modules` existe)
-- [ ] Scripts SQL ejecutados en Supabase en el orden correcto
-- [ ] Al menos una tienda creada en la tabla `stores`
-- [ ] Función `get_store_by_subdomain` creada y funcionando
-- [ ] Archivo `hosts` configurado para subdominios locales
-- [ ] Servidor de desarrollo inicia sin errores
-- [ ] `http://localhost:3000` carga correctamente
-- [ ] `http://reposteria.localhost:3000` carga correctamente
-- [ ] No hay errores en la consola del navegador
-- [ ] No hay errores en la consola del servidor
-
-## 🎉 ¡Listo!
-
-Si completaste todos los pasos, tu proyecto debería estar funcionando localmente. Ahora puedes:
-
-- Desarrollar nuevas funcionalidades
-- Probar cambios en el código
-- Ver los cambios en tiempo real con hot-reload
-- Probar la funcionalidad multi-tienda con diferentes subdominios
-
-## 📚 Próximos Pasos
-
-- **Despliegue en Vercel**: Consulta `GUIA-DESPLIEGUE-VERCEL.md`
-- **Configurar Emails**: Agrega las variables SMTP en `.env.local`
-- **Integrar Shopify**: Agrega `NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN` si lo necesitas
-- **Agregar más tiendas**: Crea más registros en la tabla `stores`
-
-## 🆘 Soporte
-
-Si tienes problemas:
-
-1. Revisa los logs del servidor (consola donde ejecutaste `pnpm dev`)
-2. Revisa la consola del navegador (F12 → Console)
-3. Verifica que todas las variables de entorno estén configuradas
-4. Verifica que los scripts SQL se ejecutaron correctamente
-5. Consulta la documentación de [Next.js](https://nextjs.org/docs) y [Supabase](https://supabase.com/docs)
+¡Listo! Tu proyecto debería estar funcionando localmente. 🎉

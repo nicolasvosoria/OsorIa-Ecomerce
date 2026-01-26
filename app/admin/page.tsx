@@ -33,8 +33,14 @@ function AdminPageContent() {
   // Mostrar loading mientras se verifica
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <Loader2 className="h-8 w-8 animate-spin" />
+      <div 
+        className="flex items-center justify-center h-screen"
+        style={{ backgroundColor: "var(--background)" }}
+      >
+        <Loader2 
+          className="h-8 w-8 animate-spin" 
+          style={{ color: "var(--foreground)" }}
+        />
       </div>
     )
   }
@@ -42,7 +48,10 @@ function AdminPageContent() {
   // Mostrar mensaje de acceso denegado si no es administrador
   if (!isAdmin) {
     return (
-      <div className="flex items-center justify-center h-screen p-4">
+      <div 
+        className="flex items-center justify-center h-screen p-4"
+        style={{ backgroundColor: "var(--background)" }}
+      >
         <Card className="max-w-md w-full">
           <CardHeader>
             <div className="flex items-center gap-2">

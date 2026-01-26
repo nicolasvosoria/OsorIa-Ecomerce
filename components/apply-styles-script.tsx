@@ -51,6 +51,8 @@ export function ApplyStylesScript() {
     // Aplicar el tema (guardado o por defecto)
     if (themeToApply.colors) {
       const colors = themeToApply.colors;
+      const body = document.body;
+      
       root.style.setProperty('--primary', colors.primary);
       root.style.setProperty('--secondary', colors.secondary);
       root.style.setProperty('--accent', colors.accent);
@@ -64,6 +66,10 @@ export function ApplyStylesScript() {
       root.style.setProperty('--primary-foreground', colors.foreground);
       root.style.setProperty('--secondary-foreground', colors.foreground);
       root.style.setProperty('--accent-foreground', colors.foreground);
+      
+      // Aplicar color de fondo al body para temas oscuros
+      // Esto evita el "flash" de fondo blanco antes de que React se monte
+      body.style.backgroundColor = colors.background;
       
       // Marcar qué tema fue aplicado
       window.__osoria_applied_theme = themeToApply.theme_name;

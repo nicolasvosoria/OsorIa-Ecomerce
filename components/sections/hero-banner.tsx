@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, useMemo } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -52,12 +52,34 @@ export function HeroBanner() {
   const [selectedFeature, setSelectedFeature] = useState<{ title: string; description: string } | null>(null)
   const [isFeatureDialogOpen, setIsFeatureDialogOpen] = useState(false)
   
+  // Determinar si el tema es oscuro para ajustar estilos
+  const isDarkTheme = useMemo(() => {
+    if (!activeTheme) return false
+    // Verificar si el nombre del tema contiene "Oscuro"
+    if (activeTheme.theme_name.toLowerCase().includes("oscuro")) {
+      return true
+    }
+    // También verificar si el background es oscuro (RGB bajo)
+    const bgColor = activeTheme.colors.background
+    if (bgColor.startsWith("#")) {
+      const r = parseInt(bgColor.slice(1, 3), 16)
+      const g = parseInt(bgColor.slice(3, 5), 16)
+      const b = parseInt(bgColor.slice(5, 7), 16)
+      // Si el promedio de RGB es menor a 128, es un tema oscuro
+      const avg = (r + g + b) / 3
+      return avg < 128
+    }
+    return false
+  }, [activeTheme])
+  
   // Combinar estilos de BD con ediciones locales para mostrar cambios en tiempo real
   const edits = componentEdits.get("hero") || {}
-  const bgColor = edits.bgColor ?? styleData.bgColor
-  const textColor = edits.textColor ?? styleData.textColor
-  const buttonColor = edits.buttonColor ?? styleData.buttonColor
-  const buttonTextColor = edits.buttonTextColor ?? styleData.buttonTextColor
+  // Usar variables CSS del tema si no hay configuración personalizada
+  // Esto permite que los temas oscuros funcionen correctamente
+  const bgColor = edits.bgColor ?? styleData.bgColor ?? "var(--primary)"
+  const textColor = edits.textColor ?? styleData.textColor ?? "var(--primary-foreground)"
+  const buttonColor = edits.buttonColor ?? styleData.buttonColor ?? "var(--accent)"
+  const buttonTextColor = edits.buttonTextColor ?? styleData.buttonTextColor ?? "var(--accent-foreground)"
   const barColor = edits.barColor ?? styleData.barColor
 
   // Características por producto
@@ -189,6 +211,8 @@ export function HeroBanner() {
     }
   }
 
+  // Obtener colores del tema activo
+  // Para temas oscuros, esto asegura que se usen los colores correctos
   const accentColor = activeTheme?.colors.accent || "#005aa1"
   const secondaryColor = activeTheme?.colors.secondary || "#c4faff"
 
@@ -238,8 +262,8 @@ export function HeroBanner() {
       data-component="hero"
       className="relative overflow-hidden rounded-2xl md:rounded-3xl mx-2 md:mx-4 mt-2 md:mt-4 mb-4 md:mb-8" 
       style={{ 
-        backgroundColor: bgColor || "var(--primary)",
-        ...(textColor && { color: textColor }),
+        backgroundColor: bgColor,
+        color: textColor,
       }}
     >
       <Carousel
@@ -262,15 +286,21 @@ export function HeroBanner() {
             
             return (
             <CarouselItem key={index} className="basis-full">
-              <div className="container mx-auto px-4 md:px-8 py-8 md:py-16 lg:py-24">
+              <div className="container mx-auto px-4 md:px-8 py-8 pb-20 md:py-16 lg:py-24">
                 <div className="grid lg:grid-cols-2 gap-6 md:gap-12 items-center">
                   <div 
                     className="space-y-4 md:space-y-6 text-center md:text-left" 
-                    style={{ color: textColor || "var(--primary-foreground)" }}
+                    style={{ color: textColor }}
                   >
                     <span 
                       className="inline-block rounded text-xs md:text-[14.21px] font-inter font-medium rounded-lg px-4 md:px-6 py-1"
-                      style={{ backgroundColor: "rgba(255, 255, 255, 0.2)" }}
+                      style={{ 
+                        backgroundColor: activeTheme 
+                          ? (isDarkTheme 
+                              ? "rgba(255, 255, 255, 0.1)" 
+                              : "rgba(255, 255, 255, 0.2)")
+                          : "rgba(255, 255, 255, 0.2)"
+                      }}
                     >
                       {displayLabel}
                     </span>
@@ -290,10 +320,10 @@ export function HeroBanner() {
                     </p>
                     <Button
                       size="lg"
-                      className="text-sm md:text-[16px] font-inter font-medium rounded px-6 md:px-8 w-full md:w-auto transition-all duration-200 min-h-[44px] touch-manipulation"
+                      className="text-sm md:text-[16px] font-inter font-medium rounded px-6 md:px-8 w-full md:w-auto transition-all duration-200 min-h-[44px] touch-manipulation mb-4 md:mb-0"
                       style={{
-                        backgroundColor: buttonColor || "var(--accent)",
-                        color: buttonTextColor || "var(--accent-foreground)",
+                        backgroundColor: buttonColor,
+                        color: buttonTextColor,
                       }}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.filter = "brightness(0.85)"
@@ -370,6 +400,8 @@ export function HeroBanner() {
           background: barColor 
             ? `linear-gradient(to bottom, ${hexToRgba(barColor, 0.8)}, ${hexToRgba(barColor, 0.4)})`
             : `linear-gradient(to bottom, ${hexToRgba(accentColor, 0.8)}, ${hexToRgba(secondaryColor, 0.6)})`,
+          // Asegurar que use los colores del tema activo
+          // Si el tema es oscuro, los colores se adaptarán automáticamente
         }}
       />
 

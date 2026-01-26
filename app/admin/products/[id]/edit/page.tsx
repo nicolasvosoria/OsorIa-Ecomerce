@@ -221,15 +221,24 @@ export default function EditProductPage() {
 
   if (loading || loadingProduct) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <Loader2 className="h-8 w-8 animate-spin" />
+      <div 
+        className="flex items-center justify-center h-screen"
+        style={{ backgroundColor: "var(--background)" }}
+      >
+        <Loader2 
+          className="h-8 w-8 animate-spin" 
+          style={{ color: "var(--foreground)" }}
+        />
       </div>
     )
   }
 
   if (!isAdmin) {
     return (
-      <div className="flex items-center justify-center h-screen p-4">
+      <div 
+        className="flex items-center justify-center h-screen p-4"
+        style={{ backgroundColor: "var(--background)" }}
+      >
         <Card className="max-w-md w-full">
           <CardHeader>
             <div className="flex items-center gap-2">
@@ -251,9 +260,21 @@ export default function EditProductPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+    <div 
+      className="min-h-screen" 
+      style={{ 
+        backgroundColor: "var(--background)",
+        background: "linear-gradient(to bottom right, var(--background), var(--muted))"
+      }}
+    >
       {/* Header */}
-      <header className="bg-white border-b shadow-sm">
+      <header 
+        className="border-b shadow-sm"
+        style={{ 
+          backgroundColor: "var(--card)",
+          borderColor: "var(--border)"
+        }}
+      >
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -263,8 +284,16 @@ export default function EditProductPage() {
                 </Link>
               </Button>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">Editar Producto</h1>
-                <p className="text-sm text-gray-600 mt-1">
+                <h1 
+                  className="text-2xl font-bold"
+                  style={{ color: "var(--foreground)" }}
+                >
+                  Editar Producto
+                </h1>
+                <p 
+                  className="text-sm mt-1"
+                  style={{ color: "var(--muted-foreground)" }}
+                >
                   Modifica la información del producto
                 </p>
               </div>

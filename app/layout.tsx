@@ -102,10 +102,10 @@ export default async function RootLayout({
               <DynamicFavicon />
               <ReposteriaLayout>
                 <StylesProvider>
-                  <SiteBackground />
                   <AuthProvider>
                 <AdminPermissionsProvider>
                   <ThemeProvider>
+                  <SiteBackground />
                   <FontProvider>
                     <ShopifyCartProvider>
                       <CartProvider>

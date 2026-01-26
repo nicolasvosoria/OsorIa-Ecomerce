@@ -104,20 +104,21 @@ export function Header() {
     logoImageDark: "/logo-osoria-blanco.svg",
     searchPlaceholder: "Buscar...",
     tagline: "Big Sale! Hurry up! Sale ends in 2025",
-    bgColor: "#ffffff",
-    bannerBgColor: "#c4faff",
-    bannerTextColor: "#005aa1",
-    menuButtonColor: "#1a1a1a",
-    menuButtonHoverBg: "#f5f5f5",
-    loginButtonColor: "#1a1a1a",
-    loginButtonHoverBg: "#f5f5f5",
-    iconColor: "#1a1a1a",
-    iconHoverBg: "#f5f5f5",
-    searchIconColor: "#737373",
-    searchBgColor: "#f5f5f5",
-    searchTextColor: "#1a1a1a",
-    searchBorderColor: "#e5e5e5",
-    linkColor: "#005aa1",
+    // Usar variables CSS del tema para que se adapte a temas oscuros
+    bgColor: "var(--background)",
+    bannerBgColor: "var(--secondary)",
+    bannerTextColor: "var(--primary)",
+    menuButtonColor: "var(--foreground)",
+    menuButtonHoverBg: "var(--muted)",
+    loginButtonColor: "var(--foreground)",
+    loginButtonHoverBg: "var(--muted)",
+    iconColor: "var(--foreground)",
+    iconHoverBg: "var(--muted)",
+    searchIconColor: "var(--muted-foreground)",
+    searchBgColor: "var(--muted)",
+    searchTextColor: "var(--foreground)",
+    searchBorderColor: "var(--border)",
+    linkColor: "var(--primary)",
   })
 
   // Determinar si el tema es oscuro
@@ -270,7 +271,8 @@ export function Header() {
       className="sticky top-0 z-50 w-full border-b" 
       style={{ 
         backgroundColor: styleData.bgColor || "var(--background)", 
-        borderColor: "var(--border)" 
+        borderColor: "var(--border)",
+        // Asegurar que el header use el color de fondo del tema
       }}
     >
       <div className="container mx-auto px-4 py-3 md:py-6">
