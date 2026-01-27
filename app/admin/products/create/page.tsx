@@ -40,6 +40,7 @@ export default function CreateProductPage() {
     item_name: "",
     item_code: "",
     item_description: "",
+    ai_details: "",
     category_id: "",
     base_price: "",
     compare_at_price: "",
@@ -118,6 +119,12 @@ export default function CreateProductPage() {
       const primaryImage = images.length > 0 ? images[0] : undefined
       const additionalImages = images.length > 1 ? images.slice(1) : []
 
+      // Preparar metadata con ai_details si existe
+      const metadata: Record<string, any> = {}
+      if (formData.ai_details.trim()) {
+        metadata.ai_details = formData.ai_details.trim()
+      }
+
       const result = await createItem(
         {
           item_name: formData.item_name.trim(),
@@ -139,6 +146,7 @@ export default function CreateProductPage() {
           primary_image_url: primaryImage,
           primary_image_alt: formData.item_name.trim(),
           display_order: parseInt(formData.display_order) || 0,
+          metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
         },
         additionalImages
       )
@@ -316,6 +324,24 @@ export default function CreateProductPage() {
                       placeholder="Descripción del producto..."
                       rows={6}
                     />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="ai_details">
+                      Detalles y Características para el Asistente Virtual
+                    </Label>
+                    <Textarea
+                      id="ai_details"
+                      value={formData.ai_details}
+                      onChange={(e) => setFormData({ ...formData, ai_details: e.target.value })}
+                      placeholder="Ej: Material: Aluminio anodizado. Dimensiones: 15x10x5 cm. Peso: 250g. Incluye: Cable USB-C, manual de usuario. Garantía: 2 años. Compatible con: iOS 12+, Android 8+..."
+                      rows={6}
+                      className="font-mono text-sm"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Información detallada sobre características, especificaciones técnicas, materiales, compatibilidad, etc. 
+                      Esta información será utilizada por el asistente virtual para responder preguntas específicas sobre el producto.
+                    </p>
                   </div>
                 </CardContent>
               </Card>

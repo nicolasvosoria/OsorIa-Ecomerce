@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { X, Send, Bot, User } from "lucide-react"
+import { X, Send, Bot, User, Loader2 } from "lucide-react"
 
 interface Message {
   id: string
@@ -105,12 +105,13 @@ export function Chatbot({ isOpen, onClose }: ChatbotProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
-      text: "¡Hola! 👋 Soy tu asistente virtual. ¿En qué puedo ayudarte hoy?",
+      text: "¡Hola! 👋 Soy tu asistente virtual con IA. ¿En qué puedo ayudarte hoy?",
       sender: "bot",
       timestamp: typeof window !== 'undefined' ? new Date() : new Date(0),
     },
   ])
   const [inputValue, setInputValue] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Auto-scroll al final cuando hay nuevos mensajes
@@ -118,8 +119,33 @@ export function Chatbot({ isOpen, onClose }: ChatbotProps) {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
-  const handleSend = () => {
-    if (!inputValue.trim()) return
+  // Función para obtener respuesta de DeepSeek
+  const getDeepSeekResponse = async (userMessages: Message[]): Promise<string | null> => {
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          messages: userMessages,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to get response from DeepSeek")
+      }
+
+      const data = await response.json()
+      return data.message || null
+    } catch (error) {
+      console.error("[Chatbot] Error calling DeepSeek API:", error)
+      return null
+    }
+  }
+
+  const handleSend = async () => {
+    if (!inputValue.trim() || isLoading) return
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -128,19 +154,46 @@ export function Chatbot({ isOpen, onClose }: ChatbotProps) {
       timestamp: typeof window !== 'undefined' ? new Date() : new Date(0),
     }
 
+    const currentInput = inputValue
     setMessages((prev) => [...prev, userMessage])
     setInputValue("")
+    setIsLoading(true)
 
-    // Simular respuesta del bot después de un breve delay
-    setTimeout(() => {
+    try {
+      // Intentar obtener respuesta de DeepSeek
+      const allMessages = [...messages, userMessage]
+      const aiResponse = await getDeepSeekResponse(allMessages)
+
+      let botResponseText: string
+
+      if (aiResponse) {
+        // Usar respuesta de DeepSeek
+        botResponseText = aiResponse
+      } else {
+        // Fallback a base de conocimiento
+        botResponseText = findAnswer(currentInput)
+      }
+
       const botResponse: Message = {
         id: (Date.now() + 1).toString(),
-        text: findAnswer(inputValue),
+        text: botResponseText,
+        sender: "bot",
+        timestamp: typeof window !== 'undefined' ? new Date() : new Date(0),
+      }
+
+      setMessages((prev) => [...prev, botResponse])
+    } catch (error) {
+      // En caso de error, usar base de conocimiento
+      const botResponse: Message = {
+        id: (Date.now() + 1).toString(),
+        text: findAnswer(currentInput),
         sender: "bot",
         timestamp: typeof window !== 'undefined' ? new Date() : new Date(0),
       }
       setMessages((prev) => [...prev, botResponse])
-    }, 500)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -245,6 +298,31 @@ export function Chatbot({ isOpen, onClose }: ChatbotProps) {
               )}
             </div>
           ))}
+          
+          {/* Indicador de carga */}
+          {isLoading && (
+            <div className="flex gap-3 justify-start">
+              <div
+                className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
+                style={{ backgroundColor: "var(--accent)" }}
+              >
+                <Bot className="h-4 w-4" style={{ color: "var(--accent-foreground)" }} />
+              </div>
+              <div
+                className="max-w-[75%] rounded-lg px-4 py-2 rounded-bl-none"
+                style={{
+                  backgroundColor: "var(--muted)",
+                  color: "var(--muted-foreground)",
+                }}
+              >
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="text-sm">Pensando...</span>
+                </div>
+              </div>
+            </div>
+          )}
+          
           <div ref={messagesEndRef} />
         </div>
 
@@ -263,13 +341,17 @@ export function Chatbot({ isOpen, onClose }: ChatbotProps) {
             />
             <Button
               onClick={handleSend}
-              disabled={!inputValue.trim()}
+              disabled={!inputValue.trim() || isLoading}
               style={{
                 backgroundColor: "var(--accent)",
                 color: "var(--accent-foreground)",
               }}
             >
-              <Send className="h-4 w-4" />
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
             </Button>
           </div>
         </div>

@@ -15,7 +15,8 @@ import {
   ArrowRight,
   Eye,
   Edit,
-  BarChart3
+  BarChart3,
+  Bot
 } from "lucide-react"
 import Link from "next/link"
 // getDashboardStats se importa dinámicamente para evitar problemas con Turbopack
@@ -142,6 +143,13 @@ function DashboardContent() {
       icon: Edit,
       href: "/admin",
       color: "bg-orange-500",
+    },
+    {
+      title: "Asistente Virtual",
+      description: "Configura el chatbot y su comportamiento",
+      icon: Bot,
+      href: "/admin/chatbot",
+      color: "bg-teal-500",
     },
   ]
 
