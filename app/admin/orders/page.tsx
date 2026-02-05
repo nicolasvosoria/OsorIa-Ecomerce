@@ -15,7 +15,7 @@ import {
   Download,
 } from "lucide-react"
 import Link from "next/link"
-import { getOrders, getOrderById, type Order, type OrderWithItems } from "@/lib/supabase/orders-api"
+import { getOrders, getOrderById, updateOrderStatus, type Order, type OrderWithItems } from "@/lib/supabase/orders-api"
 import { formatPrice } from "@/lib/shopify/utils"
 import {
   Table,
@@ -26,6 +26,13 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import * as XLSX from "xlsx"
 
 export default function AdminOrdersPage() {
@@ -35,6 +42,7 @@ export default function AdminOrdersPage() {
   const [loadingOrders, setLoadingOrders] = useState(true)
   const [totalOrders, setTotalOrders] = useState(0)
   const [downloadingExcel, setDownloadingExcel] = useState(false)
+  const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!loading && !isAdmin) {
@@ -74,6 +82,7 @@ export default function AdminOrdersPage() {
       processing: { variant: "default", label: "Procesando" },
       shipped: { variant: "outline", label: "Enviado" },
       delivered: { variant: "default", label: "Entregado" },
+      returned: { variant: "outline", label: "Devuelto" },
       cancelled: { variant: "destructive", label: "Cancelado" },
     }
     const config = variants[status] || { variant: "secondary" as const, label: status }
@@ -99,9 +108,24 @@ export default function AdminOrdersPage() {
       processing: "Procesando",
       shipped: "Enviado",
       delivered: "Entregado",
+      returned: "Devuelto",
       cancelled: "Cancelado",
     }
     return statusMap[status] || status
+  }
+
+  const ORDER_STATUSES: Order['status'][] = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'returned', 'cancelled']
+
+  const handleStatusChange = async (orderId: string, newStatus: Order['status']) => {
+    setUpdatingOrderId(orderId)
+    try {
+      const ok = await updateOrderStatus(orderId, newStatus)
+      if (ok) {
+        setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o)))
+      }
+    } finally {
+      setUpdatingOrderId(null)
+    }
   }
 
   // Función para obtener el texto del estado de pago
@@ -458,7 +482,27 @@ export default function AdminOrdersPage() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          {getStatusBadge(order.status)}
+                          <div className="flex items-center gap-2">
+                            <Select
+                              value={order.status}
+                              onValueChange={(value) => handleStatusChange(order.id, value as Order['status'])}
+                              disabled={updatingOrderId === order.id}
+                            >
+                              <SelectTrigger className="w-[140px] h-9">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {ORDER_STATUSES.map((s) => (
+                                  <SelectItem key={s} value={s}>
+                                    {getStatusText(s)}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            {updatingOrderId === order.id && (
+                              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground shrink-0" />
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell>
                           {getPaymentStatusBadge(order.payment_status)}

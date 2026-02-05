@@ -23,17 +23,19 @@ export function EditModeToggle() {
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
-  // Ocultar el botón en las páginas del dashboard y admin
-  const isDashboardOrAdminPage = pathname?.startsWith('/dashboard') || pathname?.startsWith('/admin')
+  // Ocultar el botón en dashboard. En /admin mostrarlo siempre que esté en modo edición.
+  const isDashboardPage = pathname?.startsWith('/dashboard')
+  const isAdminPage = pathname?.startsWith('/admin')
+  const hideToggle = !isAdmin || isDashboardPage || (isAdminPage && !isEditMode)
 
   // Return condicional después de todos los hooks
-  if (!isAdmin || isDashboardOrAdminPage) {
+  if (hideToggle) {
     return null
   }
-  
-  // Posicionar el botón de modo edición en la esquina inferior derecha
-  // Cuando el panel de edición está abierto, ajustar la posición para no quedar detrás del panel
-  const rightOffset = !isMobile && isEditMode && selectedComponent ? "28rem" : "1rem" // 28rem cuando el panel está abierto, 1rem para esquina con pequeño margen
+
+  // Posicionar el botón de modo edición en la esquina inferior derecha.
+  // Cuando el panel de edición está abierto (hay componente seleccionado), desplazar para no quedar detrás del panel.
+  const rightOffset = !isMobile && isEditMode && selectedComponent ? "28rem" : "1rem"
 
   return (
     <div 

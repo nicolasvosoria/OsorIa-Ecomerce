@@ -5,7 +5,7 @@ export interface Order {
   id: string
   order_number: string
   order_date: string
-  status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled'
+  status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'returned' | 'cancelled'
   customer_type: 'guest' | 'user'
   user_id?: string | null
   customer_email: string
