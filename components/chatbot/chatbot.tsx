@@ -119,27 +119,29 @@ export function Chatbot({ isOpen, onClose }: ChatbotProps) {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
-  // Función para obtener respuesta de DeepSeek
+  // Función para obtener respuesta de DeepSeek (timeout 55s para dar margen en Vercel)
   const getDeepSeekResponse = async (userMessages: Message[]): Promise<string | null> => {
     try {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 55000)
       const response = await fetch("/api/chat", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          messages: userMessages,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: userMessages }),
+        signal: controller.signal,
       })
+      clearTimeout(timeoutId)
 
       if (!response.ok) {
-        throw new Error("Failed to get response from DeepSeek")
+        const errBody = await response.json().catch(() => ({}))
+        console.error("[Chatbot] API error:", response.status, errBody)
+        return null
       }
 
       const data = await response.json()
       return data.message || null
     } catch (error) {
-      console.error("[Chatbot] Error calling DeepSeek API:", error)
+      console.error("[Chatbot] Error calling chat API:", error)
       return null
     }
   }
@@ -167,11 +169,14 @@ export function Chatbot({ isOpen, onClose }: ChatbotProps) {
       let botResponseText: string
 
       if (aiResponse) {
-        // Usar respuesta de DeepSeek
         botResponseText = aiResponse
       } else {
-        // Fallback a base de conocimiento
-        botResponseText = findAnswer(currentInput)
+        // La API falló (timeout, error en Vercel, etc.): no dar respuesta genérica de catálogo para no confundir
+        const fallback = findAnswer(currentInput)
+        const looksLikeCatalogQuestion = /catalogo|catálogo|productos|qué tienen|que tienen|cuéntame|hablame/i.test(currentInput)
+        botResponseText = looksLikeCatalogQuestion
+          ? "No pude cargar el catálogo en este momento. Comprueba tu conexión e inténtalo de nuevo en unos segundos. Si el problema continúa, navega por las categorías del menú para ver los productos."
+          : fallback
       }
 
       const botResponse: Message = {
@@ -183,10 +188,13 @@ export function Chatbot({ isOpen, onClose }: ChatbotProps) {
 
       setMessages((prev) => [...prev, botResponse])
     } catch (error) {
-      // En caso de error, usar base de conocimiento
+      const looksLikeCatalogQuestion = /catalogo|catálogo|productos|qué tienen|que tienen|cuéntame|hablame/i.test(currentInput)
+      const text = looksLikeCatalogQuestion
+        ? "No pude conectar con el asistente. Inténtalo de nuevo en unos segundos."
+        : findAnswer(currentInput)
       const botResponse: Message = {
         id: (Date.now() + 1).toString(),
-        text: findAnswer(currentInput),
+        text,
         sender: "bot",
         timestamp: typeof window !== 'undefined' ? new Date() : new Date(0),
       }

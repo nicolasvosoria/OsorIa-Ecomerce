@@ -3,6 +3,9 @@ import { createServerClient } from "@supabase/ssr"
 import { createClient } from "@supabase/supabase-js"
 import { cookies } from "next/headers"
 
+// En Vercel: dar más tiempo a la función (DeepSeek + Supabase pueden tardar). Plan Hobby máx 10s; Pro hasta 300s.
+export const maxDuration = 30
+
 const DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
 const DEEPSEEK_MODEL = "deepseek-chat"
 

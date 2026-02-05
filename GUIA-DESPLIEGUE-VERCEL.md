@@ -38,7 +38,15 @@ En el dashboard de Vercel, ve a **Settings** → **Environment Variables** y agr
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://tu-proyecto.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=tu-anon-key-aqui
+SUPABASE_SERVICE_ROLE_KEY=tu-service-role-key-aqui
 ```
+**Importante:** `SUPABASE_SERVICE_ROLE_KEY` es necesaria para que el asistente virtual pueda leer el catálogo de productos. Sin ella, las preguntas sobre productos darán error o respuestas genéricas. Añádela en **Production** y **Preview**.
+
+#### **Asistente virtual (Chat con IA)**
+```
+DEEPSEEK_API_KEY=tu-api-key-de-deepseek
+```
+Sin esta variable, el chat no podrá responder con IA. La ruta `/api/chat` tiene `maxDuration = 30` segundos; en plan Hobby de Vercel el límite es 10s, por lo que respuestas muy largas pueden hacer timeout (en plan Pro el límite es mayor).
 
 #### **SMTP para Emails (Opcional pero recomendado)**
 ```
