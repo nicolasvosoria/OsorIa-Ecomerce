@@ -140,16 +140,17 @@ export default function CheckoutPage() {
     } else if (hasLocalItems) {
       // Procesar items del carrito local
       orderItems = localCart.items.map((item) => {
-        const priceNum = parseFloat((item.salePrice || item.price).replace(/[$,]/g, "")) || 0
+        const itemSubtotal = localCart.getItemSubtotal(item)
+        const unitPrice = item.quantity > 0 ? itemSubtotal / item.quantity : 0
         return {
           product_id: typeof item.id === "string" ? item.id : undefined,
           product_name: item.name,
           product_sku: undefined,
           variant_id: undefined,
           variant_title: undefined,
-          unit_price: priceNum,
+          unit_price: unitPrice,
           quantity: item.quantity,
-          total_price: priceNum * item.quantity,
+          total_price: itemSubtotal,
           currency_code: "COP",
           product_image_url: item.image || undefined,
           product_slug: undefined,
@@ -438,7 +439,7 @@ export default function CheckoutPage() {
                       </div>
                       <p className="text-sm font-semibold ml-4">
                         {formatPrice(
-                          ((parseFloat((item.salePrice || item.price).replace(/[$,]/g, "")) || 0) * item.quantity).toString(),
+                          localCart.getItemSubtotal(item).toString(),
                           "COP"
                         )}
                       </p>

@@ -93,7 +93,7 @@ export function Header() {
   const [isSearching, setIsSearching] = useState(false)
   const [categories, setCategories] = useState<Array<{ id: string; category_name: string; display_order: number }>>([])
   const { activeTheme } = useTheme()
-  const { items, removeFromCart, updateQuantity, getTotal, getTotalItems } = useCart()
+  const { items, removeFromCart, updateQuantity, getTotal, getItemSubtotal, getTotalItems } = useCart()
   const { getTotalItems: getWishlistTotalItems } = useWishlist()
   const { user, isAuthenticated, login, register, logout, refreshUser } = useAuth()
   const { store } = useStore()
@@ -1162,21 +1162,16 @@ export function Header() {
               <div className="p-6 border-t flex-shrink-0 bg-background" style={{ borderColor: "var(--border)", backgroundColor: "var(--background)" }}>
                 {/* Resumen de productos */}
                 <div className="space-y-2 mb-4">
-                  {items.map((item) => {
-                    const priceStr = item.salePrice || item.price
-                    const priceNum = parseFloat(priceStr.replace(/[$,]/g, "")) || 0
-                    const itemTotal = priceNum * item.quantity
-                    return (
-                      <div key={item.id} className="flex items-center justify-between text-sm">
-                        <span style={{ color: "var(--muted-foreground)" }}>
-                          {item.name} x{item.quantity}
-                        </span>
-                        <span style={{ color: "var(--foreground)", fontWeight: 500 }}>
-                          ${itemTotal.toFixed(2)}
-                        </span>
-                      </div>
-                    )
-                  })}
+                  {items.map((item) => (
+                    <div key={item.id} className="flex items-center justify-between text-sm">
+                      <span style={{ color: "var(--muted-foreground)" }}>
+                        {item.name} x{item.quantity}
+                      </span>
+                      <span style={{ color: "var(--foreground)", fontWeight: 500 }}>
+                        ${getItemSubtotal(item).toFixed(2)}
+                      </span>
+                    </div>
+                  ))}
                 </div>
                 
                 {/* Línea separadora */}

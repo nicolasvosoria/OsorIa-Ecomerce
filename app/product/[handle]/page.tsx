@@ -24,17 +24,24 @@ import { VariantSelectorSlots } from './components/variant-selector-slots';
 import { MobileGallerySlider } from './components/mobile-gallery-slider';
 import { DesktopGallery } from './components/desktop-gallery';
 
-// Generate static params for all products at build time
+// Generate static params for all products at build time.
+// Next.js 16 con Cache Components exige al menos un resultado.
 export async function generateStaticParams() {
   try {
-    const products = await getProducts({ limit: 100 }); // Get first 100 products
+    const products = await getProducts({ limit: 100 });
+
+    if (products.length === 0) {
+      return [{ handle: 'placeholder' }];
+    }
 
     return products.map(product => ({
       handle: product.handle,
     }));
   } catch (error) {
-    console.error('Error generating static params for products:', error);
-    return [];
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Error generating static params for /product/[handle]:', error);
+    }
+    return [{ handle: 'placeholder' }];
   }
 }
 
