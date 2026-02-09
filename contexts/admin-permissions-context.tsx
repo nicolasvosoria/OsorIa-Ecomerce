@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
+import { createContext, useContext, useEffect, useState, useRef, type ReactNode } from "react"
 import { isCurrentUserAdmin, getCurrentUserRole } from "@/lib/supabase/permissions-api"
 import { useAuth } from "@/contexts/auth-context"
 import type { UserRole } from "@/lib/types/user"
@@ -16,13 +16,23 @@ interface AdminPermissionsContextType {
 const AdminPermissionsContext = createContext<AdminPermissionsContextType | undefined>(undefined)
 
 export function AdminPermissionsProvider({ children }: { children: ReactNode }) {
-  const { isLoading: authLoading } = useAuth()
+  const { isLoading: authLoading, isAuthenticated } = useAuth()
   const [isAdmin, setIsAdmin] = useState(false)
   const [role, setRole] = useState<UserRole | null>(null)
   const [loading, setLoading] = useState(true)
   const [hasChecked, setHasChecked] = useState(false) // Indica si ya se verificó al menos una vez
+  const refreshRef = useRef(false) // Ref para evitar múltiples llamadas simultáneas
+  const verifiedAsAdminRef = useRef(false) // Ref para rastrear si ya se verificó como admin exitosamente
 
   const refreshPermissions = async () => {
+    // Evitar múltiples verificaciones simultáneas
+    if (refreshRef.current) {
+      console.log("[AdminPermissions] Verificación ya en progreso, ignorando llamada duplicada")
+      return
+    }
+    
+    refreshRef.current = true
+    console.log("[AdminPermissions] Iniciando verificación de permisos...")
     try {
       setLoading(true)
       
@@ -36,8 +46,10 @@ export function AdminPermissionsProvider({ children }: { children: ReactNode }) 
       // Procesar resultado de isCurrentUserAdmin
       // IMPORTANTE: Actualizar isAdmin ANTES de establecer loading en false
       if (adminResult.status === 'fulfilled') {
-        setIsAdmin(adminResult.value)
-        console.log(`[AdminPermissions] Estado de admin actualizado: ${adminResult.value}`)
+        const adminValue = adminResult.value
+        setIsAdmin(adminValue)
+        verifiedAsAdminRef.current = adminValue // Rastrear si es admin
+        console.log(`[AdminPermissions] Estado de admin actualizado: ${adminValue}`)
       } else {
         const error = adminResult.reason
         const errorMessage = error?.message || String(error) || ''
@@ -100,18 +112,47 @@ export function AdminPermissionsProvider({ children }: { children: ReactNode }) 
       setTimeout(() => {
         setLoading(false)
         console.log("[AdminPermissions] Verificación de permisos completada, hasChecked:", true)
+        refreshRef.current = false // Permitir nuevas verificaciones
       }, 100)
     }
   }
 
   // Esperar a que la autenticación esté lista antes de comprobar permisos (evita "no tienes permisos" al entrar)
   useEffect(() => {
+    // Si ya se verificó exitosamente como admin y el usuario sigue autenticado, no verificar de nuevo
+    // Esto evita verificaciones innecesarias al navegar entre páginas
+    if (verifiedAsAdminRef.current && isAuthenticated && !authLoading) {
+      console.log("[AdminPermissions] Ya verificado como admin, omitiendo verificación adicional")
+      setLoading(false) // Asegurar que loading esté en false
+      return
+    }
+
     if (authLoading) {
       setLoading(true)
       return
     }
-    refreshPermissions()
-  }, [authLoading])
+
+    // Si el usuario se desautenticó, resetear estado
+    if (!isAuthenticated) {
+      if (verifiedAsAdminRef.current || hasChecked) {
+        console.log("[AdminPermissions] Usuario desautenticado, reseteando estado")
+        setIsAdmin(false)
+        setRole(null)
+        setHasChecked(false)
+        verifiedAsAdminRef.current = false // Resetear ref
+      }
+      setLoading(false)
+      return
+    }
+
+    // Solo verificar si no se ha verificado aún o si se reseteó el estado
+    if (!hasChecked) {
+      refreshPermissions()
+    } else if (hasChecked && !isAdmin && !verifiedAsAdminRef.current) {
+      // Ya se verificó y no es admin, mantener estado
+      setLoading(false)
+    }
+  }, [authLoading, isAuthenticated]) // Solo depender de authLoading e isAuthenticated para evitar loops
 
 
   return (
