@@ -20,33 +20,38 @@ import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 function AdminPageContent() {
-  const { isAdmin, loading } = useAdminPermissions()
+  const { isAdmin, loading, hasChecked } = useAdminPermissions()
   const router = useRouter()
 
   useEffect(() => {
-    if (!loading && !isAdmin) {
-      // Redirigir a la página principal si no es administrador o cuando cierra sesión
+    // Solo redirigir si la verificación se completó (hasChecked) y no es admin
+    // Esto asegura que esperamos a que isAdmin se actualice antes de redirigir
+    if (hasChecked && !loading && !isAdmin) {
+      console.log("[Admin] Usuario no es admin después de verificación, redirigiendo...")
       router.push("/")
     }
-  }, [isAdmin, loading, router])
+  }, [isAdmin, loading, hasChecked, router])
 
-  // Mostrar loading mientras se verifica
-  if (loading) {
+  // Mostrar loading mientras se verifican permisos
+  if (loading || !hasChecked) {
     return (
       <div 
-        className="flex items-center justify-center h-screen"
+        className="flex flex-col items-center justify-center h-screen gap-4"
         style={{ backgroundColor: "var(--background)" }}
       >
         <Loader2 
           className="h-8 w-8 animate-spin" 
           style={{ color: "var(--foreground)" }}
         />
+        <p className="text-sm text-muted-foreground">
+          Verificando permisos de administrador...
+        </p>
       </div>
     )
   }
 
-  // Mostrar mensaje de acceso denegado si no es administrador
-  if (!isAdmin) {
+  // Solo mostrar acceso denegado si ya se verificaron los permisos y no es admin
+  if (!isAdmin && hasChecked) {
     return (
       <div 
         className="flex items-center justify-center h-screen p-4"

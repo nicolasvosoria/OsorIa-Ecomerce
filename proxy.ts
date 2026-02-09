@@ -75,10 +75,20 @@ function getSubdomain(hostname: string): string | null {
   return null
 }
 
+// Caché simple en memoria para las tiendas (evita consultas repetidas)
+const storeCache = new Map<string, { store: Store | null; timestamp: number }>()
+const CACHE_TTL = 5 * 60 * 1000 // 5 minutos
+
 /**
- * Obtiene la tienda desde Supabase por subdominio
+ * Obtiene la tienda desde Supabase por subdominio (con caché)
  */
 async function getStoreBySubdomain(subdomain: string): Promise<Store | null> {
+  // Verificar caché primero
+  const cached = storeCache.get(subdomain)
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.store
+  }
+
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -97,23 +107,33 @@ async function getStoreBySubdomain(subdomain: string): Promise<Store | null> {
           'Authorization': `Bearer ${supabaseAnonKey}`,
           'Content-Type': 'application/json',
         },
+        // Agregar timeout para evitar que se quede colgado
+        signal: AbortSignal.timeout(5000), // 5 segundos timeout
       }
     )
 
     if (!response.ok) {
       console.error('[Proxy] Error al obtener tienda:', response.statusText)
+      // Cachear null para evitar consultas repetidas en caso de error
+      storeCache.set(subdomain, { store: null, timestamp: Date.now() })
       return null
     }
 
     const data = await response.json()
     
+    let store: Store | null = null
     if (data && data.length > 0) {
-      return data[0] as Store
+      store = data[0] as Store
     }
 
-    return null
+    // Guardar en caché
+    storeCache.set(subdomain, { store, timestamp: Date.now() })
+    
+    return store
   } catch (error) {
     console.error('[Proxy] Error al obtener tienda:', error)
+    // Cachear null para evitar consultas repetidas en caso de error
+    storeCache.set(subdomain, { store: null, timestamp: Date.now() })
     return null
   }
 }

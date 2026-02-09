@@ -23,6 +23,26 @@ const nextConfig = {
       },
     ],
   },
+  // Optimizaciones de compilación
+  experimental: {
+    // Optimizar imports de paquetes grandes
+    optimizePackageImports: [
+      'lucide-react',
+      'recharts',
+      '@radix-ui/react-dialog',
+      '@radix-ui/react-dropdown-menu',
+      '@radix-ui/react-select',
+      '@radix-ui/react-tabs',
+      '@radix-ui/react-tooltip',
+    ],
+  },
+  // Configuración de compilación
+  compiler: {
+    // Remover console.log en producción (opcional, puede ayudar con performance)
+    removeConsole: process.env.NODE_ENV === 'production' ? {
+      exclude: ['error', 'warn'],
+    } : false,
+  },
 };
 
 export default nextConfig;

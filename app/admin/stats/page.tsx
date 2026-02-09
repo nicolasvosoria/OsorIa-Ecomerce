@@ -24,16 +24,19 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
 export default function AdminStatsPage() {
-  const { isAdmin, loading } = useAdminPermissions()
+  const { isAdmin, loading, hasChecked } = useAdminPermissions()
   const router = useRouter()
   const [detailedStats, setDetailedStats] = useState<DetailedStats | null>(null)
   const [loadingDetailed, setLoadingDetailed] = useState(true)
 
   useEffect(() => {
-    if (!loading && !isAdmin) {
+    // Solo redirigir si la verificación se completó (hasChecked) y no es admin
+    // Esto asegura que esperamos a que isAdmin se actualice antes de redirigir
+    if (hasChecked && !loading && !isAdmin) {
+      console.log("[Admin Stats] Usuario no es admin después de verificación, redirigiendo...")
       router.push("/")
     }
-  }, [isAdmin, loading, router])
+  }, [isAdmin, loading, hasChecked, router])
 
   useEffect(() => {
     const loadStats = async () => {
@@ -55,21 +58,26 @@ export default function AdminStatsPage() {
     }
   }, [isAdmin])
 
-  if (loading) {
+  // Mostrar loading mientras se verifican permisos
+  if (loading || !hasChecked) {
     return (
       <div 
-        className="flex items-center justify-center h-screen"
+        className="flex flex-col items-center justify-center h-screen gap-4"
         style={{ backgroundColor: "var(--background)" }}
       >
         <Loader2 
           className="h-8 w-8 animate-spin" 
           style={{ color: "var(--foreground)" }}
         />
+        <p className="text-sm text-muted-foreground">
+          Verificando permisos de administrador...
+        </p>
       </div>
     )
   }
 
-  if (!isAdmin) {
+  // Solo mostrar acceso denegado si ya se verificaron los permisos y no es admin
+  if (!isAdmin && hasChecked) {
     return (
       <div 
         className="flex items-center justify-center h-screen p-4"
