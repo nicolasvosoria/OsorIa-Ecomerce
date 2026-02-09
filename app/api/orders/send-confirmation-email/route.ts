@@ -179,7 +179,7 @@ function generateInvoiceEmailHTML(order: any, customerName?: string, baseUrlOver
   const { daysText, rangeText } = getEstimatedDeliveryRange(orderDateStr)
   const baseUrl = baseUrlOverride || process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "")
   const verPedidoUrl = baseUrl ? `${baseUrl}/checkout/success?order=${order.order_number}` : "#"
-  const logoUrl = baseUrl ? `${baseUrl}/logo-negro.svg` : ""
+  const logoUrl = baseUrl ? `${baseUrl}/logo-negro.png` : ""
   // Iconos de método de pago, ubicación y redes sociales: www.flaticon.es
   const paymentIconUrl = baseUrl ? `${baseUrl}/icon-metodo-pago.png` : ""
   const ubicacionIconUrl = baseUrl ? `${baseUrl}/icon-ubicacion.png` : ""
