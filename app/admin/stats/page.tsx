@@ -14,6 +14,7 @@ import {
   Package,
   ArrowLeft,
   HelpCircle,
+  Download,
 } from "lucide-react"
 import Link from "next/link"
 import { getDetailedStats, type DetailedStats } from "@/lib/supabase/stats-api"
@@ -22,12 +23,68 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/
 import { AreaChart, Area, LineChart, Line, PieChart as RechartsPieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from "recharts"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import * as XLSX from "xlsx"
 
 export default function AdminStatsPage() {
   const { isAdmin, loading, hasChecked } = useAdminPermissions()
   const router = useRouter()
   const [detailedStats, setDetailedStats] = useState<DetailedStats | null>(null)
   const [loadingDetailed, setLoadingDetailed] = useState(true)
+  const [downloadingExcel, setDownloadingExcel] = useState(false)
+
+  const downloadExcel = () => {
+    if (!detailedStats) return
+
+    setDownloadingExcel(true)
+    try {
+      // Crear un nuevo workbook
+      const workbook = XLSX.utils.book_new()
+
+      // Hoja 1: Ventas por Día
+      const salesData = detailedStats.salesByDay.map(item => ({
+        'Fecha': new Date(item.date + 'T00:00:00').toLocaleDateString('es-ES'),
+        'Ventas (COP)': item.sales,
+        'Pedidos': item.orders,
+      }))
+      const salesSheet = XLSX.utils.json_to_sheet(salesData)
+      XLSX.utils.book_append_sheet(workbook, salesSheet, 'Ventas por Día')
+
+      // Hoja 2: Pedidos por Estado
+      const ordersData = detailedStats.ordersByStatus.map(item => ({
+        'Estado': item.status.charAt(0).toUpperCase() + item.status.slice(1),
+        'Cantidad': item.count,
+      }))
+      const ordersSheet = XLSX.utils.json_to_sheet(ordersData)
+      XLSX.utils.book_append_sheet(workbook, ordersSheet, 'Pedidos por Estado')
+
+      // Hoja 3: Estadísticas Adicionales
+      const statsData = [
+        { 'Métrica': 'Total de Pedidos', 'Valor': detailedStats.totalOrders },
+        { 'Métrica': 'Valor Promedio del Pedido', 'Valor': formatPrice(detailedStats.averageOrderValue.toString(), "COP") },
+        { 'Métrica': 'Tasa de Conversión (%)', 'Valor': detailedStats.conversionRate.toFixed(2) },
+      ]
+      const statsSheet = XLSX.utils.json_to_sheet(statsData)
+      XLSX.utils.book_append_sheet(workbook, statsSheet, 'Estadísticas Adicionales')
+
+      // Hoja 4: Productos Más Vendidos
+      const productsData = detailedStats.topProducts.map(item => ({
+        'Producto': item.name,
+        'Cantidad Vendida': item.quantity,
+        'Ingresos (COP)': item.revenue,
+      }))
+      const productsSheet = XLSX.utils.json_to_sheet(productsData)
+      XLSX.utils.book_append_sheet(workbook, productsSheet, 'Productos Más Vendidos')
+
+      // Generar el archivo Excel
+      const fileName = `estadisticas_${new Date().toISOString().split('T')[0]}.xlsx`
+      XLSX.writeFile(workbook, fileName)
+    } catch (error) {
+      console.error("Error al generar Excel:", error)
+      alert("Error al generar el archivo Excel. Por favor, intenta nuevamente.")
+    } finally {
+      setDownloadingExcel(false)
+    }
+  }
 
   useEffect(() => {
     // Solo redirigir si la verificación se completó (hasChecked) y no es admin
@@ -142,6 +199,23 @@ export default function AdminStatsPage() {
                 </p>
               </div>
             </div>
+            <Button 
+              onClick={downloadExcel}
+              disabled={!detailedStats || loadingDetailed || downloadingExcel}
+              className="shrink-0"
+            >
+              {downloadingExcel ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Generando...
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4 mr-2" />
+                  Descargar Excel
+                </>
+              )}
+            </Button>
           </div>
         </div>
       </header>
