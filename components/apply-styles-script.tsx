@@ -178,7 +178,6 @@ export function ApplyStylesScript() {
         console.log('[ApplyStyles] Favicon aplicado desde script:', faviconPath);
       };
       img.onerror = function() {
-        // El favicon específico no existe, usar el por defecto
         if (subdomain !== 'default') {
           faviconLink.setAttribute('href', '/favicon.ico');
           console.log('[ApplyStyles] Favicon específico no encontrado, usando por defecto');

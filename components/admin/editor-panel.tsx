@@ -240,7 +240,7 @@ const COMPONENT_FIELDS: Record<
     ],
     defaults: {
       brandName: "Osoria",
-      logoImage: "/logo-osoria.png",
+      logoImage: "/logo-negro.svg",
       logoImageDark: "/logo-osoria-blanco.svg",
       searchPlaceholder: "Buscar...",
       tagline: "Big Sale! Hurry up! Sale ends in 2025",

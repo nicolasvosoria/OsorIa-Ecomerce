@@ -100,7 +100,7 @@ export function Header() {
   const { t } = useLanguage()
   const { styles: styleData } = useComponentStyle("header", {
     brandName: "Osoria",
-    logoImage: "/logo-osoria.png",
+    logoImage: "/logo-negro.svg",
     logoImageDark: "/logo-osoria-blanco.svg",
     searchPlaceholder: "Buscar...",
     tagline: "Big Sale! Hurry up! Sale ends in 2025",
@@ -144,7 +144,7 @@ export function Header() {
   // Usar logo desde configuración o valores por defecto
   const logoSrc = isDarkTheme 
     ? (styleData.logoImageDark || "/logo-osoria-blanco.svg")
-    : (styleData.logoImage || "/logo-osoria.png")
+    : (styleData.logoImage || "/logo-negro.svg")
   const pathname = usePathname()
 
   // Sincronizar el query de búsqueda con la URL cuando esté en /shop

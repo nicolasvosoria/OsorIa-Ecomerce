@@ -40,14 +40,13 @@ function updateFavicon(subdomain: string) {
   if (typeof document === 'undefined') return
 
   // Construir la ruta del favicon específico
-  const faviconPath = subdomain === 'default' 
-    ? '/favicon.ico' 
+  const faviconPath = subdomain === 'default'
+    ? '/favicon.ico'
     : `/favicon-${subdomain}.ico`
 
   // Buscar el link del favicon existente
   let faviconLink = document.querySelector("link[rel='icon']") as HTMLLinkElement
-  
-  // Si no existe, crear uno nuevo
+
   if (!faviconLink) {
     faviconLink = document.createElement('link')
     faviconLink.rel = 'icon'
@@ -55,22 +54,18 @@ function updateFavicon(subdomain: string) {
     document.head.appendChild(faviconLink)
   }
 
-  // Verificar si el favicon existe antes de cambiarlo
   const img = new Image()
   img.onload = () => {
-    // El favicon existe, actualizarlo
     faviconLink.href = faviconPath
     console.log(`[Favicon] Actualizado a: ${faviconPath}`)
   }
   img.onerror = () => {
-    // El favicon específico no existe, usar el por defecto
     if (subdomain !== 'default') {
       faviconLink.href = '/favicon.ico'
       console.log(`[Favicon] Favicon específico no encontrado (${faviconPath}), usando por defecto`)
     }
   }
-  
-  // Intentar cargar la imagen para verificar si existe
+
   img.src = faviconPath
 
   // También actualizar apple-touch-icon si existe

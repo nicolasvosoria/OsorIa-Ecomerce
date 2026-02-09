@@ -23,6 +23,10 @@ import { formatPrice } from "@/lib/shopify/utils"
  * GET (solo desarrollo): devuelve el HTML del correo de confirmación con el último pedido.
  * Abre en el navegador: http://localhost:3000/api/orders/send-confirmation-email
  * para ver y corregir el diseño sin hacer un pedido.
+ *
+ * Iconos en producción (Vercel): las imágenes del correo (logo, ubicación, redes, etc.)
+ * usan la URL base de la petición (x-forwarded-host/proto) para que carguen al abrir el email.
+ * Si no se ven, definir NEXT_PUBLIC_APP_URL en Vercel (ej. https://tu-dominio.vercel.app).
  */
 export async function GET(request: NextRequest) {
   if (process.env.NODE_ENV !== "development") {
@@ -95,8 +99,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Generar HTML del correo con la factura
-    const emailHtml = generateInvoiceEmailHTML(order, customerName)
+    // URL base para imágenes del correo: desde la petición (Vercel/producción) o env
+    const host = request.headers.get("x-forwarded-host") || request.headers.get("host")
+    const protocol = request.headers.get("x-forwarded-proto") || "https"
+    const requestOrigin = host ? `${protocol}://${host}` : ""
+    const baseUrlForEmail = requestOrigin || process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "")
+
+    // Generar HTML del correo con la factura (baseUrl para que los iconos se vean en producción)
+    const emailHtml = generateInvoiceEmailHTML(order, customerName, baseUrlForEmail)
 
     // Intentar enviar el correo
     const emailSent = await sendEmail({

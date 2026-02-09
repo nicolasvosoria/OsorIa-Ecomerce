@@ -39,7 +39,7 @@ export function FooterNew() {
     return false
   }, [activeTheme])
 
-  const logoSrc = isDarkTheme ? "/logo-osoria-blanco.svg" : "/logo-osoria.png"
+  const logoSrc = isDarkTheme ? "/logo-osoria-blanco.svg" : "/logo-negro.svg"
   const brandName = isReposteria ? (store?.store_name || "Tienda de Postres") : "OSORIA"
 
   return (
