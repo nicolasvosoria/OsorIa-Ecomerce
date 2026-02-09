@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
 import { isCurrentUserAdmin, getCurrentUserRole } from "@/lib/supabase/permissions-api"
+import { useAuth } from "@/contexts/auth-context"
 import type { UserRole } from "@/lib/types/user"
 
 interface AdminPermissionsContextType {
@@ -14,6 +15,7 @@ interface AdminPermissionsContextType {
 const AdminPermissionsContext = createContext<AdminPermissionsContextType | undefined>(undefined)
 
 export function AdminPermissionsProvider({ children }: { children: ReactNode }) {
+  const { isLoading: authLoading } = useAuth()
   const [isAdmin, setIsAdmin] = useState(false)
   const [role, setRole] = useState<UserRole | null>(null)
   const [loading, setLoading] = useState(true)
@@ -36,9 +38,15 @@ export function AdminPermissionsProvider({ children }: { children: ReactNode }) 
     }
   }
 
+  // Esperar a que la autenticación esté lista antes de comprobar permisos (evita "no tienes permisos" al entrar)
   useEffect(() => {
+    if (authLoading) {
+      setLoading(true)
+      return
+    }
     refreshPermissions()
-  }, [])
+  }, [authLoading])
+
 
   return (
     <AdminPermissionsContext.Provider

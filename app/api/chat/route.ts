@@ -362,20 +362,30 @@ function adjustPromptForTone(prompt: string, tone: string): string {
   return `${prompt}\n\n${toneInstruction}`
 }
 
-/** GET: diagnóstico para comprobar que el chat puede leer el catálogo (solo en desarrollo). */
+/** GET: comprobar si el servidor tiene configuradas las variables del chat (útil en Vercel). */
 export async function GET() {
-  if (process.env.NODE_ENV !== "development") {
-    return NextResponse.json({ error: "Solo en desarrollo" }, { status: 404 })
-  }
-  const supabase = getSupabaseServiceClient()
   const serviceRolePresent = !!(
     process.env.NEXT_PUBLIC_SUPABASE_URL &&
     process.env.SUPABASE_SERVICE_ROLE_KEY
   )
+  const deepSeekPresent = !!process.env.DEEPSEEK_API_KEY
+  const ok = serviceRolePresent && deepSeekPresent
+
+  if (process.env.NODE_ENV !== "development") {
+    return NextResponse.json({
+      ok,
+      serviceRolePresent,
+      deepSeekPresent,
+      hint: !ok ? "En Vercel: Settings → Environment Variables. Añade SUPABASE_SERVICE_ROLE_KEY y DEEPSEEK_API_KEY para Production." : undefined,
+    })
+  }
+
+  const supabase = getSupabaseServiceClient()
   if (!supabase) {
     return NextResponse.json({
       ok: false,
       serviceRolePresent,
+      deepSeekPresent,
       productCount: 0,
       hint: "Revisa NEXT_PUBLIC_SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY en .env.local",
     })
@@ -391,6 +401,7 @@ export async function GET() {
       return NextResponse.json({
         ok: false,
         serviceRolePresent: true,
+        deepSeekPresent,
         productCount: 0,
         error: error.message,
       })
@@ -399,6 +410,7 @@ export async function GET() {
     return NextResponse.json({
       ok: true,
       serviceRolePresent: true,
+      deepSeekPresent: true,
       productCount: count,
       productNames: products?.map((p: { item_name: string }) => p.item_name) ?? [],
     })
@@ -406,6 +418,7 @@ export async function GET() {
     return NextResponse.json({
       ok: false,
       serviceRolePresent: true,
+      deepSeekPresent,
       productCount: 0,
       error: e instanceof Error ? e.message : String(e),
     })

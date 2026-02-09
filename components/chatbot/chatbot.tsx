@@ -171,12 +171,17 @@ export function Chatbot({ isOpen, onClose }: ChatbotProps) {
       if (aiResponse) {
         botResponseText = aiResponse
       } else {
-        // La API falló (timeout, error en Vercel, etc.): no dar respuesta genérica de catálogo para no confundir
+        // La API falló: no mostrar respuestas genéricas que parezcan válidas
         const fallback = findAnswer(currentInput)
-        const looksLikeCatalogQuestion = /catalogo|catálogo|productos|qué tienen|que tienen|cuéntame|hablame/i.test(currentInput)
-        botResponseText = looksLikeCatalogQuestion
-          ? "No pude cargar el catálogo en este momento. Comprueba tu conexión e inténtalo de nuevo en unos segundos. Si el problema continúa, navega por las categorías del menú para ver los productos."
-          : fallback
+        const isSimpleGreeting = /^(hola|hi|hey|buenas|gracias|adios|chao)$/i.test(currentInput.trim())
+        const wantsStoreOrCatalog = /catalogo|catálogo|productos|tienda|qué tienen|que tienen|cuéntame|hablame|información|informacion/i.test(currentInput)
+        if (isSimpleGreeting) {
+          botResponseText = fallback
+        } else if (wantsStoreOrCatalog) {
+          botResponseText = "No pude conectar con el asistente en este momento. Comprueba tu conexión e inténtalo de nuevo. Si estás en un despliegue (Vercel), verifica que las variables SUPABASE_SERVICE_ROLE_KEY y DEEPSEEK_API_KEY estén configuradas."
+        } else {
+          botResponseText = "El asistente no pudo responder ahora. Inténtalo de nuevo en unos segundos."
+        }
       }
 
       const botResponse: Message = {
@@ -188,10 +193,8 @@ export function Chatbot({ isOpen, onClose }: ChatbotProps) {
 
       setMessages((prev) => [...prev, botResponse])
     } catch (error) {
-      const looksLikeCatalogQuestion = /catalogo|catálogo|productos|qué tienen|que tienen|cuéntame|hablame/i.test(currentInput)
-      const text = looksLikeCatalogQuestion
-        ? "No pude conectar con el asistente. Inténtalo de nuevo en unos segundos."
-        : findAnswer(currentInput)
+      const isSimpleGreeting = /^(hola|hi|hey|buenas|gracias|adios|chao)$/i.test(currentInput.trim())
+      const text = isSimpleGreeting ? findAnswer(currentInput) : "El asistente no pudo responder. Inténtalo de nuevo."
       const botResponse: Message = {
         id: (Date.now() + 1).toString(),
         text,
