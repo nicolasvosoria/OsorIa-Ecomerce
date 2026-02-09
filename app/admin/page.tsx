@@ -80,27 +80,27 @@ function AdminPageContent() {
   return (
     <AdminProvider>
       <AdminPageWrapper>
-        <div className="flex h-screen overflow-hidden">
+        <div className="flex h-screen overflow-hidden min-w-0">
         {/* Preview Area */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex flex-col overflow-hidden min-w-0">
           {/* Admin Header */}
-          <div className="bg-blue-600 text-white p-4 flex items-center justify-between shadow-lg">
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" size="sm" asChild className="text-white hover:bg-blue-700">
+          <div className="bg-blue-600 text-white p-3 sm:p-4 flex flex-wrap items-center justify-between gap-2 shadow-lg shrink-0">
+            <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
+              <Button variant="ghost" size="sm" className="shrink-0 text-white hover:bg-blue-700 h-8 sm:h-9" asChild>
                 <Link href="/">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Salir
+                  <ArrowLeft className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Salir</span>
                 </Link>
               </Button>
-              <div>
-                <h1 className="text-lg font-bold">Modo de Edición</h1>
-                <p className="text-xs text-blue-100">Haz clic en cualquier sección para editarla</p>
+              <div className="min-w-0">
+                <h1 className="text-base sm:text-lg font-bold truncate">Modo de Edición</h1>
+                <p className="text-xs text-blue-100 truncate hidden sm:block">Haz clic en cualquier sección para editarla</p>
               </div>
             </div>
-            <Button variant="secondary" size="sm" asChild>
+            <Button variant="secondary" size="sm" className="shrink-0 h-8 sm:h-9 gap-1.5 sm:gap-2" asChild>
               <Link href="/" target="_blank">
-                <Eye className="h-4 w-4 mr-2" />
-                Vista Previa
+                <Eye className="h-4 w-4 shrink-0" />
+                <span className="hidden sm:inline">Vista Previa</span>
               </Link>
             </Button>
           </div>

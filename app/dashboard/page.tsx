@@ -170,33 +170,34 @@ function DashboardContent() {
           borderColor: "var(--border)"
         }}
       >
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div>
+        <div className="container mx-auto px-4 py-4 max-w-full">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0 flex-1">
               <h1 
-                className="text-2xl font-bold"
+                className="text-lg sm:text-xl md:text-2xl font-bold truncate"
                 style={{ color: "var(--foreground)" }}
               >
                 Panel de Administración
               </h1>
               <p 
-                className="text-sm mt-1"
+                className="text-xs sm:text-sm mt-1 truncate"
                 style={{ color: "var(--muted-foreground)" }}
+                title={user?.first_name || user?.email}
               >
                 Bienvenido, {user?.first_name || user?.email}
               </p>
             </div>
-            <div className="flex items-center gap-3">
-              <Button variant="outline" asChild>
+            <div className="flex flex-shrink-0 gap-2">
+              <Button variant="outline" size="sm" className="gap-1.5 sm:gap-2" asChild>
                 <Link href="/">
-                  <Eye className="h-4 w-4 mr-2" />
-                  Ver Tienda
+                  <Eye className="h-4 w-4 shrink-0" />
+                  <span className="hidden sm:inline">Ver Tienda</span>
                 </Link>
               </Button>
-              <Button variant="outline" asChild>
+              <Button variant="outline" size="sm" className="gap-1.5 sm:gap-2" asChild>
                 <Link href="/admin">
-                  <Edit className="h-4 w-4 mr-2" />
-                  Editor
+                  <Edit className="h-4 w-4 shrink-0" />
+                  <span className="hidden sm:inline">Editor</span>
                 </Link>
               </Button>
             </div>
@@ -205,7 +206,7 @@ function DashboardContent() {
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-4 py-8 max-w-full overflow-x-hidden">
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           <Card>

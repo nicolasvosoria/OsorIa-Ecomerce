@@ -294,23 +294,23 @@ export default function EditProductPage() {
           borderColor: "var(--border)"
         }}
       >
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" size="icon" asChild>
+        <div className="container mx-auto px-4 py-4 max-w-full">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
+              <Button variant="ghost" size="icon" className="shrink-0 h-9 w-9 sm:h-10 sm:w-10" asChild>
                 <Link href="/admin/products">
                   <ArrowLeft className="h-5 w-5" />
                 </Link>
               </Button>
-              <div>
+              <div className="min-w-0">
                 <h1 
-                  className="text-2xl font-bold"
+                  className="text-lg sm:text-xl md:text-2xl font-bold truncate"
                   style={{ color: "var(--foreground)" }}
                 >
                   Editar Producto
                 </h1>
                 <p 
-                  className="text-sm mt-1"
+                  className="text-xs sm:text-sm mt-1 truncate"
                   style={{ color: "var(--muted-foreground)" }}
                 >
                   Modifica la información del producto
@@ -322,7 +322,7 @@ export default function EditProductPage() {
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-4 py-8 max-w-full overflow-x-hidden">
         <form onSubmit={handleSubmit}>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Columna Principal */}

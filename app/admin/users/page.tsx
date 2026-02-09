@@ -123,23 +123,23 @@ export default function AdminUsersPage() {
           borderColor: "var(--border)"
         }}
       >
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" size="icon" asChild>
+        <div className="container mx-auto px-4 py-4 max-w-full">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
+              <Button variant="ghost" size="icon" className="shrink-0 h-9 w-9 sm:h-10 sm:w-10" asChild>
                 <Link href="/dashboard">
                   <ArrowLeft className="h-5 w-5" />
                 </Link>
               </Button>
-              <div>
+              <div className="min-w-0">
                 <h1 
-                  className="text-2xl font-bold"
+                  className="text-lg sm:text-xl md:text-2xl font-bold truncate"
                   style={{ color: "var(--foreground)" }}
                 >
                   Gestión de Usuarios
                 </h1>
                 <p 
-                  className="text-sm mt-1"
+                  className="text-xs sm:text-sm mt-1 truncate"
                   style={{ color: "var(--muted-foreground)" }}
                 >
                   Administra usuarios y permisos del sistema
@@ -151,7 +151,7 @@ export default function AdminUsersPage() {
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-4 py-8 max-w-full overflow-x-hidden">
         {loadingUsers ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -174,9 +174,9 @@ export default function AdminUsersPage() {
                 Gestiona todos los usuarios registrados en el sistema
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <Table>
+            <CardContent className="p-2 sm:p-6">
+              <div className="overflow-x-auto -mx-2 sm:mx-0 rounded-md border border-border">
+                <Table className="min-w-[600px]">
                   <TableHeader>
                     <TableRow>
                       <TableHead>Usuario</TableHead>
