@@ -52,7 +52,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { CheckoutOptionsDialog } from "@/components/cart/checkout-options-dialog"
-import { LanguageSelector } from "@/components/ui/language-selector"
 import { useLanguage } from "@/contexts/language-context"
 
 // Helper para generar slug desde el nombre de categoría
@@ -559,7 +558,6 @@ export function Header() {
                 </span>
               )}
             </Button>
-            <LanguageSelector />
           </div>
         </div>
 
@@ -696,7 +694,6 @@ export function Header() {
                   </span>
                 )}
               </Button>
-              <LanguageSelector />
               <Button
                 variant="ghost"
                 size="icon"

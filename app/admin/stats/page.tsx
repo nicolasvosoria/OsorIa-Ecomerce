@@ -52,46 +52,109 @@ export default function AdminStatsPage() {
 
     setDownloadingExcel(true)
     try {
-      // Crear un nuevo workbook
       const workbook = XLSX.utils.book_new()
+      const totalSales = detailedStats.salesByDay.reduce((sum, d) => sum + (Number(d.sales) || 0), 0)
+      const paidOrders = Math.round((detailedStats.totalOrders * detailedStats.conversionRate) / 100)
+      const fechaGen = new Date().toLocaleString("es-ES", { dateStyle: "medium", timeStyle: "short" })
+      const setColWidths = (ws: XLSX.WorkSheet, widths: number[]) => {
+        ws["!cols"] = widths.map((w) => ({ wch: w }))
+      }
 
-      // Hoja 1: Ventas por Día
-      const salesData = detailedStats.salesByDay.map(item => ({
-        'Fecha': new Date(item.date + 'T00:00:00').toLocaleDateString('es-ES'),
-        'Ventas (COP)': item.sales,
-        'Pedidos': item.orders,
-      }))
+      // —— Hoja 1: Resumen ——
+      const resumenRows = [
+        ["REPORTE DE ESTADÍSTICAS Y VENTAS"],
+        [],
+        ["Período:", "Últimos 30 días"],
+        ["Fecha de generación:", fechaGen],
+        [],
+        ["INDICADORES PRINCIPALES"],
+        ["Indicador", "Valor"],
+        ["Total de pedidos", detailedStats.totalOrders],
+        ["Pedidos pagados", paidOrders],
+        ["Ventas totales (COP)", totalSales],
+        ["Valor promedio del pedido (COP)", Math.round(detailedStats.averageOrderValue)],
+        ["Tasa de conversión (%)", `${detailedStats.conversionRate.toFixed(1)}%`],
+      ]
+      const resumenSheet = XLSX.utils.aoa_to_sheet(resumenRows)
+      setColWidths(resumenSheet, [35, 22])
+      XLSX.utils.book_append_sheet(workbook, resumenSheet, "Resumen")
+
+      // —— Hoja 2: Ventas por Día ——
+      let acum = 0
+      const salesData = detailedStats.salesByDay.map((item) => {
+        acum += Number(item.sales) || 0
+        const date = new Date(item.date + "T00:00:00")
+        const pct = totalSales > 0 ? ((Number(item.sales) || 0) / totalSales) * 100 : 0
+        return {
+          Fecha: date.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" }),
+          "Día semana": date.toLocaleDateString("es-ES", { weekday: "short" }),
+          "Ventas (COP)": Number(item.sales) || 0,
+          Pedidos: Number(item.orders) || 0,
+          "Ventas acumuladas (COP)": acum,
+          "% del total": pct.toFixed(1),
+        }
+      })
       const salesSheet = XLSX.utils.json_to_sheet(salesData)
-      XLSX.utils.book_append_sheet(workbook, salesSheet, 'Ventas por Día')
+      setColWidths(salesSheet, [12, 12, 16, 10, 20, 12])
+      XLSX.utils.book_append_sheet(workbook, salesSheet, "Ventas por Día")
 
-      // Hoja 2: Pedidos por Estado
-      const ordersData = detailedStats.ordersByStatus.map(item => ({
-        'Estado': statusToSpanish(item.status),
-        'Cantidad': item.count,
+      // —— Hoja 3: Pedidos por Estado ——
+      const totalCount = detailedStats.ordersByStatus.reduce((s, i) => s + i.count, 0)
+      const ordersSorted = [...detailedStats.ordersByStatus].sort((a, b) => b.count - a.count)
+      const ordersData = ordersSorted.map((item) => ({
+        Estado: statusToSpanish(item.status),
+        Cantidad: item.count,
+        "% del total": totalCount > 0 ? ((item.count / totalCount) * 100).toFixed(1) : "0",
       }))
       const ordersSheet = XLSX.utils.json_to_sheet(ordersData)
-      XLSX.utils.book_append_sheet(workbook, ordersSheet, 'Pedidos por Estado')
+      XLSX.utils.sheet_add_aoa(ordersSheet, [["TOTAL", totalCount, "100"]], { origin: ordersData.length + 1 })
+      setColWidths(ordersSheet, [18, 12, 14])
+      XLSX.utils.book_append_sheet(workbook, ordersSheet, "Pedidos por Estado")
 
-      // Hoja 3: Estadísticas Adicionales
-      const statsData = [
-        { 'Métrica': 'Total de Pedidos', 'Valor': detailedStats.totalOrders },
-        { 'Métrica': 'Valor Promedio del Pedido', 'Valor': formatPrice(detailedStats.averageOrderValue.toString(), "COP") },
-        { 'Métrica': 'Tasa de Conversión (%)', 'Valor': detailedStats.conversionRate.toFixed(2) },
+      // —— Hoja 4: Estadísticas detalladas ——
+      const statsRows = [
+        ["ESTADÍSTICAS ADICIONALES"],
+        [],
+        ["Métrica", "Valor"],
+        ["Total de pedidos (período)", detailedStats.totalOrders],
+        ["Pedidos pagados", paidOrders],
+        ["Ventas totales (COP)", totalSales],
+        ["Valor promedio del pedido (COP)", formatPrice(detailedStats.averageOrderValue.toString(), "COP")],
+        ["Tasa de conversión (%)", detailedStats.conversionRate.toFixed(2)],
+        [],
+        ["Resumen por estado"],
+        ["Estado", "Cantidad", "%"],
+        ...ordersSorted.map((item) => [
+          statusToSpanish(item.status),
+          item.count,
+          totalCount > 0 ? ((item.count / totalCount) * 100).toFixed(1) + "%" : "0%",
+        ]),
       ]
-      const statsSheet = XLSX.utils.json_to_sheet(statsData)
-      XLSX.utils.book_append_sheet(workbook, statsSheet, 'Estadísticas Adicionales')
+      const statsSheet = XLSX.utils.aoa_to_sheet(statsRows)
+      setColWidths(statsSheet, [38, 20])
+      XLSX.utils.book_append_sheet(workbook, statsSheet, "Estadísticas")
 
-      // Hoja 4: Productos Más Vendidos
-      const productsData = detailedStats.topProducts.map(item => ({
-        'Producto': item.name,
-        'Cantidad Vendida': item.quantity,
-        'Ingresos (COP)': item.revenue,
-      }))
+      // —— Hoja 5: Productos más vendidos ——
+      const totalRevenue = detailedStats.topProducts.reduce((s, p) => s + (Number(p.revenue) || 0), 0)
+      const productsData = detailedStats.topProducts.map((item, idx) => {
+        const rev = Number(item.revenue) || 0
+        const qty = Number(item.quantity) || 0
+        return {
+          "#": idx + 1,
+          Producto: item.name,
+          "Cantidad vendida": qty,
+          "Ingresos (COP)": rev,
+          "Precio promedio (COP)": qty > 0 ? Math.round(rev / qty) : 0,
+          "% de ingresos": totalRevenue > 0 ? ((rev / totalRevenue) * 100).toFixed(1) : "0",
+        }
+      })
       const productsSheet = XLSX.utils.json_to_sheet(productsData)
-      XLSX.utils.book_append_sheet(workbook, productsSheet, 'Productos Más Vendidos')
+      const totalQty = detailedStats.topProducts.reduce((s, p) => s + (Number(p.quantity) || 0), 0)
+      XLSX.utils.sheet_add_aoa(productsSheet, [["TOTAL", "", totalQty, totalRevenue, "", "100"]], { origin: productsData.length + 1 })
+      setColWidths(productsSheet, [4, 32, 16, 16, 18, 14])
+      XLSX.utils.book_append_sheet(workbook, productsSheet, "Productos Más Vendidos")
 
-      // Generar el archivo Excel
-      const fileName = `estadisticas_${new Date().toISOString().split('T')[0]}.xlsx`
+      const fileName = `estadisticas_${new Date().toISOString().split("T")[0]}.xlsx`
       XLSX.writeFile(workbook, fileName)
     } catch (error) {
       console.error("Error al generar Excel:", error)
