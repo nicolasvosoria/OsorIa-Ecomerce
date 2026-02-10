@@ -25,6 +25,21 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import * as XLSX from "xlsx"
 
+const STATUS_LABELS_ES: Record<string, string> = {
+  pending: "Pendiente",
+  confirmed: "Confirmado",
+  processing: "Procesando",
+  shipped: "Enviado",
+  delivered: "Entregado",
+  returned: "Devuelto",
+  cancelled: "Cancelado",
+  unknown: "Desconocido",
+}
+
+function statusToSpanish(status: string): string {
+  return STATUS_LABELS_ES[status] ?? status.charAt(0).toUpperCase() + status.slice(1)
+}
+
 export default function AdminStatsPage() {
   const { isAdmin, loading, hasChecked } = useAdminPermissions()
   const router = useRouter()
@@ -51,7 +66,7 @@ export default function AdminStatsPage() {
 
       // Hoja 2: Pedidos por Estado
       const ordersData = detailedStats.ordersByStatus.map(item => ({
-        'Estado': item.status.charAt(0).toUpperCase() + item.status.slice(1),
+        'Estado': statusToSpanish(item.status),
         'Cantidad': item.count,
       }))
       const ordersSheet = XLSX.utils.json_to_sheet(ordersData)
@@ -318,7 +333,7 @@ export default function AdminStatsPage() {
                   config={detailedStats.ordersByStatus.reduce((acc, item, index) => {
                     const colors = ['hsl(221, 83%, 53%)', 'hsl(142, 76%, 36%)', 'hsl(38, 92%, 50%)', 'hsl(0, 84%, 60%)', 'hsl(262, 83%, 58%)', 'hsl(280, 100%, 70%)']
                     acc[item.status] = {
-                      label: item.status.charAt(0).toUpperCase() + item.status.slice(1),
+                      label: statusToSpanish(item.status),
                       color: colors[index % colors.length],
                     }
                     return acc
@@ -334,7 +349,7 @@ export default function AdminStatsPage() {
                         cx="50%"
                         cy="50%"
                         outerRadius={80}
-                        label={(entry) => `${entry.status}: ${entry.count}`}
+                        label={(entry) => `${statusToSpanish(entry.status)}: ${entry.count}`}
                       >
                         {detailedStats.ordersByStatus.map((entry, index) => {
                           const colors = ['hsl(221, 83%, 53%)', 'hsl(142, 76%, 36%)', 'hsl(38, 92%, 50%)', 'hsl(0, 84%, 60%)', 'hsl(262, 83%, 58%)', 'hsl(280, 100%, 70%)']

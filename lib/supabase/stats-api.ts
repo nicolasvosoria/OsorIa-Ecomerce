@@ -279,12 +279,10 @@ export async function getDetailedStats(days: number = 30): Promise<DetailedStats
 
     // Calcular estadísticas adicionales
     const totalOrders = ordersByStatusResult.data?.length || 0
-    // Asegurar que sales sea número en el reduce
-    const totalSales = salesByDay.reduce((sum, day) => sum + (Number(day.sales) || 0), 0)
-    const averageOrderValue = totalOrders > 0 ? totalSales / totalOrders : 0
-
-    // Calcular tasa de conversión (simplificado: pedidos pagados / total pedidos)
     const paidOrders = salesByDayResult.data?.length || 0
+    const totalSales = salesByDay.reduce((sum, day) => sum + (Number(day.sales) || 0), 0)
+    // Valor promedio = total ventas (pedidos pagados) / cantidad de pedidos pagados
+    const averageOrderValue = paidOrders > 0 ? totalSales / paidOrders : 0
     const conversionRate = totalOrders > 0 ? (paidOrders / totalOrders) * 100 : 0
 
     return {
