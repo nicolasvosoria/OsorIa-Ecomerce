@@ -698,6 +698,29 @@ export async function getItemsByCategory(categoryId: string, limit: number = 20)
 }
 
 /**
+ * Obtener productos relacionados (misma categoría o últimos activos) para mostrar en la ficha del producto
+ */
+export async function getRelatedItems(
+  excludeProductId: string,
+  categoryId?: string | null,
+  limit: number = 6,
+  storeId?: string | null
+): Promise<StoreItemWithDetails[]> {
+  const fetchLimit = limit + 10
+  const result = await getItems({
+    store_id: storeId ?? undefined,
+    category_id: categoryId ?? undefined,
+    limit: fetchLimit,
+    order_by: 'display_order',
+    order_direction: 'asc',
+    is_active: true,
+    is_available_for_sale: true,
+  })
+  const filtered = result.items.filter((item) => item.id !== excludeProductId)
+  return filtered.slice(0, limit)
+}
+
+/**
  * Crear un nuevo producto
  */
 export interface CreateItemData {

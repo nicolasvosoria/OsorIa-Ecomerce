@@ -1,9 +1,8 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import { notFound } from 'next/navigation';
-import Image from 'next/image';
 import Link from 'next/link';
-import { getItemBySlug } from '@/lib/supabase/products-api';
+import { getItemBySlug, getRelatedItems } from '@/lib/supabase/products-api';
 import { formatPrice } from '@/lib/shopify/utils';
 import {
   Breadcrumb,
@@ -20,6 +19,7 @@ import { WishlistButton } from '@/components/wishlist/wishlist-button';
 import { adaptSupabaseProduct } from '@/lib/products/adapter';
 import { cn } from '@/lib/utils';
 import { ProductImageGallery } from './components/product-image-gallery';
+import { RelatedProductsCarousel } from './components/related-products-carousel';
 
 // Generar parámetros estáticos para productos
 // Con cacheComponents habilitado, debe retornar al menos un resultado
@@ -107,6 +107,8 @@ async function ProductContent({ slug }: { slug: string }) {
   if (!product) {
     return notFound();
   }
+
+  const relatedProducts = await getRelatedItems(product.id, product.category_id ?? null, 6);
 
   // Adaptar producto para usar con componentes existentes
   const adaptedProduct = adaptSupabaseProduct(product);
@@ -356,7 +358,10 @@ async function ProductContent({ slug }: { slug: string }) {
           </div>
         )}
 
-        {/* Productos relacionados (opcional - se puede implementar después) */}
+        {/* Productos relacionados */}
+        {relatedProducts.length > 0 && (
+          <RelatedProductsCarousel products={relatedProducts} />
+        )}
       </div>
     </div>
   );
