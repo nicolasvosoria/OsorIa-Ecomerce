@@ -1257,19 +1257,28 @@ export function Header() {
                   })
                   return
                 }
+                // Validar longitud mínima de contraseña (Supabase requiere al menos 6)
+                if (password.length < 6) {
+                  toast.error(t.header.passwordMinLength, { duration: 3000 })
+                  return
+                }
                 // Registrar usuario
                 const result = await register(email, password, firstName, lastName)
                 if (result.success) {
-                  // Refrescar el usuario para obtener el rol actualizado
                   await refreshUser()
-                  
-                  // Todos los usuarios van a la página principal después del registro
-                  toast.success(t.header.accountCreated, {
-                    description: result.user?.role === 'admin' 
-                      ? t.header.welcomeAdminMessage 
-                      : t.header.accountCreatedSuccess,
-                    duration: 3000,
-                  })
+                  if (result.emailSent) {
+                    toast.success(t.header.confirmEmailSent, {
+                      description: t.header.confirmEmailDescription,
+                      duration: 6000,
+                    })
+                  } else {
+                    toast.success(t.header.accountCreated, {
+                      description: result.user?.role === 'admin'
+                        ? t.header.welcomeAdminMessage
+                        : t.header.accountCreatedSuccess,
+                      duration: 3000,
+                    })
+                  }
                   
                   setLoginModalOpen(false)
                   setEmail("")

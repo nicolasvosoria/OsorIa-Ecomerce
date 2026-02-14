@@ -40,9 +40,8 @@ function AuthCallbackContent() {
           }
 
           if (data.session) {
-            // Sesión creada exitosamente, redirigir a la página principal
-            // Agregar parámetro para indicar que viene de autenticación
-            router.push("/?from=auth")
+            // Sesión creada (p. ej. tras confirmar correo), redirigir a página de éxito
+            router.push("/auth/cuenta-confirmada")
             return
           }
         }
@@ -57,8 +56,8 @@ function AuthCallbackContent() {
         }
 
         if (session) {
-          // Ya hay sesión, redirigir a la página principal
-          router.push("/")
+          // Ya hay sesión (p. ej. llegó sin code), redirigir a éxito o inicio
+          router.push("/auth/cuenta-confirmada")
         } else {
           // No hay sesión, redirigir al login
           router.push("/?error=no_session")

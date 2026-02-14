@@ -267,6 +267,9 @@ export interface Translations {
     accountCreated: string
     welcomeAdminMessage: string
     accountCreatedSuccess: string
+    confirmEmailSent: string
+    confirmEmailDescription: string
+    passwordMinLength: string
     errorCreatingAccount: string
     sessionStarted: string
     welcomeAdminLogin: string
@@ -534,6 +537,9 @@ export const translations: Record<Language, Translations> = {
       accountCreated: 'Cuenta creada',
       welcomeAdminMessage: 'Bienvenido, Administrador!',
       accountCreatedSuccess: 'Tu cuenta ha sido creada exitosamente',
+      confirmEmailSent: 'Revisa tu correo',
+      confirmEmailDescription: 'Te hemos enviado un enlace para confirmar tu cuenta. Haz clic en el enlace del correo para activar tu cuenta e iniciar sesión.',
+      passwordMinLength: 'La contraseña debe tener al menos 6 caracteres',
       errorCreatingAccount: 'Error al crear cuenta',
       sessionStarted: 'Sesión iniciada',
       welcomeAdminLogin: 'Bienvenido, Administrador!',
@@ -799,6 +805,9 @@ export const translations: Record<Language, Translations> = {
       accountCreated: 'Account created',
       welcomeAdminMessage: 'Welcome, Administrator!',
       accountCreatedSuccess: 'Your account has been created successfully',
+      confirmEmailSent: 'Check your email',
+      confirmEmailDescription: 'We sent you a link to confirm your account. Click the link in the email to activate your account and sign in.',
+      passwordMinLength: 'Password must be at least 6 characters',
       errorCreatingAccount: 'Error creating account',
       sessionStarted: 'Session started',
       welcomeAdminLogin: 'Welcome, Administrator!',
@@ -1064,6 +1073,9 @@ export const translations: Record<Language, Translations> = {
       accountCreated: 'Conta criada',
       welcomeAdminMessage: 'Bem-vindo, Administrador!',
       accountCreatedSuccess: 'Sua conta foi criada com sucesso',
+      confirmEmailSent: 'Verifique seu e-mail',
+      confirmEmailDescription: 'Enviamos um link para confirmar sua conta. Clique no link do e-mail para ativar sua conta e entrar.',
+      passwordMinLength: 'A senha deve ter pelo menos 6 caracteres',
       errorCreatingAccount: 'Erro ao criar conta',
       sessionStarted: 'Sessão iniciada',
       welcomeAdminLogin: 'Bem-vindo, Administrador!',
