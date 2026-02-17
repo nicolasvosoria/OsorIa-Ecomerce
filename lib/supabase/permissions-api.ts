@@ -1,4 +1,4 @@
-import { getSupabaseBrowserClient } from "./client"
+import { getSupabaseBrowserClient, getSupabaseEcommerce } from "./client"
 import type { UserRole } from "@/lib/types/user"
 
 // Helper para manejar timeouts
@@ -20,18 +20,18 @@ async function withTimeout<T>(
  * @returns true si el usuario es administrador, false en caso contrario
  */
 export async function isCurrentUserAdmin(): Promise<boolean> {
-  const supabase = getSupabaseBrowserClient()
-  if (!supabase) {
+  const authClient = getSupabaseBrowserClient()
+  const supabase = getSupabaseEcommerce()
+  if (!authClient || !supabase) {
     console.warn("[Permissions] Supabase no configurado")
     return false
   }
 
   try {
-    // Obtener usuario con reintentos y timeout más largo
     let user: any = null
     let getUserError: any = null
-    const maxGetUserRetries = 2 // 2 reintentos para getUser
-    const getUserTimeoutMs = 15000 // 15 segundos para getUser también
+    const maxGetUserRetries = 2
+    const getUserTimeoutMs = 15000
 
     for (let getUserAttempt = 0; getUserAttempt <= maxGetUserRetries; getUserAttempt++) {
       try {
@@ -41,7 +41,7 @@ export async function isCurrentUserAdmin(): Promise<boolean> {
         }
 
         const getUserResult = await withTimeout(
-          supabase.auth.getUser(),
+          authClient.auth.getUser(),
           getUserTimeoutMs,
           `getUser en isCurrentUserAdmin (intento ${getUserAttempt + 1})`
         ) as { data: { user: any } | null; error: any }
@@ -94,7 +94,6 @@ export async function isCurrentUserAdmin(): Promise<boolean> {
           await new Promise(resolve => setTimeout(resolve, 500 * attempt))
         }
 
-        // Consultar perfil con timeout
         const queryPromise = supabase
           .from("user_profiles")
           .select("role")
@@ -176,18 +175,18 @@ export async function isCurrentUserAdmin(): Promise<boolean> {
  * @returns El rol del usuario ('user' o 'admin'), o null si no está autenticado
  */
 export async function getCurrentUserRole(): Promise<UserRole | null> {
-  const supabase = getSupabaseBrowserClient()
-  if (!supabase) {
+  const authClient = getSupabaseBrowserClient()
+  const supabase = getSupabaseEcommerce()
+  if (!authClient || !supabase) {
     console.warn("[Permissions] Supabase no configurado")
     return null
   }
 
   try {
-    // Obtener usuario con reintentos y timeout más largo
     let user: any = null
     let getUserError: any = null
-    const maxGetUserRetries = 2 // 2 reintentos para getUser
-    const getUserTimeoutMs = 15000 // 15 segundos para getUser también
+    const maxGetUserRetries = 2
+    const getUserTimeoutMs = 15000
 
     for (let getUserAttempt = 0; getUserAttempt <= maxGetUserRetries; getUserAttempt++) {
       try {
@@ -197,7 +196,7 @@ export async function getCurrentUserRole(): Promise<UserRole | null> {
         }
 
         const getUserResult = await withTimeout(
-          supabase.auth.getUser(),
+          authClient.auth.getUser(),
           getUserTimeoutMs,
           `getUser en getCurrentUserRole (intento ${getUserAttempt + 1})`
         ) as { data: { user: any } | null; error: any }

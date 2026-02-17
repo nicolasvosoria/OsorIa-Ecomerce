@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/client"
+import { getSupabaseEcommerce } from "@/lib/supabase/client"
 
 export interface ChatbotConfig {
   systemPrompt: string
@@ -30,20 +30,18 @@ Sé conciso, amigable y profesional. Responde en español. Si no sabes algo espe
  */
 export async function getChatbotConfig(): Promise<ChatbotConfig> {
   try {
-    const supabase = createClient()
+    const supabase = getSupabaseEcommerce()
     if (!supabase) {
       console.warn("[Chatbot API] Supabase no configurado, usando configuración por defecto")
       return DEFAULT_CONFIG
     }
 
-    // Obtener el store_id desde la cookie
-    const storeId = typeof document !== 'undefined' 
+    const storeId = typeof document !== 'undefined'
       ? document.cookie.split(';').find(c => c.trim().startsWith('store_id='))?.split('=')[1] || 'default'
       : 'default'
 
-    // Buscar la tienda
     let query = supabase
-      .from('stores')
+      .from('stores_legacy')
       .select('metadata')
       .eq('is_active', true)
       .is('deleted_at', null)
@@ -85,19 +83,17 @@ export async function getChatbotConfig(): Promise<ChatbotConfig> {
  */
 export async function saveChatbotConfig(config: ChatbotConfig): Promise<{ success: boolean; error?: string }> {
   try {
-    const supabase = createClient()
+    const supabase = getSupabaseEcommerce()
     if (!supabase) {
       return { success: false, error: "Supabase no configurado" }
     }
 
-    // Obtener el store_id desde la cookie
-    const storeId = typeof document !== 'undefined' 
+    const storeId = typeof document !== 'undefined'
       ? document.cookie.split(';').find(c => c.trim().startsWith('store_id='))?.split('=')[1] || 'default'
       : 'default'
 
-    // Buscar la tienda
     let query = supabase
-      .from('stores')
+      .from('stores_legacy')
       .select('id, metadata')
       .eq('is_active', true)
       .is('deleted_at', null)
@@ -118,7 +114,6 @@ export async function saveChatbotConfig(config: ChatbotConfig): Promise<{ succes
     const metadata = (storeData.metadata as Record<string, any>) || {}
     metadata.chatbot = config
 
-    // Actualizar la tienda
     const { error: updateError } = await supabase
       .from('stores')
       .update({ 

@@ -1,5 +1,5 @@
 import type { UserProfile, AuthResult } from '@/lib/types/user'
-import { getSupabaseBrowserClient } from './client'
+import { getSupabaseBrowserClient, getSupabaseEcommerce } from './client'
 import { getUrl } from '@/lib/utils/url'
 
 // Helper para manejar timeouts
@@ -70,22 +70,23 @@ export async function signUp(
       if (profileResult.success && profileResult.user) {
         userProfile = profileResult.user
       } else {
-        // Si el trigger no funcionó, crear el perfil manualmente
-        const { error: insertError } = await supabase
-          .from('user_profiles')
-          .insert({
-            id: data.user!.id,
-            email: data.user!.email || email,
-            first_name: firstName || null,
-            last_name: lastName || null,
-          })
-
-        if (!insertError) {
-          userProfile = {
-            id: data.user!.id,
-            email: data.user!.email || email,
-            first_name: firstName || null,
-            last_name: lastName || null,
+        const ecommerce = getSupabaseEcommerce()
+        if (ecommerce) {
+          const { error: insertError } = await ecommerce
+            .from('user_profiles')
+            .insert({
+              id: data.user!.id,
+              email: data.user!.email || email,
+              first_name: firstName || null,
+              last_name: lastName || null,
+            })
+          if (!insertError) {
+            userProfile = {
+              id: data.user!.id,
+              email: data.user!.email || email,
+              first_name: firstName || null,
+              last_name: lastName || null,
+            }
           }
         }
       }
@@ -143,21 +144,21 @@ export async function signIn(email: string, password: string): Promise<AuthResul
       }
     }
 
-    // Obtener el perfil del usuario
     const profileResult = await getUserProfile(data.user!.id)
     if (!profileResult.success || !profileResult.user) {
-      // Si no existe perfil, crearlo
-      const { error: insertError } = await supabase
-        .from('user_profiles')
-        .insert({
-          id: data.user!.id,
-          email: data.user!.email || email,
-          first_name: null,
-          last_name: null,
-        })
-
-      if (insertError) {
-        console.error('[Auth] Error al crear perfil:', insertError)
+      const ecommerce = getSupabaseEcommerce()
+      if (ecommerce) {
+        const { error: insertError } = await ecommerce
+          .from('user_profiles')
+          .insert({
+            id: data.user!.id,
+            email: data.user!.email || email,
+            first_name: null,
+            last_name: null,
+          })
+        if (insertError) {
+          console.error('[Auth] Error al crear perfil:', insertError)
+        }
       }
 
       return {
@@ -275,8 +276,9 @@ export async function getCurrentUser(): Promise<AuthResult> {
  */
 export async function getUserProfile(userId: string): Promise<AuthResult> {
   try {
-    const supabase = getSupabaseBrowserClient()
-    if (!supabase) {
+    const authClient = getSupabaseBrowserClient()
+    const supabase = getSupabaseEcommerce()
+    if (!authClient || !supabase) {
       console.warn('[Auth] Supabase no configurado')
       return {
         success: false,
@@ -286,21 +288,17 @@ export async function getUserProfile(userId: string): Promise<AuthResult> {
 
     console.log('[Auth] Obteniendo perfil para usuario:', userId)
     const startTime = Date.now()
-
-    // Configuración de reintentos y timeout
     let lastError: any = null
-    const maxRetries = 1 // Solo 1 reintento
-    const timeoutMs = 10000 // 10 segundos para dar más tiempo a la conexión
-    
+    const maxRetries = 1
+    const timeoutMs = 10000
+
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
         if (attempt > 0) {
           console.log(`[Auth] Reintento ${attempt} de obtener perfil...`)
-          // Esperar un poco antes de reintentar
           await new Promise(resolve => setTimeout(resolve, 500 * attempt))
         }
 
-        // Usar una consulta más simple y directa sin timeout adicional si es posible
         const queryPromise = supabase
           .from('user_profiles')
           .select('*')
@@ -324,16 +322,12 @@ export async function getUserProfile(userId: string): Promise<AuthResult> {
             details: error.details,
             hint: error.hint,
           })
-          
-          // Si es un error de "no encontrado", intentar crear el perfil
+
           if (error.code === 'PGRST116' || error.message?.includes('No rows') || error.message?.includes('not found')) {
             console.log('[Auth] Perfil no encontrado, intentando crear perfil automáticamente...')
-            
-            // Obtener el usuario de auth para crear el perfil
-            const { data: { user: authUser } } = await supabase.auth.getUser()
-            
+            const { data: { user: authUser } } = await authClient.auth.getUser()
+
             if (authUser && authUser.id === userId) {
-              // Intentar crear el perfil
               const { data: newProfile, error: insertError } = await supabase
                 .from('user_profiles')
                 .insert({
@@ -444,7 +438,7 @@ export async function updateUserProfile(
   updates: Partial<Pick<UserProfile, 'first_name' | 'last_name'>>
 ): Promise<AuthResult> {
   try {
-    const supabase = getSupabaseBrowserClient()
+    const supabase = getSupabaseEcommerce()
     if (!supabase) {
       return {
         success: false,

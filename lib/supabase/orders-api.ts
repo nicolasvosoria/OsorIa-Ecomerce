@@ -1,4 +1,4 @@
-import { getSupabaseBrowserClient } from './client'
+import { getSupabaseEcommerce } from './client'
 
 // Tipos para pedidos
 export interface Order {
@@ -141,7 +141,7 @@ async function validateInventoryBeforeOrder(
   }
 
   try {
-    const supabase = getSupabaseBrowserClient()
+    const supabase = getSupabaseEcommerce()
     if (!supabase) {
       // Si no hay supabase, permitir la orden (para productos externos como Shopify)
       return result
@@ -209,7 +209,7 @@ async function validateInventoryBeforeOrder(
         else if (item.product_id) {
           const productResult = await withTimeout(
             supabase
-              .from('store_items')
+              .from('store_items_legacy')
               .select('track_inventory, inventory_quantity, is_available_for_sale, is_active')
               .eq('id', item.product_id)
               .single(),
@@ -275,7 +275,7 @@ async function validateInventoryBeforeOrder(
  */
 async function updateInventoryAfterOrder(items: OrderItem[]): Promise<void> {
   try {
-    const supabase = getSupabaseBrowserClient()
+    const supabase = getSupabaseEcommerce()
     if (!supabase) {
       console.error('[Orders] Supabase no configurado para actualizar inventario')
       return
@@ -330,7 +330,7 @@ async function updateInventoryAfterOrder(items: OrderItem[]): Promise<void> {
           // Obtener el producto actual
           const productResult = await withTimeout(
             supabase
-              .from('store_items')
+              .from('store_items_legacy')
               .select('track_inventory, inventory_quantity')
               .eq('id', item.product_id)
               .single(),
@@ -352,7 +352,7 @@ async function updateInventoryAfterOrder(items: OrderItem[]): Promise<void> {
 
             const updateResult = await withTimeout(
               supabase
-                .from('store_items')
+                .from('store_items_legacy')
                 .update({ inventory_quantity: newQuantity })
                 .eq('id', item.product_id),
               10000,
@@ -383,7 +383,7 @@ async function updateInventoryAfterOrder(items: OrderItem[]): Promise<void> {
  */
 export async function createOrder(orderData: CreateOrderData): Promise<OrderWithItems | null> {
   try {
-    const supabase = getSupabaseBrowserClient()
+    const supabase = getSupabaseEcommerce()
     if (!supabase) {
       console.error('[Orders] Supabase no configurado')
       return null
@@ -504,16 +504,15 @@ export async function createOrder(orderData: CreateOrderData): Promise<OrderWith
  */
 export async function getOrderById(orderId: string): Promise<OrderWithItems | null> {
   try {
-    const supabase = getSupabaseBrowserClient()
+    const supabase = getSupabaseEcommerce()
     if (!supabase) {
       console.error('[Orders] Supabase no configurado')
       return null
     }
 
-    // Obtener el pedido
     const orderResult = await withTimeout(
       supabase
-        .from('orders')
+        .from('orders_legacy')
         .select('*')
         .eq('id', orderId)
         .single(),
@@ -552,7 +551,7 @@ export async function getOrderById(orderId: string): Promise<OrderWithItems | nu
  */
 export async function getOrderByNumber(orderNumber: string): Promise<OrderWithItems | null> {
   try {
-    const supabase = getSupabaseBrowserClient()
+    const supabase = getSupabaseEcommerce()
     if (!supabase) {
       console.error('[Orders] Supabase no configurado')
       return null
@@ -560,7 +559,7 @@ export async function getOrderByNumber(orderNumber: string): Promise<OrderWithIt
 
     const orderResult = await withTimeout(
       supabase
-        .from('orders')
+        .from('orders_legacy')
         .select('*')
         .eq('order_number', orderNumber)
         .single(),
@@ -615,7 +614,7 @@ export interface GetOrdersResult {
 
 export async function getOrders(params: GetOrdersParams = {}): Promise<GetOrdersResult> {
   try {
-    const supabase = getSupabaseBrowserClient()
+    const supabase = getSupabaseEcommerce()
     if (!supabase) {
       console.error('[Orders] Supabase no configurado')
       return { orders: [], total: 0 }
@@ -631,7 +630,7 @@ export async function getOrders(params: GetOrdersParams = {}): Promise<GetOrders
     } = params
 
     let query = supabase
-      .from('orders')
+      .from('orders_legacy')
       .select('*', { count: 'exact' })
 
     // Filtrar por estado si se especifica
@@ -674,7 +673,7 @@ export async function getOrders(params: GetOrdersParams = {}): Promise<GetOrders
  */
 export async function getOrdersByEmail(email: string, limit: number = 50): Promise<OrderWithItems[]> {
   try {
-    const supabase = getSupabaseBrowserClient()
+    const supabase = getSupabaseEcommerce()
     if (!supabase) {
       console.error('[Orders] Supabase no configurado')
       return []
@@ -682,7 +681,7 @@ export async function getOrdersByEmail(email: string, limit: number = 50): Promi
 
     const ordersResult = await withTimeout(
       supabase
-        .from('orders')
+        .from('orders_legacy')
         .select('*')
         .eq('customer_email', email)
         .order('order_date', { ascending: false })
@@ -739,7 +738,7 @@ export async function updateOrderStatus(
   }
 ): Promise<boolean> {
   try {
-    const supabase = getSupabaseBrowserClient()
+    const supabase = getSupabaseEcommerce()
     if (!supabase) {
       console.error('[Orders] Supabase no configurado')
       return false

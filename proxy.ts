@@ -80,10 +80,9 @@ const storeCache = new Map<string, { store: Store | null; timestamp: number }>()
 const CACHE_TTL = 5 * 60 * 1000 // 5 minutos
 
 /**
- * Obtiene la tienda desde Supabase por subdominio (con caché)
+ * Obtiene la tienda desde Supabase por subdominio (schema ecommerce, vista stores_legacy)
  */
 async function getStoreBySubdomain(subdomain: string): Promise<Store | null> {
-  // Verificar caché primero
   const cached = storeCache.get(subdomain)
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
     return cached.store
@@ -98,41 +97,39 @@ async function getStoreBySubdomain(subdomain: string): Promise<Store | null> {
       return null
     }
 
-    // Llamar a la función de Supabase
+    const params = new URLSearchParams({
+      subdomain: `eq.${subdomain}`,
+      is_active: 'eq.true',
+      deleted_at: 'is.null',
+      select: 'id,subdomain,store_name,domain,is_active,is_public',
+    })
     const response = await fetch(
-      `${supabaseUrl}/rest/v1/rpc/get_store_by_subdomain?p_subdomain=${encodeURIComponent(subdomain)}`,
+      `${supabaseUrl}/rest/v1/stores_legacy?${params.toString()}`,
       {
         headers: {
           'apikey': supabaseAnonKey,
           'Authorization': `Bearer ${supabaseAnonKey}`,
           'Content-Type': 'application/json',
+          'Accept-Profile': 'ecommerce',
+          'Prefer': 'return=representation',
         },
-        // Agregar timeout para evitar que se quede colgado
-        signal: AbortSignal.timeout(5000), // 5 segundos timeout
+        signal: AbortSignal.timeout(5000),
       }
     )
 
     if (!response.ok) {
-      console.error('[Proxy] Error al obtener tienda:', response.statusText)
-      // Cachear null para evitar consultas repetidas en caso de error
+      console.error('[Proxy] Error al obtener tienda:', response.status, response.statusText)
       storeCache.set(subdomain, { store: null, timestamp: Date.now() })
       return null
     }
 
     const data = await response.json()
-    
-    let store: Store | null = null
-    if (data && data.length > 0) {
-      store = data[0] as Store
-    }
+    const store: Store | null = Array.isArray(data) && data.length > 0 ? (data[0] as Store) : null
 
-    // Guardar en caché
     storeCache.set(subdomain, { store, timestamp: Date.now() })
-    
     return store
   } catch (error) {
     console.error('[Proxy] Error al obtener tienda:', error)
-    // Cachear null para evitar consultas repetidas en caso de error
     storeCache.set(subdomain, { store: null, timestamp: Date.now() })
     return null
   }

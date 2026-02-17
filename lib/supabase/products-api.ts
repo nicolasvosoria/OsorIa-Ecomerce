@@ -1,4 +1,4 @@
-import { getSupabaseBrowserClient } from './client'
+import { getSupabaseBrowserClient, getSupabaseEcommerce } from './client'
 import type {
   StoreItem,
   StoreItemWithDetails,
@@ -38,39 +38,25 @@ async function withTimeout<T>(
  */
 export async function getCategories(includeInactive: boolean = false, storeId?: string | null): Promise<ItemCategory[]> {
   try {
-    const supabase = getSupabaseBrowserClient()
+    const supabase = getSupabaseEcommerce()
     if (!supabase) {
       console.error('[Products] Supabase no configurado')
       return []
     }
 
-    // Obtener store_id si no se proporciona
-    // Si storeId es null explícitamente, no llamar a getStoreId() (para evitar problemas con 'use cache')
     let currentStoreId = storeId
-    
     if (currentStoreId === undefined) {
       try {
         currentStoreId = await getStoreId()
       } catch (error: any) {
-        // Si falla (por ejemplo, en build time o dentro de 'use cache'), usar null
-        if (
-          error?.message?.includes('cache scope') ||
-          error?.message?.includes('prerender') ||
-          error?.message?.includes('outside a request scope')
-        ) {
-          currentStoreId = null
-        } else {
-          // Si es otro error, intentar continuar
-          currentStoreId = null
-        }
+        currentStoreId = null
       }
     }
-    
-    // Si no hay store_id (por ejemplo, durante build time), intentar obtener el UUID de la tienda por defecto
+
     if (!currentStoreId) {
       try {
         const { data: defaultStore } = await supabase
-          .from('stores')
+          .from('stores_legacy')
           .select('id')
           .eq('subdomain', 'default')
           .eq('is_active', true)
@@ -119,7 +105,7 @@ export async function getCategories(includeInactive: boolean = false, storeId?: 
  */
 export async function getCategoryById(categoryId: string): Promise<ItemCategory | null> {
   try {
-    const supabase = getSupabaseBrowserClient()
+    const supabase = getSupabaseEcommerce()
     if (!supabase) {
       return null
     }
@@ -148,7 +134,7 @@ export async function getCategoryById(categoryId: string): Promise<ItemCategory 
  */
 export async function getItems(params: GetItemsParams = {}): Promise<GetItemsResult> {
   try {
-    const supabase = getSupabaseBrowserClient()
+    const supabase = getSupabaseEcommerce()
     if (!supabase) {
       return { items: [], total: 0, has_more: false }
     }
@@ -241,7 +227,7 @@ export async function getItems(params: GetItemsParams = {}): Promise<GetItemsRes
             })
             
             const { data: store } = await serverSupabase
-              .from('stores')
+              .from('stores_legacy')
               .select('id')
               .eq('subdomain', subdomain)
               .eq('is_active', true)
@@ -266,7 +252,7 @@ export async function getItems(params: GetItemsParams = {}): Promise<GetItemsRes
     if (!currentStoreId) {
       try {
         const { data: defaultStore } = await supabase
-          .from('stores')
+          .from('stores_legacy')
           .select('id')
           .eq('subdomain', 'default')
           .eq('is_active', true)
@@ -291,7 +277,7 @@ export async function getItems(params: GetItemsParams = {}): Promise<GetItemsRes
     }
 
     let query = supabase
-      .from('store_items')
+      .from('store_items_legacy')
       .select('*, item_categories(*)', { count: 'exact' })
       .eq('store_id', currentStoreId!) // Filtrar por tienda (currentStoreId ya está validado)
       .eq('is_active', is_active)
@@ -354,7 +340,7 @@ export async function getItems(params: GetItemsParams = {}): Promise<GetItemsRes
  */
 export async function getItemBySlug(slug: string, storeId?: string | null): Promise<StoreItemWithDetails | null> {
   try {
-    const supabase = getSupabaseBrowserClient()
+    const supabase = getSupabaseEcommerce()
     if (!supabase) {
       return null
     }
@@ -434,7 +420,7 @@ export async function getItemBySlug(slug: string, storeId?: string | null): Prom
             })
             
             const { data: store } = await serverSupabase
-              .from('stores')
+              .from('stores_legacy')
               .select('id')
               .eq('subdomain', subdomain)
               .eq('is_active', true)
@@ -459,7 +445,7 @@ export async function getItemBySlug(slug: string, storeId?: string | null): Prom
     if (!currentStoreId) {
       try {
         const { data: defaultStore } = await supabase
-          .from('stores')
+          .from('stores_legacy')
           .select('id')
           .eq('subdomain', 'default')
           .eq('is_active', true)
@@ -484,7 +470,7 @@ export async function getItemBySlug(slug: string, storeId?: string | null): Prom
     // Obtener el producto con su categoría, filtrando por tienda
     const result = await withTimeout(
       supabase
-        .from('store_items')
+        .from('store_items_legacy')
         .select('*, item_categories(*)')
         .eq('item_slug', slug)
         .eq('store_id', currentStoreId) // Filtrar por tienda
@@ -542,7 +528,7 @@ export async function getItemBySlug(slug: string, storeId?: string | null): Prom
 
     // Obtener opciones
     const optionsResult = await withTimeout(
-      supabase.from('item_options').select('*').eq('item_id', item.id).order('display_order', { ascending: true }),
+      supabase.from('item_options_legacy').select('*').eq('item_id', item.id).order('display_order', { ascending: true }),
       15000,
       'getItemOptions'
     ) as { data: any; error: any }
@@ -566,7 +552,7 @@ export async function getItemBySlug(slug: string, storeId?: string | null): Prom
  */
 export async function getItemById(itemId: string, storeId?: string): Promise<StoreItemWithDetails | null> {
   try {
-    const supabase = getSupabaseBrowserClient()
+    const supabase = getSupabaseEcommerce()
     if (!supabase) {
       return null
     }
@@ -578,7 +564,7 @@ export async function getItemById(itemId: string, storeId?: string): Promise<Sto
     if (!currentStoreId) {
       try {
         const { data: defaultStore } = await supabase
-          .from('stores')
+          .from('stores_legacy')
           .select('id')
           .eq('subdomain', 'default')
           .eq('is_active', true)
@@ -599,7 +585,7 @@ export async function getItemById(itemId: string, storeId?: string): Promise<Sto
 
     const result = await withTimeout(
       supabase
-        .from('store_items')
+        .from('store_items_legacy')
         .select('*, item_categories(*)')
         .eq('id', itemId)
         .eq('store_id', currentStoreId) // Filtrar por tienda
@@ -639,7 +625,7 @@ export async function getItemById(itemId: string, storeId?: string): Promise<Sto
     const [variantsResult, imagesResult, optionsResult] = await Promise.all([
       supabase.from('item_variants').select('*').eq('item_id', item.id).order('display_order', { ascending: true }),
       supabase.from('item_images').select('*').eq('item_id', item.id).order('display_order', { ascending: true }),
-      supabase.from('item_options').select('*').eq('item_id', item.id).order('display_order', { ascending: true }),
+      supabase.from('item_options_legacy').select('*').eq('item_id', item.id).order('display_order', { ascending: true }),
     ])
 
     return {
@@ -760,7 +746,7 @@ export async function createItem(
   additionalImages: string[] = []
 ): Promise<CreateItemResult> {
   try {
-    const supabase = getSupabaseBrowserClient()
+    const supabase = getSupabaseEcommerce()
     if (!supabase) {
       return {
         success: false,
@@ -784,7 +770,7 @@ export async function createItem(
     if (!storeId) {
       try {
         const { data: defaultStore } = await supabase
-          .from('stores')
+          .from('stores_legacy')
           .select('id')
           .eq('subdomain', 'default')
           .eq('is_active', true)
@@ -988,7 +974,7 @@ export async function updateItem(
   additionalImages: string[] = []
 ): Promise<UpdateItemResult> {
   try {
-    const supabase = getSupabaseBrowserClient()
+    const supabase = getSupabaseEcommerce()
     if (!supabase) {
       return {
         success: false,
@@ -1007,7 +993,7 @@ export async function updateItem(
 
     // Obtener el producto actual para preservar valores no modificados
     const currentItemResult = await withTimeout(
-      supabase.from('store_items').select('*').eq('id', itemId).single(),
+      supabase.from('store_items_legacy').select('*').eq('id', itemId).single(),
       15000,
       'getCurrentItem'
     ) as { data: any; error: any }
@@ -1184,7 +1170,7 @@ export async function updateItem(
  */
 export async function incrementItemViewCount(itemId: string): Promise<boolean> {
   try {
-    const supabase = getSupabaseBrowserClient()
+    const supabase = getSupabaseEcommerce()
     if (!supabase) {
       return false
     }
@@ -1197,19 +1183,16 @@ export async function incrementItemViewCount(itemId: string): Promise<boolean> {
     const { error } = result
 
     if (error) {
-      // Si la función RPC no existe, hacer update manual
-      const { data: currentItem } = await supabase.from('store_items').select('view_count').eq('id', itemId).single()
-
-      if (currentItem) {
-        const { error: updateError } = await supabase
-          .from('store_items')
-          .update({ view_count: (currentItem.view_count || 0) + 1 })
-          .eq('id', itemId)
-
-        if (updateError) {
-          console.error('[Products] Error al incrementar vistas:', updateError)
-          return false
-        }
+      // Fallback: en schema ecommerce las vistas están en item_metrics (item_id, view_count)
+      const { data: metrics } = await supabase.from('item_metrics').select('view_count').eq('item_id', itemId).single()
+      const newCount = (metrics?.view_count ?? 0) + 1
+      const { error: upsertError } = await supabase.from('item_metrics').upsert(
+        { item_id: itemId, view_count: newCount, updated_at: new Date().toISOString() },
+        { onConflict: 'item_id' }
+      )
+      if (upsertError) {
+        console.error('[Products] Error al incrementar vistas (item_metrics):', upsertError)
+        return false
       }
     }
 
@@ -1226,7 +1209,7 @@ export async function incrementItemViewCount(itemId: string): Promise<boolean> {
  */
 export async function getProductStock(productId: string): Promise<number | null> {
   try {
-    const supabase = getSupabaseBrowserClient()
+    const supabase = getSupabaseEcommerce()
     if (!supabase) {
       return null
     }
@@ -1270,7 +1253,7 @@ export async function getProductStock(productId: string): Promise<number | null>
  */
 export async function getVariantStock(variantId: string): Promise<number | null> {
   try {
-    const supabase = getSupabaseBrowserClient()
+    const supabase = getSupabaseEcommerce()
     if (!supabase) {
       return null
     }

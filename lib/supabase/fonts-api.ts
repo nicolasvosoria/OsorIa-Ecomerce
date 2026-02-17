@@ -1,4 +1,4 @@
-import { getSupabaseBrowserClient } from "./client"
+import { getSupabaseBrowserClient, getSupabaseEcommerce } from "./client"
 import type { AppFont } from "@/lib/types/font"
 import { requireAdmin } from "./permissions-api"
 
@@ -14,7 +14,7 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number = 10000): Promise
 
 export async function getFonts(): Promise<AppFont[]> {
   console.log("[Font] === INICIANDO getFonts ===")
-  const supabase = getSupabaseBrowserClient()
+  const supabase = getSupabaseEcommerce()
   if (!supabase) {
     console.error("[Font] ❌ Supabase no configurado - retornando array vacío")
     return []
@@ -32,7 +32,7 @@ export async function getFonts(): Promise<AppFont[]> {
     if (process.env.NODE_ENV === 'development') {
       try {
         console.log("[Font] Probando conectividad con Supabase...")
-        const testQuery = supabase.from("app_fonts").select("id").limit(1)
+        const testQuery = supabase.from("app_fonts_legacy").select("id").limit(1)
         const testResult = await Promise.race([
           testQuery,
           new Promise((_, reject) => 
@@ -52,7 +52,7 @@ export async function getFonts(): Promise<AppFont[]> {
     }
     
     const queryPromise = supabase
-      .from("app_fonts")
+      .from("app_fonts_legacy")
       .select("*")
       .order("font_name")
     
@@ -98,13 +98,13 @@ export async function getFonts(): Promise<AppFont[]> {
 }
 
 export async function getActiveFont(): Promise<AppFont | null> {
-  const supabase = getSupabaseBrowserClient()
+  const supabase = getSupabaseEcommerce()
   if (!supabase) {
     return null
   }
 
   const { data, error } = await supabase
-    .from("app_fonts")
+    .from("app_fonts_legacy")
     .select("*")
     .eq("is_active", true)
     .single()
@@ -130,13 +130,12 @@ export async function setActiveFont(fontName: string): Promise<{ success: boolea
     }
   }
 
-  const supabase = getSupabaseBrowserClient()
+  const supabase = getSupabaseEcommerce()
   if (!supabase) {
     return { success: false, error: "Supabase no configurado" }
   }
 
   try {
-    // Primero desactivar todas las fuentes
     const { error: deactivateError } = await supabase
       .from("app_fonts")
       .update({ is_active: false })

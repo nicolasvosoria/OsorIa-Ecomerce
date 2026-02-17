@@ -1,4 +1,4 @@
-import { getSupabaseBrowserClient } from './client'
+import { getSupabaseEcommerce } from './client'
 import type { UserProfile } from '@/lib/types/user'
 
 // Helper para manejar timeouts
@@ -33,7 +33,7 @@ export interface GetUsersResult {
  */
 export async function getUsers(params: GetUsersParams = {}): Promise<GetUsersResult> {
   try {
-    const supabase = getSupabaseBrowserClient()
+    const supabase = getSupabaseEcommerce()
     if (!supabase) {
       console.error('[Users] Supabase no configurado')
       return { users: [], total: 0 }
@@ -86,7 +86,7 @@ export async function getUsers(params: GetUsersParams = {}): Promise<GetUsersRes
  */
 export async function getUserById(userId: string): Promise<UserProfile | null> {
   try {
-    const supabase = getSupabaseBrowserClient()
+    const supabase = getSupabaseEcommerce()
     if (!supabase) {
       console.error('[Users] Supabase no configurado')
       return null

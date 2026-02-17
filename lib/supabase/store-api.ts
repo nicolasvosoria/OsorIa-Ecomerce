@@ -14,8 +14,7 @@ async function getSupabaseServerClient() {
   }
 
   const cookieStore = await cookies()
-  
-  return createServerClient(supabaseUrl, supabaseKey, {
+  const client = createServerClient(supabaseUrl, supabaseKey, {
     cookies: {
       get(name: string) {
         return cookieStore.get(name)?.value
@@ -36,6 +35,8 @@ async function getSupabaseServerClient() {
       },
     },
   })
+  // Usar schema ecommerce para consultar tablas/vistas legacy del nuevo proyecto
+  return client.schema("ecommerce") as Awaited<ReturnType<typeof createServerClient>>
 }
 
 /**
@@ -83,19 +84,17 @@ export async function getStoreFromServer(): Promise<{ id: string; subdomain: str
       return null
     }
 
-    // Si storeId es 'default' (string), buscar por subdomain en lugar de por ID
+    // Vista legacy: stores_legacy ya incluye primary_color, secondary_color
     let query = supabase
-      .from('stores')
+      .from('stores_legacy')
       .select('id, subdomain, store_name, primary_color, secondary_color')
       .eq('is_active', true)
       .is('deleted_at', null)
 
     if (storeId === 'default') {
-      // Buscar por subdomain si el storeId es 'default'
       query = query.eq('subdomain', 'default')
       console.log('[Store API] Buscando tienda por subdomain: default')
     } else {
-      // Buscar por ID si es un UUID válido
       query = query.eq('id', storeId)
       console.log('[Store API] Buscando tienda por ID:', storeId)
     }

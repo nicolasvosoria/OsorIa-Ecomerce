@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSupabaseBrowserClient } from '@/lib/supabase/client'
+import { getSupabaseEcommerce } from '@/lib/supabase/client'
 
 /**
  * API Route para obtener información de una tienda
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     const subdomain = url.searchParams.get('subdomain')
     const storeId = url.searchParams.get('id')
 
-    const supabase = getSupabaseBrowserClient()
+    const supabase = getSupabaseEcommerce()
     if (!supabase) {
       return NextResponse.json(
         { error: 'Supabase no configurado' },
@@ -29,10 +29,13 @@ export async function GET(request: NextRequest) {
     let store = null
 
     if (subdomain) {
-      // Obtener por subdominio usando la función RPC
-      const { data, error } = await supabase.rpc('get_store_by_subdomain', {
-        p_subdomain: subdomain,
-      })
+      const { data, error } = await supabase
+        .from('stores_legacy')
+        .select('*')
+        .eq('subdomain', subdomain)
+        .eq('is_active', true)
+        .is('deleted_at', null)
+        .maybeSingle()
 
       if (error) {
         console.error('[Store API] Error al obtener tienda por subdominio:', error)
@@ -41,19 +44,15 @@ export async function GET(request: NextRequest) {
           { status: 500 }
         )
       }
-
-      if (data && data.length > 0) {
-        store = data[0]
-      }
+      store = data
     } else if (storeId) {
-      // Obtener por ID
       const { data, error } = await supabase
-        .from('stores')
+        .from('stores_legacy')
         .select('*')
         .eq('id', storeId)
         .eq('is_active', true)
         .is('deleted_at', null)
-        .single()
+        .maybeSingle()
 
       if (error) {
         console.error('[Store API] Error al obtener tienda por ID:', error)
@@ -62,7 +61,6 @@ export async function GET(request: NextRequest) {
           { status: 500 }
         )
       }
-
       store = data
     } else {
       return NextResponse.json(

@@ -1,4 +1,4 @@
-import { getSupabaseBrowserClient } from './client'
+import { getSupabaseEcommerce } from './client'
 
 // Helper para manejar timeouts
 async function withTimeout<T>(
@@ -54,7 +54,7 @@ export interface DetailedStats {
  */
 export async function getDashboardStats(): Promise<DashboardStats> {
   try {
-    const supabase = getSupabaseBrowserClient()
+    const supabase = getSupabaseEcommerce()
     if (!supabase) {
       return {
         totalProducts: 0,
@@ -64,29 +64,23 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       }
     }
 
-    // Obtener todas las estadísticas en paralelo
     const [productsResult, ordersTodayResult, usersResult, monthlySalesResult] = await Promise.all([
-      // Conteo de productos activos
       withTimeout(
         supabase
-          .from('store_items')
+          .from('store_items_legacy')
           .select('id', { count: 'exact', head: true })
           .eq('is_active', true),
         10000,
         'getProductsCount'
       ) as Promise<{ count: number | null; error: any }>,
-      
-      // Pedidos de hoy
       withTimeout(
         supabase
-          .from('orders')
+          .from('orders_legacy')
           .select('id', { count: 'exact', head: true })
           .gte('created_at', new Date().toISOString().split('T')[0] + 'T00:00:00.000Z'),
         10000,
         'getOrdersTodayCount'
       ) as Promise<{ count: number | null; error: any }>,
-      
-      // Conteo de usuarios
       withTimeout(
         supabase
           .from('user_profiles')
@@ -94,11 +88,9 @@ export async function getDashboardStats(): Promise<DashboardStats> {
         10000,
         'getUsersCount'
       ) as Promise<{ count: number | null; error: any }>,
-      
-      // Ventas del mes actual
       withTimeout(
         supabase
-          .from('orders')
+          .from('orders_legacy')
           .select('total_amount, currency_code')
           .gte('created_at', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString())
           .in('status', ['confirmed', 'processing', 'shipped', 'delivered'])
@@ -144,7 +136,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
  */
 export async function getDetailedStats(days: number = 30): Promise<DetailedStats> {
   try {
-    const supabase = getSupabaseBrowserClient()
+    const supabase = getSupabaseEcommerce()
     if (!supabase) {
       return {
         salesByDay: [],
@@ -160,10 +152,9 @@ export async function getDetailedStats(days: number = 30): Promise<DetailedStats
     startDate.setDate(startDate.getDate() - days)
     const startDateISO = startDate.toISOString()
 
-    // Obtener ventas por día
     const salesByDayResult = await withTimeout(
       supabase
-        .from('orders')
+        .from('orders_legacy')
         .select('created_at, total_amount, id')
         .gte('created_at', startDateISO)
         .in('status', ['confirmed', 'processing', 'shipped', 'delivered'])
@@ -172,17 +163,15 @@ export async function getDetailedStats(days: number = 30): Promise<DetailedStats
       'getSalesByDay'
     ) as Promise<{ data: any[] | null; error: any }>
 
-    // Obtener pedidos por estado
     const ordersByStatusResult = await withTimeout(
       supabase
-        .from('orders')
+        .from('orders_legacy')
         .select('status, id')
         .gte('created_at', startDateISO),
       15000,
       'getOrdersByStatus'
     ) as Promise<{ data: any[] | null; error: any }>
 
-    // Obtener productos más vendidos (usando join con orders para filtrar por fecha del pedido)
     const topProductsResult = await withTimeout(
       supabase
         .from('order_items')

@@ -11,8 +11,7 @@ export function getSupabaseBrowserClient() {
     return null
   }
 
-  // Siempre crear un nuevo cliente para asegurar que la sesión esté actualizada
-  // El cliente de @supabase/ssr maneja automáticamente la sesión desde las cookies
+  // Cliente estándar: Auth y sesión. Para datos ecommerce usar ecommerceFrom().
   if (!supabaseClient) {
     supabaseClient = createBrowserClient(supabaseUrl, supabaseKey)
   }
@@ -20,8 +19,16 @@ export function getSupabaseBrowserClient() {
   return supabaseClient
 }
 
-// Función para refrescar el cliente (útil después de cambios de autenticación)
+/** Cliente con schema ecommerce para consultar vistas/tablas legacy. No usar para supabase.auth. */
+export function getSupabaseEcommerce() {
+  const client = getSupabaseBrowserClient()
+  return client ? client.schema("ecommerce") : null
+}
+
 export function refreshSupabaseClient() {
   supabaseClient = null
   return getSupabaseBrowserClient()
 }
+
+/** Alias para compatibilidad: prefiere getSupabaseEcommerce() para datos de tienda. */
+export const createClient = getSupabaseBrowserClient

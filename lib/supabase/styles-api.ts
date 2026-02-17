@@ -1,15 +1,22 @@
-import { getSupabaseBrowserClient } from "./client"
+import { getSupabaseBrowserClient, getSupabaseEcommerce } from "./client"
 import type { ComponentStyle } from "./types"
 import { requireAdmin } from "./permissions-api"
 import { getStoreId } from "@/lib/utils/store"
 
-export async function getComponentStyles() {
-  const supabase = getSupabaseBrowserClient()
-  if (!supabase) {
-    return []
+function mapLegacyStyle(row: any): ComponentStyle {
+  return {
+    id: row.id,
+    component_name: row.component_name,
+    store_id: row.store_id,
+    variables: row.style_config ?? row.variables ?? {},
+    updated_at: row.updated_at,
   }
+}
 
-  // Obtener store_id actual
+export async function getComponentStyles() {
+  const supabase = getSupabaseEcommerce()
+  if (!supabase) return []
+
   const storeId = await getStoreId()
   if (!storeId) {
     console.warn("[v0] No store_id available, returning empty array")
@@ -17,7 +24,7 @@ export async function getComponentStyles() {
   }
 
   const { data, error } = await supabase
-    .from("component_styles")
+    .from("component_styles_legacy")
     .select("*")
     .eq("store_id", storeId)
     .order("component_name")
@@ -27,32 +34,26 @@ export async function getComponentStyles() {
     return []
   }
 
-  return data as ComponentStyle[]
+  return (data ?? []).map(mapLegacyStyle)
 }
 
 export async function getComponentStyleByName(componentName: string) {
-  const supabase = getSupabaseBrowserClient()
-  if (!supabase) {
-    return null
-  }
+  const supabase = getSupabaseEcommerce()
+  if (!supabase) return null
 
-  // Para el componente Hero, siempre usar el store por defecto
   let storeId: string | null = null
   if (componentName === "hero") {
     const { data: defaultStore } = await supabase
-      .from("stores")
+      .from("stores_legacy")
       .select("id")
       .eq("subdomain", "default")
       .single()
-    
     if (!defaultStore?.id) {
       console.warn(`[v0] Default store not found for ${componentName}`)
       return null
     }
-    
     storeId = defaultStore.id
   } else {
-    // Para otros componentes, usar el store_id actual
     storeId = await getStoreId()
     if (!storeId) {
       console.warn(`[v0] No store_id available for ${componentName}`)
@@ -61,7 +62,7 @@ export async function getComponentStyleByName(componentName: string) {
   }
 
   const { data, error } = await supabase
-    .from("component_styles")
+    .from("component_styles_legacy")
     .select("*")
     .eq("component_name", componentName)
     .eq("store_id", storeId)
@@ -72,49 +73,36 @@ export async function getComponentStyleByName(componentName: string) {
     return null
   }
 
-  return data as ComponentStyle
+  return data ? mapLegacyStyle(data) : null
 }
 
 export async function updateComponentStyle(componentName: string, variables: Record<string, any>) {
-  // Verificar que el usuario es administrador
   await requireAdmin()
 
-  const supabase = getSupabaseBrowserClient()
-  if (!supabase) {
-    throw new Error("Supabase is not configured")
-  }
+  const supabase = getSupabaseEcommerce()
+  if (!supabase) throw new Error("Supabase is not configured")
 
-  // Para el componente Hero, siempre usar el store por defecto
   if (componentName === "hero") {
     const { data: defaultStore } = await supabase
-      .from("stores")
+      .from("stores_legacy")
       .select("id")
       .eq("subdomain", "default")
       .single()
-    
     if (!defaultStore?.id) {
       throw new Error("Default store not found. Hero component can only be edited for the default store.")
     }
-    
     return await updateComponentStyleWithStoreId(componentName, variables, defaultStore.id, supabase)
   }
 
-  // Para otros componentes, usar el store_id actual
   const storeId = await getStoreId()
   if (!storeId) {
-    // Si no hay store_id, intentar obtener el UUID de la tienda por defecto
     const { data: defaultStore } = await supabase
-      .from("stores")
+      .from("stores_legacy")
       .select("id")
       .eq("subdomain", "default")
       .single()
-    
-    if (!defaultStore?.id) {
-      throw new Error("No store_id available and default store not found")
-    }
-    
-    const finalStoreId = storeId || defaultStore.id
-    return await updateComponentStyleWithStoreId(componentName, variables, finalStoreId, supabase)
+    if (!defaultStore?.id) throw new Error("No store_id available and default store not found")
+    return await updateComponentStyleWithStoreId(componentName, variables, defaultStore.id, supabase)
   }
 
   return await updateComponentStyleWithStoreId(componentName, variables, storeId, supabase)
@@ -124,14 +112,11 @@ async function updateComponentStyleWithStoreId(
   componentName: string,
   variables: Record<string, any>,
   storeId: string,
-  supabase: ReturnType<typeof getSupabaseBrowserClient>
+  supabase: NonNullable<ReturnType<typeof getSupabaseEcommerce>>
 ) {
-  if (!supabase) {
-    throw new Error("Supabase is not configured")
-  }
+  if (!supabase) throw new Error("Supabase is not configured")
 
   try {
-    // Primero verificar si el registro existe
     const { data: existing, error: checkError } = await supabase
       .from("component_styles")
       .select("id")
@@ -204,21 +189,12 @@ async function updateComponentStyleWithStoreId(
 }
 
 export async function subscribeToStyleChanges(componentName: string, callback: (payload: ComponentStyle) => void) {
-  const supabase = getSupabaseBrowserClient()
-  if (!supabase) {
-    return {
-      unsubscribe: () => {},
-    }
-  }
+  const supabase = getSupabaseEcommerce()
+  if (!supabase) return { unsubscribe: () => {} }
 
   try {
-    // Obtener store_id actual
     const storeId = await getStoreId()
-    if (!storeId) {
-      return {
-        unsubscribe: () => {},
-      }
-    }
+    if (!storeId) return { unsubscribe: () => {} }
 
     const channel = supabase
       .channel(`component_styles:${componentName}:${storeId}`)
