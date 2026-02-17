@@ -6,10 +6,10 @@ import { FooterNew } from "@/components/sections/footer-new"
 import { getCategories, getItems } from "@/lib/supabase/products-api"
 import { CatalogProductsList } from "@/components/catalog/catalog-products-list"
 import { getStoreId } from "@/lib/utils/store"
-import { headers } from "next/headers"
+import { headers, cookies } from "next/headers"
 import { createServerClient } from "@supabase/ssr"
-import { cookies } from "next/headers"
 import { notFound } from "next/navigation"
+import { getStoreIdServer } from "@/lib/utils/store-server"
 
 // Helper para formatear precio
 function formatPrice(price: number | string, currencyCode: string = "COP"): string {
@@ -127,9 +127,8 @@ async function CategoryContent({ categorySlug }: { categorySlug: string }) {
     // Obtener store_id de múltiples fuentes
     storeId = await getStoreId()
     
-    // Si no se obtuvo, intentar desde el request
     if (!storeId) {
-      storeId = await getStoreIdFromRequest()
+      storeId = await getStoreIdServer()
     }
     
     if (!storeId) {

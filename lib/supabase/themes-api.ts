@@ -1,4 +1,4 @@
-import { getSupabaseBrowserClient, getSupabaseEcommerce } from "./client"
+import { getSupabaseEcommerce } from "./client"
 import type { AppTheme } from "@/lib/types/theme"
 import { requireAdmin } from "./permissions-api"
 import { getStoreId } from "@/lib/utils/store"
@@ -20,7 +20,7 @@ export async function getThemes(): Promise<AppTheme[]> {
     console.error("[Theme] ❌ Supabase no configurado - retornando array vacío")
     return []
   }
-  console.log("[Theme] ✅ Cliente Supabase obtenido")
+  console.log("[Theme] ✅ Cliente Supabase obtenido (schema ecommerce)")
 
   try {
     let storeId = await getStoreId()
@@ -39,34 +39,43 @@ export async function getThemes(): Promise<AppTheme[]> {
       }
     }
 
-    console.log("[Theme] Ejecutando consulta a app_themes_legacy...")
+    console.log("[Theme] Ejecutando consulta a app_themes (schema ecommerce)...")
     const startTime = Date.now()
     let queryPromise = supabase
-      .from("app_themes_legacy")
+      .from("app_themes")
       .select("*")
       .order("theme_name")
     if (storeId) {
-      queryPromise = queryPromise.eq("store_id", storeId)
+      queryPromise = queryPromise.or(`store_id.eq.${storeId},store_id.is.null`)
     } else {
       queryPromise = queryPromise.is("store_id", null)
     }
 
     console.log("[Theme] Enviando consulta completa...")
-    const result = await withTimeout(queryPromise, 20000) as { data: any; error: any }
-    const { data, error } = result
+    let result = await withTimeout(queryPromise, 20000) as { data: any; error: any }
+    let { data, error } = result
+    if (error && (error?.message?.includes("store_id") || error?.code === "42703")) {
+      queryPromise = supabase.from("app_themes").select("*").order("theme_name")
+      result = await withTimeout(queryPromise, 20000) as { data: any; error: any }
+      data = result.data
+      error = result.error
+    }
     const elapsedTime = Date.now() - startTime
     console.log("[Theme] Consulta completada en", elapsedTime, "ms. Error:", error ? "Sí" : "No")
 
     if (error) {
+      const errMsg = typeof error?.message === "string" ? error.message : JSON.stringify(error)
+      const errCode = error?.code
       console.error("[Theme] ❌ Error fetching themes:", {
-        message: error.message,
-        code: error.code,
-        details: error.details,
-        hint: error.hint,
+        message: errMsg,
+        code: errCode,
+        details: error?.details,
+        hint: error?.hint,
         storeId,
+        rawError: error,
       })
-      if (error.code === 'PGRST301' || error.message?.includes('permission') || error.message?.includes('RLS')) {
-        console.error("[Theme] ⚠️ Posible problema de RLS o permisos. Verifica que RLS esté deshabilitado o que las políticas permitan lectura pública.")
+      if (errCode === "PGRST301" || (errMsg && (errMsg.includes("permission") || errMsg.includes("RLS") || errMsg.includes("does not exist")))) {
+        console.error("[Theme] ⚠️ Posible problema: tabla app_themes en schema ecommerce, RLS o permisos. Revisa que la tabla exista y RLS permita lectura.")
       }
       return []
     }
@@ -79,7 +88,9 @@ export async function getThemes(): Promise<AppTheme[]> {
     console.log("[Theme] ✅ Temas cargados exitosamente:", data.length)
     const themes = data.map((theme: any) => ({
       ...theme,
-      colors: typeof theme.theme_config === "string" ? JSON.parse(theme.theme_config) : (theme.theme_config ?? theme.colors),
+      colors: typeof theme.colors === "string" ? JSON.parse(theme.colors) : (theme.theme_config != null
+        ? (typeof theme.theme_config === "string" ? JSON.parse(theme.theme_config) : theme.theme_config)
+        : theme.colors),
     })) as AppTheme[]
     console.log("[Theme] === FINALIZANDO getThemes ===")
     return themes
@@ -106,17 +117,39 @@ export async function getActiveTheme(): Promise<AppTheme | null> {
       .select("id")
       .eq("subdomain", "default")
       .maybeSingle()
-    if (defaultStore?.id) {
-      storeId = defaultStore.id
+    if (defaultStore?.id) storeId = defaultStore.id
+  }
+
+  // Nuevo esquema: tema activo por tienda en app_theme_versions
+  if (storeId) {
+    const { data: version } = await supabase
+      .from("app_theme_versions")
+      .select("theme_id")
+      .eq("store_id", storeId)
+      .eq("is_current", true)
+      .maybeSingle()
+    if (version?.theme_id) {
+      const { data: theme, error: themeError } = await supabase
+        .from("app_themes")
+        .select("*")
+        .eq("id", version.theme_id)
+        .maybeSingle()
+      if (!themeError && theme) {
+        const colors = theme.colors != null
+          ? (typeof theme.colors === "string" ? JSON.parse(theme.colors) : theme.colors)
+          : (theme.theme_config != null ? (typeof theme.theme_config === "string" ? JSON.parse(theme.theme_config) : theme.theme_config) : {})
+        return { ...theme, colors } as AppTheme
+      }
     }
   }
 
+  // Fallback: tema con is_active en app_themes (compatibilidad)
   let query = supabase
-    .from("app_themes_legacy")
+    .from("app_themes")
     .select("*")
     .eq("is_active", true)
   if (storeId) {
-    query = query.eq("store_id", storeId)
+    query = query.or(`store_id.eq.${storeId},store_id.is.null`).limit(1)
   } else {
     query = query.is("store_id", null)
   }
@@ -154,29 +187,32 @@ export async function getActiveTheme(): Promise<AppTheme | null> {
       return null
     }
 
-    const errorInfo: Record<string, any> = {
-      storeId,
-      errorType: typeof error,
+    // Fallback: si falla por columna store_id u otro, intentar sin filtro store_id
+    const fallbackRes = await supabase.from("app_themes").select("*").eq("is_active", true).limit(1).maybeSingle()
+    if (!fallbackRes.error && fallbackRes.data) {
+      const colors = fallbackRes.data.colors ?? fallbackRes.data.theme_config
+      return { ...fallbackRes.data, colors: typeof colors === "string" ? JSON.parse(colors) : colors } as AppTheme
     }
 
-    if (errorMessage) errorInfo.message = errorMessage
-    if (errorCode) errorInfo.code = errorCode
-    if (errorDetails) errorInfo.details = errorDetails
-    if (errorHint) errorInfo.hint = errorHint
+    const errMsg = errorMessage ?? (typeof error?.message === "string" ? error.message : JSON.stringify(error))
+    const errCode = errorCode ?? error?.code
+
+    const errorInfo: Record<string, any> = {
+      storeId,
+      message: errMsg,
+      code: errCode,
+      details: errorDetails ?? error?.details,
+      hint: errorHint ?? error?.hint,
+      rawError: error,
+    }
 
     try {
-      errorInfo.fullError = JSON.stringify(error, (key, value) => {
-        if (typeof value === 'object' && value !== null) {
-          try {
-            return value
-          } catch {
-            return '[Circular]'
-          }
-        }
+      errorInfo.rawString = JSON.stringify(error, (key, value) => {
+        if (typeof value === "object" && value !== null) return value
         return value
       }, 2)
-    } catch (e) {
-      errorInfo.fullError = String(error)
+    } catch (_) {
+      errorInfo.rawString = String(error)
     }
 
     console.error("[Theme] Error fetching active theme:", errorInfo)
@@ -185,7 +221,7 @@ export async function getActiveTheme(): Promise<AppTheme | null> {
 
   if (!data) return null
 
-  const colors = data.theme_config ?? data.colors
+  const colors = data.colors ?? data.theme_config
   return {
     ...data,
     colors: typeof colors === "string" ? JSON.parse(colors) : colors,

@@ -219,8 +219,6 @@ const COMPONENT_FIELDS: Record<
       { key: "brandName", label: "Nombre de la Marca", type: "text" },
       { key: "logoImage", label: "Logo de la Empresa", type: "image" },
       { key: "logoImageDark", label: "Logo para Tema Oscuro (opcional)", type: "image" },
-      { key: "searchPlaceholder", label: "Texto del Buscador", type: "text" },
-      { key: "tagline", label: "Texto del Banner", type: "text" },
     ],
     styles: [
       { key: "bgColor", label: "Color de Fondo del Header", type: "color" },

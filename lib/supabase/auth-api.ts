@@ -70,9 +70,9 @@ export async function signUp(
       if (profileResult.success && profileResult.user) {
         userProfile = profileResult.user
       } else {
-        const ecommerce = getSupabaseEcommerce()
-        if (ecommerce) {
-          const { error: insertError } = await ecommerce
+        const profilesClient = getSupabaseEcommerce()
+        if (profilesClient) {
+          const { error: insertError } = await profilesClient
             .from('user_profiles')
             .insert({
               id: data.user!.id,
@@ -146,9 +146,9 @@ export async function signIn(email: string, password: string): Promise<AuthResul
 
     const profileResult = await getUserProfile(data.user!.id)
     if (!profileResult.success || !profileResult.user) {
-      const ecommerce = getSupabaseEcommerce()
-      if (ecommerce) {
-        const { error: insertError } = await ecommerce
+      const profilesClient = getSupabaseEcommerce()
+      if (profilesClient) {
+        const { error: insertError } = await profilesClient
           .from('user_profiles')
           .insert({
             id: data.user!.id,
@@ -316,14 +316,19 @@ export async function getUserProfile(userId: string): Promise<AuthResult> {
         console.log(`[Auth] Consulta de perfil completada en ${elapsedTime}ms`)
 
         if (error) {
-          console.error('[Auth] Error en consulta de perfil:', {
-            message: error.message,
-            code: error.code,
-            details: error.details,
-            hint: error.hint,
-          })
+          const errMsg = typeof error?.message === 'string' ? error.message : (error && typeof error === 'object' ? JSON.stringify(error) : String(error))
+          const errCode = error?.code
+          let rawString: string
+          try {
+            rawString = JSON.stringify(error, (_, value) => (typeof value === 'object' && value !== null ? value : value), 2)
+          } catch {
+            rawString = String(error)
+          }
+          const msg = `[Auth] Error en consulta de perfil: message=${errMsg || '(sin mensaje)'} code=${errCode ?? '(sin código)'} rawString=${rawString?.slice(0, 300) ?? '(nulo)'}`
+          console.error(msg)
+          console.error('[Auth] Error objeto:', error)
 
-          if (error.code === 'PGRST116' || error.message?.includes('No rows') || error.message?.includes('not found')) {
+          if (errCode === 'PGRST116' || (errMsg && (errMsg.includes('No rows') || errMsg.includes('not found')))) {
             console.log('[Auth] Perfil no encontrado, intentando crear perfil automáticamente...')
             const { data: { user: authUser } } = await authClient.auth.getUser()
 
@@ -358,7 +363,7 @@ export async function getUserProfile(userId: string): Promise<AuthResult> {
           }
           
           // Si es un error de permisos o RLS, no reintentar
-          if (error.code === '42501' || error.message?.includes('permission') || error.message?.includes('RLS')) {
+          if (errCode === '42501' || (errMsg && (errMsg.includes('permission') || errMsg.includes('RLS')))) {
             console.error('[Auth] Error de permisos/RLS en user_profiles. Verifica que RLS esté deshabilitado o las políticas estén configuradas correctamente.')
             return {
               success: false,

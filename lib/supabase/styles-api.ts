@@ -202,7 +202,7 @@ export async function subscribeToStyleChanges(componentName: string, callback: (
         "postgres_changes",
         {
           event: "*",
-          schema: "public",
+          schema: "ecommerce",
           table: "component_styles",
           filter: `component_name=eq.${componentName}`,
         },

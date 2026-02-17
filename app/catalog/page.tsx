@@ -6,9 +6,9 @@ import { FooterNew } from "@/components/sections/footer-new"
 import { getCategories, getItems } from "@/lib/supabase/products-api"
 import { CatalogProductsList } from "@/components/catalog/catalog-products-list"
 import { getStoreId } from "@/lib/utils/store"
-import { headers } from "next/headers"
+import { getStoreIdServer } from "@/lib/utils/store-server"
+import { headers, cookies } from "next/headers"
 import { createServerClient } from "@supabase/ssr"
-import { cookies } from "next/headers"
 
 // Helper para formatear precio
 function formatPrice(price: number | string, currencyCode: string = "COP"): string {
@@ -171,12 +171,10 @@ async function CatalogContent() {
   let storeId: string | null = null
   
   try {
-    // Obtener store_id de múltiples fuentes
+    // Obtener store_id (getStoreIdServer evita errores de headers() en prerender)
     storeId = await getStoreId()
-    
-    // Si no se obtuvo, intentar desde el request
     if (!storeId) {
-      storeId = await getStoreIdFromRequest()
+      storeId = await getStoreIdServer()
     }
     
     console.log('[Catalog] Store ID obtenido:', storeId)
