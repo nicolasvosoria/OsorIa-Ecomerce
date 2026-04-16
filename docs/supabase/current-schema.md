@@ -53,11 +53,20 @@ Este documento resume el **estado observado en el repositorio** entre scripts SQ
   - `lib/supabase/themes-api.ts`
 - Métricas de vistas de producto: la app invoca RPC `increment_item_views` y, si falla, usa `item_metrics`:
   - `lib/supabase/products-api.ts`
+- La app también consume otros objetos legacy/runtime no versionados en SQL:
+  - `orders_legacy`: `lib/supabase/stats-api.ts`, `lib/supabase/orders-api.ts`
+  - `component_styles_legacy`: `lib/supabase/styles-api.ts`
+  - `app_fonts_legacy`: `lib/supabase/fonts-api.ts`
+  - `item_options_legacy`: `lib/supabase/products-api.ts`
 
 ### Objetos de compatibilidad que la app da por existentes
 
 - Schema lógico: `ecommerce`
 - Vista/tabla de lectura legacy: `stores_legacy`
+- Vista/tabla de pedidos legacy: `orders_legacy`
+- Vista/tabla de estilos legacy: `component_styles_legacy`
+- Vista/tabla de fuentes legacy: `app_fonts_legacy`
+- Vista/tabla de opciones legacy: `item_options_legacy`
 - Tabla de versionado de tema activo: `app_theme_versions`
 - RPC para vistas: `increment_item_views`
 - Tabla fallback de métricas: `item_metrics`
@@ -73,15 +82,27 @@ Este documento resume el **estado observado en el repositorio** entre scripts SQ
    - Se consume en múltiples puntos de app/proxy.
    - En `scripts/*.sql` no aparece definición versionada de vista/tabla `stores_legacy`.
 
-3. **`app_theme_versions` requerido por runtime, no versionado en scripts**
+3. **Dependencia runtime en `*_legacy` no versionada en SQL**
+   - Además de `stores_legacy`, la app consume `orders_legacy`, `component_styles_legacy`, `app_fonts_legacy` e `item_options_legacy`.
+   - No hay scripts versionados que creen esas vistas/tablas de compatibilidad.
+
+4. **`app_theme_versions` requerido por runtime, no versionado en scripts**
    - Usado para activar tema por tienda en `lib/supabase/themes-api.ts`.
    - No hay script que cree o migre explícitamente `app_theme_versions`.
 
-4. **RPC `increment_item_views` requerida por runtime, no versionada en scripts**
+5. **RPC `increment_item_views` requerida por runtime, no versionada en scripts**
    - La app llama `supabase.rpc('increment_item_views', ...)` y cae en fallback `item_metrics`.
    - No hay definición SQL versionada para `increment_item_views` ni para `item_metrics`.
 
-5. **Scripts opcionales vacíos**
+6. **`user_profiles.role` se usa en código/policies, pero no existe en el script base de creación**
+   - `scripts/19-create-user-profiles-table.sql` crea `public.user_profiles` con `id`, `email`, `first_name`, `last_name`, timestamps, pero sin columna `role`.
+   - Sin embargo, `scripts/30-create-stores-table.sql` y `scripts/27-setup-storage-bucket.sql` consultan `public.user_profiles.role = 'admin'`.
+
+7. **Persisten constraints globales que chocan con expectativas multi-tenant después de agregar `store_id`**
+   - En scripts base siguen existiendo unicidades globales como `item_categories.category_name`, `store_items.item_code`, `store_items.item_slug`, `orders.order_number`, `component_styles.component_name`, `app_themes.theme_name`, `app_fonts.font_name` y `user_profiles.email`.
+   - Después de `scripts/31-add-store-id-to-products.sql`, `scripts/32-add-store-id-to-orders.sql` y `scripts/33-add-store-id-to-styles.sql`, varias entidades pasan a ser por tienda, pero no todas las restricciones fueron adaptadas al nuevo modelo multi-tenant (por ejemplo, solo `component_styles` recibe una unicidad compuesta `(component_name, store_id)`).
+
+8. **Scripts opcionales vacíos**
    - `scripts/21-add-user-roles.sql`, `scripts/22-create-cart-tables.sql` y `scripts/00-inicializacion-completa.sql` están vacíos en el repositorio actual.
 
 ### Siguientes pasos recomendados (solo documentación/diagnóstico)
