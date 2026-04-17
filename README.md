@@ -1,99 +1,82 @@
 # Osoria E-commerce
 
-E-commerce platform built with Next.js 16, React 19, Supabase, and Shopify integration.
+E-commerce storefront built with Next.js 16, React 19, Supabase, and optional Shopify integration.
 
-## 🚀 Deployment
+## Setup
 
-**Live URL:** [https://osor-ia-ecomerce.vercel.app](https://osor-ia-ecomerce.vercel.app)
+### Prerequisites
 
-## 📋 Prerequisites
+- Node.js 22+
+- `pnpm` (via Corepack is fine)
+- A Supabase project
 
-- Node.js 18+ 
-- pnpm (recommended) or npm
-- Supabase account
-- (Optional) Shopify store
-
-## 🛠️ Setup
-
-### 1. Install Dependencies
+### Install dependencies
 
 ```bash
-pnpm install
+corepack pnpm install
 ```
 
-### 2. Environment Variables
+## Environment Variables
 
-Copy `.env.example` to `.env.local` and fill in your values:
+Create `.env.local` manually and set the values your environment needs.
 
-```bash
-cp .env.example .env.local
-```
+Required for app boot:
 
-**Required Variables:**
-- `NEXT_PUBLIC_SUPABASE_URL` - Your Supabase project URL
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Your Supabase anonymous key
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 
-**Optional Variables:**
-- `NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN` - Your Shopify store domain
-- `NEXT_PUBLIC_SITE_URL` - Your production URL (auto-detected in Vercel)
+Common optional variables by feature:
 
-### 3. Run Development Server
+- Multi-tenant toggle (used in `proxy.ts` and store helpers):
+  - `DISABLE_SUBDOMAIN_MULTI_TENANT`
+  - `DEFAULT_STORE_ID`
+  - `NEXT_PUBLIC_DISABLE_SUBDOMAIN_MULTI_TENANT`
+  - `NEXT_PUBLIC_DEFAULT_STORE_ID`
+- Chat API enrichment (`app/api/chat/route.ts`):
+  - `SUPABASE_SERVICE_ROLE_KEY`
+  - `DEEPSEEK_API_KEY`
+- Email confirmation route (`app/api/orders/send-confirmation-email/route.ts`):
+  - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`
+  - `NEXT_PUBLIC_APP_URL` (recommended in production)
+  - `NEXT_PUBLIC_FACEBOOK_URL`, `NEXT_PUBLIC_INSTAGRAM_URL` (optional)
+- Optional storefront/domain:
+  - `NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN`
+  - `NEXT_PUBLIC_SITE_URL`
+
+## Run
 
 ```bash
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+App runs at `http://localhost:3000`.
 
-## 📦 Deploy to Vercel
-
-### Automatic Deployment
-
-1. Push your code to GitHub
-2. Import the repository in [Vercel](https://vercel.com)
-3. Configure environment variables in Vercel dashboard:
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   - `NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN` (if using Shopify)
-   - `NEXT_PUBLIC_SITE_URL` (optional, defaults to VERCEL_URL)
-
-### Supabase Configuration
-
-After deploying, configure Supabase redirect URLs:
-
-1. Go to Supabase Dashboard → Authentication → URL Configuration
-2. Add to **Site URL**: `https://osor-ia-ecomerce.vercel.app`
-3. Add to **Redirect URLs**:
-   - `https://osor-ia-ecomerce.vercel.app/auth/callback`
-   - `https://osor-ia-ecomerce.vercel.app/auth/reset-password`
-
-## 🏗️ Build
+## Test
 
 ```bash
-pnpm build
-pnpm start
+pnpm test
+pnpm test:coverage
 ```
 
-## 📚 Tech Stack
+More testing details live in `tests/README.md`.
 
-- **Framework:** Next.js 16
-- **React:** 19.2.1
-- **Database:** Supabase (PostgreSQL)
-- **Authentication:** Supabase Auth
-- **E-commerce:** Shopify (optional)
-- **Styling:** Tailwind CSS
-- **UI Components:** Radix UI
+## Deployment
 
-## 🔧 Features
+Deploy on Vercel with `pnpm build` (`next build`) and runtime `pnpm start` (`next start`).
 
-- ✅ User authentication (sign up, sign in, password recovery)
-- ✅ Product catalog with categories
-- ✅ Shopping cart
-- ✅ Responsive design
-- ✅ Theme customization
-- ✅ Chatbot support
-- ✅ Admin panel
+Minimum production environment variables:
 
-## 📝 License
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 
-Private project - All rights reserved
+If using chat/catalog AI or order confirmation emails in production, also configure the optional feature variables listed above.
+
+After deployment, update Supabase Auth URL settings:
+
+- Site URL: your production domain
+- Redirect URLs: include `/auth/callback` and `/auth/reset-password`
+
+## Related scoped docs
+
+- `tests/README.md` — testing structure and commands.
+- `lib/email-templates/README.md` — Supabase email template setup.
