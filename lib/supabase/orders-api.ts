@@ -171,13 +171,188 @@ function generateUuid(): string {
   });
 }
 
-function applyPaymentCompatibility(order: any): Order {
+function mapProviderPaymentStatus(
+  providerStatus: string | null | undefined,
+): Order["payment_status"] | null {
+  if (!providerStatus) {
+    return null;
+  }
+
+  const normalized = providerStatus.toLowerCase();
+
+  if (
+    ["approved", "succeeded", "paid", "completed", "authorized"].includes(
+      normalized,
+    )
+  ) {
+    return "paid";
+  }
+
+  if (
+    ["rejected", "failed", "cancelled", "declined", "error"].includes(
+      normalized,
+    )
+  ) {
+    return "failed";
+  }
+
+  if (["refunded", "partially_refunded", "chargeback"].includes(normalized)) {
+    return "refunded";
+  }
+
+  if (
+    ["pending", "in_process", "requires_action", "processing"].includes(
+      normalized,
+    )
+  ) {
+    return "pending";
+  }
+
+  return null;
+}
+
+function getProviderPaymentField(
+  transaction: any,
+  keys: string[],
+): string | null {
+  for (const key of keys) {
+    const value = transaction?.[key];
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value;
+    }
+  }
+
+  return null;
+}
+
+function applyPaymentCompatibility(
+  order: any,
+  providerTransaction?: any,
+): Order {
+  const providerMethod = getProviderPaymentField(providerTransaction, [
+    "provider_payment_method",
+    "payment_method",
+    "method",
+    "provider",
+  ]);
+  const providerReference = getProviderPaymentField(providerTransaction, [
+    "provider_transaction_id",
+    "transaction_id",
+    "reference",
+    "id",
+  ]);
+  const providerStatus = mapProviderPaymentStatus(
+    getProviderPaymentField(providerTransaction, ["status"]),
+  );
+
   return {
     ...order,
-    payment_method: order?.payment_method ?? null,
-    payment_status: order?.payment_status ?? "pending",
-    payment_reference: order?.payment_reference ?? null,
+    payment_method: order?.payment_method ?? providerMethod ?? null,
+    payment_status: order?.payment_status ?? providerStatus ?? "pending",
+    payment_reference: order?.payment_reference ?? providerReference ?? null,
   } as Order;
+}
+
+async function fetchLatestPaymentTransaction(
+  supabase: any,
+  orderId: string,
+): Promise<any | null> {
+  const transactionResult = (await withTimeout(
+    supabase
+      .from("payment_transactions")
+      .select("*")
+      .eq("order_id", orderId)
+      .order("created_at", { ascending: false })
+      .limit(1),
+    15000,
+    "fetchLatestPaymentTransaction",
+  )) as { data: any[] | null; error: any };
+
+  if (transactionResult.error) {
+    return null;
+  }
+
+  return transactionResult.data?.[0] || null;
+}
+
+function extractProviderPaymentPayload(
+  metadata?: Record<string, any>,
+): Record<string, any> | null {
+  if (!metadata || typeof metadata !== "object") {
+    return null;
+  }
+
+  const candidates = [
+    metadata.provider_payload,
+    metadata.providerPayload,
+    metadata.payment_transaction,
+    metadata.paymentTransaction,
+    metadata.transaction,
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate && typeof candidate === "object") {
+      return candidate;
+    }
+  }
+
+  if (
+    metadata.provider ||
+    metadata.provider_payment_method ||
+    metadata.provider_transaction_id ||
+    metadata.status
+  ) {
+    return metadata;
+  }
+
+  return null;
+}
+
+async function maybeInsertPaymentTransaction(
+  supabase: any,
+  order: Order,
+  metadata?: Record<string, any>,
+): Promise<void> {
+  const providerPayload = extractProviderPaymentPayload(metadata);
+  if (!providerPayload) {
+    return;
+  }
+
+  await withTimeout(
+    supabase.from("payment_transactions").insert({
+      id: generateUuid(),
+      order_id: order.id,
+      provider:
+        providerPayload.provider ||
+        providerPayload.gateway ||
+        "provider_payload",
+      transaction_type: providerPayload.transaction_type || "payment",
+      amount:
+        providerPayload.amount ??
+        providerPayload.total_amount ??
+        order.total_amount,
+      currency_code:
+        providerPayload.currency_code || order.currency_code || "COP",
+      status: providerPayload.status || "pending",
+      provider_payment_method:
+        providerPayload.provider_payment_method ||
+        providerPayload.payment_method ||
+        null,
+      provider_transaction_id:
+        providerPayload.provider_transaction_id ||
+        providerPayload.transaction_id ||
+        providerPayload.reference ||
+        null,
+      metadata: providerPayload,
+    }),
+    15000,
+    "createPaymentTransaction",
+  ).catch((paymentError) => {
+    console.warn(
+      "[Orders] No se pudo persistir payment_transactions:",
+      paymentError,
+    );
+  });
 }
 
 async function fetchOrderItems(
@@ -234,13 +409,14 @@ async function hydrateOrderGraph(
   supabase: any,
   orderRow: any,
 ): Promise<OrderWithItems> {
-  const [items, addresses] = await Promise.all([
+  const [items, addresses, providerTransaction] = await Promise.all([
     fetchOrderItems(supabase, orderRow.id),
     fetchOrderAddresses(supabase, orderRow.id),
+    fetchLatestPaymentTransaction(supabase, orderRow.id),
   ]);
 
   return {
-    ...applyPaymentCompatibility(orderRow),
+    ...applyPaymentCompatibility(orderRow, providerTransaction),
     items,
     addresses,
   };
@@ -729,6 +905,8 @@ export async function createOrder(
         addressError,
       );
     });
+
+    await maybeInsertPaymentTransaction(supabase, order, orderData.metadata);
 
     // Actualizar inventario después de crear la orden exitosamente
     // Ejecutamos de forma síncrona para asegurar consistencia de datos

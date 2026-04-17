@@ -5,8 +5,10 @@ import {
   getOrderById,
   getOrderByNumber,
   getOrders,
+  getOrdersByEmail,
   type CreateOrderData,
 } from "@/lib/supabase/orders-api";
+import { loadSuccessPageFallbackOrder } from "@/app/checkout/success/fallback-order";
 
 const { getSupabaseEcommerceMock, getStoreIdMock } = vi.hoisted(() => ({
   getSupabaseEcommerceMock: vi.fn(),
@@ -277,6 +279,217 @@ describe("orders-api live order contract", () => {
     expect(insertedOrder.store_id).toBe("store-uuid-2");
   });
 
+  it("decrements product and variant inventory on writable base tables", async () => {
+    const state = new MockSupabaseState({
+      "store_items:select": [
+        {
+          data: {
+            track_inventory: true,
+            inventory_quantity: 5,
+            is_available_for_sale: true,
+            is_active: true,
+          },
+          error: null,
+        },
+        {
+          data: {
+            store_id: "store-uuid-1",
+            track_inventory: true,
+            inventory_quantity: 5,
+          },
+          error: null,
+        },
+        {
+          data: {
+            track_inventory: true,
+            inventory_quantity: 5,
+            is_available_for_sale: true,
+            is_active: true,
+          },
+          error: null,
+        },
+      ],
+      "item_variants:select": [
+        {
+          data: {
+            track_inventory: true,
+            inventory_quantity: 8,
+            is_available: true,
+          },
+          error: null,
+        },
+        {
+          data: {
+            track_inventory: true,
+            inventory_quantity: 8,
+            is_available: true,
+          },
+          error: null,
+        },
+      ],
+      "orders:insert": [
+        {
+          data: {
+            id: "order-inventory-1",
+            order_number: "A-1003",
+            payment_method: "cash_on_delivery",
+            payment_status: "pending",
+            payment_reference: null,
+            created_at: "2026-01-01T00:00:00.000Z",
+            updated_at: "2026-01-01T00:00:00.000Z",
+            ...baseOrderData,
+          },
+          error: null,
+        },
+      ],
+      "order_items:insert": [
+        {
+          data: [
+            {
+              id: "item-inventory-1",
+              order_id: "order-inventory-1",
+              product_id: "store-item-1",
+              product_name: "Campera",
+              quantity: 2,
+              unit_price: 100000,
+              total_price: 200000,
+              currency_code: "COP",
+              created_at: "2026-01-01T00:00:00.000Z",
+              updated_at: "2026-01-01T00:00:00.000Z",
+            },
+            {
+              id: "item-inventory-2",
+              order_id: "order-inventory-1",
+              variant_id: "variant-1",
+              product_name: "Campera Variante",
+              quantity: 3,
+              unit_price: 90000,
+              total_price: 270000,
+              currency_code: "COP",
+              created_at: "2026-01-01T00:00:00.000Z",
+              updated_at: "2026-01-01T00:00:00.000Z",
+            },
+          ],
+          error: null,
+        },
+      ],
+      "order_addresses:insert": [{ data: [{ id: "addr-3" }], error: null }],
+      "store_items:update": [{ error: null }],
+      "item_variants:update": [{ error: null }],
+    });
+
+    getSupabaseEcommerceMock.mockReturnValue({ from: state.from });
+
+    await createOrder({
+      ...baseOrderData,
+      items: [
+        {
+          product_id: "store-item-1",
+          product_name: "Campera",
+          unit_price: 100000,
+          quantity: 2,
+          total_price: 200000,
+        },
+        {
+          product_name: "Campera Variante",
+          variant_id: "variant-1",
+          unit_price: 90000,
+          quantity: 3,
+          total_price: 270000,
+        },
+      ],
+      subtotal: 470000,
+      total_amount: 470000,
+    });
+
+    expect(state.updates.store_items?.[0].inventory_quantity).toBe(3);
+    expect(state.updates.item_variants?.[0].inventory_quantity).toBe(5);
+    expect(state.fromCalls).not.toContain("store_items_legacy");
+  });
+
+  it("persists provider payment transaction payload when present on checkout metadata", async () => {
+    const state = new MockSupabaseState({
+      "store_items:select": [
+        {
+          data: {
+            track_inventory: false,
+            inventory_quantity: 10,
+            is_available_for_sale: true,
+            is_active: true,
+          },
+          error: null,
+        },
+        {
+          data: {
+            store_id: "store-uuid-1",
+            track_inventory: false,
+            inventory_quantity: 10,
+          },
+          error: null,
+        },
+        {
+          data: {
+            track_inventory: false,
+            inventory_quantity: 10,
+            is_available_for_sale: true,
+            is_active: true,
+          },
+          error: null,
+        },
+      ],
+      "orders:insert": [
+        {
+          data: {
+            id: "order-provider-insert-1",
+            order_number: "A-1004",
+            payment_method: null,
+            payment_status: "pending",
+            payment_reference: null,
+            created_at: "2026-01-01T00:00:00.000Z",
+            updated_at: "2026-01-01T00:00:00.000Z",
+            ...baseOrderData,
+          },
+          error: null,
+        },
+      ],
+      "order_items:insert": [
+        { data: [{ id: "item-provider-1" }], error: null },
+      ],
+      "order_addresses:insert": [
+        { data: [{ id: "addr-provider-1" }], error: null },
+      ],
+      "store_items:update": [{ error: null }],
+      "payment_transactions:insert": [{ data: [{ id: "txn-1" }], error: null }],
+    });
+
+    getSupabaseEcommerceMock.mockReturnValue({ from: state.from });
+
+    await createOrder({
+      ...baseOrderData,
+      payment_method: undefined,
+      payment_reference: undefined,
+      metadata: {
+        provider_payload: {
+          provider: "mercado_pago",
+          status: "approved",
+          provider_payment_method: "credit_card",
+          provider_transaction_id: "mp_tx_checkout_1",
+          amount: 100000,
+          currency_code: "COP",
+        },
+      },
+    });
+
+    const insertedTransaction = state.inserts.payment_transactions?.[0];
+    expect(insertedTransaction.order_id).toBe("order-provider-insert-1");
+    expect(insertedTransaction.provider).toBe("mercado_pago");
+    expect(insertedTransaction.status).toBe("approved");
+    expect(insertedTransaction.provider_payment_method).toBe("credit_card");
+    expect(insertedTransaction.provider_transaction_id).toBe(
+      "mp_tx_checkout_1",
+    );
+  });
+
   it("reads live orders table for id/number/admin paths with payment compatibility fallback", async () => {
     const orderRow = {
       id: "order-live-1",
@@ -389,5 +602,153 @@ describe("orders-api live order contract", () => {
 
     expect(state.fromCalls).toContain("orders");
     expect(state.fromCalls).not.toContain("orders_legacy");
+  });
+
+  it("hydrates success-page fallback from server order lookup when local state is missing", async () => {
+    const orderRow = {
+      id: "order-success-1",
+      order_number: "A-3001",
+      order_date: "2026-01-01T00:00:00.000Z",
+      status: "pending",
+      customer_type: "guest",
+      customer_email: "fallback@example.com",
+      customer_first_name: "Grace",
+      customer_last_name: "Hopper",
+      customer_phone: "+57 300 123 4567",
+      shipping_address: "Calle Fallback 10",
+      shipping_city: "Medellín",
+      shipping_postal_code: "050001",
+      shipping_country: "Colombia",
+      shipping_notes: "Torre B",
+      subtotal: 50000,
+      shipping_cost: 0,
+      tax_amount: 0,
+      discount_amount: 0,
+      total_amount: 50000,
+      currency_code: "COP",
+      payment_method: null,
+      payment_status: null,
+      payment_reference: null,
+      created_at: "2026-01-01T00:00:00.000Z",
+      updated_at: "2026-01-01T00:00:00.000Z",
+    };
+
+    const state = new MockSupabaseState({
+      "orders:select": [{ data: orderRow, error: null }],
+      "order_items:select": [{ data: [], error: null }],
+      "order_addresses:select": [{ data: [], error: null }],
+    });
+
+    getSupabaseEcommerceMock.mockReturnValue({ from: state.from });
+
+    const fallback = await loadSuccessPageFallbackOrder("A-3001");
+
+    expect(fallback.orderNumber).toBe("A-3001");
+    expect(fallback.customerData?.firstName).toBe("Grace");
+    expect(fallback.customerData?.lastName).toBe("Hopper");
+    expect(fallback.customerData?.email).toBe("fallback@example.com");
+    expect(fallback.customerData?.address).toBe("Calle Fallback 10");
+  });
+
+  it("keeps payment fields non-misleading when provider transaction payload exists", async () => {
+    const orderRow = {
+      id: "order-provider-1",
+      order_number: "A-4001",
+      order_date: "2026-01-01T00:00:00.000Z",
+      status: "pending",
+      customer_type: "guest",
+      customer_email: "provider@example.com",
+      customer_first_name: "Ada",
+      customer_last_name: "Lovelace",
+      shipping_address: "Calle 1",
+      shipping_city: "Bogotá",
+      shipping_postal_code: "110111",
+      shipping_country: "Colombia",
+      subtotal: 100000,
+      shipping_cost: 0,
+      tax_amount: 0,
+      discount_amount: 0,
+      total_amount: 100000,
+      currency_code: "COP",
+      payment_method: null,
+      payment_status: null,
+      payment_reference: null,
+      created_at: "2026-01-01T00:00:00.000Z",
+      updated_at: "2026-01-01T00:00:00.000Z",
+    };
+
+    const state = new MockSupabaseState({
+      "orders:select": [{ data: orderRow, error: null }],
+      "payment_transactions:select": [
+        {
+          data: [
+            {
+              provider: "mercado_pago",
+              transaction_type: "payment",
+              amount: 100000,
+              currency_code: "COP",
+              status: "approved",
+              provider_payment_method: "credit_card",
+              provider_transaction_id: "mp_tx_123",
+              created_at: "2026-01-01T00:00:01.000Z",
+            },
+          ],
+          error: null,
+        },
+      ],
+      "order_items:select": [{ data: [], error: null }],
+      "order_addresses:select": [{ data: [], error: null }],
+    });
+
+    getSupabaseEcommerceMock.mockReturnValue({ from: state.from });
+
+    const order = await getOrderById("order-provider-1");
+
+    expect(order?.payment_method).toBe("credit_card");
+    expect(order?.payment_status).toBe("paid");
+    expect(order?.payment_reference).toBe("mp_tx_123");
+  });
+
+  it("hydrates email-order retrieval with same live payment compatibility source", async () => {
+    const orderRow = {
+      id: "order-email-1",
+      order_number: "A-5001",
+      order_date: "2026-01-01T00:00:00.000Z",
+      status: "pending",
+      customer_type: "guest",
+      customer_email: "email@example.com",
+      customer_first_name: "Linus",
+      customer_last_name: "Torvalds",
+      shipping_address: "Calle 99",
+      shipping_city: "Cali",
+      shipping_postal_code: "760001",
+      shipping_country: "Colombia",
+      subtotal: 200000,
+      shipping_cost: 0,
+      tax_amount: 0,
+      discount_amount: 0,
+      total_amount: 200000,
+      currency_code: "COP",
+      payment_method: "cash_on_delivery",
+      payment_status: "pending",
+      payment_reference: "cod-5001",
+      created_at: "2026-01-01T00:00:00.000Z",
+      updated_at: "2026-01-01T00:00:00.000Z",
+    };
+
+    const state = new MockSupabaseState({
+      "orders:select": [{ data: [orderRow], error: null }],
+      "order_items:select": [{ data: [], error: null }],
+      "order_addresses:select": [{ data: [], error: null }],
+    });
+
+    getSupabaseEcommerceMock.mockReturnValue({ from: state.from });
+
+    const orders = await getOrdersByEmail("email@example.com");
+
+    expect(orders).toHaveLength(1);
+    expect(orders[0].payment_method).toBe("cash_on_delivery");
+    expect(orders[0].payment_status).toBe("pending");
+    expect(state.fromCalls).toContain("orders");
   });
 });
