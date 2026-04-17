@@ -321,3 +321,64 @@ npx vitest run -c tests/vitest.security.config.ts tests/security/store-contract.
 - Minimum viable target architecture is defined as adapter-first convergence with compatibility shell retained.
 - Duplicated flows are converged at contract level with low-risk sequencing and rollback clause.
 - Transition/deprecation path for legacy pieces is explicit without runtime behavior changes in H3.
+
+---
+
+## H5 Focused Batch — Maintainability/Risk Reduction in Critical Email Flow
+
+### Scope (requested)
+
+- Codify maintainability + legibility standards tied to change risk.
+- Prioritize hotspots with highest blast radius first.
+- Reduce risky `any`/error/config ambiguity where it improves safety.
+- Modularize critical monoliths incrementally (no broad rewrite).
+- Keep changes low-risk and non-cosmetic.
+
+### Traceable Tasks Matrix (H5)
+
+| Task ID | Task                                                                             | Production Artifact(s)                                                                    | Linked Test File(s)                                                                          | Outcome            |
+| ------- | -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ------------------ |
+| H5.1    | Codify maintainability/risk standards and hotspot prioritization                 | `.atl/ecommerce-saneamiento-secuencial/h5-maintainability-standards.md`                   | `tests/quality/h5-maintainability-standards.test.ts`                                         | ✅ Contract green  |
+| H5.2    | Extract runtime/config guards from critical email monolith                       | `lib/security/email-runtime-guards.ts`, `app/api/orders/send-confirmation-email/route.ts` | `tests/security/email-runtime-guards.test.ts`                                                | ✅ Risk reduced    |
+| H5.3    | Remove risky `any` catches in order-email critical flow with typed normalization | `app/api/orders/send-confirmation-email/route.ts`                                         | `tests/security/email-runtime-guards.test.ts`, `tests/security/order-email-contract.test.ts` | ✅ Safety improved |
+
+### Strict TDD Cycle Evidence (H5)
+
+| Task | Test File                                            | Layer                          | Safety Net                                                    | RED                                                                                  | GREEN                                                   | TRIANGULATE                                                                                  | REFACTOR                                                     |
+| ---- | ---------------------------------------------------- | ------------------------------ | ------------------------------------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| H5.1 | `tests/quality/h5-maintainability-standards.test.ts` | Unit (artifact contract)       | N/A (new artifact)                                            | ✅ Authored assertions first; run failed (`ENOENT` missing H5 artifact)              | ✅ Pass (`3/3`) after H5 artifact creation              | ✅ Multiple assertions across standards/matrix/slices/validation sections                    | ➖ None needed                                               |
+| H5.2 | `tests/security/email-runtime-guards.test.ts`        | Unit (pure runtime guards)     | ✅ Baseline captured (`2/2` on existing order-email contract) | ✅ New test authored first; run failed (`module not found`) before helper extraction | ✅ Pass (`4/4`) after helper module + route integration | ✅ Covers SMTP complete/missing branches + base URL precedence + unknown-error normalization | ✅ One assertion refined for sanitized trailing-slash output |
+| H5.3 | `tests/security/order-email-contract.test.ts`        | Unit (request contract safety) | ✅ Baseline captured (`2/2`)                                  | ✅ Existing contract retained while route internals changed                          | ✅ Pass (`2/2`) after `unknown` catches + helper usage  | ✅ Combined with H5.2 + html-sanitization regression to cover config/error surfaces          | ➖ None needed                                               |
+
+### Command Log (H5)
+
+```bash
+npx vitest run -c tests/vitest.security.config.ts tests/security/order-email-contract.test.ts
+```
+
+- Safety Net baseline: ✅ 1 file passed, 2 tests passed.
+
+```bash
+npx vitest run -c tests/vitest.security.config.ts tests/security/email-runtime-guards.test.ts tests/quality/h5-maintainability-standards.test.ts
+```
+
+- RED result: ❌ 2 files failed (`ENOENT` missing H5 artifact + missing runtime-guards module).
+
+```bash
+npx vitest run -c tests/vitest.security.config.ts tests/security/email-runtime-guards.test.ts tests/security/order-email-contract.test.ts tests/quality/h5-maintainability-standards.test.ts
+```
+
+- GREEN result: ✅ 3 files passed, 9 tests passed.
+
+```bash
+npx vitest run -c tests/vitest.security.config.ts tests/security/html-sanitization.test.ts tests/security/order-email-contract.test.ts tests/quality/h5-maintainability-standards.test.ts tests/security/email-runtime-guards.test.ts
+```
+
+- Focused regression suite: ✅ 4 files passed, 13 tests passed.
+
+### H5 Outcome Summary
+
+- Maintainability standards are now explicit and test-enforced under H5 contract.
+- Critical order-email monolith received low-blast-radius modularization via runtime guard helpers.
+- Risky `any` catch handling in `send-confirmation-email` was replaced by `unknown` + deterministic error normalization.
+- SMTP/base URL fallback behavior is now centralized and test-covered, reducing config ambiguity in production incidents.

@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { getOrderById } from "@/lib/supabase/orders-api";
+import { getOrderById, type OrderWithItems } from "@/lib/supabase/orders-api";
 import { formatPrice } from "@/lib/shopify/utils";
 import {
   escapeHtml,
   sanitizePublicUrl,
 } from "@/lib/security/html-sanitization";
 import { parseOrderConfirmationRequest } from "@/lib/security/order-email-contract";
+import {
+  getErrorMessage,
+  resolveEmailBaseUrl,
+  resolveSmtpConfig,
+} from "@/lib/security/email-runtime-guards";
 
 /**
  * API Route para enviar correo de confirmación con factura
@@ -85,10 +90,11 @@ export async function GET(request: NextRequest) {
     return new NextResponse(html, {
       headers: { "Content-Type": "text/html; charset=utf-8" },
     });
-  } catch (err: any) {
-    console.error("Error en vista previa del correo:", err);
+  } catch (error: unknown) {
+    const errorMessage = getErrorMessage(error);
+    console.error("Error en vista previa del correo:", error);
     return new NextResponse(
-      `<html><body><p>Error: ${err?.message || "interno"}</p></body></html>`,
+      `<html><body><p>Error: ${errorMessage}</p></body></html>`,
       { status: 500, headers: { "Content-Type": "text/html; charset=utf-8" } },
     );
   }
@@ -124,10 +130,11 @@ export async function POST(request: NextRequest) {
       request.headers.get("x-forwarded-host") || request.headers.get("host");
     const protocol = request.headers.get("x-forwarded-proto") || "https";
     const requestOrigin = host ? `${protocol}://${host}` : "";
-    const baseUrlForEmail =
-      requestOrigin ||
-      process.env.NEXT_PUBLIC_APP_URL ||
-      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "");
+    const baseUrlForEmail = resolveEmailBaseUrl({
+      requestOrigin,
+      appUrl: process.env.NEXT_PUBLIC_APP_URL,
+      vercelUrl: process.env.VERCEL_URL,
+    });
 
     // Generar HTML del correo con la factura (baseUrl para que los iconos se vean en producción)
     const emailHtml = generateInvoiceEmailHTML(
@@ -165,7 +172,7 @@ export async function POST(request: NextRequest) {
       success: true,
       message: "Correo de confirmación enviado exitosamente",
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error en send-confirmation-email:", error);
     return NextResponse.json(
       { error: "Error interno del servidor" },
@@ -207,7 +214,7 @@ function getEstimatedDeliveryRange(orderDate: string): {
  * @param baseUrlOverride - URL base para imágenes/links (ej. en vista previa desde GET)
  */
 function generateInvoiceEmailHTML(
-  order: any,
+  order: OrderWithItems,
   customerName?: string,
   baseUrlOverride?: string,
 ): string {
@@ -262,7 +269,7 @@ function generateInvoiceEmailHTML(
 
   const productRows = (order.items || [])
     .map(
-      (item: any) => `
+      (item) => `
     <tr>
       <td style="padding: 12px 0; border-bottom: 1px solid #eee; vertical-align: top;">
         <table cellpadding="0" cellspacing="0" border="0" style="width: 100%;">
@@ -433,17 +440,13 @@ async function sendEmail({
 }): Promise<{ success: boolean; error?: string }> {
   try {
     // Verificar que las variables de entorno estén configuradas
-    const smtpHost = process.env.SMTP_HOST;
-    const smtpPort = process.env.SMTP_PORT;
-    const smtpUser = process.env.SMTP_USER;
-    const smtpPass = process.env.SMTP_PASS;
-    const smtpFrom =
-      process.env.SMTP_FROM || smtpUser || "noreply@tutienda.com";
+    const smtpConfig = resolveSmtpConfig(process.env);
 
-    if (!smtpHost || !smtpPort || !smtpUser || !smtpPass) {
+    if (!smtpConfig.ok) {
       console.warn(
         "⚠️ Variables SMTP no configuradas. El correo no se enviará.",
       );
+      console.warn(`Faltan: ${smtpConfig.missing.join(", ")}`);
       console.warn("Configura en .env.local:");
       console.warn("  SMTP_HOST=smtp.gmail.com (o tu servidor SMTP)");
       console.warn("  SMTP_PORT=587");
@@ -531,12 +534,12 @@ async function sendEmail({
 
     // Crear transporter
     const transporter = nodemailer.createTransport({
-      host: smtpHost,
-      port: parseInt(smtpPort, 10),
-      secure: parseInt(smtpPort, 10) === 465, // true para 465, false para otros puertos
+      host: smtpConfig.config.host,
+      port: smtpConfig.config.port,
+      secure: smtpConfig.config.secure, // true para 465, false para otros puertos
       auth: {
-        user: smtpUser,
-        pass: smtpPass,
+        user: smtpConfig.config.user,
+        pass: smtpConfig.config.pass,
       },
     });
 
@@ -545,7 +548,7 @@ async function sendEmail({
 
     // Enviar correo
     const info = await transporter.sendMail({
-      from: smtpFrom,
+      from: smtpConfig.config.from,
       to: to,
       subject: subject,
       html: html,
@@ -553,11 +556,12 @@ async function sendEmail({
 
     console.log("✅ Correo enviado exitosamente:", info.messageId);
     return { success: true };
-  } catch (error: any) {
-    console.error("❌ Error al enviar correo:", error.message || error);
+  } catch (error: unknown) {
+    const errorMessage = getErrorMessage(error);
+    console.error("❌ Error al enviar correo:", errorMessage);
     return {
       success: false,
-      error: error.message || "Error desconocido al enviar correo",
+      error: errorMessage,
     };
   }
 }
