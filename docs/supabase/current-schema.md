@@ -111,3 +111,24 @@ Este documento resume el **estado observado en el repositorio** entre scripts SQ
 - Agregar una matriz de trazabilidad `scripts/*.sql` ↔ objetos esperados por runtime (`stores_legacy`, `app_theme_versions`, `increment_item_views`, `item_metrics`).
 - Registrar explícitamente, en documentación de operación, qué objetos son “base versionada” y cuáles son “compatibilidad requerida por app” para reducir incidentes de despliegue.
 - Definir un checklist de verificación de entorno (diagnóstico) previo a deploy que confirme presencia de objetos runtime críticos en el schema esperado.
+
+## Contrato runtime reparado (sin mutaciones DB)
+
+Este lane implementa un **contrato runtime app-side** para tolerar payloads legacy sin tocar datos productivos ni ejecutar SQL:
+
+- Tema canónico en runtime: `{ theme_name, colors }`
+  - Alias aceptado de entrada: `theme_config`
+  - Consumidores (`bootstrap`, providers, APIs) solo exponen/guardan `colors`.
+- Fuente canónica en runtime: `{ font_name, font_family, google_font_url }`
+  - Alias aceptado de entrada: `font_url`
+  - Consumidores de runtime convierten alias y preservan `google_font_url: null` para fuentes de sistema.
+- Resolución de tienda para cachés críticos:
+  - `default` se considera placeholder simbólico de UI.
+  - Caches store-scoped usan UUID real o `null`; no deben tratar `default` como UUID real.
+
+### Postura de seguridad de DB en este cambio
+
+- No se aplicaron migraciones.
+- No se hizo backfill ni reparación de datos.
+- No se mutaron objetos `public.*`.
+- La corrección es 100% en la capa de aplicación/runtime.
