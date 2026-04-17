@@ -1013,7 +1013,7 @@ export interface GetOrdersParams {
 }
 
 export interface GetOrdersResult {
-  orders: Order[];
+  orders: OrderWithItems[];
   total: number;
 }
 
@@ -1064,10 +1064,16 @@ export async function getOrders(
       return { orders: [], total: 0 };
     }
 
+    const orders = ((result.data || []) as Order[]).map((order) =>
+      applyPaymentCompatibility(order),
+    );
+
+    const hydratedOrders = await Promise.all(
+      orders.map(async (order) => hydrateOrderGraph(supabase, order)),
+    );
+
     return {
-      orders: ((result.data || []) as Order[]).map((order) =>
-        applyPaymentCompatibility(order),
-      ),
+      orders: hydratedOrders,
       total: result.count || 0,
     };
   } catch (error: any) {

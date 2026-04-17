@@ -552,8 +552,36 @@ describe("orders-api live order contract", () => {
           ],
           error: null,
         },
+        {
+          data: [
+            {
+              id: "item-live-1",
+              order_id: "order-live-1",
+              product_name: "Campera",
+              quantity: 1,
+              unit_price: 100000,
+              total_price: 100000,
+              currency_code: "COP",
+            },
+          ],
+          error: null,
+        },
       ],
       "order_addresses:select": [
+        {
+          data: [
+            {
+              id: "addr-live-1",
+              order_id: "order-live-1",
+              address_type: "shipping",
+              address_line_1: "Calle 123",
+              city: "Bogotá",
+              postal_code: "110111",
+              country: "Colombia",
+            },
+          ],
+          error: null,
+        },
         {
           data: [
             {
@@ -601,6 +629,104 @@ describe("orders-api live order contract", () => {
     expect(adminList.total).toBe(1);
 
     expect(state.fromCalls).toContain("orders");
+    expect(state.fromCalls).not.toContain("orders_legacy");
+  });
+
+  it("returns admin and email orders with aligned hydrated live graph fields", async () => {
+    const orderRow = {
+      id: "order-aligned-1",
+      order_number: "A-7001",
+      order_date: "2026-01-01T00:00:00.000Z",
+      status: "pending",
+      customer_type: "guest",
+      customer_email: "aligned@example.com",
+      customer_first_name: "Dana",
+      customer_last_name: "Scully",
+      shipping_address: "Calle Alineada 77",
+      shipping_city: "Bogotá",
+      shipping_postal_code: "110111",
+      shipping_country: "Colombia",
+      subtotal: 150000,
+      shipping_cost: 0,
+      tax_amount: 0,
+      discount_amount: 0,
+      total_amount: 150000,
+      currency_code: "COP",
+      payment_method: "cash_on_delivery",
+      payment_status: "pending",
+      payment_reference: "cod-7001",
+      created_at: "2026-01-01T00:00:00.000Z",
+      updated_at: "2026-01-01T00:00:00.000Z",
+    };
+
+    const expectedItems = [
+      {
+        id: "item-aligned-1",
+        order_id: "order-aligned-1",
+        product_name: "Campera Alineada",
+        quantity: 2,
+        unit_price: 75000,
+        total_price: 150000,
+        currency_code: "COP",
+      },
+    ];
+
+    const expectedAddresses = [
+      {
+        id: "addr-aligned-1",
+        order_id: "order-aligned-1",
+        address_type: "shipping",
+        address_line_1: "Calle Alineada 77",
+        city: "Bogotá",
+        postal_code: "110111",
+        country: "Colombia",
+      },
+    ];
+
+    const state = new MockSupabaseState({
+      "orders:select": [
+        { data: [orderRow], error: null, count: 1 },
+        { data: [orderRow], error: null },
+      ],
+      "order_items:select": [
+        { data: expectedItems, error: null },
+        { data: expectedItems, error: null },
+      ],
+      "order_addresses:select": [
+        { data: expectedAddresses, error: null },
+        { data: expectedAddresses, error: null },
+      ],
+      "payment_transactions:select": [
+        { data: [], error: null },
+        { data: [], error: null },
+      ],
+    });
+
+    getSupabaseEcommerceMock.mockReturnValue({ from: state.from });
+
+    const adminList = await getOrders({ limit: 20 });
+    const emailOrders = await getOrdersByEmail("aligned@example.com");
+
+    expect(adminList.orders).toHaveLength(1);
+    expect(adminList.total).toBe(1);
+    expect(emailOrders).toHaveLength(1);
+
+    const adminOrder = adminList.orders[0] as any;
+    expect(adminOrder.items).toEqual(expectedItems);
+    expect(adminOrder.addresses).toEqual(expectedAddresses);
+    expect(adminOrder.payment_method).toBe("cash_on_delivery");
+    expect(adminOrder.payment_status).toBe("pending");
+    expect(adminOrder.payment_reference).toBe("cod-7001");
+
+    expect(emailOrders[0].items).toEqual(expectedItems);
+    expect(emailOrders[0].addresses).toEqual(expectedAddresses);
+    expect(emailOrders[0].payment_method).toBe(adminOrder.payment_method);
+    expect(emailOrders[0].payment_status).toBe(adminOrder.payment_status);
+    expect(emailOrders[0].payment_reference).toBe(adminOrder.payment_reference);
+
+    expect(state.fromCalls).toContain("orders");
+    expect(state.fromCalls).toContain("order_items");
+    expect(state.fromCalls).toContain("order_addresses");
     expect(state.fromCalls).not.toContain("orders_legacy");
   });
 

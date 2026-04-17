@@ -135,6 +135,7 @@ Este documento resume el **estado observado en el repositorio** entre scripts SQ
   1. Creación live con `store_id`, UUID explícito en `order_items.id`, y persistencia en `order_addresses`.
   2. Resolución de `store_id` vía contexto de variante (`item_variants -> store_items`).
   3. Lecturas por ID/número/admin sobre `orders` (no `orders_legacy`) con fallback de pago compatible.
+  4. Alineación admin/email sobre el mismo reader live hidratado (items, direcciones y campos de pago compatibles).
 
 ### Verificación ejecutada (comando del brief)
 
@@ -145,5 +146,5 @@ npm test -- --run tests/orders/order-flow.contract.test.ts
 Resultado observado:
 
 - `Test Files  8 passed (8)`
-- `Tests  25 passed (25)`
+- `Tests  31 passed (31)`
 - Incluye `tests/orders/order-flow.contract.test.ts` en verde.
