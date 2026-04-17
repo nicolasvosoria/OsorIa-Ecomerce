@@ -6,14 +6,17 @@ E-commerce storefront built with Next.js 16, React 19, Supabase, and optional Sh
 
 ### Prerequisites
 
-- Node.js 22+
-- `pnpm` (via Corepack is fine)
-- A Supabase project
+- Node.js 20+
+- pnpm 10 (official package manager for this repo)
+- Supabase account
+- (Optional) Shopify store
 
-### Install dependencies
+## 🛠️ Setup
+
+### 1. Install Dependencies
 
 ```bash
-corepack pnpm install
+pnpm install --frozen-lockfile
 ```
 
 ## Environment Variables
@@ -66,6 +69,27 @@ Deploy on Vercel with `pnpm build` (`next build`) and runtime `pnpm start` (`nex
 
 Minimum production environment variables:
 
+## ✅ Minimum Quality Gates (H2)
+
+Before promoting changes to later phases, run this exact sequence with pnpm:
+
+```bash
+pnpm install --frozen-lockfile
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
+```
+
+Gate policy:
+
+- `pnpm-lock.yaml` is the single lockfile source of truth.
+- `lint`, `typecheck`, `test`, and `build` must fail loudly on real errors (no warning-only pass-through).
+- Current H2 `lint`/`typecheck`/`test` scripts are **focused quality gates** for hardening surfaces (`app/api/store`, `app/api/orders/send-confirmation-email`, `lib/security`, `tests/security`, `tests/quality`).
+- Full-repository visibility remains available via `pnpm lint:full`, `pnpm typecheck:full`, and `pnpm test:full` so hidden issues are explicit instead of ignored.
+- If any command fails, stop the lane and fix the issue before continuing.
+
+## 📚 Tech Stack
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 
