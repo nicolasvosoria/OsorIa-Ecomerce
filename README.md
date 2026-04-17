@@ -8,8 +8,8 @@ E-commerce platform built with Next.js 16, React 19, Supabase, and Shopify integ
 
 ## 📋 Prerequisites
 
-- Node.js 18+ 
-- pnpm (recommended) or npm
+- Node.js 20+
+- pnpm 10 (official package manager for this repo)
 - Supabase account
 - (Optional) Shopify store
 
@@ -18,7 +18,7 @@ E-commerce platform built with Next.js 16, React 19, Supabase, and Shopify integ
 ### 1. Install Dependencies
 
 ```bash
-pnpm install
+pnpm install --frozen-lockfile
 ```
 
 ### 2. Environment Variables
@@ -30,10 +30,12 @@ cp .env.example .env.local
 ```
 
 **Required Variables:**
+
 - `NEXT_PUBLIC_SUPABASE_URL` - Your Supabase project URL
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Your Supabase anonymous key
 
 **Optional Variables:**
+
 - `NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN` - Your Shopify store domain
 - `NEXT_PUBLIC_SITE_URL` - Your production URL (auto-detected in Vercel)
 
@@ -73,6 +75,26 @@ After deploying, configure Supabase redirect URLs:
 pnpm build
 pnpm start
 ```
+
+## ✅ Minimum Quality Gates (H2)
+
+Before promoting changes to later phases, run this exact sequence with pnpm:
+
+```bash
+pnpm install --frozen-lockfile
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
+```
+
+Gate policy:
+
+- `pnpm-lock.yaml` is the single lockfile source of truth.
+- `lint`, `typecheck`, `test`, and `build` must fail loudly on real errors (no warning-only pass-through).
+- Current H2 `lint`/`typecheck`/`test` scripts are **focused quality gates** for hardening surfaces (`app/api/store`, `app/api/orders/send-confirmation-email`, `lib/security`, `tests/security`, `tests/quality`).
+- Full-repository visibility remains available via `pnpm lint:full`, `pnpm typecheck:full`, and `pnpm test:full` so hidden issues are explicit instead of ignored.
+- If any command fails, stop the lane and fix the issue before continuing.
 
 ## 📚 Tech Stack
 

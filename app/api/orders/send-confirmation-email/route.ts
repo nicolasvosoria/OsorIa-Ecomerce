@@ -406,21 +406,6 @@ function generateInvoiceEmailHTML(
 }
 
 /**
- * Convierte el estado del pedido a un label legible
- */
-function getStatusLabel(status: string): string {
-  const statusMap: Record<string, string> = {
-    pending: "Pendiente",
-    confirmed: "Confirmado",
-    processing: "En Proceso",
-    shipped: "Enviado",
-    delivered: "Entregado",
-    cancelled: "Cancelado",
-  };
-  return statusMap[status] || status;
-}
-
-/**
  * Convierte el método de pago a un label legible
  */
 function getPaymentLabel(method: string | null | undefined): string {
@@ -480,7 +465,7 @@ async function sendEmail({
           console.log(`\n📧 HTML del correo guardado en: ${emailPath}`);
           console.log(`   Para: ${to}`);
           console.log(`   Asunto: ${subject}\n`);
-        } catch (fsError) {
+        } catch {
           console.log("\n📧 CONTENIDO DEL CORREO QUE SE ENVIARÍA:");
           console.log(`   Para: ${to}`);
           console.log(`   Asunto: ${subject}`);
@@ -529,9 +514,9 @@ async function sendEmail({
       ) {
         nodemailer = nodemailerModule as NodemailerLike;
       }
-    } catch (importError) {
+    } catch {
       console.error(
-        "❌ nodemailer no está instalado. Ejecuta: npm install nodemailer @types/nodemailer",
+        "❌ nodemailer no está instalado. Ejecuta: pnpm add nodemailer",
       );
       return {
         success: false,
