@@ -111,3 +111,40 @@ Este documento resume el **estado observado en el repositorio** entre scripts SQ
 - Agregar una matriz de trazabilidad `scripts/*.sql` ↔ objetos esperados por runtime (`stores_legacy`, `app_theme_versions`, `increment_item_views`, `item_metrics`).
 - Registrar explícitamente, en documentación de operación, qué objetos son “base versionada” y cuáles son “compatibilidad requerida por app” para reducir incidentes de despliegue.
 - Definir un checklist de verificación de entorno (diagnóstico) previo a deploy que confirme presencia de objetos runtime críticos en el schema esperado.
+
+## Remediación QAP — contrato de órdenes checkout (2026-04-17)
+
+### Contrato reparado en código
+
+- Archivo: `lib/supabase/orders-api.ts`
+- Escrituras de checkout:
+  - `ecommerce.orders` ahora persiste `store_id` resuelto desde `store_items` / `item_variants` (con fallback a contexto de tienda o tienda default).
+  - `ecommerce.order_items` ahora escribe `id` UUID explícito por item.
+  - `ecommerce.order_addresses` ahora recibe una fila complementaria de envío por pedido.
+- Compatibilidad de pago:
+  - Estrategia unificada en readers: fallback seguro a `orders.payment_method`, `orders.payment_status`, `orders.payment_reference`.
+- Inventario:
+  - Validación y actualización cambiadas a tablas base escribibles (`store_items`, `item_variants`) sin depender de `store_items_legacy`.
+- Lecturas unificadas (admin/email/lookup):
+  - `getOrderById`, `getOrderByNumber`, `getOrders`, `getOrdersByEmail` usan `ecommerce.orders` + hidratación compartida de `order_items`/`order_addresses`.
+
+### Evidencia de regresión enfocada
+
+- Archivo: `tests/orders/order-flow.contract.test.ts`
+- Cobertura del contrato:
+  1. Creación live con `store_id`, UUID explícito en `order_items.id`, y persistencia en `order_addresses`.
+  2. Resolución de `store_id` vía contexto de variante (`item_variants -> store_items`).
+  3. Lecturas por ID/número/admin sobre `orders` (no `orders_legacy`) con fallback de pago compatible.
+  4. Alineación admin/email sobre el mismo reader live hidratado (items, direcciones y campos de pago compatibles).
+
+### Verificación ejecutada (comando del brief)
+
+```bash
+npm test -- --run tests/orders/order-flow.contract.test.ts
+```
+
+Resultado observado:
+
+- `Test Files  8 passed (8)`
+- `Tests  31 passed (31)`
+- Incluye `tests/orders/order-flow.contract.test.ts` en verde.
