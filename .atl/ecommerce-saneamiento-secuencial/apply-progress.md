@@ -269,3 +269,55 @@ npx vitest run -c tests/vitest.security.config.ts tests/security/store-contract.
 - H4 verify blocker closed through explicit, test-enforced compatibility boundaries for divergent tenancy helpers.
 - Runtime behavior remained unchanged (documentation + quality test hardening only).
 - Later phases now have an explicit migration envelope for converging route-local helpers and split `stores` / `stores_legacy` usage.
+
+---
+
+## H3 Focused Batch — Commerce Domain Convergence (Low Blast Radius)
+
+### Scope (requested)
+
+- Map active commerce domain and current source(s) of truth.
+- Define minimum viable target architecture.
+- Converge duplicated flows/adapters where safe.
+- Leave explicit transition/deprecation path for legacy pieces.
+- Preserve active storefront/cart/checkout behavior.
+
+### Traceable Tasks Matrix (H3)
+
+| Task ID | Task                                                                    | Production Artifact(s)                                                    | Linked Test File(s)                                    | Outcome              |
+| ------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------ | -------------------- |
+| H3.1    | Map active commerce domain + source-of-truth matrix                     | `.atl/ecommerce-saneamiento-secuencial/h3-commerce-domain-convergence.md` | `tests/quality/h3-commerce-domain-convergence.test.ts` | ✅ Contract green    |
+| H3.2    | Define minimum viable target architecture with compatibility shell      | `.atl/ecommerce-saneamiento-secuencial/h3-commerce-domain-convergence.md` | `tests/quality/h3-commerce-domain-convergence.test.ts` | ✅ Contract green    |
+| H3.3    | Converge duplicated flows/adapters through low-risk sequencing contract | `.atl/ecommerce-saneamiento-secuencial/h3-commerce-domain-convergence.md` | `tests/quality/h3-commerce-domain-convergence.test.ts` | ✅ Ambiguity reduced |
+| H3.4    | Define transition + deprecation path for legacy pieces                  | `.atl/ecommerce-saneamiento-secuencial/h3-commerce-domain-convergence.md` | `tests/quality/h3-commerce-domain-convergence.test.ts` | ✅ Contract green    |
+
+### Strict TDD Cycle Evidence (H3)
+
+| Task | Test File                                              | Layer                        | Safety Net      | RED                                                                                              | GREEN                                            | TRIANGULATE                                                                                    | REFACTOR       |
+| ---- | ------------------------------------------------------ | ---------------------------- | --------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------ | ---------------------------------------------------------------------------------------------- | -------------- |
+| H3.1 | `tests/quality/h3-commerce-domain-convergence.test.ts` | Unit (artifact contract)     | N/A (new files) | ✅ Authored domain/source assertions first; run failed (`4/4`) with `ENOENT` missing H3 artifact | ✅ Pass (`4/4`) after domain map + source matrix | ✅ Non-trivial assertions across storefront/cart/checkout sources and concrete file references | ➖ None needed |
+| H3.2 | `tests/quality/h3-commerce-domain-convergence.test.ts` | Unit (architecture contract) | N/A (new files) | ✅ Architecture assertions authored before contract existed                                      | ✅ Pass (`4/4`) with target architecture section | ✅ Verifies CommerceCore + gateway boundaries + compatibility shell + no-behavior-change rule  | ➖ None needed |
+| H3.3 | `tests/quality/h3-commerce-domain-convergence.test.ts` | Unit (convergence contract)  | N/A (new files) | ✅ Duplication-convergence assertions authored before contract existed                           | ✅ Pass (`4/4`) with safe sequence section       | ✅ Covers three concrete duplicates + three canonical convergence adapters                     | ➖ None needed |
+| H3.4 | `tests/quality/h3-commerce-domain-convergence.test.ts` | Unit (deprecation contract)  | N/A (new files) | ✅ Deprecation-stage assertions authored before contract existed                                 | ✅ Pass (`4/4`) with transition/deprecation path | ✅ Validates staged rollout + rollback clause + explicit legacy table/entrypoint references    | ➖ None needed |
+
+### Command Log (H3)
+
+```bash
+npx vitest run -c tests/vitest.security.config.ts tests/quality/h3-commerce-domain-convergence.test.ts
+```
+
+- RED result: ❌ 1 file failed, 4 tests failed (`ENOENT` missing H3 artifact).
+- GREEN result: ✅ 1 file passed, 4 tests passed.
+
+```bash
+npx vitest run -c tests/vitest.security.config.ts tests/security/store-contract.test.ts tests/security/api-routes-security.test.ts tests/security/order-email-contract.test.ts tests/quality/h4-store-resolution-contract.test.ts tests/quality/h6-cart-mutation-smoke.test.ts tests/quality/h3-commerce-domain-convergence.test.ts
+```
+
+- Focused regression suite: ✅ 6 files passed, 21 tests passed.
+
+### H3 Outcome Summary
+
+- Active commerce domain and source-of-truth boundaries are now explicit and test-enforced.
+- Minimum viable target architecture is defined as adapter-first convergence with compatibility shell retained.
+- Duplicated flows are converged at contract level with low-risk sequencing and rollback clause.
+- Transition/deprecation path for legacy pieces is explicit without runtime behavior changes in H3.
