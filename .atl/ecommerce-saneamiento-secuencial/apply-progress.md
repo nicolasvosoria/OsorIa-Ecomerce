@@ -168,3 +168,104 @@ npx vitest run -c tests/vitest.security.config.ts tests/security/store-contract.
 - H6 blocker removed: continuation is now explicitly allowed by pre-phase automated gate with repo-versioned QA evidence.
 - Pre-merge manual gate remains mandatory and explicit (`h6-manual-smoke-checklist.md` must transition `PENDING` → `PASS`).
 - Cart mutation no longer appears as automated `N/A`; now has low-risk smoke coverage wired into H6 evidence.
+
+---
+
+## H4 Focused Batch — Store/Tenant Resolution Trace + Contract Clarification
+
+### Scope (requested)
+
+- Trace current tenant/store-resolution path end to end.
+- Define target contract and valid store states.
+- Clarify schema/compatibility dependencies.
+- Reduce ambiguity around fallback boundaries and propagation keys.
+- Preserve active behavior (documentation/contract convergence only).
+
+### Traceable Tasks Matrix (H4)
+
+| Task ID | Task                                                                  | Production Artifact(s)                                                  | Linked Test File(s)                                  | Outcome              |
+| ------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------- | -------------------- |
+| H4.1    | Trace current tenant/store resolution path end-to-end                 | `.atl/ecommerce-saneamiento-secuencial/h4-store-resolution-contract.md` | `tests/quality/h4-store-resolution-contract.test.ts` | ✅ Contract green    |
+| H4.2    | Define target contract + valid store states                           | `.atl/ecommerce-saneamiento-secuencial/h4-store-resolution-contract.md` | `tests/quality/h4-store-resolution-contract.test.ts` | ✅ Contract green    |
+| H4.3    | Clarify schema/compatibility dependencies                             | `.atl/ecommerce-saneamiento-secuencial/h4-store-resolution-contract.md` | `tests/quality/h4-store-resolution-contract.test.ts` | ✅ Contract green    |
+| H4.4    | Clarify fallback and propagation boundaries while preserving behavior | `.atl/ecommerce-saneamiento-secuencial/h4-store-resolution-contract.md` | `tests/quality/h4-store-resolution-contract.test.ts` | ✅ Ambiguity reduced |
+
+### Strict TDD Cycle Evidence (H4)
+
+| Task | Test File                                            | Layer                      | Safety Net      | RED                                                                             | GREEN                                            | TRIANGULATE                                                                | REFACTOR       |
+| ---- | ---------------------------------------------------- | -------------------------- | --------------- | ------------------------------------------------------------------------------- | ------------------------------------------------ | -------------------------------------------------------------------------- | -------------- |
+| H4.1 | `tests/quality/h4-store-resolution-contract.test.ts` | Unit (artifact contract)   | N/A (new files) | ✅ First run failed with `ENOENT` for missing `h4-store-resolution-contract.md` | ✅ Pass (`4/4`) after trace section authored     | ✅ Multiple assertions across ingress/runtime/consumer/public-api segments | ➖ None needed |
+| H4.2 | `tests/quality/h4-store-resolution-contract.test.ts` | Unit (state contract)      | N/A (new files) | ✅ State-contract assertions authored before artifact existed                   | ✅ Pass (`4/4`) with target contract/state table | ✅ Covers six distinct states and outcomes                                 | ➖ None needed |
+| H4.3 | `tests/quality/h4-store-resolution-contract.test.ts` | Unit (schema dependency)   | N/A (new files) | ✅ Dependency assertions authored before artifact existed                       | ✅ Pass (`4/4`) with dependency section          | ✅ Covers relation/profile/column compatibility requirements               | ➖ None needed |
+| H4.4 | `tests/quality/h4-store-resolution-contract.test.ts` | Unit (fallback boundaries) | N/A (new files) | ✅ Boundary assertions authored before artifact existed                         | ✅ Pass (`4/4`) with explicit fallback rules     | ✅ Covers propagation keys + no-write implicit fallback boundary           | ➖ None needed |
+
+### Command Log (H4)
+
+```bash
+npx vitest run -c tests/vitest.security.config.ts tests/quality/h4-store-resolution-contract.test.ts
+```
+
+- RED result: ❌ 1 file failed, 4 tests failed (`ENOENT` missing H4 contract artifact).
+- GREEN result: ✅ 1 file passed, 4 tests passed.
+
+```bash
+npx vitest run -c tests/vitest.security.config.ts tests/security/store-contract.test.ts tests/security/api-routes-security.test.ts tests/quality/h4-store-resolution-contract.test.ts
+```
+
+- Focused regression result: ✅ 3 files passed, 11 tests passed.
+
+### H4 Outcome Summary
+
+- End-to-end tenant/store resolution trace is now explicit and auditable.
+- Target contract, valid store states, and dependency boundaries are documented without changing runtime behavior.
+- Fallback and propagation ambiguity is reduced through explicit boundary rules tied to existing helpers/contracts.
+
+---
+
+## H4 Follow-up Batch — Verify Blocker Closure (Divergent Helper Contract)
+
+### Scope (requested)
+
+- Address only H4 verify blockers tied to divergent tenancy helpers/routes.
+- Keep runtime behavior unchanged and avoid broad refactors.
+- Prefer lowest-blast-radius closure by consolidating explicit compatibility boundaries in the authoritative H4 contract.
+
+### Option Chosen
+
+- **Option B**: Fold known divergent helpers/exceptions into the H4 authoritative contract with precise compatibility boundaries and enforceable tests.
+
+### Traceable Tasks Matrix (H4 follow-up)
+
+| Task ID | Task                                                                   | Production Artifact(s)                                                  | Linked Test File(s)                                  | Outcome                |
+| ------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------- | ---------------------- |
+| H4.5    | Document compatibility exceptions for divergent helper implementations | `.atl/ecommerce-saneamiento-secuencial/h4-store-resolution-contract.md` | `tests/quality/h4-store-resolution-contract.test.ts` | ✅ Contract hardened   |
+| H4.6    | Pin non-expansion migration boundaries for later phases                | `.atl/ecommerce-saneamiento-secuencial/h4-store-resolution-contract.md` | `tests/quality/h4-store-resolution-contract.test.ts` | ✅ Boundary guardrails |
+
+### Strict TDD Cycle Evidence (H4 follow-up)
+
+| Task | Test File                                            | Layer                    | Safety Net                   | RED                                                                                            | GREEN                                                   | TRIANGULATE                                                                   | REFACTOR       |
+| ---- | ---------------------------------------------------- | ------------------------ | ---------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------- | ----------------------------------------------------------------------------- | -------------- |
+| H4.5 | `tests/quality/h4-store-resolution-contract.test.ts` | Unit (artifact contract) | ✅ Baseline captured (`4/4`) | ✅ Added compatibility-exception assertions first; failed (`4/6`) before doc updates           | ✅ Pass (`6/6`) after explicit divergent-helper section | ✅ Asserts all four known gap files + fallback/schema split invariants        | ➖ None needed |
+| H4.6 | `tests/quality/h4-store-resolution-contract.test.ts` | Unit (boundary contract) | ✅ Baseline captured (`4/4`) | ✅ Added boundary assertions first; failed until non-expansion/migration target was documented | ✅ Pass (`6/6`) with boundary rules in contract         | ✅ Separate assertions for no-expansion, scope limit, write-path explicitness | ➖ None needed |
+
+### Command Log (H4 follow-up)
+
+```bash
+npx vitest run -c tests/vitest.security.config.ts tests/quality/h4-store-resolution-contract.test.ts
+```
+
+- Safety Net baseline: ✅ 1 file passed, 4 tests passed.
+- RED after new assertions: ❌ 1 file failed, 2 tests failed.
+- GREEN after contract update: ✅ 1 file passed, 6 tests passed.
+
+```bash
+npx vitest run -c tests/vitest.security.config.ts tests/security/store-contract.test.ts tests/security/api-routes-security.test.ts tests/quality/h4-store-resolution-contract.test.ts
+```
+
+- Focused regression suite: ✅ 3 files passed, 13 tests passed.
+
+### H4 Follow-up Outcome Summary
+
+- H4 verify blocker closed through explicit, test-enforced compatibility boundaries for divergent tenancy helpers.
+- Runtime behavior remained unchanged (documentation + quality test hardening only).
+- Later phases now have an explicit migration envelope for converging route-local helpers and split `stores` / `stores_legacy` usage.
