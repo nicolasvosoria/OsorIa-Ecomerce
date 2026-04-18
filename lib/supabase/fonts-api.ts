@@ -1,4 +1,4 @@
-import { getSupabaseBrowserClient, getSupabaseEcommerce } from "./client";
+import { getSupabaseEcommerce } from "./client";
 import type { AppFont } from "@/lib/types/font";
 import { requireAdmin } from "./permissions-api";
 import { normalizeFontRecord } from "@/lib/theme-font/runtime-contract";
@@ -185,31 +185,28 @@ export async function setActiveFont(
     };
   }
 
-  const supabase = getSupabaseEcommerce();
-  if (!supabase) {
-    return { success: false, error: "Supabase no configurado" };
-  }
-
   try {
-    const { error: deactivateError } = await supabase
-      .from("app_fonts")
-      .update({ is_active: false })
-      .neq("is_active", false);
+    const response = await fetch("/api/admin/font-activation", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        fontName,
+      }),
+    });
 
-    if (deactivateError) {
-      console.error("[Font] Error deactivating fonts:", deactivateError);
-      return { success: false, error: "Error al desactivar fuentes" };
-    }
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+      const message =
+        payload &&
+        typeof payload === "object" &&
+        "error" in payload &&
+        typeof payload.error === "string"
+          ? payload.error
+          : "Error al activar fuente";
 
-    // Luego activar la fuente seleccionada
-    const { error: activateError } = await supabase
-      .from("app_fonts")
-      .update({ is_active: true, updated_at: new Date().toISOString() })
-      .eq("font_name", fontName);
-
-    if (activateError) {
-      console.error("[Font] Error activating font:", activateError);
-      return { success: false, error: "Error al activar fuente" };
+      return { success: false, error: message };
     }
 
     return { success: true };

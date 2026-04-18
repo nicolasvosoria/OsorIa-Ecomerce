@@ -310,68 +310,28 @@ export async function setActiveTheme(
     };
   }
 
-  const supabase = getSupabaseEcommerce();
-  if (!supabase) {
-    return { success: false, error: "Supabase no configurado" };
-  }
-
   try {
-    let storeId = normalizeRuntimeStoreId(await getStoreId());
-    if (!storeId) {
-      const { data: defaultStore } = await supabase
-        .from("stores_legacy")
-        .select("id")
-        .eq("subdomain", "default")
-        .maybeSingle();
-      if (defaultStore?.id) storeId = defaultStore.id;
-    }
-    if (!storeId) {
-      return { success: false, error: "No se pudo obtener la tienda" };
-    }
+    const response = await fetch("/api/admin/theme-activation", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        themeName,
+      }),
+    });
 
-    const { data: theme } = await supabase
-      .from("app_themes")
-      .select("id")
-      .eq("theme_name", themeName)
-      .single();
-    if (!theme?.id) {
-      return { success: false, error: "Tema no encontrado" };
-    }
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+      const message =
+        payload &&
+        typeof payload === "object" &&
+        "error" in payload &&
+        typeof payload.error === "string"
+          ? payload.error
+          : "Error al activar tema";
 
-    await supabase
-      .from("app_theme_versions")
-      .update({ is_current: false })
-      .eq("store_id", storeId);
-
-    const { data: existing } = await supabase
-      .from("app_theme_versions")
-      .select("id")
-      .eq("store_id", storeId)
-      .eq("theme_id", theme.id)
-      .maybeSingle();
-
-    if (existing?.id) {
-      const { error: activateError } = await supabase
-        .from("app_theme_versions")
-        .update({ is_current: true })
-        .eq("id", existing.id);
-      if (activateError) {
-        console.error("[Theme] Error activating theme:", activateError);
-        return { success: false, error: "Error al activar tema" };
-      }
-    } else {
-      const { error: insertError } = await supabase
-        .from("app_theme_versions")
-        .insert({
-          id: crypto.randomUUID(),
-          store_id: storeId,
-          theme_id: theme.id,
-          is_current: true,
-        });
-      if (insertError) {
-        console.error("[Theme] Error creating theme version:", insertError);
-        return { success: false, error: "Error al activar tema" };
-      }
+      return { success: false, error: message };
     }
 
     return { success: true };
