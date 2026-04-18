@@ -45,61 +45,21 @@ export async function getThemes(): Promise<AppTheme[]> {
   console.log("[Theme] ✅ Cliente Supabase obtenido (schema ecommerce)");
 
   try {
-    let storeId = normalizeRuntimeStoreId(await getStoreId());
-    if (!storeId) {
-      console.log(
-        "[Theme] No hay store_id disponible, obteniendo tienda por defecto...",
-      );
-      const { data: defaultStore } = await supabase
-        .from("stores_legacy")
-        .select("id")
-        .eq("subdomain", "default")
-        .maybeSingle();
-      if (defaultStore?.id) {
-        storeId = defaultStore.id;
-        console.log("[Theme] ✅ Usando tienda por defecto:", storeId);
-      } else {
-        console.warn(
-          "[Theme] ⚠️ No se encontró tienda por defecto, consultando sin filtro store_id",
-        );
-      }
-    }
-
     console.log(
       "[Theme] Ejecutando consulta a app_themes (schema ecommerce)...",
     );
     const startTime = Date.now();
-    let queryPromise = supabase
+    const queryPromise = supabase
       .from("app_themes")
       .select("*")
       .order("theme_name");
-    if (storeId) {
-      queryPromise = queryPromise.or(`store_id.eq.${storeId},store_id.is.null`);
-    } else {
-      queryPromise = queryPromise.is("store_id", null);
-    }
 
     console.log("[Theme] Enviando consulta completa...");
-    let result = (await withTimeout(queryPromise, 20000)) as {
+    const result = (await withTimeout(queryPromise, 20000)) as {
       data: any;
       error: any;
     };
-    let { data, error } = result;
-    if (
-      error &&
-      (error?.message?.includes("store_id") || error?.code === "42703")
-    ) {
-      queryPromise = supabase
-        .from("app_themes")
-        .select("*")
-        .order("theme_name");
-      result = (await withTimeout(queryPromise, 20000)) as {
-        data: any;
-        error: any;
-      };
-      data = result.data;
-      error = result.error;
-    }
+    const { data, error } = result;
     const elapsedTime = Date.now() - startTime;
     console.log(
       "[Theme] Consulta completada en",
@@ -119,7 +79,6 @@ export async function getThemes(): Promise<AppTheme[]> {
         code: errCode,
         details: error?.details,
         hint: error?.hint,
-        storeId,
         rawError: error,
       });
       if (
@@ -137,10 +96,7 @@ export async function getThemes(): Promise<AppTheme[]> {
     }
 
     if (!data || data.length === 0) {
-      console.warn(
-        "[Theme] ⚠️ No se encontraron temas en la base de datos para store_id:",
-        storeId,
-      );
+      console.warn("[Theme] ⚠️ No se encontraron temas en la base de datos");
       return [];
     }
 
@@ -200,14 +156,12 @@ export async function getActiveTheme(): Promise<AppTheme | null> {
   }
 
   // Fallback: tema con is_active en app_themes (compatibilidad)
-  let query = supabase.from("app_themes").select("*").eq("is_active", true);
-  if (storeId) {
-    query = query.or(`store_id.eq.${storeId},store_id.is.null`).limit(1);
-  } else {
-    query = query.is("store_id", null);
-  }
-
-  const { data, error } = await query.maybeSingle();
+  const { data, error } = await supabase
+    .from("app_themes")
+    .select("*")
+    .eq("is_active", true)
+    .limit(1)
+    .maybeSingle();
 
   if (error) {
     let errorCode: string | undefined;
@@ -241,20 +195,6 @@ export async function getActiveTheme(): Promise<AppTheme | null> {
         `[Theme] No se encontró tema activo para store_id: ${storeId || "NULL"}`,
       );
       return null;
-    }
-
-    // Fallback: si falla por columna store_id u otro, intentar sin filtro store_id
-    const fallbackRes = await supabase
-      .from("app_themes")
-      .select("*")
-      .eq("is_active", true)
-      .limit(1)
-      .maybeSingle();
-    if (!fallbackRes.error && fallbackRes.data) {
-      const normalizedTheme = normalizeThemeRow(fallbackRes.data);
-      if (normalizedTheme) {
-        return normalizedTheme;
-      }
     }
 
     const errMsg =
