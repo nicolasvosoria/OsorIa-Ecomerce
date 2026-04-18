@@ -5,7 +5,10 @@ import {
   getThemes,
   setActiveTheme,
 } from "@/lib/supabase/themes-api";
-import { getSupabaseEcommerce } from "@/lib/supabase/client";
+import {
+  getSupabaseBrowserClient,
+  getSupabaseEcommerce,
+} from "@/lib/supabase/client";
 import { requireAdmin } from "@/lib/supabase/permissions-api";
 import { getStoreId } from "@/lib/utils/store";
 
@@ -31,6 +34,7 @@ vi.mock("@/lib/utils/store", async () => {
 });
 
 const mockedRequireAdmin = vi.mocked(requireAdmin);
+const mockedGetSupabaseBrowserClient = vi.mocked(getSupabaseBrowserClient);
 const mockedGetSupabaseEcommerce = vi.mocked(getSupabaseEcommerce);
 const mockedGetStoreId = vi.mocked(getStoreId);
 
@@ -39,6 +43,13 @@ describe("theme activation admin client contract", () => {
     vi.clearAllMocks();
     mockedRequireAdmin.mockResolvedValue();
     mockedGetStoreId.mockResolvedValue(null);
+    mockedGetSupabaseBrowserClient.mockReturnValue({
+      auth: {
+        getSession: vi.fn().mockResolvedValue({
+          data: { session: { access_token: "preview-token" } },
+        }),
+      },
+    } as any);
     mockedGetSupabaseEcommerce.mockImplementation(() => {
       throw new Error("browser client write path should not be used");
     });
@@ -61,6 +72,7 @@ describe("theme activation admin client contract", () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Authorization: "Bearer preview-token",
       },
       body: JSON.stringify({
         themeName: "Claro Original",
@@ -84,6 +96,35 @@ describe("theme activation admin client contract", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(mockedGetSupabaseEcommerce).not.toHaveBeenCalled();
+  });
+
+  it("omits the bearer header when no session token is available", async () => {
+    mockedGetSupabaseBrowserClient.mockReturnValue({
+      auth: {
+        getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
+      },
+    } as any);
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({ success: true }),
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(setActiveTheme("Claro Original")).resolves.toEqual({
+      success: true,
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/admin/theme-activation", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        themeName: "Claro Original",
+      }),
+    });
   });
 
   it("reads app_themes without emitting store_id filters", async () => {

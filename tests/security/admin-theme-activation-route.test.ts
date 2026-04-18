@@ -95,11 +95,13 @@ describe("theme activation admin route", () => {
   });
 
   it("writes theme activation through service-role path for authenticated admins", async () => {
+    const getUser = vi
+      .fn()
+      .mockResolvedValue({ data: { user: { id: "user-1" } }, error: null });
+
     createServerClient.mockReturnValue({
       auth: {
-        getUser: vi
-          .fn()
-          .mockResolvedValue({ data: { user: { id: "user-1" } }, error: null }),
+        getUser,
       },
     });
 
@@ -146,7 +148,10 @@ describe("theme activation admin route", () => {
     const response = await POST(
       new NextRequest("http://localhost/api/admin/theme-activation", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          authorization: "Bearer preview-token",
+        },
         body: JSON.stringify({
           themeName: "Claro Original",
         }),
@@ -166,5 +171,6 @@ describe("theme activation admin route", () => {
       is_current: true,
     });
     expect(activateChain.eq).toHaveBeenCalledWith("id", "version-1");
+    expect(getUser).toHaveBeenCalledWith("preview-token");
   });
 });

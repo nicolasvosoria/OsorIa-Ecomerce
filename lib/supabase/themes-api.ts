@@ -1,6 +1,7 @@
 import { getSupabaseEcommerce } from "./client";
 import type { AppTheme } from "@/lib/types/theme";
 import { requireAdmin } from "./permissions-api";
+import { getAdminRequestHeaders } from "./admin-request-headers";
 import { getStoreId, normalizeRuntimeStoreId } from "@/lib/utils/store";
 import { normalizeThemeRecord } from "@/lib/theme-font/runtime-contract";
 
@@ -253,9 +254,7 @@ export async function setActiveTheme(
   try {
     const response = await fetch("/api/admin/theme-activation", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: await getAdminRequestHeaders(),
       body: JSON.stringify({
         themeName,
       }),

@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { updateComponentStyle } from "@/lib/supabase/styles-api";
-import { getSupabaseEcommerce } from "@/lib/supabase/client";
+import {
+  getSupabaseBrowserClient,
+  getSupabaseEcommerce,
+} from "@/lib/supabase/client";
 import { requireAdmin } from "@/lib/supabase/permissions-api";
 
 vi.mock("@/lib/supabase/permissions-api", () => ({
@@ -14,12 +17,20 @@ vi.mock("@/lib/supabase/client", () => ({
 }));
 
 const mockedRequireAdmin = vi.mocked(requireAdmin);
+const mockedGetSupabaseBrowserClient = vi.mocked(getSupabaseBrowserClient);
 const mockedGetSupabaseEcommerce = vi.mocked(getSupabaseEcommerce);
 
 describe("component styles admin client contract", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockedRequireAdmin.mockResolvedValue();
+    mockedGetSupabaseBrowserClient.mockReturnValue({
+      auth: {
+        getSession: vi.fn().mockResolvedValue({
+          data: { session: { access_token: "preview-token" } },
+        }),
+      },
+    } as any);
     mockedGetSupabaseEcommerce.mockImplementation(() => {
       throw new Error("browser client write path should not be used");
     });
@@ -50,6 +61,7 @@ describe("component styles admin client contract", () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Authorization: "Bearer preview-token",
       },
       body: JSON.stringify({
         componentName: "header",
@@ -73,5 +85,42 @@ describe("component styles admin client contract", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(mockedGetSupabaseEcommerce).not.toHaveBeenCalled();
+  });
+
+  it("omits the bearer header when no session token is available", async () => {
+    mockedGetSupabaseBrowserClient.mockReturnValue({
+      auth: {
+        getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
+      },
+    } as any);
+
+    const payload = {
+      id: "style-1",
+      component_name: "header",
+      store_id: "store-1",
+      variables: { bgColor: "#111111" },
+      updated_at: "2026-04-17T12:00:00.000Z",
+    };
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({ data: payload }),
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      updateComponentStyle("header", { bgColor: "#111111" }),
+    ).resolves.toEqual(payload);
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/admin/component-styles", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        componentName: "header",
+        variables: { bgColor: "#111111" },
+      }),
+    });
   });
 });

@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { setActiveFont } from "@/lib/supabase/fonts-api";
-import { getSupabaseEcommerce } from "@/lib/supabase/client";
+import {
+  getSupabaseBrowserClient,
+  getSupabaseEcommerce,
+} from "@/lib/supabase/client";
 import { requireAdmin } from "@/lib/supabase/permissions-api";
 
 vi.mock("@/lib/supabase/permissions-api", () => ({
@@ -14,12 +17,20 @@ vi.mock("@/lib/supabase/client", () => ({
 }));
 
 const mockedRequireAdmin = vi.mocked(requireAdmin);
+const mockedGetSupabaseBrowserClient = vi.mocked(getSupabaseBrowserClient);
 const mockedGetSupabaseEcommerce = vi.mocked(getSupabaseEcommerce);
 
 describe("font activation admin client contract", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockedRequireAdmin.mockResolvedValue();
+    mockedGetSupabaseBrowserClient.mockReturnValue({
+      auth: {
+        getSession: vi.fn().mockResolvedValue({
+          data: { session: { access_token: "preview-token" } },
+        }),
+      },
+    } as any);
     mockedGetSupabaseEcommerce.mockImplementation(() => {
       throw new Error("browser client write path should not be used");
     });
@@ -42,6 +53,7 @@ describe("font activation admin client contract", () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Authorization: "Bearer preview-token",
       },
       body: JSON.stringify({
         fontName: "Poppins",
@@ -65,5 +77,34 @@ describe("font activation admin client contract", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(mockedGetSupabaseEcommerce).not.toHaveBeenCalled();
+  });
+
+  it("omits the bearer header when no session token is available", async () => {
+    mockedGetSupabaseBrowserClient.mockReturnValue({
+      auth: {
+        getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
+      },
+    } as any);
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({ success: true }),
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(setActiveFont("Poppins")).resolves.toEqual({
+      success: true,
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/admin/font-activation", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        fontName: "Poppins",
+      }),
+    });
   });
 });

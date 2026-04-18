@@ -89,11 +89,13 @@ describe("font activation admin route", () => {
   });
 
   it("writes font activation through service-role path for authenticated admins", async () => {
+    const getUser = vi
+      .fn()
+      .mockResolvedValue({ data: { user: { id: "user-1" } }, error: null });
+
     createServerClient.mockReturnValue({
       auth: {
-        getUser: vi
-          .fn()
-          .mockResolvedValue({ data: { user: { id: "user-1" } }, error: null }),
+        getUser,
       },
     });
 
@@ -133,7 +135,10 @@ describe("font activation admin route", () => {
     const response = await POST(
       new NextRequest("http://localhost/api/admin/font-activation", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          authorization: "Bearer preview-token",
+        },
         body: JSON.stringify({
           fontName: "Poppins",
         }),
@@ -152,5 +157,6 @@ describe("font activation admin route", () => {
     );
     expect(deactivateChain.neq).toHaveBeenCalledWith("is_active", false);
     expect(activateChain.eq).toHaveBeenCalledWith("font_name", "Poppins");
+    expect(getUser).toHaveBeenCalledWith("preview-token");
   });
 });

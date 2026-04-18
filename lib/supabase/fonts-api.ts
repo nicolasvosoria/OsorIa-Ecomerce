@@ -1,6 +1,7 @@
 import { getSupabaseEcommerce } from "./client";
 import type { AppFont } from "@/lib/types/font";
 import { requireAdmin } from "./permissions-api";
+import { getAdminRequestHeaders } from "./admin-request-headers";
 import { normalizeFontRecord } from "@/lib/theme-font/runtime-contract";
 
 // Helper para agregar timeout a las promesas
@@ -188,9 +189,7 @@ export async function setActiveFont(
   try {
     const response = await fetch("/api/admin/font-activation", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: await getAdminRequestHeaders(),
       body: JSON.stringify({
         fontName,
       }),

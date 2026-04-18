@@ -1,6 +1,7 @@
 import { getSupabaseEcommerce } from "./client";
 import type { ComponentStyle } from "./types";
 import { requireAdmin } from "./permissions-api";
+import { getAdminRequestHeaders } from "./admin-request-headers";
 import { getStoreId } from "@/lib/utils/store";
 
 function mapLegacyStyle(row: any): ComponentStyle {
@@ -84,9 +85,7 @@ export async function updateComponentStyle(
 
   const response = await fetch("/api/admin/component-styles", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: await getAdminRequestHeaders(),
     body: JSON.stringify({
       componentName,
       variables,

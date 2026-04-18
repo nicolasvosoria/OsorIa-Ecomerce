@@ -109,11 +109,13 @@ describe("component styles admin route", () => {
   });
 
   it("writes through the service role path for authenticated admins", async () => {
+    const getUser = vi
+      .fn()
+      .mockResolvedValue({ data: { user: { id: "user-1" } }, error: null });
+
     createServerClient.mockReturnValue({
       auth: {
-        getUser: vi
-          .fn()
-          .mockResolvedValue({ data: { user: { id: "user-1" } }, error: null }),
+        getUser,
       },
     });
 
@@ -150,7 +152,10 @@ describe("component styles admin route", () => {
     const response = await POST(
       new NextRequest("http://localhost/api/admin/component-styles", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          authorization: "Bearer preview-token",
+        },
         body: JSON.stringify({
           componentName: "header",
           variables: { bgColor: "#111111" },
@@ -169,5 +174,6 @@ describe("component styles admin route", () => {
         variables: { bgColor: "#111111" },
       }),
     );
+    expect(getUser).toHaveBeenCalledWith("preview-token");
   });
 });
