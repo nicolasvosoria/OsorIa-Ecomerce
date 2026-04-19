@@ -113,6 +113,74 @@ describe("theme activation admin route", () => {
     expect(serviceSchema.from).not.toHaveBeenCalledWith("app_theme_versions");
   });
 
+  it("includes safe diagnostics for permission verification failures when debug header is enabled", async () => {
+    const getUser = vi.fn().mockImplementation(async (token?: string) => {
+      if (token === "preview-token") {
+        return { data: { user: { id: "bearer-user" } }, error: null };
+      }
+
+      return { data: { user: { id: "cookie-admin" } }, error: null };
+    });
+
+    createServerClient.mockReturnValue({
+      auth: {
+        getUser,
+      },
+    });
+
+    const profileError = {
+      code: "42501",
+      message: 'permission denied for table "user_profiles"',
+      hint: "Check RLS policy",
+    };
+    const userProfilesQuery = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({ data: null, error: profileError }),
+    };
+    const serviceSchema = {
+      from: vi.fn((table: string) => {
+        if (table === "user_profiles") return userProfilesQuery;
+        throw new Error(`unexpected table ${table}`);
+      }),
+    };
+
+    createClient.mockReturnValue({
+      schema: vi.fn().mockReturnValue(serviceSchema),
+    });
+
+    const response = await POST(
+      new NextRequest("http://localhost/api/admin/theme-activation", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: "Bearer preview-token",
+          "x-osoria-admin-debug": "1",
+        },
+        body: JSON.stringify({
+          themeName: "Claro Original",
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({
+      error: "Error verificando permisos",
+      diagnostics: {
+        bearerPresent: true,
+        cookieAuthUserExists: true,
+        candidateUserIds: ["bearer-user", "cookie-admin"],
+        profileQuery: {
+          schema: "ecommerce",
+          table: "user_profiles",
+        },
+        profileError,
+      },
+    });
+    expect(serviceSchema.from).toHaveBeenCalledWith("user_profiles");
+    expect(serviceSchema.from).not.toHaveBeenCalledWith("app_themes");
+  });
+
   it("writes theme activation through service-role path for authenticated admins", async () => {
     const getUser = vi
       .fn()

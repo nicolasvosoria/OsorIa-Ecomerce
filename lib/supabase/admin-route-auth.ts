@@ -4,10 +4,35 @@ import type { NextRequest } from "next/server";
 
 type AdminRouteAuthResult =
   | { userId: string }
-  | { error: string; status: 401 | 403 | 500 };
+  | {
+      error: string;
+      status: 401 | 403 | 500;
+      diagnostics?: AdminAuthDiagnostics;
+    };
+
+type AdminAuthDiagnostics = {
+  bearerPresent: boolean;
+  cookieAuthUserExists: boolean;
+  candidateUserIds: string[];
+  profileQuery: {
+    schema: "ecommerce";
+    table: "user_profiles";
+  };
+  profileError?: {
+    code?: string;
+    message?: string;
+    hint?: string;
+  };
+};
 
 type AuthenticatedUser = {
   id: string;
+};
+
+type AuthResolution = {
+  users: AuthenticatedUser[];
+  bearerPresent: boolean;
+  cookieAuthUserExists: boolean;
 };
 
 async function getSupabaseAuthClient() {
@@ -53,10 +78,42 @@ function getBearerToken(request: NextRequest) {
   return token;
 }
 
+function isAdminDebugEnabled(request: NextRequest) {
+  return request.headers.get("x-osoria-admin-debug") === "1";
+}
+
+function buildDiagnostics(
+  authResolution: AuthResolution,
+  profileError?: {
+    code?: string;
+    message?: string;
+    hint?: string;
+  } | null,
+): AdminAuthDiagnostics {
+  return {
+    bearerPresent: authResolution.bearerPresent,
+    cookieAuthUserExists: authResolution.cookieAuthUserExists,
+    candidateUserIds: authResolution.users.map((user) => user.id),
+    profileQuery: {
+      schema: "ecommerce",
+      table: "user_profiles",
+    },
+    ...(profileError
+      ? {
+          profileError: {
+            code: profileError.code,
+            message: profileError.message,
+            ...(profileError.hint ? { hint: profileError.hint } : {}),
+          },
+        }
+      : {}),
+  };
+}
+
 async function getAuthenticatedUsers(
   request: NextRequest,
   authSupabase: any,
-): Promise<AuthenticatedUser[]> {
+): Promise<AuthResolution> {
   const accessToken = getBearerToken(request);
   const authRequests = [authSupabase.auth.getUser()];
 
@@ -66,6 +123,7 @@ async function getAuthenticatedUsers(
 
   const authResults = await Promise.all(authRequests);
   const users = new Map<string, AuthenticatedUser>();
+  const cookieAuthUser = authResults.at(-1)?.data?.user;
 
   for (const result of authResults) {
     const user = result.data?.user;
@@ -74,24 +132,35 @@ async function getAuthenticatedUsers(
     }
   }
 
-  return [...users.values()];
+  return {
+    users: [...users.values()],
+    bearerPresent: Boolean(accessToken),
+    cookieAuthUserExists: Boolean(cookieAuthUser?.id),
+  };
 }
 
 export async function requireAdminUser(
   request: NextRequest,
   serviceSupabase: any,
 ): Promise<AdminRouteAuthResult> {
+  const debugEnabled = isAdminDebugEnabled(request);
   const authSupabase = await getSupabaseAuthClient();
   if (!authSupabase) {
     return { error: "Supabase no configurado", status: 500 };
   }
 
-  const users = await getAuthenticatedUsers(request, authSupabase);
-  if (users.length === 0) {
-    return { error: "Acceso denegado", status: 401 };
+  const authResolution = await getAuthenticatedUsers(request, authSupabase);
+  if (authResolution.users.length === 0) {
+    return {
+      error: "Acceso denegado",
+      status: 401,
+      ...(debugEnabled
+        ? { diagnostics: buildDiagnostics(authResolution) }
+        : {}),
+    };
   }
 
-  for (const user of users) {
+  for (const user of authResolution.users) {
     const { data: profile, error: profileError } = await serviceSupabase
       .from("user_profiles")
       .select("role")
@@ -103,9 +172,25 @@ export async function requireAdminUser(
     }
 
     if (profileError && profileError.code !== "PGRST116") {
-      return { error: "Error verificando permisos", status: 500 };
+      return {
+        error: "Error verificando permisos",
+        status: 500,
+        ...(debugEnabled
+          ? {
+              diagnostics: buildDiagnostics(authResolution, {
+                code: profileError.code,
+                message: profileError.message,
+                hint: profileError.hint,
+              }),
+            }
+          : {}),
+      };
     }
   }
 
-  return { error: "Acceso denegado", status: 403 };
+  return {
+    error: "Acceso denegado",
+    status: 403,
+    ...(debugEnabled ? { diagnostics: buildDiagnostics(authResolution) } : {}),
+  };
 }

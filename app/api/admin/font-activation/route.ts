@@ -33,10 +33,11 @@ export async function POST(request: NextRequest) {
 
     const adminCheck = await requireAdminUser(request, supabase);
     if ("error" in adminCheck) {
-      return NextResponse.json(
-        { error: adminCheck.error },
-        { status: adminCheck.status },
-      );
+      const responseBody = adminCheck.diagnostics
+        ? { error: adminCheck.error, diagnostics: adminCheck.diagnostics }
+        : { error: adminCheck.error };
+
+      return NextResponse.json(responseBody, { status: adminCheck.status });
     }
 
     const { data: targetFont, error: targetFontError } = await supabase
