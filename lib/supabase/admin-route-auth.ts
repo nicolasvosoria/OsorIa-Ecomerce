@@ -6,6 +6,10 @@ type AdminRouteAuthResult =
   | { userId: string }
   | { error: string; status: 401 | 403 | 500 };
 
+type AuthenticatedUser = {
+  id: string;
+};
+
 async function getSupabaseAuthClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -49,6 +53,30 @@ function getBearerToken(request: NextRequest) {
   return token;
 }
 
+async function getAuthenticatedUsers(
+  request: NextRequest,
+  authSupabase: any,
+): Promise<AuthenticatedUser[]> {
+  const accessToken = getBearerToken(request);
+  const authRequests = [authSupabase.auth.getUser()];
+
+  if (accessToken) {
+    authRequests.unshift(authSupabase.auth.getUser(accessToken));
+  }
+
+  const authResults = await Promise.all(authRequests);
+  const users = new Map<string, AuthenticatedUser>();
+
+  for (const result of authResults) {
+    const user = result.data?.user;
+    if (user?.id) {
+      users.set(user.id, { id: user.id });
+    }
+  }
+
+  return [...users.values()];
+}
+
 export async function requireAdminUser(
   request: NextRequest,
   serviceSupabase: any,
@@ -58,27 +86,26 @@ export async function requireAdminUser(
     return { error: "Supabase no configurado", status: 500 };
   }
 
-  const accessToken = getBearerToken(request);
-  const {
-    data: { user },
-    error: authError,
-  } = accessToken
-    ? await authSupabase.auth.getUser(accessToken)
-    : await authSupabase.auth.getUser();
-
-  if (authError || !user) {
+  const users = await getAuthenticatedUsers(request, authSupabase);
+  if (users.length === 0) {
     return { error: "Acceso denegado", status: 401 };
   }
 
-  const { data: profile, error: profileError } = await serviceSupabase
-    .from("user_profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
+  for (const user of users) {
+    const { data: profile, error: profileError } = await serviceSupabase
+      .from("user_profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
 
-  if (profileError || profile?.role !== "admin") {
-    return { error: "Acceso denegado", status: 403 };
+    if (profile?.role === "admin") {
+      return { userId: user.id };
+    }
+
+    if (profileError && profileError.code !== "PGRST116") {
+      return { error: "Error verificando permisos", status: 500 };
+    }
   }
 
-  return { userId: user.id };
+  return { error: "Acceso denegado", status: 403 };
 }

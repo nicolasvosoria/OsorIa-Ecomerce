@@ -34,13 +34,32 @@ function makeCookieStore(storeId = "store-1") {
   };
 }
 
-function makeUserProfilesQuery(role: string | null) {
-  const chain = {
-    select: vi.fn().mockReturnThis(),
-    eq: vi.fn().mockReturnThis(),
-    single: vi
-      .fn()
-      .mockResolvedValue({ data: role ? { role } : null, error: null }),
+function makeUserProfilesQuery(
+  role: string | null | Record<string, string | null>,
+) {
+  let currentId: string | null = null;
+  const chain: any = {
+    select: vi.fn().mockImplementation(() => chain),
+    eq: vi.fn().mockImplementation((column: string, value: string) => {
+      if (column === "id") {
+        currentId = value;
+      }
+
+      return chain;
+    }),
+    single: vi.fn().mockImplementation(async () => {
+      const resolvedRole =
+        typeof role === "string" || role === null
+          ? role
+          : currentId
+            ? (role[currentId] ?? null)
+            : null;
+
+      return {
+        data: resolvedRole ? { role: resolvedRole } : null,
+        error: null,
+      };
+    }),
   };
 
   return chain;
@@ -175,5 +194,128 @@ describe("component styles admin route", () => {
       }),
     );
     expect(getUser).toHaveBeenCalledWith("preview-token");
+  });
+
+  it("accepts cookie-backed admin requests without a bearer token", async () => {
+    createServerClient.mockReturnValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: "cookie-admin" } },
+          error: null,
+        }),
+      },
+    });
+
+    const userProfilesQuery = makeUserProfilesQuery("admin");
+    const existingStyleQuery = makeExistingStyleQuery("style-1");
+    const updatedRow = {
+      id: "style-1",
+      component_name: "header",
+      store_id: "store-1",
+      variables: { bgColor: "#111111" },
+      updated_at: "2026-04-17T12:00:00.000Z",
+    };
+    const updateChain = {
+      eq: vi.fn().mockReturnThis(),
+      select: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({ data: updatedRow, error: null }),
+    };
+    const componentStylesTable = {
+      select: vi.fn().mockReturnValue(existingStyleQuery),
+      update: vi.fn().mockReturnValue(updateChain),
+    };
+    const serviceSchema = {
+      from: vi.fn((table: string) => {
+        if (table === "user_profiles") return userProfilesQuery;
+        if (table === "component_styles") return componentStylesTable;
+        throw new Error(`unexpected table ${table}`);
+      }),
+    };
+
+    createClient.mockReturnValue({
+      schema: vi.fn().mockReturnValue(serviceSchema),
+    });
+
+    const response = await POST(
+      new NextRequest("http://localhost/api/admin/component-styles", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          componentName: "header",
+          variables: { bgColor: "#111111" },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ data: updatedRow });
+  });
+
+  it("accepts drifted bearer requests when the cookie identity is admin", async () => {
+    const getUser = vi.fn().mockImplementation(async (token?: string) => {
+      if (token === "preview-token") {
+        return { data: { user: { id: "stale-user" } }, error: null };
+      }
+
+      return { data: { user: { id: "cookie-admin" } }, error: null };
+    });
+
+    createServerClient.mockReturnValue({
+      auth: {
+        getUser,
+      },
+    });
+
+    const userProfilesQuery = makeUserProfilesQuery({
+      "stale-user": "user",
+      "cookie-admin": "admin",
+    });
+    const existingStyleQuery = makeExistingStyleQuery("style-1");
+    const updatedRow = {
+      id: "style-1",
+      component_name: "header",
+      store_id: "store-1",
+      variables: { bgColor: "#111111" },
+      updated_at: "2026-04-17T12:00:00.000Z",
+    };
+    const updateChain = {
+      eq: vi.fn().mockReturnThis(),
+      select: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({ data: updatedRow, error: null }),
+    };
+    const componentStylesTable = {
+      select: vi.fn().mockReturnValue(existingStyleQuery),
+      update: vi.fn().mockReturnValue(updateChain),
+    };
+    const serviceSchema = {
+      from: vi.fn((table: string) => {
+        if (table === "user_profiles") return userProfilesQuery;
+        if (table === "component_styles") return componentStylesTable;
+        throw new Error(`unexpected table ${table}`);
+      }),
+    };
+
+    createClient.mockReturnValue({
+      schema: vi.fn().mockReturnValue(serviceSchema),
+    });
+
+    const response = await POST(
+      new NextRequest("http://localhost/api/admin/component-styles", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: "Bearer preview-token",
+        },
+        body: JSON.stringify({
+          componentName: "header",
+          variables: { bgColor: "#111111" },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ data: updatedRow });
+    expect(getUser).toHaveBeenCalledWith("preview-token");
+    expect(getUser).toHaveBeenCalledWith();
   });
 });

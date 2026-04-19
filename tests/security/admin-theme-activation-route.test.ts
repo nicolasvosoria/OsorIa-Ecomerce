@@ -34,13 +34,32 @@ function makeCookieStore(storeId = "store-1") {
   };
 }
 
-function makeUserProfilesQuery(role: string | null) {
-  const chain = {
-    select: vi.fn().mockReturnThis(),
-    eq: vi.fn().mockReturnThis(),
-    single: vi
-      .fn()
-      .mockResolvedValue({ data: role ? { role } : null, error: null }),
+function makeUserProfilesQuery(
+  role: string | null | Record<string, string | null>,
+) {
+  let currentId: string | null = null;
+  const chain: any = {
+    select: vi.fn(() => chain),
+    eq: vi.fn((column: string, value: string) => {
+      if (column === "id") {
+        currentId = value;
+      }
+
+      return chain;
+    }),
+    single: vi.fn().mockImplementation(async () => {
+      const resolvedRole =
+        typeof role === "string" || role === null
+          ? role
+          : currentId
+            ? (role[currentId] ?? null)
+            : null;
+
+      return {
+        data: resolvedRole ? { role: resolvedRole } : null,
+        error: null,
+      };
+    }),
   };
 
   return chain;
@@ -172,5 +191,144 @@ describe("theme activation admin route", () => {
     });
     expect(activateChain.eq).toHaveBeenCalledWith("id", "version-1");
     expect(getUser).toHaveBeenCalledWith("preview-token");
+  });
+
+  it("accepts cookie-backed admin requests without a bearer token", async () => {
+    createServerClient.mockReturnValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: "cookie-admin" } },
+          error: null,
+        }),
+      },
+    });
+
+    const userProfilesQuery = makeUserProfilesQuery("admin");
+    const themeQuery = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: vi
+        .fn()
+        .mockResolvedValue({ data: { id: "theme-1" }, error: null }),
+    };
+    const existingQuery = {
+      eq: vi.fn().mockReturnThis(),
+      maybeSingle: vi
+        .fn()
+        .mockResolvedValue({ data: { id: "version-1" }, error: null }),
+    };
+    const deactivateChain = {
+      eq: vi.fn().mockResolvedValue({ error: null }),
+    };
+    const activateChain = {
+      eq: vi.fn().mockResolvedValue({ error: null }),
+    };
+    const themeVersionsTable = {
+      update: vi.fn((payload: { is_current?: boolean }) =>
+        payload.is_current === false ? deactivateChain : activateChain,
+      ),
+      select: vi.fn().mockReturnValue(existingQuery),
+    };
+    const serviceSchema = {
+      from: vi.fn((table: string) => {
+        if (table === "user_profiles") return userProfilesQuery;
+        if (table === "app_themes") return themeQuery;
+        if (table === "app_theme_versions") return themeVersionsTable;
+        throw new Error(`unexpected table ${table}`);
+      }),
+    };
+
+    createClient.mockReturnValue({
+      schema: vi.fn().mockReturnValue(serviceSchema),
+    });
+
+    const response = await POST(
+      new NextRequest("http://localhost/api/admin/theme-activation", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          themeName: "Claro Original",
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ success: true });
+  });
+
+  it("accepts drifted bearer requests when the cookie identity is admin", async () => {
+    const getUser = vi.fn().mockImplementation(async (token?: string) => {
+      if (token === "preview-token") {
+        return { data: { user: { id: "stale-user" } }, error: null };
+      }
+
+      return { data: { user: { id: "cookie-admin" } }, error: null };
+    });
+
+    createServerClient.mockReturnValue({
+      auth: {
+        getUser,
+      },
+    });
+
+    const userProfilesQuery = makeUserProfilesQuery({
+      "stale-user": "user",
+      "cookie-admin": "admin",
+    });
+    const themeQuery = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: vi
+        .fn()
+        .mockResolvedValue({ data: { id: "theme-1" }, error: null }),
+    };
+    const existingQuery = {
+      eq: vi.fn().mockReturnThis(),
+      maybeSingle: vi
+        .fn()
+        .mockResolvedValue({ data: { id: "version-1" }, error: null }),
+    };
+    const deactivateChain = {
+      eq: vi.fn().mockResolvedValue({ error: null }),
+    };
+    const activateChain = {
+      eq: vi.fn().mockResolvedValue({ error: null }),
+    };
+    const themeVersionsTable = {
+      update: vi.fn((payload: { is_current?: boolean }) =>
+        payload.is_current === false ? deactivateChain : activateChain,
+      ),
+      select: vi.fn().mockReturnValue(existingQuery),
+    };
+    const serviceSchema = {
+      from: vi.fn((table: string) => {
+        if (table === "user_profiles") return userProfilesQuery;
+        if (table === "app_themes") return themeQuery;
+        if (table === "app_theme_versions") return themeVersionsTable;
+        throw new Error(`unexpected table ${table}`);
+      }),
+    };
+
+    createClient.mockReturnValue({
+      schema: vi.fn().mockReturnValue(serviceSchema),
+    });
+
+    const response = await POST(
+      new NextRequest("http://localhost/api/admin/theme-activation", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: "Bearer preview-token",
+        },
+        body: JSON.stringify({
+          themeName: "Claro Original",
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ success: true });
+    expect(getUser).toHaveBeenCalledWith("preview-token");
+    expect(getUser).toHaveBeenCalledWith();
   });
 });

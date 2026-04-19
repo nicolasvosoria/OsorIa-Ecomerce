@@ -26,9 +26,18 @@ describe("font activation admin client contract", () => {
     mockedRequireAdmin.mockResolvedValue();
     mockedGetSupabaseBrowserClient.mockReturnValue({
       auth: {
-        getSession: vi.fn().mockResolvedValue({
-          data: { session: { access_token: "preview-token" } },
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: "live-admin" } },
         }),
+        getSession: vi.fn().mockResolvedValue({
+          data: {
+            session: {
+              access_token: "preview-token",
+              user: { id: "live-admin" },
+            },
+          },
+        }),
+        refreshSession: vi.fn(),
       },
     } as any);
     mockedGetSupabaseEcommerce.mockImplementation(() => {
@@ -82,7 +91,9 @@ describe("font activation admin client contract", () => {
   it("omits the bearer header when no session token is available", async () => {
     mockedGetSupabaseBrowserClient.mockReturnValue({
       auth: {
+        getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
         getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
+        refreshSession: vi.fn(),
       },
     } as any);
 
@@ -101,6 +112,57 @@ describe("font activation admin client contract", () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        fontName: "Poppins",
+      }),
+    });
+  });
+
+  it("refreshes a stale session when requireAdmin validated a different live user", async () => {
+    const refreshSession = vi.fn().mockResolvedValue({
+      data: {
+        session: {
+          access_token: "recovered-token",
+          user: { id: "live-admin" },
+        },
+      },
+    });
+
+    mockedGetSupabaseBrowserClient.mockReturnValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: "live-admin" } },
+        }),
+        getSession: vi.fn().mockResolvedValue({
+          data: {
+            session: {
+              access_token: "stale-token",
+              user: { id: "stale-user" },
+            },
+          },
+        }),
+        refreshSession,
+      },
+    } as any);
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({ success: true }),
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(setActiveFont("Poppins")).resolves.toEqual({
+      success: true,
+    });
+
+    expect(refreshSession).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith("/api/admin/font-activation", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer recovered-token",
       },
       body: JSON.stringify({
         fontName: "Poppins",

@@ -26,9 +26,18 @@ describe("component styles admin client contract", () => {
     mockedRequireAdmin.mockResolvedValue();
     mockedGetSupabaseBrowserClient.mockReturnValue({
       auth: {
-        getSession: vi.fn().mockResolvedValue({
-          data: { session: { access_token: "preview-token" } },
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: "live-admin" } },
         }),
+        getSession: vi.fn().mockResolvedValue({
+          data: {
+            session: {
+              access_token: "preview-token",
+              user: { id: "live-admin" },
+            },
+          },
+        }),
+        refreshSession: vi.fn(),
       },
     } as any);
     mockedGetSupabaseEcommerce.mockImplementation(() => {
@@ -90,7 +99,9 @@ describe("component styles admin client contract", () => {
   it("omits the bearer header when no session token is available", async () => {
     mockedGetSupabaseBrowserClient.mockReturnValue({
       auth: {
+        getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
         getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
+        refreshSession: vi.fn(),
       },
     } as any);
 
@@ -116,6 +127,65 @@ describe("component styles admin client contract", () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        componentName: "header",
+        variables: { bgColor: "#111111" },
+      }),
+    });
+  });
+
+  it("refreshes a stale session when requireAdmin validated a different live user", async () => {
+    const refreshSession = vi.fn().mockResolvedValue({
+      data: {
+        session: {
+          access_token: "recovered-token",
+          user: { id: "live-admin" },
+        },
+      },
+    });
+
+    mockedGetSupabaseBrowserClient.mockReturnValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: "live-admin" } },
+        }),
+        getSession: vi.fn().mockResolvedValue({
+          data: {
+            session: {
+              access_token: "stale-token",
+              user: { id: "stale-user" },
+            },
+          },
+        }),
+        refreshSession,
+      },
+    } as any);
+
+    const payload = {
+      id: "style-1",
+      component_name: "header",
+      store_id: "store-1",
+      variables: { bgColor: "#111111" },
+      updated_at: "2026-04-17T12:00:00.000Z",
+    };
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({ data: payload }),
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      updateComponentStyle("header", { bgColor: "#111111" }),
+    ).resolves.toEqual(payload);
+
+    expect(refreshSession).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith("/api/admin/component-styles", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer recovered-token",
       },
       body: JSON.stringify({
         componentName: "header",
