@@ -148,3 +148,36 @@ Resultado observado:
 - `Test Files  8 passed (8)`
 - `Tests  31 passed (31)`
 - Incluye `tests/orders/order-flow.contract.test.ts` en verde.
+
+## Contrato runtime reparado (sin mutaciones DB)
+
+Este lane implementa un **contrato runtime app-side** para tolerar payloads legacy sin tocar datos productivos ni ejecutar SQL:
+
+- Tema canónico en runtime: `{ theme_name, colors }`
+  - Alias aceptado de entrada: `theme_config`
+  - Consumidores (`bootstrap`, providers, APIs) solo exponen/guardan `colors`.
+- Fuente canónica en runtime: `{ font_name, font_family, google_font_url }`
+  - Alias aceptado de entrada: `font_url`
+  - Consumidores de runtime convierten alias y preservan `google_font_url: null` para fuentes de sistema.
+- Resolución de tienda para cachés críticos:
+  - `default` se considera placeholder simbólico de UI.
+  - Caches store-scoped usan UUID real o `null`; no deben tratar `default` como UUID real.
+
+### Postura de seguridad de DB en este cambio
+
+- No se aplicaron migraciones.
+- No se hizo backfill ni reparación de datos.
+- No se mutaron objetos `public.*`.
+- La corrección es 100% en la capa de aplicación/runtime.
+
+## Contrato de escritura reparado para `component_styles`
+
+- Lectura runtime: se mantiene sobre `ecommerce.component_styles_legacy` desde `lib/supabase/styles-api.ts`.
+- Escritura admin: el cliente ya no muta `ecommerce.component_styles` desde el browser.
+- Nuevo flujo de guardado:
+  - `components/admin/editor-panel.tsx` sigue llamando `updateComponentStyle(...)`.
+  - `lib/supabase/styles-api.ts` ahora delega a `POST /api/admin/component-styles`.
+  - `app/api/admin/component-styles/route.ts` valida sesión autenticada y rol `admin`.
+  - La mutación real se ejecuta server-side con `SUPABASE_SERVICE_ROLE_KEY` sobre `ecommerce.component_styles`.
+- Objetivo: reparar el `42501 permission denied for table component_styles` sin ampliar grants ni ejecutar SQL en vivo.
+- Alcance: este cambio no toca `public.*`, no cambia RLS/policies y no altera la ruta legacy de lectura.
