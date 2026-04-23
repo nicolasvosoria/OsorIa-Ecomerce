@@ -8,6 +8,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { ImageUpload } from "@/components/admin/image-upload";
+import { HomeDiscountPopupPreview } from "@/components/home-discount-popup";
 import {
   Card,
   CardContent,
@@ -65,6 +66,8 @@ export default function HomeDiscountPopupConfigPage() {
     normalizeHomeDiscountPopupConfig({}),
   );
   const [pendingImageFile, setPendingImageFile] = useState<File | null>(null);
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+  const [isPreviewVisible, setIsPreviewVisible] = useState(false);
 
   useEffect(() => {
     if (!loading && !isAdmin) {
@@ -102,6 +105,20 @@ export default function HomeDiscountPopupConfigPage() {
       loadConfig();
     }
   }, [isAdmin]);
+
+  useEffect(() => {
+    if (!pendingImageFile) {
+      setPreviewImageUrl(null);
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(pendingImageFile);
+    setPreviewImageUrl(objectUrl);
+
+    return () => {
+      URL.revokeObjectURL(objectUrl);
+    };
+  }, [pendingImageFile]);
 
   const updateConfig = <Key extends keyof HomeDiscountPopupConfig>(
     key: Key,
@@ -154,6 +171,7 @@ export default function HomeDiscountPopupConfigPage() {
 
       setConfig(normalizedConfig);
       setPendingImageFile(null);
+      setIsPreviewVisible(false);
       toast.success("Popup promocional guardado");
     } catch (error) {
       console.error("[Home Discount Popup Admin] Error al guardar:", error);
@@ -195,6 +213,12 @@ export default function HomeDiscountPopupConfigPage() {
       </div>
     );
   }
+
+  const previewConfig = {
+    ...config,
+    imageUrl: previewImageUrl ?? config.imageUrl,
+    fingerprint: "admin-preview",
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-muted">
@@ -455,6 +479,13 @@ export default function HomeDiscountPopupConfigPage() {
               <Button variant="outline" asChild>
                 <Link href="/dashboard">Cancelar</Link>
               </Button>
+              <Button
+                variant="outline"
+                type="button"
+                onClick={() => setIsPreviewVisible(true)}
+              >
+                Vista previa
+              </Button>
               <Button onClick={handleSave} disabled={isSaving}>
                 {isSaving ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -467,6 +498,13 @@ export default function HomeDiscountPopupConfigPage() {
           </>
         )}
       </main>
+
+      {isPreviewVisible ? (
+        <HomeDiscountPopupPreview
+          config={previewConfig}
+          onDismiss={() => setIsPreviewVisible(false)}
+        />
+      ) : null}
     </div>
   );
 }

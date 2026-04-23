@@ -112,4 +112,16 @@ describe("HomeDiscountPopup", () => {
     expect(mockClipboardWriteText).toHaveBeenCalledWith("HOME10");
     expect(mockToastSuccess).toHaveBeenCalled();
   });
+
+  it("does not render on non-home routes even when the popup is active", () => {
+    mockUsePathname.mockReturnValue("/products/cafetera");
+
+    render(<HomeDiscountPopup />);
+
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+
+    expect(screen.queryByText(baseConfig.title)).not.toBeInTheDocument();
+  });
 });

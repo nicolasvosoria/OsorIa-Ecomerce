@@ -15,6 +15,8 @@ const mockPush = vi.fn();
 const mockGetAdminRequestHeaders = vi.fn();
 const mockToastSuccess = vi.fn();
 const mockToastError = vi.fn();
+const mockCreateObjectURL = vi.fn();
+const mockRevokeObjectURL = vi.fn();
 
 vi.mock("@/contexts/admin-permissions-context", () => ({
   useAdminPermissions: () => mockUseAdminPermissions(),
@@ -46,6 +48,7 @@ vi.mock("lucide-react", () => {
     Percent: Icon,
     Save: Icon,
     ShieldAlert: Icon,
+    X: Icon,
   };
 });
 
@@ -126,6 +129,7 @@ vi.mock("@/components/admin/image-upload", () => ({
 describe("home discount popup admin page", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockCreateObjectURL.mockReturnValue("blob:preview-image");
     mockUseAdminPermissions.mockReturnValue({
       isAdmin: true,
       loading: false,
@@ -133,6 +137,14 @@ describe("home discount popup admin page", () => {
     mockGetAdminRequestHeaders.mockResolvedValue({
       "Content-Type": "application/json",
       Authorization: "Bearer preview-token",
+    });
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      value: mockCreateObjectURL,
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      value: mockRevokeObjectURL,
     });
   });
 
@@ -253,5 +265,52 @@ describe("home discount popup admin page", () => {
       },
     });
     expect(mockToastSuccess).toHaveBeenCalledWith("Popup promocional guardado");
+  });
+
+  it("opens a local preview with unsaved content and the staged image without uploading", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({
+        config: {
+          active: true,
+          title: "Promo home",
+          text: "Texto original",
+          imageUrl: "https://cdn.example.com/original.png",
+          ctaText: "Copiar cupon",
+          coupon: "HOME10",
+          ctaMode: "copy_coupon",
+        },
+      }),
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(createElement(HomeDiscountPopupConfigPage));
+
+    await screen.findByRole("button", { name: /vista previa/i });
+
+    fireEvent.change(screen.getByLabelText(/titulo/i), {
+      target: { value: "Promo preview" },
+    });
+    fireEvent.change(screen.getByLabelText(/mensaje principal/i), {
+      target: { value: "Texto sin guardar para preview" },
+    });
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: "Seleccionar imagen pendiente" }),
+      );
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /vista previa/i }));
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(
+      screen.getByText("Texto sin guardar para preview", { selector: "p" }),
+    ).toBeInTheDocument();
+    expect(screen.getByAltText("Promo preview")).toHaveAttribute(
+      "src",
+      "blob:preview-image",
+    );
   });
 });

@@ -48,17 +48,27 @@ function PopupCard({
   config,
   onDismiss,
   storageKey,
+  previewMode = false,
 }: {
   config: PublicHomeDiscountPopupConfig;
   onDismiss: () => void;
   storageKey: string;
+  previewMode?: boolean;
 }) {
   const handleCopy = async () => {
+    if (previewMode) {
+      return;
+    }
+
     await copyCoupon(config.coupon);
     dismissPopup(storageKey, onDismiss);
   };
 
   const handleRedirect = () => {
+    if (previewMode) {
+      return;
+    }
+
     dismissPopup(storageKey, onDismiss);
   };
 
@@ -69,7 +79,14 @@ function PopupCard({
           type="button"
           aria-label="Cerrar popup"
           className="absolute right-3 top-3 rounded-full border bg-background/80 p-1 text-muted-foreground transition hover:text-foreground"
-          onClick={() => dismissPopup(storageKey, onDismiss)}
+          onClick={() => {
+            if (previewMode) {
+              onDismiss();
+              return;
+            }
+
+            dismissPopup(storageKey, onDismiss);
+          }}
         >
           <X className="h-4 w-4" />
         </button>
@@ -105,19 +122,46 @@ function PopupCard({
           ) : null}
 
           {config.ctaMode === "redirect" && config.ctaUrl ? (
-            <Button asChild className="w-full">
-              <a href={config.ctaUrl} onClick={handleRedirect}>
+            previewMode ? (
+              <Button className="w-full" disabled>
                 {config.ctaText}
-              </a>
-            </Button>
+              </Button>
+            ) : (
+              <Button asChild className="w-full">
+                <a href={config.ctaUrl} onClick={handleRedirect}>
+                  {config.ctaText}
+                </a>
+              </Button>
+            )
           ) : (
-            <Button className="w-full" onClick={handleCopy}>
+            <Button
+              className="w-full"
+              onClick={handleCopy}
+              disabled={previewMode}
+            >
               {config.ctaText}
             </Button>
           )}
         </div>
       </div>
     </div>
+  );
+}
+
+export function HomeDiscountPopupPreview({
+  config,
+  onDismiss,
+}: {
+  config: PublicHomeDiscountPopupConfig;
+  onDismiss: () => void;
+}) {
+  return (
+    <PopupCard
+      config={config}
+      storageKey="home-discount-popup-preview"
+      onDismiss={onDismiss}
+      previewMode
+    />
   );
 }
 
