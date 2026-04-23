@@ -34,9 +34,7 @@ describe("H2 quality gates contract", () => {
       "eslint app/api/store app/api/orders/send-confirmation-email lib/security tests/security tests/quality --max-warnings=0",
     );
     expect(scripts.typecheck).toBe("tsc --noEmit -p tsconfig.quality.json");
-    expect(scripts.test).toBe(
-      "vitest run -c tests/vitest.security.config.ts tests/security tests/quality",
-    );
+    expect(scripts.test).toBe("node scripts/run-vitest.mjs");
     expect(scripts.build).toBe("next build");
     expect(scripts["lint:full"]).toBe("eslint . --max-warnings=0");
     expect(scripts["typecheck:full"]).toBe("tsc --noEmit");
