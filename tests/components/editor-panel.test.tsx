@@ -72,6 +72,88 @@ describe("EditorPanel", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Diseño del Banner")).toBeInTheDocument();
     expect(
+      screen.queryByText("Ajuste de Imagen (Full image)"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("uses concise hero layout option labels", () => {
+    mockUseAdmin.mockReturnValue({
+      selectedComponent: "hero",
+      selectComponent: vi.fn(),
+      componentEdits: new Map(),
+      updateComponentEdit: vi.fn(),
+      scheduleComponentEdit: vi.fn(),
+      flushScheduledEdits: vi.fn(),
+      clearComponentEdits: vi.fn(),
+      getComponentEditsSnapshot: vi.fn(() => ({})),
+      isEditMode: true,
+      toggleEditMode: vi.fn(),
+    });
+
+    render(<EditorPanel />);
+
+    const [layoutModeSelector] = screen.getAllByRole("combobox");
+    fireEvent.click(layoutModeSelector);
+
+    expect(screen.getByRole("option", { name: "Split" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: "Full Image" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("Split actual (texto + imagen lateral)"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Full image (imagen completa de fondo)"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("hides full-image-only controls when hero layout is split", () => {
+    mockUseAdmin.mockReturnValue({
+      selectedComponent: "hero",
+      selectComponent: vi.fn(),
+      componentEdits: new Map(),
+      updateComponentEdit: vi.fn(),
+      scheduleComponentEdit: vi.fn(),
+      flushScheduledEdits: vi.fn(),
+      clearComponentEdits: vi.fn(),
+      getComponentEditsSnapshot: vi.fn(() => ({})),
+      isEditMode: true,
+      toggleEditMode: vi.fn(),
+    });
+
+    render(<EditorPanel />);
+
+    expect(
+      screen.queryByText("Ajuste de Imagen (Full image)"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Posición Horizontal de Imagen (Full image)"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Posición Vertical de Imagen (Full image)"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Alineación de Contenido (Full image)"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows full-image-only controls when hero layout is full-image", () => {
+    mockUseAdmin.mockReturnValue({
+      selectedComponent: "hero",
+      selectComponent: vi.fn(),
+      componentEdits: new Map([["hero", { layoutMode: "full-image" }]]),
+      updateComponentEdit: vi.fn(),
+      scheduleComponentEdit: vi.fn(),
+      flushScheduledEdits: vi.fn(),
+      clearComponentEdits: vi.fn(),
+      getComponentEditsSnapshot: vi.fn(() => ({})),
+      isEditMode: true,
+      toggleEditMode: vi.fn(),
+    });
+
+    render(<EditorPanel />);
+
+    expect(
       screen.getByText("Ajuste de Imagen (Full image)"),
     ).toBeInTheDocument();
     expect(

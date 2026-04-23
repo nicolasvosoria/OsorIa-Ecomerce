@@ -61,11 +61,8 @@ const COMPONENT_FIELDS: Record<
         label: "Diseño del Banner",
         type: "select",
         options: [
-          { value: "split", label: "Split actual (texto + imagen lateral)" },
-          {
-            value: "full-image",
-            label: "Full image (imagen completa de fondo)",
-          },
+          { value: "split", label: "Split" },
+          { value: "full-image", label: "Full Image" },
         ],
       },
       {
@@ -1160,214 +1157,239 @@ export function EditorPanel() {
                 </p>
               </CardHeader>
               <CardContent className="space-y-4">
-                {config.content.map((field) => (
-                  <div key={field.key} className="space-y-2">
-                    {field.isArray ? (
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between mb-2 sticky top-0 bg-background z-10 py-2 -mx-2 px-2 border-b border-border">
-                          <Label className="font-semibold">{field.label}</Label>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() =>
-                              handleAddArrayItem(
-                                field.key,
-                                field.arrayFields || [],
-                              )
-                            }
-                            className="h-8"
-                          >
-                            <Plus className="h-3 w-3 mr-1" />
-                            Agregar
-                          </Button>
-                        </div>
-                        <div className="max-h-[400px] overflow-y-auto pr-2 space-y-3 custom-scrollbar">
-                          {(localValues[field.key] || []).map(
-                            (item: any, index: number) => (
-                              <Card key={index} className="mb-3">
-                                <CardHeader className="pb-3">
-                                  <div className="flex items-center justify-between">
-                                    <CardTitle className="text-sm">
-                                      Item {index + 1}
-                                    </CardTitle>
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() =>
-                                        handleRemoveArrayItem(field.key, index)
-                                      }
-                                      className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                </CardHeader>
-                                <CardContent className="space-y-2">
-                                  {field.arrayFields?.map((subField) => (
-                                    <div
-                                      key={subField.key}
-                                      className="space-y-1"
-                                    >
-                                      {subField.type === "image" ||
-                                      subField.key
-                                        .toLowerCase()
-                                        .includes("image") ? (
-                                        <ImageUpload
-                                          value={item[subField.key] || ""}
-                                          onChange={(url) =>
-                                            handleArrayItemChange(
-                                              field.key,
-                                              index,
-                                              subField.key,
-                                              url,
-                                            )
-                                          }
-                                          label={subField.label}
-                                          context={`${selectedComponent}-${field.key}-${subField.key}-${index + 1}`}
-                                        />
-                                      ) : subField.type === "textarea" ? (
-                                        <>
-                                          <Label className="text-xs">
-                                            {subField.label}
-                                          </Label>
-                                          <Textarea
+                {config.content.map((field) => {
+                  const layoutModeValue =
+                    localValues.layoutMode ?? config.defaults?.layoutMode;
+                  const isHeroFullImageControl =
+                    selectedComponent === "hero" &&
+                    [
+                      "imageFit",
+                      "imagePositionX",
+                      "imagePositionY",
+                      "fullImageContentAlign",
+                    ].includes(field.key);
+
+                  if (
+                    isHeroFullImageControl &&
+                    layoutModeValue !== "full-image"
+                  ) {
+                    return null;
+                  }
+
+                  return (
+                    <div key={field.key} className="space-y-2">
+                      {field.isArray ? (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between mb-2 sticky top-0 bg-background z-10 py-2 -mx-2 px-2 border-b border-border">
+                            <Label className="font-semibold">
+                              {field.label}
+                            </Label>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                handleAddArrayItem(
+                                  field.key,
+                                  field.arrayFields || [],
+                                )
+                              }
+                              className="h-8"
+                            >
+                              <Plus className="h-3 w-3 mr-1" />
+                              Agregar
+                            </Button>
+                          </div>
+                          <div className="max-h-[400px] overflow-y-auto pr-2 space-y-3 custom-scrollbar">
+                            {(localValues[field.key] || []).map(
+                              (item: any, index: number) => (
+                                <Card key={index} className="mb-3">
+                                  <CardHeader className="pb-3">
+                                    <div className="flex items-center justify-between">
+                                      <CardTitle className="text-sm">
+                                        Item {index + 1}
+                                      </CardTitle>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() =>
+                                          handleRemoveArrayItem(
+                                            field.key,
+                                            index,
+                                          )
+                                        }
+                                        className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  </CardHeader>
+                                  <CardContent className="space-y-2">
+                                    {field.arrayFields?.map((subField) => (
+                                      <div
+                                        key={subField.key}
+                                        className="space-y-1"
+                                      >
+                                        {subField.type === "image" ||
+                                        subField.key
+                                          .toLowerCase()
+                                          .includes("image") ? (
+                                          <ImageUpload
                                             value={item[subField.key] || ""}
-                                            onChange={(e) =>
+                                            onChange={(url) =>
                                               handleArrayItemChange(
                                                 field.key,
                                                 index,
                                                 subField.key,
-                                                e.target.value,
+                                                url,
                                               )
                                             }
-                                            rows={2}
+                                            label={subField.label}
+                                            context={`${selectedComponent}-${field.key}-${subField.key}-${index + 1}`}
                                           />
-                                        </>
-                                      ) : (
-                                        <>
-                                          <Label className="text-xs">
-                                            {subField.label}
-                                          </Label>
-                                          <Input
-                                            type={subField.type}
-                                            value={item[subField.key] || ""}
-                                            onChange={(e) => {
-                                              const value =
-                                                subField.type === "number"
-                                                  ? Number(e.target.value)
-                                                  : e.target.value;
-                                              handleArrayItemChange(
-                                                field.key,
-                                                index,
-                                                subField.key,
-                                                value,
-                                              );
-                                            }}
-                                          />
-                                        </>
-                                      )}
-                                    </div>
-                                  ))}
-                                </CardContent>
-                              </Card>
-                            ),
+                                        ) : subField.type === "textarea" ? (
+                                          <>
+                                            <Label className="text-xs">
+                                              {subField.label}
+                                            </Label>
+                                            <Textarea
+                                              value={item[subField.key] || ""}
+                                              onChange={(e) =>
+                                                handleArrayItemChange(
+                                                  field.key,
+                                                  index,
+                                                  subField.key,
+                                                  e.target.value,
+                                                )
+                                              }
+                                              rows={2}
+                                            />
+                                          </>
+                                        ) : (
+                                          <>
+                                            <Label className="text-xs">
+                                              {subField.label}
+                                            </Label>
+                                            <Input
+                                              type={subField.type}
+                                              value={item[subField.key] || ""}
+                                              onChange={(e) => {
+                                                const value =
+                                                  subField.type === "number"
+                                                    ? Number(e.target.value)
+                                                    : e.target.value;
+                                                handleArrayItemChange(
+                                                  field.key,
+                                                  index,
+                                                  subField.key,
+                                                  value,
+                                                );
+                                              }}
+                                            />
+                                          </>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </CardContent>
+                                </Card>
+                              ),
+                            )}
+                          </div>
+                          {(!localValues[field.key] ||
+                            localValues[field.key].length === 0) && (
+                            <div className="text-center py-4 text-sm text-muted-foreground">
+                              No hay items. Haz clic en "Agregar" para crear uno
+                              nuevo.
+                            </div>
                           )}
                         </div>
-                        {(!localValues[field.key] ||
-                          localValues[field.key].length === 0) && (
-                          <div className="text-center py-4 text-sm text-muted-foreground">
-                            No hay items. Haz clic en "Agregar" para crear uno
-                            nuevo.
-                          </div>
-                        )}
-                      </div>
-                    ) : field.type === "select" && field.options ? (
-                      <>
-                        <Label htmlFor={field.key}>{field.label}</Label>
-                        <Select
-                          value={
-                            localValues[field.key] ||
-                            config.defaults?.[field.key]
-                          }
-                          onValueChange={(value) =>
-                            handleInputChange(field.key, value)
-                          }
-                        >
-                          <SelectTrigger id={field.key} className="w-full">
-                            <SelectValue
-                              placeholder={`Selecciona ${field.label.toLowerCase()}`}
-                            />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {field.options.map((option) => (
-                              <SelectItem
-                                key={option.value}
-                                value={option.value}
-                              >
-                                {option.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </>
-                    ) : field.type === "image" ||
-                      field.key.toLowerCase().includes("image") ? (
-                      <ImageUpload
-                        value={localValues[field.key] || ""}
-                        onChange={(url) => handleInputChange(field.key, url)}
-                        label={field.label}
-                        context={`${selectedComponent}-${field.key}`}
-                        // Configuración específica para logos
-                        recommendedWidth={
-                          field.key.toLowerCase().includes("logo")
-                            ? 240
-                            : undefined
-                        }
-                        recommendedHeight={
-                          field.key.toLowerCase().includes("logo")
-                            ? 80
-                            : undefined
-                        }
-                        fileTypes={
-                          field.key.toLowerCase().includes("logo")
-                            ? ["PNG", "SVG", "JPG", "WEBP"]
-                            : undefined
-                        }
-                        accept={
-                          field.key.toLowerCase().includes("logo")
-                            ? "image/png,image/svg+xml,image/jpeg,image/jpg,image/webp"
-                            : undefined
-                        }
-                      />
-                    ) : field.type === "textarea" ? (
-                      <>
-                        <Label htmlFor={field.key}>{field.label}</Label>
-                        <Textarea
-                          id={field.key}
+                      ) : field.type === "select" && field.options ? (
+                        <>
+                          <Label htmlFor={field.key}>{field.label}</Label>
+                          <Select
+                            value={
+                              localValues[field.key] ||
+                              config.defaults?.[field.key]
+                            }
+                            onValueChange={(value) =>
+                              handleInputChange(field.key, value)
+                            }
+                          >
+                            <SelectTrigger id={field.key} className="w-full">
+                              <SelectValue
+                                placeholder={`Selecciona ${field.label.toLowerCase()}`}
+                              />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {field.options.map((option) => (
+                                <SelectItem
+                                  key={option.value}
+                                  value={option.value}
+                                >
+                                  {option.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </>
+                      ) : field.type === "image" ||
+                        field.key.toLowerCase().includes("image") ? (
+                        <ImageUpload
                           value={localValues[field.key] || ""}
-                          onChange={(e) =>
-                            handleInputChange(field.key, e.target.value)
+                          onChange={(url) => handleInputChange(field.key, url)}
+                          label={field.label}
+                          context={`${selectedComponent}-${field.key}`}
+                          // Configuración específica para logos
+                          recommendedWidth={
+                            field.key.toLowerCase().includes("logo")
+                              ? 240
+                              : undefined
                           }
-                          rows={3}
-                        />
-                      </>
-                    ) : (
-                      <>
-                        <Label htmlFor={field.key}>{field.label}</Label>
-                        <Input
-                          id={field.key}
-                          type={field.type}
-                          value={localValues[field.key] || ""}
-                          onChange={(e) =>
-                            handleInputChange(field.key, e.target.value)
+                          recommendedHeight={
+                            field.key.toLowerCase().includes("logo")
+                              ? 80
+                              : undefined
+                          }
+                          fileTypes={
+                            field.key.toLowerCase().includes("logo")
+                              ? ["PNG", "SVG", "JPG", "WEBP"]
+                              : undefined
+                          }
+                          accept={
+                            field.key.toLowerCase().includes("logo")
+                              ? "image/png,image/svg+xml,image/jpeg,image/jpg,image/webp"
+                              : undefined
                           }
                         />
-                      </>
-                    )}
-                  </div>
-                ))}
+                      ) : field.type === "textarea" ? (
+                        <>
+                          <Label htmlFor={field.key}>{field.label}</Label>
+                          <Textarea
+                            id={field.key}
+                            value={localValues[field.key] || ""}
+                            onChange={(e) =>
+                              handleInputChange(field.key, e.target.value)
+                            }
+                            rows={3}
+                          />
+                        </>
+                      ) : (
+                        <>
+                          <Label htmlFor={field.key}>{field.label}</Label>
+                          <Input
+                            id={field.key}
+                            type={field.type}
+                            value={localValues[field.key] || ""}
+                            onChange={(e) =>
+                              handleInputChange(field.key, e.target.value)
+                            }
+                          />
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
               </CardContent>
             </Card>
           </TabsContent>

@@ -123,6 +123,29 @@ describe("HeroBanner", () => {
     expect(screen.getByText("HEADPHONES")).toBeInTheDocument();
   });
 
+  it("keeps hero banner width constrained to ecommerce layout", () => {
+    mockUseComponentStyle.mockReturnValue({
+      styles: {
+        layoutMode: "full-image",
+        products: [
+          {
+            label: "Audio",
+            title: "PREMIUM",
+            subtitle: "HEADPHONES",
+            description: "Auriculares premium",
+            buttonText: "Comprar ahora",
+            image: "/premium-headphones.png",
+          },
+        ],
+      },
+    });
+
+    const { container } = render(<HeroBanner />);
+    const hero = container.querySelector('[data-component="hero"]');
+
+    expect(hero).toHaveClass("max-w-7xl");
+  });
+
   it("applies full-image fit, position and content alignment controls", () => {
     mockUseComponentStyle.mockReturnValue({
       styles: {
