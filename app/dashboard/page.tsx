@@ -1,86 +1,93 @@
-"use client"
+"use client";
 
-import { Suspense, useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import { useAdminPermissions } from "@/contexts/admin-permissions-context"
-import { useAuth } from "@/contexts/auth-context"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { 
-  Loader2, 
-  ShieldAlert, 
-  Package, 
-  ShoppingCart, 
-  Users, 
+import { Suspense, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useAdminPermissions } from "@/contexts/admin-permissions-context";
+import { useAuth } from "@/contexts/auth-context";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  Loader2,
+  ShieldAlert,
+  Package,
+  ShoppingCart,
+  Users,
   ArrowRight,
   Eye,
   Edit,
   BarChart3,
-  Bot
-} from "lucide-react"
-import Link from "next/link"
+  Bot,
+  Percent,
+} from "lucide-react";
+import Link from "next/link";
 // getDashboardStats se importa dinámicamente para evitar problemas con Turbopack
-import { formatPrice } from "@/lib/shopify/utils"
+import { formatPrice } from "@/lib/shopify/utils";
 // Importación dinámica de getDashboardStats para evitar problemas con Turbopack
 
 function DashboardContent() {
-  const { isAdmin, loading } = useAdminPermissions()
-  const { user } = useAuth()
-  const router = useRouter()
+  const { isAdmin, loading } = useAdminPermissions();
+  const { user } = useAuth();
+  const router = useRouter();
   const [stats, setStats] = useState({
     totalProducts: 0,
     ordersToday: 0,
     totalUsers: 0,
     monthlySales: 0,
-  })
-  const [loadingStats, setLoadingStats] = useState(true)
+  });
+  const [loadingStats, setLoadingStats] = useState(true);
 
   useEffect(() => {
     if (!loading && !isAdmin) {
-      router.push("/")
+      router.push("/");
     }
-  }, [isAdmin, loading, router])
+  }, [isAdmin, loading, router]);
 
   // Cargar estadísticas desde la BD
   useEffect(() => {
     const loadStats = async () => {
-      if (!isAdmin) return
-      
-      setLoadingStats(true)
+      if (!isAdmin) return;
+
+      setLoadingStats(true);
       try {
         // Importación dinámica para evitar problemas con Turbopack durante el build
-        const { getDashboardStats } = await import("@/lib/supabase/stats-api")
-        const dashboardStats = await getDashboardStats()
-        setStats(dashboardStats)
+        const { getDashboardStats } = await import("@/lib/supabase/stats-api");
+        const dashboardStats = await getDashboardStats();
+        setStats(dashboardStats);
       } catch (error) {
-        console.error("[Dashboard] Error al cargar estadísticas:", error)
+        console.error("[Dashboard] Error al cargar estadísticas:", error);
       } finally {
-        setLoadingStats(false)
+        setLoadingStats(false);
       }
-    }
+    };
 
     if (isAdmin) {
-      loadStats()
+      loadStats();
     }
-  }, [isAdmin])
+  }, [isAdmin]);
 
   if (loading) {
     return (
-      <div 
+      <div
         className="flex items-center justify-center h-screen"
         style={{ backgroundColor: "var(--background)" }}
       >
-        <Loader2 
-          className="h-8 w-8 animate-spin" 
+        <Loader2
+          className="h-8 w-8 animate-spin"
           style={{ color: "var(--foreground)" }}
         />
       </div>
-    )
+    );
   }
 
   if (!isAdmin) {
     return (
-      <div 
+      <div
         className="flex items-center justify-center h-screen p-4"
         style={{ backgroundColor: "var(--background)" }}
       >
@@ -101,7 +108,7 @@ function DashboardContent() {
           </CardContent>
         </Card>
       </div>
-    )
+    );
   }
 
   // Solo mostrar opciones de productos, pedidos y usuarios
@@ -151,35 +158,43 @@ function DashboardContent() {
       href: "/admin/chatbot",
       color: "bg-teal-500",
     },
-  ]
+    {
+      title: "Popup de Descuento",
+      description: "Administra la promo flotante de la home",
+      icon: Percent,
+      href: "/admin/home-discount-popup",
+      color: "bg-rose-500",
+    },
+  ];
 
   return (
-    <div 
-      className="min-h-screen" 
-      style={{ 
+    <div
+      className="min-h-screen"
+      style={{
         backgroundColor: "var(--background)",
         // Usar un gradiente sutil basado en el tema
-        background: "linear-gradient(to bottom right, var(--background), var(--muted))"
+        background:
+          "linear-gradient(to bottom right, var(--background), var(--muted))",
       }}
     >
       {/* Header */}
-      <header 
+      <header
         className="border-b shadow-sm"
-        style={{ 
+        style={{
           backgroundColor: "var(--card)",
-          borderColor: "var(--border)"
+          borderColor: "var(--border)",
         }}
       >
         <div className="container mx-auto px-4 py-4 max-w-full">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <h1 
+              <h1
                 className="text-lg sm:text-xl md:text-2xl font-bold truncate"
                 style={{ color: "var(--foreground)" }}
               >
                 Panel de Administración
               </h1>
-              <p 
+              <p
                 className="text-xs sm:text-sm mt-1 truncate"
                 style={{ color: "var(--muted-foreground)" }}
                 title={user?.first_name || user?.email}
@@ -188,13 +203,23 @@ function DashboardContent() {
               </p>
             </div>
             <div className="flex flex-shrink-0 gap-2">
-              <Button variant="outline" size="sm" className="gap-1.5 sm:gap-2" asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 sm:gap-2"
+                asChild
+              >
                 <Link href="/">
                   <Eye className="h-4 w-4 shrink-0" />
                   <span className="hidden sm:inline">Ver Tienda</span>
                 </Link>
               </Button>
-              <Button variant="outline" size="sm" className="gap-1.5 sm:gap-2" asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 sm:gap-2"
+                asChild
+              >
                 <Link href="/admin">
                   <Edit className="h-4 w-4 shrink-0" />
                   <span className="hidden sm:inline">Editor</span>
@@ -218,7 +243,9 @@ function DashboardContent() {
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               ) : (
                 <>
-                  <div className="text-2xl font-bold">{stats.totalProducts}</div>
+                  <div className="text-2xl font-bold">
+                    {stats.totalProducts}
+                  </div>
                   <p className="text-xs text-muted-foreground">En catálogo</p>
                 </>
               )}
@@ -234,7 +261,9 @@ function DashboardContent() {
               ) : (
                 <>
                   <div className="text-2xl font-bold">{stats.ordersToday}</div>
-                  <p className="text-xs text-muted-foreground">Nuevos pedidos</p>
+                  <p className="text-xs text-muted-foreground">
+                    Nuevos pedidos
+                  </p>
                 </>
               )}
             </CardContent>
@@ -276,9 +305,12 @@ function DashboardContent() {
         {/* Dashboard Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {dashboardCards.map((card) => {
-            const Icon = card.icon
+            const Icon = card.icon;
             return (
-              <Card key={card.href} className="hover:shadow-lg transition-shadow cursor-pointer group">
+              <Card
+                key={card.href}
+                className="hover:shadow-lg transition-shadow cursor-pointer group"
+              >
                 <Link href={card.href}>
                   <CardHeader>
                     <div className="flex items-center justify-between">
@@ -291,7 +323,9 @@ function DashboardContent() {
                     <CardDescription>{card.description}</CardDescription>
                     {card.count !== undefined && (
                       <div className="mt-2">
-                        <span className="text-2xl font-bold text-primary">{card.count}</span>
+                        <span className="text-2xl font-bold text-primary">
+                          {card.count}
+                        </span>
                         <span className="text-sm text-muted-foreground ml-2">
                           {card.title === "Productos" && "productos"}
                           {card.title === "Pedidos" && "hoy"}
@@ -302,13 +336,13 @@ function DashboardContent() {
                   </CardHeader>
                 </Link>
               </Card>
-            )
+            );
           })}
         </div>
 
         {/* Quick Actions */}
         <div className="mt-8">
-          <h2 
+          <h2
             className="text-xl font-semibold mb-4"
             style={{ color: "var(--foreground)" }}
           >
@@ -328,6 +362,12 @@ function DashboardContent() {
               </Link>
             </Button>
             <Button variant="outline" asChild>
+              <Link href="/admin/home-discount-popup">
+                <Percent className="h-4 w-4 mr-2" />
+                Popup de Descuento
+              </Link>
+            </Button>
+            <Button variant="outline" asChild>
               <Link href="/shop">
                 <ShoppingCart className="h-4 w-4 mr-2" />
                 Catálogo de Productos
@@ -337,26 +377,19 @@ function DashboardContent() {
         </div>
       </main>
     </div>
-  )
+  );
 }
 
 export default function DashboardPage() {
   return (
-    <Suspense fallback={
-      <div className="flex items-center justify-center h-screen">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center h-screen">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      }
+    >
       <DashboardContent />
     </Suspense>
-  )
+  );
 }
-
-
-
-
-
-
-
-
-
