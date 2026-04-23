@@ -180,6 +180,94 @@ describe("EditorPanel", () => {
     expect(setPropertySpy).not.toHaveBeenCalled();
   });
 
+  it("keeps site background color edits on the scheduled path without mutating body styles", () => {
+    const updateComponentEdit = vi.fn();
+    const scheduleComponentEdit = vi.fn();
+
+    mockUseAdmin.mockReturnValue({
+      selectedComponent: "site_background",
+      selectComponent: vi.fn(),
+      componentEdits: new Map(),
+      updateComponentEdit,
+      scheduleComponentEdit,
+      flushScheduledEdits: vi.fn(),
+      clearComponentEdits: vi.fn(),
+      getComponentEditsSnapshot: vi.fn(() => ({})),
+      isEditMode: true,
+      toggleEditMode: vi.fn(),
+    });
+
+    document.body.style.backgroundColor = "rgb(1, 2, 3)";
+
+    render(<EditorPanel />);
+    const stylesTab = screen.getByRole("tab", { name: /estilos/i });
+    fireEvent.mouseDown(stylesTab);
+    fireEvent.click(stylesTab);
+
+    const input = screen.getByLabelText("Color de Fondo");
+    fireEvent.change(input, { target: { value: "#abcdef" } });
+
+    expect(updateComponentEdit).not.toHaveBeenCalled();
+    expect(scheduleComponentEdit).toHaveBeenCalledWith(
+      "site_background",
+      "backgroundColor",
+      "#abcdef",
+    );
+    expect(document.body.style.backgroundColor).toBe("rgb(1, 2, 3)");
+  });
+
+  it("does not eagerly touch body background when switching site background type", () => {
+    const updateComponentEdit = vi.fn();
+
+    mockUseStyles.mockReturnValue({
+      styles: new Map([
+        [
+          "site_background",
+          {
+            type: "image",
+            backgroundImage: "https://cdn.osoria.test/bg.jpg",
+            backgroundColor: "#112233",
+            backgroundPosition: "center",
+            backgroundRepeat: "no-repeat",
+            backgroundSize: "cover",
+          },
+        ],
+      ]),
+      refreshStyles: vi.fn(),
+    });
+
+    mockUseAdmin.mockReturnValue({
+      selectedComponent: "site_background",
+      selectComponent: vi.fn(),
+      componentEdits: new Map(),
+      updateComponentEdit,
+      scheduleComponentEdit: vi.fn(),
+      flushScheduledEdits: vi.fn(),
+      clearComponentEdits: vi.fn(),
+      getComponentEditsSnapshot: vi.fn(() => ({})),
+      isEditMode: true,
+      toggleEditMode: vi.fn(),
+    });
+
+    document.body.style.backgroundImage = "url(initial.jpg)";
+
+    render(<EditorPanel />);
+    const stylesTab = screen.getByRole("tab", { name: /estilos/i });
+    fireEvent.mouseDown(stylesTab);
+    fireEvent.click(stylesTab);
+
+    const [typeSelector] = screen.getAllByRole("combobox");
+    fireEvent.click(typeSelector);
+    fireEvent.click(screen.getByRole("option", { name: "Color" }));
+
+    expect(updateComponentEdit).toHaveBeenCalledWith(
+      "site_background",
+      "type",
+      "color",
+    );
+    expect(document.body.style.backgroundImage).toBe('url("initial.jpg")');
+  });
+
   it("renders only content tab panel by default", () => {
     mockUseAdmin.mockReturnValue({
       selectedComponent: "hero",

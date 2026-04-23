@@ -868,63 +868,6 @@ export function EditorPanel() {
     } else {
       updateComponentEdit(selectedComponent, key, value);
     }
-
-    // Aplicar cambios en tiempo real para el fondo del sitio
-    if (selectedComponent === "site_background") {
-      if (typeof document !== "undefined") {
-        const body = document.body;
-        const type = localValues.type || value;
-
-        if (key === "type") {
-          // Cuando cambia el tipo, aplicar la configuración completa
-          const bgType = value;
-          if (bgType === "color") {
-            body.style.backgroundColor =
-              localValues.backgroundColor || "#ffffff";
-            body.style.backgroundImage = "none";
-          } else if (bgType === "image" && localValues.backgroundImage) {
-            body.style.backgroundColor =
-              localValues.backgroundColor || "transparent";
-            body.style.backgroundImage = `url(${localValues.backgroundImage})`;
-            body.style.backgroundPosition =
-              localValues.backgroundPosition || "center";
-            body.style.backgroundRepeat =
-              localValues.backgroundRepeat || "no-repeat";
-            body.style.backgroundSize = localValues.backgroundSize || "cover";
-            body.style.backgroundAttachment = "fixed";
-          }
-        } else if (key === "backgroundColor") {
-          body.style.backgroundColor = value;
-          if (type === "image" && localValues.backgroundImage) {
-            // Mantener la imagen si existe
-            body.style.backgroundImage = `url(${localValues.backgroundImage})`;
-          }
-        } else if (key === "backgroundImage") {
-          if (value && type === "image") {
-            body.style.backgroundImage = `url(${value})`;
-            body.style.backgroundColor =
-              localValues.backgroundColor || "transparent";
-            body.style.backgroundPosition =
-              localValues.backgroundPosition || "center";
-            body.style.backgroundRepeat =
-              localValues.backgroundRepeat || "no-repeat";
-            body.style.backgroundSize = localValues.backgroundSize || "cover";
-            body.style.backgroundAttachment = "fixed";
-          } else {
-            body.style.backgroundImage = "none";
-          }
-        } else if (
-          key === "backgroundPosition" ||
-          key === "backgroundRepeat" ||
-          key === "backgroundSize"
-        ) {
-          if (type === "image" && localValues.backgroundImage) {
-            const styleKey = key.replace(/([A-Z])/g, "-$1").toLowerCase();
-            body.style.setProperty(styleKey, value as string);
-          }
-        }
-      }
-    }
   };
 
   const handleArrayItemChange = (
