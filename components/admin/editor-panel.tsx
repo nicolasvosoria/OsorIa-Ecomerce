@@ -869,27 +869,6 @@ export function EditorPanel() {
       updateComponentEdit(selectedComponent, key, value);
     }
 
-    // Aplicar cambios en tiempo real para estilos (solo para colores)
-    if (isColorField) {
-      if (typeof document !== "undefined" && selectedComponent) {
-        const root = document.documentElement;
-        const cssVar = `--${selectedComponent}-${key.replace(/([A-Z])/g, "-$1").toLowerCase()}`;
-        root.style.setProperty(cssVar, value);
-
-        // También aplicar directamente al componente si es posible
-        const componentElement = document.querySelector(
-          `[data-component="${selectedComponent}"]`,
-        );
-        if (componentElement) {
-          if (key === "bgColor") {
-            (componentElement as HTMLElement).style.backgroundColor = value;
-          } else if (key === "textColor") {
-            (componentElement as HTMLElement).style.color = value;
-          }
-        }
-      }
-    }
-
     // Aplicar cambios en tiempo real para el fondo del sitio
     if (selectedComponent === "site_background") {
       if (typeof document !== "undefined") {

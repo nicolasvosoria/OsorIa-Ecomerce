@@ -108,6 +108,78 @@ describe("EditorPanel", () => {
     );
   });
 
+  it("avoids eager css variable mutations while dragging color inputs", () => {
+    const scheduleComponentEdit = vi.fn();
+    const setPropertySpy = vi.spyOn(
+      document.documentElement.style,
+      "setProperty",
+    );
+
+    mockUseAdmin.mockReturnValue({
+      selectedComponent: "hero",
+      selectComponent: vi.fn(),
+      componentEdits: new Map(),
+      updateComponentEdit: vi.fn(),
+      scheduleComponentEdit,
+      flushScheduledEdits: vi.fn(),
+      clearComponentEdits: vi.fn(),
+      getComponentEditsSnapshot: vi.fn(() => ({})),
+      isEditMode: true,
+      toggleEditMode: vi.fn(),
+    });
+
+    render(<EditorPanel />);
+    const stylesTab = screen.getByRole("tab", { name: /estilos/i });
+    fireEvent.mouseDown(stylesTab);
+    fireEvent.click(stylesTab);
+
+    const input = screen.getByLabelText("Color de Fondo");
+    fireEvent.change(input, { target: { value: "#111111" } });
+    fireEvent.change(input, { target: { value: "#222222" } });
+    fireEvent.change(input, { target: { value: "#333333" } });
+
+    expect(scheduleComponentEdit).toHaveBeenCalledTimes(3);
+    expect(setPropertySpy).not.toHaveBeenCalled();
+  });
+
+  it("keeps text color drags on scheduled path without touching root styles", () => {
+    const scheduleComponentEdit = vi.fn();
+    const setPropertySpy = vi.spyOn(
+      document.documentElement.style,
+      "setProperty",
+    );
+
+    mockUseAdmin.mockReturnValue({
+      selectedComponent: "hero",
+      selectComponent: vi.fn(),
+      componentEdits: new Map(),
+      updateComponentEdit: vi.fn(),
+      scheduleComponentEdit,
+      flushScheduledEdits: vi.fn(),
+      clearComponentEdits: vi.fn(),
+      getComponentEditsSnapshot: vi.fn(() => ({})),
+      isEditMode: true,
+      toggleEditMode: vi.fn(),
+    });
+
+    render(<EditorPanel />);
+    const stylesTab = screen.getByRole("tab", { name: /estilos/i });
+    fireEvent.mouseDown(stylesTab);
+    fireEvent.click(stylesTab);
+
+    const textColorInput = screen.getByLabelText("Color de Texto");
+    fireEvent.change(textColorInput, { target: { value: "#a1a1a1" } });
+    fireEvent.change(textColorInput, { target: { value: "#b2b2b2" } });
+
+    expect(scheduleComponentEdit).toHaveBeenCalledTimes(2);
+    expect(scheduleComponentEdit).toHaveBeenLastCalledWith(
+      "hero",
+      "textColor",
+      "#b2b2b2",
+    );
+    expect(setPropertySpy).not.toHaveBeenCalled();
+  });
+
   it("renders only content tab panel by default", () => {
     mockUseAdmin.mockReturnValue({
       selectedComponent: "hero",
