@@ -65,6 +65,11 @@
 -- Ejecutar: 27-verify-storage-buckets.sql
 -- Fail-closed si falta products/component-images o no son públicos
 
+-- 14. FIX DE PERMISOS PARA COMPONENT STYLES (si el editor devuelve 403/42501)
+-- Ejecutar: 36-fix-ecommerce-component-styles-permissions.sql
+-- Scope: ecommerce.component_styles solamente; no tocar public
+-- Verificar con: 36-verify-ecommerce-component-styles-permissions.sql
+
 -- ============================================
 -- SCRIPTS OPCIONALES:
 -- ============================================
