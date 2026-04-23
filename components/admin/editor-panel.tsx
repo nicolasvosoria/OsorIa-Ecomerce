@@ -67,7 +67,7 @@ const COMPONENT_FIELDS: Record<
       },
       {
         key: "imageFit",
-        label: "Ajuste de Imagen (Full image)",
+        label: "Ajuste de Imagen",
         type: "select",
         options: [
           { value: "cover", label: "Cover (rellenar recortando)" },
@@ -76,7 +76,7 @@ const COMPONENT_FIELDS: Record<
       },
       {
         key: "imagePositionX",
-        label: "Posición Horizontal de Imagen (Full image)",
+        label: "Posición Horizontal de Imagen",
         type: "select",
         options: [
           { value: "left", label: "Izquierda" },
@@ -86,7 +86,7 @@ const COMPONENT_FIELDS: Record<
       },
       {
         key: "imagePositionY",
-        label: "Posición Vertical de Imagen (Full image)",
+        label: "Posición Vertical de Imagen",
         type: "select",
         options: [
           { value: "top", label: "Arriba" },
@@ -96,7 +96,7 @@ const COMPONENT_FIELDS: Record<
       },
       {
         key: "fullImageContentAlign",
-        label: "Alineación de Contenido (Full image)",
+        label: "Alineación de Contenido",
         type: "select",
         options: [
           { value: "left", label: "Izquierda" },

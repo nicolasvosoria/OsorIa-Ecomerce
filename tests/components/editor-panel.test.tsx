@@ -74,6 +74,7 @@ describe("EditorPanel", () => {
     expect(
       screen.queryByText("Ajuste de Imagen (Full image)"),
     ).not.toBeInTheDocument();
+    expect(screen.queryByText("Ajuste de Imagen")).not.toBeInTheDocument();
   });
 
   it("uses concise hero layout option labels", () => {
@@ -153,18 +154,24 @@ describe("EditorPanel", () => {
 
     render(<EditorPanel />);
 
+    expect(screen.getByText("Ajuste de Imagen")).toBeInTheDocument();
     expect(
-      screen.getByText("Ajuste de Imagen (Full image)"),
+      screen.getByText("Posición Horizontal de Imagen"),
     ).toBeInTheDocument();
+    expect(screen.getByText("Posición Vertical de Imagen")).toBeInTheDocument();
+    expect(screen.getByText("Alineación de Contenido")).toBeInTheDocument();
     expect(
-      screen.getByText("Posición Horizontal de Imagen (Full image)"),
-    ).toBeInTheDocument();
+      screen.queryByText("Ajuste de Imagen (Full image)"),
+    ).not.toBeInTheDocument();
     expect(
-      screen.getByText("Posición Vertical de Imagen (Full image)"),
-    ).toBeInTheDocument();
+      screen.queryByText("Posición Horizontal de Imagen (Full image)"),
+    ).not.toBeInTheDocument();
     expect(
-      screen.getByText("Alineación de Contenido (Full image)"),
-    ).toBeInTheDocument();
+      screen.queryByText("Posición Vertical de Imagen (Full image)"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Alineación de Contenido (Full image)"),
+    ).not.toBeInTheDocument();
   });
 
   it("routes rapid color edits through the scheduled update path", () => {

@@ -324,7 +324,11 @@ export function HeroBanner() {
     <section
       data-component="hero"
       data-hero-layout={layoutMode}
-      className="relative w-full max-w-7xl overflow-hidden rounded-2xl md:rounded-3xl mx-auto px-2 md:px-4 mt-2 md:mt-4 mb-4 md:mb-8"
+      className={
+        layoutMode === "full-image"
+          ? "relative w-full overflow-hidden mt-2 md:mt-4 mb-4 md:mb-8"
+          : "relative w-full max-w-7xl overflow-hidden rounded-2xl md:rounded-3xl mx-auto px-2 md:px-4 mt-2 md:mt-4 mb-4 md:mb-8"
+      }
       style={{
         backgroundColor: bgColor,
         color: textColor,
