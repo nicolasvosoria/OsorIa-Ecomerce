@@ -33,29 +33,37 @@
 -- Ejecutar: 31-add-store-id-to-products.sql
 -- Agrega store_id a productos y categorías
 
--- 6. PEDIDOS
+-- 6. STORAGE (OBLIGATORIO)
+-- Ejecutar: 27-setup-storage-bucket.sql
+-- Declara y valida buckets requeridos: products y component-images (ambos públicos)
+
+-- 7. PEDIDOS
 -- Ejecutar: 29-create-orders-tables.sql
 -- Crea las tablas de pedidos y items de pedido
 
--- 7. RELACIONAR PEDIDOS CON TIENDAS
+-- 8. RELACIONAR PEDIDOS CON TIENDAS
 -- Ejecutar: 32-add-store-id-to-orders.sql
 -- Agrega store_id a pedidos
 
--- 8. RELACIONAR ESTILOS CON TIENDAS
+-- 9. RELACIONAR ESTILOS CON TIENDAS
 -- Ejecutar: 33-add-store-id-to-styles.sql
 -- Agrega store_id a temas y estilos
 
--- 9. CONFIGURAR RLS (Row Level Security)
+-- 10. CONFIGURAR RLS (Row Level Security)
 -- Ejecutar: 18-fix-rls-y-datos-final.sql
 -- Configura las políticas de seguridad
 
--- 10. CREAR TIENDA DE EJEMPLO
+-- 11. CREAR TIENDA DE EJEMPLO
 -- Ejecutar: 34-create-reposteria-store.sql
 -- Crea la tienda "reposteria" de ejemplo
 
--- 11. CONFIGURAR TEMA PARA REPOSTERÍA
+-- 12. CONFIGURAR TEMA PARA REPOSTERÍA
 -- Ejecutar: 35-update-reposteria-theme.sql
 -- Configura el tema visual para la tienda de repostería
+
+-- 13. VERIFICAR STORAGE (OBLIGATORIO)
+-- Ejecutar: 27-verify-storage-buckets.sql
+-- Fail-closed si falta products/component-images o no son públicos
 
 -- ============================================
 -- SCRIPTS OPCIONALES:
@@ -65,7 +73,6 @@
 -- 22-create-cart-tables.sql - Tabla de carritos (si no usas Shopify)
 -- 23-create-admin-user.sql - Crear usuario administrador
 -- 27-insert-sample-products.sql - Insertar productos de ejemplo
--- 27-setup-storage-bucket.sql - Configurar bucket de almacenamiento
 
 -- ============================================
 -- VERIFICACIÓN FINAL:
@@ -93,3 +100,9 @@ SELECT schemaname, tablename, policyname
 FROM pg_policies
 WHERE schemaname = 'public'
 ORDER BY tablename, policyname;
+
+-- Verificar buckets de Storage requeridos (debe devolver 2 filas públicas)
+SELECT id, name, public
+FROM storage.buckets
+WHERE id IN ('products', 'component-images')
+ORDER BY id;
