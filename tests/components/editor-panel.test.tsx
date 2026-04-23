@@ -91,6 +91,10 @@ describe("EditorPanel", () => {
     });
 
     render(<EditorPanel />);
+    const stylesTab = screen.getByRole("tab", { name: /estilos/i });
+    fireEvent.mouseDown(stylesTab);
+    fireEvent.click(stylesTab);
+
     const input = screen.getByLabelText("Color de Fondo");
     fireEvent.change(input, { target: { value: "#111111" } });
     fireEvent.change(input, { target: { value: "#222222" } });
@@ -102,5 +106,53 @@ describe("EditorPanel", () => {
       "bgColor",
       "#333333",
     );
+  });
+
+  it("renders only content tab panel by default", () => {
+    mockUseAdmin.mockReturnValue({
+      selectedComponent: "hero",
+      selectComponent: vi.fn(),
+      componentEdits: new Map(),
+      updateComponentEdit: vi.fn(),
+      scheduleComponentEdit: vi.fn(),
+      flushScheduledEdits: vi.fn(),
+      clearComponentEdits: vi.fn(),
+      getComponentEditsSnapshot: vi.fn(() => ({})),
+      isEditMode: true,
+      toggleEditMode: vi.fn(),
+    });
+
+    render(<EditorPanel />);
+
+    expect(screen.getByText("Contenido del Componente")).toBeInTheDocument();
+    expect(
+      screen.queryByText("Estilos del Componente"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("switches between tabs showing only the active panel", () => {
+    mockUseAdmin.mockReturnValue({
+      selectedComponent: "hero",
+      selectComponent: vi.fn(),
+      componentEdits: new Map(),
+      updateComponentEdit: vi.fn(),
+      scheduleComponentEdit: vi.fn(),
+      flushScheduledEdits: vi.fn(),
+      clearComponentEdits: vi.fn(),
+      getComponentEditsSnapshot: vi.fn(() => ({})),
+      isEditMode: true,
+      toggleEditMode: vi.fn(),
+    });
+
+    render(<EditorPanel />);
+
+    const stylesTab = screen.getByRole("tab", { name: /estilos/i });
+    fireEvent.mouseDown(stylesTab);
+    fireEvent.click(stylesTab);
+
+    expect(screen.getByText("Estilos del Componente")).toBeInTheDocument();
+    expect(
+      screen.queryByText("Contenido del Componente"),
+    ).not.toBeInTheDocument();
   });
 });

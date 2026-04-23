@@ -1127,14 +1127,15 @@ export function EditorPanel() {
       )}
 
       <div
-        className="fixed right-0 top-0 h-screen w-full md:w-96 bg-background border-l border-border z-50 flex flex-col shadow-2xl"
+        className="fixed right-0 top-0 h-screen w-full md:w-96 bg-background text-foreground border-l border-border z-50 flex flex-col shadow-2xl font-sans"
         data-editor-panel={selectedComponent ? "open" : "closed"}
+        data-admin-neutral="true"
       >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-border flex-shrink-0">
-          <h2 className="text-base md:text-lg font-semibold">
+          <div className="text-base md:text-lg font-semibold tracking-normal leading-tight">
             Editando: {componentLabel}
-          </h2>
+          </div>
           <Button
             variant="ghost"
             size="icon"
@@ -1181,7 +1182,6 @@ export function EditorPanel() {
           {/* Content Tab */}
           <TabsContent
             value="content"
-            forceMount
             className="flex-1 overflow-y-auto p-4 space-y-4 mt-0 min-h-0 custom-scrollbar"
           >
             <Card>
@@ -1410,7 +1410,6 @@ export function EditorPanel() {
           {/* Styles Tab */}
           <TabsContent
             value="styles"
-            forceMount
             className="flex-1 overflow-y-auto p-4 space-y-4 mt-0 min-h-0 custom-scrollbar"
           >
             <Card>
