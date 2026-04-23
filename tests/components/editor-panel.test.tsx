@@ -71,6 +71,18 @@ describe("EditorPanel", () => {
       screen.getByText(/organizá el mensaje, los slides y el tipo de banner/i),
     ).toBeInTheDocument();
     expect(screen.getByText("Diseño del Banner")).toBeInTheDocument();
+    expect(
+      screen.getByText("Ajuste de Imagen (Full image)"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Posición Horizontal de Imagen (Full image)"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Posición Vertical de Imagen (Full image)"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Alineación de Contenido (Full image)"),
+    ).toBeInTheDocument();
   });
 
   it("routes rapid color edits through the scheduled update path", () => {

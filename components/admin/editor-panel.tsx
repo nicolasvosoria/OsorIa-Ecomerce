@@ -69,6 +69,45 @@ const COMPONENT_FIELDS: Record<
         ],
       },
       {
+        key: "imageFit",
+        label: "Ajuste de Imagen (Full image)",
+        type: "select",
+        options: [
+          { value: "cover", label: "Cover (rellenar recortando)" },
+          { value: "contain", label: "Contain (mostrar completa)" },
+        ],
+      },
+      {
+        key: "imagePositionX",
+        label: "Posición Horizontal de Imagen (Full image)",
+        type: "select",
+        options: [
+          { value: "left", label: "Izquierda" },
+          { value: "center", label: "Centro" },
+          { value: "right", label: "Derecha" },
+        ],
+      },
+      {
+        key: "imagePositionY",
+        label: "Posición Vertical de Imagen (Full image)",
+        type: "select",
+        options: [
+          { value: "top", label: "Arriba" },
+          { value: "center", label: "Centro" },
+          { value: "bottom", label: "Abajo" },
+        ],
+      },
+      {
+        key: "fullImageContentAlign",
+        label: "Alineación de Contenido (Full image)",
+        type: "select",
+        options: [
+          { value: "left", label: "Izquierda" },
+          { value: "center", label: "Centro" },
+          { value: "right", label: "Derecha" },
+        ],
+      },
+      {
         key: "products",
         label: "Productos del Carrusel",
         type: "array",
@@ -102,6 +141,10 @@ const COMPONENT_FIELDS: Record<
     ],
     defaults: {
       layoutMode: "split",
+      imageFit: "cover",
+      imagePositionX: "center",
+      imagePositionY: "center",
+      fullImageContentAlign: "left",
       products: [
         {
           label: "Electrónica",

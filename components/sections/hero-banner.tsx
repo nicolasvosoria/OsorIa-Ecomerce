@@ -95,6 +95,29 @@ export function HeroBanner() {
     edits.overlayOpacity ?? styleData.overlayOpacity ?? 0.45,
   );
   const layoutMode = edits.layoutMode ?? styleData.layoutMode ?? "split";
+  const imageFit = edits.imageFit ?? styleData.imageFit ?? "cover";
+  const imagePositionX =
+    edits.imagePositionX ?? styleData.imagePositionX ?? "center";
+  const imagePositionY =
+    edits.imagePositionY ?? styleData.imagePositionY ?? "center";
+  const fullImageContentAlign =
+    edits.fullImageContentAlign ?? styleData.fullImageContentAlign ?? "left";
+
+  const fullImageFitClass =
+    imageFit === "contain" ? "object-contain" : "object-cover";
+  const fullImageObjectPosition = `${imagePositionX} ${imagePositionY}`;
+  const fullImageContentPositionClass =
+    fullImageContentAlign === "center"
+      ? "justify-center"
+      : fullImageContentAlign === "right"
+        ? "justify-end"
+        : "justify-start";
+  const fullImageTextAlignClass =
+    fullImageContentAlign === "center"
+      ? "text-center"
+      : fullImageContentAlign === "right"
+        ? "text-right"
+        : "text-left";
 
   // Características por producto
   const productFeatures: Record<
@@ -358,7 +381,8 @@ export function HeroBanner() {
                             src={displayImage}
                             alt={displayTitle || "Hero background image"}
                             fill
-                            className="object-cover"
+                            className={fullImageFitClass}
+                            style={{ objectPosition: fullImageObjectPosition }}
                             sizes="100vw"
                             priority={index === 0}
                           />
@@ -370,9 +394,21 @@ export function HeroBanner() {
                             }}
                           />
                         </div>
-                        <div className="relative z-10 flex min-h-[460px] md:min-h-[560px] lg:min-h-[640px] items-center px-6 py-12 md:px-10 lg:px-16">
+                        <div
+                          data-testid={
+                            index === 0
+                              ? "hero-full-content-container"
+                              : undefined
+                          }
+                          className={`relative z-10 flex min-h-[460px] md:min-h-[560px] lg:min-h-[640px] items-center px-6 py-12 md:px-10 lg:px-16 ${fullImageContentPositionClass}`}
+                        >
                           <div
-                            className="max-w-3xl space-y-4 md:space-y-6 text-left"
+                            data-testid={
+                              index === 0
+                                ? "hero-full-content-block"
+                                : undefined
+                            }
+                            className={`max-w-3xl space-y-4 md:space-y-6 ${fullImageTextAlignClass}`}
                             style={{ color: textColor }}
                           >
                             <span
