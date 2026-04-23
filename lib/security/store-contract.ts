@@ -3,6 +3,8 @@ export type StoreLookupResult =
   | { kind: "id"; value: string }
   | { kind: "invalid"; error: string; status: number };
 
+import { projectPublicHomeDiscountPopupConfig } from "@/lib/home-discount-popup";
+
 export interface PublicStorePayload {
   id: string;
   subdomain: string;
@@ -14,6 +16,7 @@ export interface PublicStorePayload {
   primary_color: string | null;
   secondary_color: string | null;
   currency_code: string | null;
+  homeDiscountPopup?: ReturnType<typeof projectPublicHomeDiscountPopupConfig>;
 }
 
 const SUBDOMAIN_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
@@ -21,7 +24,7 @@ const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export const PUBLIC_STORE_SELECT =
-  "id, subdomain, store_name, domain, is_active, is_public, logo_url, primary_color, secondary_color, currency_code";
+  "id, subdomain, store_name, domain, is_active, is_public, logo_url, primary_color, secondary_color, currency_code, metadata";
 
 export function parseStoreLookupParams(
   searchParams: URLSearchParams,
@@ -69,6 +72,10 @@ export function parseStoreLookupParams(
 export function toPublicStorePayload(
   input: Record<string, any>,
 ): PublicStorePayload {
+  const popupConfig = projectPublicHomeDiscountPopupConfig(
+    input.metadata?.homeDiscountPopup,
+  );
+
   return {
     id: String(input.id ?? ""),
     subdomain: String(input.subdomain ?? ""),
@@ -82,5 +89,6 @@ export function toPublicStorePayload(
       ? String(input.secondary_color)
       : null,
     currency_code: input.currency_code ? String(input.currency_code) : null,
+    ...(popupConfig ? { homeDiscountPopup: popupConfig } : {}),
   };
 }
