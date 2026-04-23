@@ -156,7 +156,7 @@ export function HomeDiscountPopup() {
 
     const showTimer = window.setTimeout(() => {
       setIsVisible(true);
-    }, config.delayMs);
+    }, config.delaySeconds * 1000);
 
     return () => {
       window.clearTimeout(showTimer);
@@ -170,7 +170,7 @@ export function HomeDiscountPopup() {
 
     const hideTimer = window.setTimeout(() => {
       dismissPopup(storageKey, () => setIsVisible(false));
-    }, config.visibleDurationMs);
+    }, config.visibleDurationSeconds * 1000);
 
     return () => {
       window.clearTimeout(hideTimer);

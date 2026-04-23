@@ -12,9 +12,9 @@ export interface HomeDiscountPopupConfig {
   coupon: string;
   startsAt: string | null;
   endsAt: string | null;
-  delayMs: number;
+  delaySeconds: number;
   frequencyHours: number;
-  visibleDurationMs: number;
+  visibleDurationSeconds: number;
   ctaMode: HomeDiscountPopupCtaMode;
 }
 
@@ -35,15 +35,15 @@ export interface HomeDiscountPopupEligibilityResult {
   reason?: "inactive" | "route" | "schedule" | "cooldown" | "invalid_cta";
 }
 
-const DEFAULT_DELAY_MS = 4000;
+const DEFAULT_DELAY_SECONDS = 4;
 const DEFAULT_FREQUENCY_HOURS = 24;
-const DEFAULT_VISIBLE_DURATION_MS = 15000;
-const MIN_DELAY_MS = 3000;
-const MAX_DELAY_MS = 5000;
+const DEFAULT_VISIBLE_DURATION_SECONDS = 15;
+const MIN_DELAY_SECONDS = 3;
+const MAX_DELAY_SECONDS = 5;
 const MIN_FREQUENCY_HOURS = 1;
 const MAX_FREQUENCY_HOURS = 24 * 30;
-const MIN_VISIBLE_DURATION_MS = 5000;
-const MAX_VISIBLE_DURATION_MS = 120000;
+const MIN_VISIBLE_DURATION_SECONDS = 5;
+const MAX_VISIBLE_DURATION_SECONDS = 120;
 
 function asTrimmedString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
@@ -81,6 +81,44 @@ function normalizeDateString(value: unknown): string | null {
   return date.toISOString();
 }
 
+function padDateTimeSegment(value: number): string {
+  return String(value).padStart(2, "0");
+}
+
+function normalizeLegacySeconds(
+  value: unknown,
+  fallback: number,
+  min: number,
+  max: number,
+): number {
+  const parsed = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+
+  const seconds = Math.round(parsed / 1000);
+  if (seconds < min || seconds > max) {
+    return fallback;
+  }
+
+  return seconds;
+}
+
+function normalizeSecondsField(
+  secondsValue: unknown,
+  legacyMsValue: unknown,
+  fallback: number,
+  min: number,
+  max: number,
+): number {
+  const normalizedSeconds = normalizeNumber(secondsValue, NaN, min, max);
+  if (Number.isFinite(normalizedSeconds)) {
+    return normalizedSeconds;
+  }
+
+  return normalizeLegacySeconds(legacyMsValue, fallback, min, max);
+}
+
 function normalizeCtaMode(value: unknown): HomeDiscountPopupCtaMode {
   return value === "redirect" ? "redirect" : "copy_coupon";
 }
@@ -110,11 +148,12 @@ export function normalizeHomeDiscountPopupConfig(
     coupon: asTrimmedString(typedSource.coupon),
     startsAt: normalizeDateString(typedSource.startsAt),
     endsAt: normalizeDateString(typedSource.endsAt),
-    delayMs: normalizeNumber(
+    delaySeconds: normalizeSecondsField(
+      typedSource.delaySeconds,
       typedSource.delayMs,
-      DEFAULT_DELAY_MS,
-      MIN_DELAY_MS,
-      MAX_DELAY_MS,
+      DEFAULT_DELAY_SECONDS,
+      MIN_DELAY_SECONDS,
+      MAX_DELAY_SECONDS,
     ),
     frequencyHours: normalizeNumber(
       typedSource.frequencyHours,
@@ -122,14 +161,49 @@ export function normalizeHomeDiscountPopupConfig(
       MIN_FREQUENCY_HOURS,
       MAX_FREQUENCY_HOURS,
     ),
-    visibleDurationMs: normalizeNumber(
+    visibleDurationSeconds: normalizeSecondsField(
+      typedSource.visibleDurationSeconds,
       typedSource.visibleDurationMs,
-      DEFAULT_VISIBLE_DURATION_MS,
-      MIN_VISIBLE_DURATION_MS,
-      MAX_VISIBLE_DURATION_MS,
+      DEFAULT_VISIBLE_DURATION_SECONDS,
+      MIN_VISIBLE_DURATION_SECONDS,
+      MAX_VISIBLE_DURATION_SECONDS,
     ),
     ctaMode,
   };
+}
+
+export function toDateTimeLocalValue(value: string | null): string {
+  if (!value) {
+    return "";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return (
+    [
+      date.getFullYear(),
+      padDateTimeSegment(date.getMonth() + 1),
+      padDateTimeSegment(date.getDate()),
+    ].join("-") +
+    `T${padDateTimeSegment(date.getHours())}:${padDateTimeSegment(date.getMinutes())}`
+  );
+}
+
+export function parseDateTimeLocalValue(value: string): string | null {
+  const trimmed = asTrimmedString(value);
+  if (!trimmed) {
+    return null;
+  }
+
+  const date = new Date(trimmed);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return date.toISOString();
 }
 
 export function isHomeDiscountPopupPath(pathname: string): boolean {
@@ -171,9 +245,9 @@ export function getHomeDiscountPopupFingerprint(
     config.coupon,
     config.startsAt ?? "",
     config.endsAt ?? "",
-    String(config.delayMs),
+    String(config.delaySeconds),
     String(config.frequencyHours),
-    String(config.visibleDurationMs),
+    String(config.visibleDurationSeconds),
     config.ctaMode,
   ].join("|");
 
@@ -245,7 +319,13 @@ export function projectPublicHomeDiscountPopupConfig(
 ): PublicHomeDiscountPopupConfig | null {
   const config = normalizeHomeDiscountPopupConfig(input);
 
-  if (!config.active || !hasValidCta(config) || !config.title || !config.text) {
+  if (
+    !config.active ||
+    !hasValidCta(config) ||
+    !config.title ||
+    !config.text ||
+    !config.ctaText
+  ) {
     return null;
   }
 

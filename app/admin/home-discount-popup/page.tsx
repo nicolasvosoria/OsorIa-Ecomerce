@@ -7,6 +7,7 @@ import { ArrowLeft, Loader2, Percent, Save, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { ImageUpload } from "@/components/admin/image-upload";
 import {
   Card,
   CardContent,
@@ -28,8 +29,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAdminPermissions } from "@/contexts/admin-permissions-context";
 import {
   normalizeHomeDiscountPopupConfig,
+  parseDateTimeLocalValue,
   type HomeDiscountPopupConfig,
   type HomeDiscountPopupCtaMode,
+  toDateTimeLocalValue,
 } from "@/lib/home-discount-popup";
 
 function PopupField({
@@ -251,14 +254,16 @@ export default function HomeDiscountPopupConfigPage() {
                   <PopupField
                     id="imageUrl"
                     label="Imagen"
-                    hint="Usa una URL HTTPS pública."
+                    hint="Usa el mismo flujo de carga que el resto del admin. Se publica en Supabase Storage."
                   >
-                    <Input
-                      id="imageUrl"
+                    <ImageUpload
                       value={config.imageUrl ?? ""}
-                      onChange={(event) =>
-                        updateConfig("imageUrl", event.target.value || null)
-                      }
+                      onChange={(url) => updateConfig("imageUrl", url || null)}
+                      label=""
+                      context="home-discount-popup"
+                      recommendedWidth={1200}
+                      recommendedHeight={900}
+                      fileTypes={["PNG", "JPG", "WEBP", "GIF"]}
                     />
                   </PopupField>
                   <PopupField
@@ -324,13 +329,21 @@ export default function HomeDiscountPopupConfigPage() {
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-3">
-                  <PopupField id="delayMs" label="Delay inicial (ms)">
+                  <PopupField
+                    id="delaySeconds"
+                    label="Delay inicial (segundos)"
+                  >
                     <Input
-                      id="delayMs"
+                      id="delaySeconds"
                       type="number"
-                      value={config.delayMs}
+                      min={3}
+                      max={5}
+                      value={config.delaySeconds}
                       onChange={(event) =>
-                        updateConfig("delayMs", Number(event.target.value) || 0)
+                        updateConfig(
+                          "delaySeconds",
+                          Number(event.target.value) || 0,
+                        )
                       }
                     />
                   </PopupField>
@@ -348,16 +361,18 @@ export default function HomeDiscountPopupConfigPage() {
                     />
                   </PopupField>
                   <PopupField
-                    id="visibleDurationMs"
-                    label="Duracion visible (ms)"
+                    id="visibleDurationSeconds"
+                    label="Duracion visible (segundos)"
                   >
                     <Input
-                      id="visibleDurationMs"
+                      id="visibleDurationSeconds"
                       type="number"
-                      value={config.visibleDurationMs}
+                      min={5}
+                      max={120}
+                      value={config.visibleDurationSeconds}
                       onChange={(event) =>
                         updateConfig(
-                          "visibleDurationMs",
+                          "visibleDurationSeconds",
                           Number(event.target.value) || 0,
                         )
                       }
@@ -370,15 +385,11 @@ export default function HomeDiscountPopupConfigPage() {
                     <Input
                       id="startsAt"
                       type="datetime-local"
-                      value={
-                        config.startsAt ? config.startsAt.slice(0, 16) : ""
-                      }
+                      value={toDateTimeLocalValue(config.startsAt)}
                       onChange={(event) =>
                         updateConfig(
                           "startsAt",
-                          event.target.value
-                            ? new Date(event.target.value).toISOString()
-                            : null,
+                          parseDateTimeLocalValue(event.target.value),
                         )
                       }
                     />
@@ -387,13 +398,11 @@ export default function HomeDiscountPopupConfigPage() {
                     <Input
                       id="endsAt"
                       type="datetime-local"
-                      value={config.endsAt ? config.endsAt.slice(0, 16) : ""}
+                      value={toDateTimeLocalValue(config.endsAt)}
                       onChange={(event) =>
                         updateConfig(
                           "endsAt",
-                          event.target.value
-                            ? new Date(event.target.value).toISOString()
-                            : null,
+                          parseDateTimeLocalValue(event.target.value),
                         )
                       }
                     />
