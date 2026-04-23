@@ -123,7 +123,7 @@ describe("HeroBanner", () => {
     expect(screen.getByText("HEADPHONES")).toBeInTheDocument();
   });
 
-  it("keeps the max width but removes the bottom overlay band in full-image layout", () => {
+  it("keeps the max width, restores rounded corners and removes the bottom overlay band in full-image layout", () => {
     mockUseComponentStyle.mockReturnValue({
       styles: {
         layoutMode: "full-image",
@@ -144,6 +144,8 @@ describe("HeroBanner", () => {
     const hero = container.querySelector('[data-component="hero"]');
 
     expect(hero).toHaveClass("max-w-7xl");
+    expect(hero).toHaveClass("rounded-2xl");
+    expect(hero).toHaveClass("md:rounded-3xl");
     expect(hero).not.toHaveClass("px-2");
     expect(hero).not.toHaveClass("md:px-4");
     expect(screen.queryByTestId("hero-bottom-bar")).not.toBeInTheDocument();
