@@ -143,6 +143,7 @@ describe("HeroBanner", () => {
     const { container } = render(<HeroBanner />);
     const hero = container.querySelector('[data-component="hero"]');
 
+    expect(hero).toHaveClass("container");
     expect(hero).not.toHaveClass("max-w-7xl");
     expect(hero).toHaveClass("rounded-2xl");
     expect(hero).toHaveClass("md:rounded-3xl");
