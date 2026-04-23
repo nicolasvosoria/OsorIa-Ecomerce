@@ -301,7 +301,7 @@ export function PopularItems({ initialProducts }: PopularItemsProps = {}) {
         ...(textColor && { color: textColor }),
       }}
     >
-      <div className="container mx-auto max-w-7xl">
+      <div className="container mx-auto">
         <div className="mb-6 md:mb-8">
           <h2 
             className="text-2xl md:text-4xl lg:text-[48.4146px] font-inter font-normal" 

@@ -34,7 +34,7 @@ export async function ConditionalHomeContent() {
             label="Catálogo de Productos"
           >
             <section className="py-20 px-4 bg-muted/30">
-              <div className="container mx-auto max-w-7xl">
+              <div className="container mx-auto">
                 <h2 className="section-title text-4xl md:text-5xl font-serif mb-12 text-center">
                   Explora Nuestro Catálogo
                 </h2>

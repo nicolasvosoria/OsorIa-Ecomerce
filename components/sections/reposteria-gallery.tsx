@@ -145,7 +145,7 @@ export function ReposteriaGallery() {
         ...(textColor && { color: textColor }),
       }}
     >
-      <div className="container mx-auto max-w-7xl">
+      <div className="container mx-auto">
         <div className="text-center mb-8 sm:mb-10 md:mb-12">
           <h2 
             className="section-title text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-serif mb-3 sm:mb-4 text-foreground"

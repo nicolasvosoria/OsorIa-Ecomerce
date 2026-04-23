@@ -152,7 +152,7 @@ export function ProductsGrid({ initialProducts }: ProductsGridProps = {}) {
         ...(textColor && { color: textColor }),
       }}
     >
-      <div className="container mx-auto max-w-7xl">
+      <div className="container mx-auto">
         <h2 
           className="text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-[51px] font-inter font-normal mb-4 sm:mb-6 md:mb-8" 
           style={{ color: textColor || "var(--foreground)" }}
