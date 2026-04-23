@@ -13,6 +13,11 @@ import {
   projectPublicHomeDiscountPopupConfig,
   toDateTimeLocalValue,
 } from "@/lib/home-discount-popup";
+import {
+  HOME_DISCOUNT_POPUP_UPLOAD_BUCKET,
+  buildHomeDiscountPopupUploadPath,
+  validateHomeDiscountPopupUpload,
+} from "@/lib/home-discount-popup-upload";
 
 describe("normalizeHomeDiscountPopupConfig", () => {
   it("applies defaults, sanitizes invalid fields, normalizes legacy milliseconds, and keeps supported values", () => {
@@ -248,6 +253,95 @@ describe("home discount popup persistence", () => {
         },
       },
     });
+  });
+
+  it("preserves unrelated metadata when updating homeDiscountPopup", async () => {
+    let upsertPayload: Record<string, unknown> | null = null;
+    const storesQuery = createTableQuery({
+      data: { id: "store-123" },
+      error: null,
+    });
+    const integrationsQuery = {
+      ...createTableQuery({
+        data: {
+          metadata: {
+            chatbot: { active: true },
+          },
+        },
+        error: null,
+      }),
+      upsert: async (values: Record<string, unknown>) => {
+        upsertPayload = values;
+        return { error: null };
+      },
+    };
+    const client = {
+      from: (table: string) => {
+        if (table === "stores") {
+          return storesQuery;
+        }
+
+        if (table === "store_integrations") {
+          return integrationsQuery;
+        }
+
+        throw new Error(`Unexpected table ${table}`);
+      },
+    };
+
+    await saveHomeDiscountPopupConfig(client as any, "default", {
+      active: true,
+      title: "Promo home",
+      text: "Texto",
+      ctaText: "Ir ahora",
+      ctaUrl: "https://example.com/promo",
+      ctaMode: "redirect",
+    });
+
+    expect(upsertPayload).toMatchObject({
+      store_id: "store-123",
+      metadata: {
+        chatbot: { active: true },
+        homeDiscountPopup: {
+          active: true,
+          ctaMode: "redirect",
+          ctaUrl: "https://example.com/promo",
+        },
+      },
+    });
+  });
+});
+
+describe("home discount popup upload helpers", () => {
+  it("builds a store-scoped storage path in the dedicated marketing bucket", () => {
+    expect(HOME_DISCOUNT_POPUP_UPLOAD_BUCKET).toBe("marketing-assets");
+    expect(
+      buildHomeDiscountPopupUploadPath(
+        "store-123",
+        "Promo Banner.JPG",
+        new Date("2026-04-23T10:20:30.456Z"),
+        "abcd1234",
+      ),
+    ).toBe("home-discount-popup/store-123/20260423T102030456Z-abcd1234.jpg");
+  });
+
+  it("rejects unsupported image uploads before touching storage", () => {
+    expect(
+      validateHomeDiscountPopupUpload({
+        type: "application/pdf",
+        size: 1024,
+      }),
+    ).toEqual({
+      valid: false,
+      error: expect.stringContaining("Tipo de archivo"),
+    });
+
+    expect(
+      validateHomeDiscountPopupUpload({
+        type: "image/png",
+        size: 6 * 1024 * 1024,
+      }),
+    ).toEqual({ valid: false, error: expect.stringContaining("5MB") });
   });
 });
 

@@ -8,6 +8,11 @@ import { Upload, X, Image as ImageIcon, Loader2 } from "lucide-react";
 import { uploadImage, deleteImage } from "@/lib/supabase/storage-api";
 import { toast } from "sonner";
 
+type UploadHandler = (
+  file: File,
+  context?: string,
+) => Promise<{ success: boolean; url?: string; error?: string }>;
+
 interface ImageUploadProps {
   value: string;
   onChange: (url: string) => void;
@@ -18,6 +23,8 @@ interface ImageUploadProps {
   recommendedWidth?: number; // Ancho recomendado en px
   recommendedHeight?: number; // Alto recomendado en px
   fileTypes?: string[]; // Tipos de archivo permitidos (ej: ["PNG", "SVG", "JPG"])
+  uploadHandler?: UploadHandler;
+  skipStorageDelete?: boolean;
 }
 
 export function ImageUpload({
@@ -30,6 +37,8 @@ export function ImageUpload({
   recommendedWidth,
   recommendedHeight,
   fileTypes,
+  uploadHandler,
+  skipStorageDelete = false,
 }: ImageUploadProps) {
   // Si el contexto es de productos, usar 1 MB como límite
   const isProductContext =
@@ -73,7 +82,7 @@ export function ImageUpload({
     // Subir archivo
     setUploading(true);
     try {
-      const result = await uploadImage(file, context);
+      const result = await (uploadHandler ?? uploadImage)(file, context);
 
       if (result.success && result.url) {
         onChange(result.url);
@@ -99,7 +108,7 @@ export function ImageUpload({
     if (!value) return;
 
     // Si es una imagen de Supabase Storage, intentar eliminarla
-    if (value.includes("supabase.co/storage")) {
+    if (!skipStorageDelete && value.includes("supabase.co/storage")) {
       try {
         await deleteImage(value);
         toast.success("Imagen eliminada");

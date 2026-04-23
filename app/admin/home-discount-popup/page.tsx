@@ -105,6 +105,29 @@ export default function HomeDiscountPopupConfigPage() {
     setConfig((current) => ({ ...current, [key]: value }));
   };
 
+  const uploadPopupImage = async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await fetch("/api/admin/home-discount-popup/upload", {
+      method: "POST",
+      body: formData,
+    });
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data?.error || "No se pudo subir la imagen del popup",
+      };
+    }
+
+    return {
+      success: true,
+      url: typeof data?.url === "string" ? data.url : undefined,
+    };
+  };
+
   const handleSave = async () => {
     setIsSaving(true);
     try {
@@ -261,6 +284,8 @@ export default function HomeDiscountPopupConfigPage() {
                       onChange={(url) => updateConfig("imageUrl", url || null)}
                       label=""
                       context="home-discount-popup"
+                      uploadHandler={uploadPopupImage}
+                      skipStorageDelete
                       recommendedWidth={1200}
                       recommendedHeight={900}
                       fileTypes={["PNG", "JPG", "WEBP", "GIF"]}

@@ -1,11 +1,17 @@
 import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
 import {
   normalizeHomeDiscountPopupConfig,
   type HomeDiscountPopupConfig,
 } from "@/lib/home-discount-popup";
+import {
+  asMetadataRecord,
+  getHomeDiscountPopupServerClients,
+  getHomeDiscountPopupStoreLookup,
+  requireHomeDiscountPopupAdmin,
+  resolveHomeDiscountPopupStoreId,
+} from "@/lib/home-discount-popup-admin";
 
 type EcommerceClient = ReturnType<typeof createServerClient>;
 
@@ -25,111 +31,11 @@ type PopupPersistenceClient = {
   from: (table: string) => PopupQuery;
 };
 
-async function getSupabaseServerClients() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseKey) {
-    return null;
-  }
-
-  const cookieStore = await cookies();
-
-  const client = createServerClient(supabaseUrl, supabaseKey, {
-    cookies: {
-      get(name: string) {
-        return cookieStore.get(name)?.value;
-      },
-      set(name: string, value: string, options: any) {
-        try {
-          cookieStore.set({ name, value, ...options });
-        } catch {}
-      },
-      remove(name: string, options: any) {
-        try {
-          cookieStore.set({ name, value: "", ...options });
-        } catch {}
-      },
-    },
-  });
-
-  return {
-    authClient: client,
-    ecommerceClient: client.schema("ecommerce") as EcommerceClient,
-  };
-}
-
-async function getStoreIdFromServer(): Promise<string> {
-  if (process.env.DISABLE_SUBDOMAIN_MULTI_TENANT === "true") {
-    return process.env.DEFAULT_STORE_ID || "default";
-  }
-
-  try {
-    const cookieStore = await cookies();
-    return cookieStore.get("store_id")?.value || "default";
-  } catch {
-    return "default";
-  }
-}
-
-async function requireAdminServer(
-  authClient: EcommerceClient,
-  ecommerceClient: EcommerceClient,
-) {
-  const {
-    data: { user },
-    error: authError,
-  } = await authClient.auth.getUser();
-
-  if (authError || !user) {
-    return {
-      error: "Debes iniciar sesión como administrador",
-      status: 401 as const,
-    };
-  }
-
-  const { data: profile, error: profileError } = await ecommerceClient
-    .from("user_profiles")
-    .select("role")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (profileError || profile?.role !== "admin") {
-    return { error: "Acceso denegado", status: 403 as const };
-  }
-
-  return { user };
-}
-
 async function resolveStoreId(
   ecommerceClient: PopupPersistenceClient,
   storeLookup: string,
 ): Promise<string> {
-  let query = ecommerceClient
-    .from("stores")
-    .select("id")
-    .eq("is_active", true)
-    .is("deleted_at", null);
-
-  query =
-    storeLookup === "default"
-      ? query.eq("subdomain", "default")
-      : query.eq("id", storeLookup);
-
-  const { data, error } = await query.single();
-  if (error || !data) {
-    throw new Error("Tienda no encontrada");
-  }
-
-  return String((data as { id?: unknown }).id ?? "");
-}
-
-function asMetadataRecord(value: unknown): Record<string, unknown> | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return null;
-  }
-
-  return value as Record<string, unknown>;
+  return resolveHomeDiscountPopupStoreId(ecommerceClient, storeLookup);
 }
 
 export async function loadHomeDiscountPopupConfig(
@@ -200,16 +106,18 @@ export async function saveHomeDiscountPopupConfig(
 
 async function getAuthorizedClients(): Promise<
   | {
-      clients: Awaited<ReturnType<typeof getSupabaseServerClients>>;
+      clients: NonNullable<
+        Awaited<ReturnType<typeof getHomeDiscountPopupServerClients>>
+      >;
     }
   | { error: string; status: 401 | 403 | 500 }
 > {
-  const clients = await getSupabaseServerClients();
+  const clients = await getHomeDiscountPopupServerClients();
   if (!clients) {
     return { error: "Supabase no configurado", status: 500 as const };
   }
 
-  const adminCheck = await requireAdminServer(
+  const adminCheck = await requireHomeDiscountPopupAdmin(
     clients.authClient,
     clients.ecommerceClient,
   );
@@ -243,7 +151,7 @@ export async function GET() {
 
     const { config } = await loadHomeDiscountPopupConfig(
       authorized.clients!.ecommerceClient as unknown as PopupPersistenceClient,
-      await getStoreIdFromServer(),
+      await getHomeDiscountPopupStoreLookup(),
     );
 
     return NextResponse.json({ config });
@@ -277,7 +185,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { config } = await saveHomeDiscountPopupConfig(
       authorized.clients!.ecommerceClient as unknown as PopupPersistenceClient,
-      await getStoreIdFromServer(),
+      await getHomeDiscountPopupStoreLookup(),
       body?.config,
     );
 
