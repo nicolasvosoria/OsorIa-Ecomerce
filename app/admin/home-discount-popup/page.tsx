@@ -34,6 +34,7 @@ import {
   type HomeDiscountPopupCtaMode,
   toDateTimeLocalValue,
 } from "@/lib/home-discount-popup";
+import { getAdminRequestHeaders } from "@/lib/supabase/admin-request-headers";
 
 function PopupField({
   id,
@@ -63,6 +64,7 @@ export default function HomeDiscountPopupConfigPage() {
   const [config, setConfig] = useState<HomeDiscountPopupConfig>(
     normalizeHomeDiscountPopupConfig({}),
   );
+  const [pendingImageFile, setPendingImageFile] = useState<File | null>(null);
 
   useEffect(() => {
     if (!loading && !isAdmin) {
@@ -78,13 +80,16 @@ export default function HomeDiscountPopupConfigPage() {
 
       setIsLoading(true);
       try {
-        const response = await fetch("/api/home-discount-popup-config");
+        const response = await fetch("/api/home-discount-popup-config", {
+          headers: await getAdminRequestHeaders(),
+        });
         if (!response.ok) {
           throw new Error("No se pudo cargar la configuración");
         }
 
         const data = await response.json();
         setConfig(normalizeHomeDiscountPopupConfig(data.config));
+        setPendingImageFile(null);
       } catch (error) {
         console.error("[Home Discount Popup Admin] Error al cargar:", error);
         toast.error("No se pudo cargar la configuración del popup");
@@ -105,36 +110,40 @@ export default function HomeDiscountPopupConfigPage() {
     setConfig((current) => ({ ...current, [key]: value }));
   };
 
-  const uploadPopupImage = async (file: File) => {
-    const formData = new FormData();
-    formData.append("file", file);
-
-    const response = await fetch("/api/admin/home-discount-popup/upload", {
-      method: "POST",
-      body: formData,
-    });
-    const data = await response.json().catch(() => null);
-
-    if (!response.ok) {
-      return {
-        success: false,
-        error: data?.error || "No se pudo subir la imagen del popup",
-      };
-    }
-
-    return {
-      success: true,
-      url: typeof data?.url === "string" ? data.url : undefined,
-    };
-  };
-
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      const normalizedConfig = normalizeHomeDiscountPopupConfig(config);
+      const nextConfig = { ...config };
+
+      if (pendingImageFile) {
+        const formData = new FormData();
+        formData.append("file", pendingImageFile);
+
+        const { ["Content-Type"]: _contentType, ...authHeaders } =
+          await getAdminRequestHeaders();
+        const uploadResponse = await fetch(
+          "/api/admin/home-discount-popup/upload",
+          {
+            method: "POST",
+            headers: authHeaders,
+            body: formData,
+          },
+        );
+        const uploadData = await uploadResponse.json().catch(() => null);
+
+        if (!uploadResponse.ok || typeof uploadData?.url !== "string") {
+          throw new Error(
+            uploadData?.error || "No se pudo subir la imagen del popup",
+          );
+        }
+
+        nextConfig.imageUrl = uploadData.url;
+      }
+
+      const normalizedConfig = normalizeHomeDiscountPopupConfig(nextConfig);
       const response = await fetch("/api/home-discount-popup-config", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: await getAdminRequestHeaders(),
         body: JSON.stringify({ config: normalizedConfig }),
       });
 
@@ -144,6 +153,7 @@ export default function HomeDiscountPopupConfigPage() {
       }
 
       setConfig(normalizedConfig);
+      setPendingImageFile(null);
       toast.success("Popup promocional guardado");
     } catch (error) {
       console.error("[Home Discount Popup Admin] Error al guardar:", error);
@@ -277,14 +287,19 @@ export default function HomeDiscountPopupConfigPage() {
                   <PopupField
                     id="imageUrl"
                     label="Imagen"
-                    hint="Usa el mismo flujo de carga que el resto del admin. Se publica en Supabase Storage."
+                    hint={
+                      pendingImageFile
+                        ? "Hay una nueva imagen pendiente. Se sube recien al guardar."
+                        : "La imagen se publica en Supabase Storage cuando guardas la configuracion."
+                    }
                   >
                     <ImageUpload
                       value={config.imageUrl ?? ""}
                       onChange={(url) => updateConfig("imageUrl", url || null)}
+                      onFileSelect={setPendingImageFile}
                       label=""
                       context="home-discount-popup"
-                      uploadHandler={uploadPopupImage}
+                      deferUpload
                       skipStorageDelete
                       recommendedWidth={1200}
                       recommendedHeight={900}

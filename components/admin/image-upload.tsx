@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,6 +16,7 @@ type UploadHandler = (
 interface ImageUploadProps {
   value: string;
   onChange: (url: string) => void;
+  onFileSelect?: (file: File | null) => void;
   label?: string;
   accept?: string;
   maxSizeMB?: number;
@@ -25,11 +26,13 @@ interface ImageUploadProps {
   fileTypes?: string[]; // Tipos de archivo permitidos (ej: ["PNG", "SVG", "JPG"])
   uploadHandler?: UploadHandler;
   skipStorageDelete?: boolean;
+  deferUpload?: boolean;
 }
 
 export function ImageUpload({
   value,
   onChange,
+  onFileSelect,
   label = "Imagen",
   accept = "image/jpeg,image/jpg,image/png,image/webp,image/gif",
   maxSizeMB = 5,
@@ -39,6 +42,7 @@ export function ImageUpload({
   fileTypes,
   uploadHandler,
   skipStorageDelete = false,
+  deferUpload = false,
 }: ImageUploadProps) {
   // Si el contexto es de productos, usar 1 MB como límite
   const isProductContext =
@@ -47,6 +51,10 @@ export function ImageUpload({
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState<string | null>(value || null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setPreview(value || null);
+  }, [value]);
 
   const handleFileSelect = async (
     event: React.ChangeEvent<HTMLInputElement>,
@@ -79,6 +87,14 @@ export function ImageUpload({
     };
     reader.readAsDataURL(file);
 
+    if (deferUpload) {
+      onFileSelect?.(file);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+      return;
+    }
+
     // Subir archivo
     setUploading(true);
     try {
@@ -105,7 +121,7 @@ export function ImageUpload({
   };
 
   const handleRemove = async () => {
-    if (!value) return;
+    if (!value && !preview) return;
 
     // Si es una imagen de Supabase Storage, intentar eliminarla
     if (!skipStorageDelete && value.includes("supabase.co/storage")) {
@@ -119,6 +135,7 @@ export function ImageUpload({
     }
 
     onChange("");
+    onFileSelect?.(null);
     setPreview(null);
   };
 
@@ -170,7 +187,7 @@ export function ImageUpload({
           )}
         </Button>
 
-        {value && (
+        {preview && (
           <Button
             type="button"
             variant="ghost"

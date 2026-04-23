@@ -1,10 +1,8 @@
-import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { NextRequest, NextResponse } from "next/server";
 
 import {
-  getHomeDiscountPopupServerClients,
+  getHomeDiscountPopupServiceClients,
   getHomeDiscountPopupStoreLookup,
-  requireHomeDiscountPopupAdmin,
   resolveHomeDiscountPopupStoreId,
 } from "@/lib/home-discount-popup-admin";
 import {
@@ -12,23 +10,11 @@ import {
   HOME_DISCOUNT_POPUP_UPLOAD_BUCKET,
   validateHomeDiscountPopupUpload,
 } from "@/lib/home-discount-popup-upload";
+import { requireAdminUser } from "@/lib/supabase/admin-route-auth";
 
-function getServiceRoleStorageClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceRoleKey) {
-    return null;
-  }
-
-  return createClient(supabaseUrl, serviceRoleKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-}
-
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const clients = await getHomeDiscountPopupServerClients();
+    const clients = getHomeDiscountPopupServiceClients();
     if (!clients) {
       return NextResponse.json(
         { error: "Supabase no configurado" },
@@ -36,22 +22,11 @@ export async function POST(request: Request) {
       );
     }
 
-    const adminCheck = await requireHomeDiscountPopupAdmin(
-      clients.authClient,
-      clients.ecommerceClient,
-    );
+    const adminCheck = await requireAdminUser(request, clients.ecommerceClient);
     if ("error" in adminCheck) {
       return NextResponse.json(
         { error: adminCheck.error },
         { status: adminCheck.status },
-      );
-    }
-
-    const storageClient = getServiceRoleStorageClient();
-    if (!storageClient) {
-      return NextResponse.json(
-        { error: "Falta SUPABASE_SERVICE_ROLE_KEY para subir imágenes" },
-        { status: 500 },
       );
     }
 
@@ -78,7 +53,7 @@ export async function POST(request: Request) {
     );
     const objectPath = buildHomeDiscountPopupUploadPath(storeId, file.name);
 
-    const { error: uploadError } = await storageClient.storage
+    const { error: uploadError } = await clients.serviceClient.storage
       .from(HOME_DISCOUNT_POPUP_UPLOAD_BUCKET)
       .upload(objectPath, file, {
         contentType: file.type,
@@ -98,7 +73,7 @@ export async function POST(request: Request) {
 
     const {
       data: { publicUrl },
-    } = storageClient.storage
+    } = clients.serviceClient.storage
       .from(HOME_DISCOUNT_POPUP_UPLOAD_BUCKET)
       .getPublicUrl(objectPath);
 
