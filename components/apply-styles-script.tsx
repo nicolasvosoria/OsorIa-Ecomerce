@@ -2,9 +2,12 @@
  * Script que se ejecuta antes de que React se monte
  * Aplica estilos desde localStorage para evitar el "flash" de contenido sin estilo
  */
-import Script from "next/script"
+import Script from "next/script";
+import { DEFAULT_RUNTIME_THEME } from "@/lib/theme-font/runtime-contract";
 
 export function ApplyStylesScript() {
+  const runtimeDefaultTheme = JSON.stringify(DEFAULT_RUNTIME_THEME);
+
   return (
     <Script
       id="apply-styles-script"
@@ -14,23 +17,48 @@ export function ApplyStylesScript() {
 (function() {
   try {
     const root = document.documentElement;
+
+    function normalizeRuntimeStoreId(value) {
+      if (!value || typeof value !== 'string') return null;
+      const normalized = value.trim();
+      if (!normalized) return null;
+      if (normalized.toLowerCase() === 'default') return null;
+      return normalized;
+    }
+
+    function parseJson(value) {
+      if (!value) return null;
+      try {
+        return JSON.parse(value);
+      } catch (_) {
+        return null;
+      }
+    }
+
+    function normalizeThemePayload(payload) {
+      if (!payload || typeof payload !== 'object') return null;
+      const colors = payload.colors || payload.theme_config;
+      if (!colors || typeof colors !== 'object') return null;
+      if (!payload.theme_name || typeof payload.theme_name !== 'string') return null;
+      return {
+        theme_name: payload.theme_name,
+        colors,
+      };
+    }
+
+    function normalizeFontPayload(payload) {
+      if (!payload || typeof payload !== 'object') return null;
+      if (!payload.font_name || !payload.font_family) return null;
+      const googleFontUrl = payload.google_font_url || payload.font_url || null;
+      return {
+        font_name: payload.font_name,
+        font_family: payload.font_family,
+        google_font_url: typeof googleFontUrl === 'string' && googleFontUrl.trim().length > 0 ? googleFontUrl : null,
+      };
+    }
     
     // Tema por defecto "Claro Original" - se usa solo si no hay tema guardado
-    const defaultTheme = {
-      theme_name: 'Claro Original',
-      colors: {
-        primary: '#005aa1',
-        secondary: '#c4faff',
-        accent: '#005aa1',
-        background: '#ffffff',
-        foreground: '#1a1a1a',
-        card: '#ffffff',
-        cardForeground: '#1a1a1a',
-        border: '#e5e5e5',
-        muted: '#f5f5f5',
-        mutedForeground: '#737373'
-      }
-    };
+    const defaultTheme = ${runtimeDefaultTheme};
     
     // Aplicar tema desde localStorage (que será actualizado por el ThemeProvider con el tema activo de BD)
     // Si no hay tema guardado, usar el por defecto
@@ -38,13 +66,12 @@ export function ApplyStylesScript() {
     let themeToApply = defaultTheme;
     
     if (savedTheme) {
-      try {
-        const parsedTheme = JSON.parse(savedTheme);
-        if (parsedTheme.colors && parsedTheme.theme_name) {
-          themeToApply = parsedTheme;
-        }
-      } catch (e) {
-        console.warn('[ApplyStyles] Error parsing saved theme, usando tema por defecto:', e);
+      const parsedTheme = parseJson(savedTheme);
+      const normalizedTheme = normalizeThemePayload(parsedTheme);
+      if (normalizedTheme) {
+        themeToApply = normalizedTheme;
+      } else {
+        console.warn('[ApplyStyles] Saved theme cache is stale/corrupt, usando tema por defecto');
       }
     }
     
@@ -78,27 +105,24 @@ export function ApplyStylesScript() {
     // Aplicar fuente desde localStorage
     const savedFont = localStorage.getItem('osoria_active_font');
     if (savedFont) {
-      try {
-        const font = JSON.parse(savedFont);
-        if (font.font_family) {
-          root.style.setProperty('--font-family-sans', font.font_family);
-          
-          // Cargar Google Font si existe
-          if (font.google_font_url) {
-            const existingLink = document.querySelector('link[href="' + font.google_font_url + '"]');
-            if (!existingLink) {
-              const link = document.createElement('link');
-              link.rel = 'stylesheet';
-              link.href = font.google_font_url;
-              document.head.appendChild(link);
-            }
+      const parsedFont = parseJson(savedFont);
+      const font = normalizeFontPayload(parsedFont);
+      if (font) {
+        root.style.setProperty('--font-family-sans', font.font_family);
+
+        // Cargar stylesheet solo para fuentes externas reales
+        if (font.google_font_url && font.font_name.toLowerCase() !== 'system') {
+          const existingLink = document.querySelector('link[href="' + font.google_font_url + '"]');
+          if (!existingLink) {
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = font.google_font_url;
+            document.head.appendChild(link);
           }
-          
-          // Marcar qué fuente fue aplicada
-          window.__osoria_applied_font = font.font_name;
         }
-      } catch (e) {
-        console.warn('[ApplyStyles] Error parsing saved font:', e);
+
+        // Marcar qué fuente fue aplicada
+        window.__osoria_applied_font = font.font_name;
       }
     }
     
@@ -109,10 +133,10 @@ export function ApplyStylesScript() {
         return c.trim().startsWith('store_id=');
       });
       if (storeIdCookie) {
-        return storeIdCookie.split('=')[1];
+        return normalizeRuntimeStoreId(storeIdCookie.split('=')[1]);
       }
       // Si no hay cookie, intentar obtener del localStorage
-      const savedStoreId = localStorage.getItem('osoria_current_store_id');
+      const savedStoreId = normalizeRuntimeStoreId(localStorage.getItem('osoria_current_store_id'));
       if (savedStoreId) {
         return savedStoreId;
       }
@@ -292,6 +316,5 @@ export function ApplyStylesScript() {
         `,
       }}
     />
-  )
+  );
 }
-

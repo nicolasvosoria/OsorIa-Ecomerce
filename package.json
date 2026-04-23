@@ -9,7 +9,7 @@
     "lint": "eslint app/api/store app/api/orders/send-confirmation-email lib/security tests/security tests/quality --max-warnings=0",
     "lint:full": "eslint . --max-warnings=0",
     "start": "next start",
-    "test": "vitest run -c tests/vitest.security.config.ts tests/security tests/quality",
+    "test": "node scripts/run-vitest.mjs",
     "test:full": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.quality.json",
     "typecheck:full": "tsc --noEmit",

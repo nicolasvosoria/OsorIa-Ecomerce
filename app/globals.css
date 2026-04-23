@@ -6,8 +6,8 @@
 
 /* Variables de fuentes Geist (cargadas directamente para evitar problemas con Turbopack) */
 :root {
-  --font-geist-sans: 'Geist', system-ui, arial, sans-serif;
-  --font-geist-mono: 'Geist Mono', monospace;
+  --font-geist-sans: "Geist", system-ui, arial, sans-serif;
+  --font-geist-mono: "Geist Mono", monospace;
 }
 
 :root {
@@ -134,6 +134,28 @@
   }
 }
 
+/* Aíslan superficies admin de estilos storefront por tienda */
+@layer components {
+  .reposteria-store [data-admin-neutral="true"] {
+    font-family: var(--font-family-sans, var(--font-geist-sans), sans-serif);
+    color: var(--foreground);
+    letter-spacing: normal;
+  }
+
+  .reposteria-store [data-admin-neutral="true"] :is(h1, h2, h3, h4, h5, h6) {
+    font-family: inherit;
+    color: inherit;
+    letter-spacing: normal;
+  }
+
+  .reposteria-store
+    [data-admin-neutral="true"]
+    :is(button, input, textarea, select) {
+    font-family: inherit;
+    letter-spacing: normal;
+  }
+}
+
 /* Estilos personalizados para barras de desplazamiento */
 .custom-scrollbar {
   scrollbar-width: thin;
@@ -172,7 +194,7 @@
     min-height: 44px;
     min-width: 44px;
   }
-  
+
   /* Excepciones para elementos que no necesitan ser tan grandes */
   button.size-icon-sm,
   [role="button"].size-icon-sm {
