@@ -326,7 +326,7 @@ export function HeroBanner() {
       data-hero-layout={layoutMode}
       className={
         layoutMode === "full-image"
-          ? "relative w-full overflow-hidden mt-2 md:mt-4 mb-4 md:mb-8"
+          ? "relative w-full max-w-7xl overflow-hidden mx-auto mt-2 md:mt-4 mb-4 md:mb-8"
           : "relative w-full max-w-7xl overflow-hidden rounded-2xl md:rounded-3xl mx-auto px-2 md:px-4 mt-2 md:mt-4 mb-4 md:mb-8"
       }
       style={{
@@ -573,16 +573,19 @@ export function HeroBanner() {
         </CarouselContent>
       </Carousel>
 
-      <div
-        className="absolute bottom-0 left-0 right-0 h-16 pointer-events-none"
-        style={{
-          background: barColor
-            ? `linear-gradient(to bottom, ${hexToRgba(barColor, 0.8)}, ${hexToRgba(barColor, 0.4)})`
-            : `linear-gradient(to bottom, ${hexToRgba(accentColor, 0.8)}, ${hexToRgba(secondaryColor, 0.6)})`,
-          // Asegurar que use los colores del tema activo
-          // Si el tema es oscuro, los colores se adaptarán automáticamente
-        }}
-      />
+      {layoutMode !== "full-image" && (
+        <div
+          data-testid="hero-bottom-bar"
+          className="absolute bottom-0 left-0 right-0 h-16 pointer-events-none"
+          style={{
+            background: barColor
+              ? `linear-gradient(to bottom, ${hexToRgba(barColor, 0.8)}, ${hexToRgba(barColor, 0.4)})`
+              : `linear-gradient(to bottom, ${hexToRgba(accentColor, 0.8)}, ${hexToRgba(secondaryColor, 0.6)})`,
+            // Asegurar que use los colores del tema activo
+            // Si el tema es oscuro, los colores se adaptarán automáticamente
+          }}
+        />
+      )}
 
       {/* Dialog para mostrar características */}
       <Dialog open={isFeatureDialogOpen} onOpenChange={setIsFeatureDialogOpen}>
