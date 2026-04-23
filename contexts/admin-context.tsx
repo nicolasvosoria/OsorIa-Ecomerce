@@ -176,6 +176,18 @@ export function AdminProvider({ children }: { children: ReactNode }) {
 
   const clearComponentEdits = (componentName: string) => {
     if (!isAdmin) return;
+
+    pendingEditsRef.delete(componentName);
+
+    Array.from(scheduledTimeoutsRef.entries()).forEach(
+      ([timeoutKey, timeoutId]) => {
+        if (!timeoutKey.startsWith(`${componentName}:`)) return;
+
+        clearTimeout(timeoutId);
+        scheduledTimeoutsRef.delete(timeoutKey);
+      },
+    );
+
     setComponentEdits((prev) => {
       const newMap = new Map(prev);
       newMap.delete(componentName);

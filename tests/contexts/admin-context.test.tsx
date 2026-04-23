@@ -27,14 +27,23 @@ function Harness() {
   const {
     isAdmin,
     componentEdits,
+    updateComponentEdit,
     scheduleComponentEdit,
     flushScheduledEdits,
+    clearComponentEdits,
     getComponentEditsSnapshot,
   } = useAdmin();
 
   return (
     <div>
       <div data-testid="is-admin">{String(isAdmin)}</div>
+      <button
+        onClick={() => {
+          updateComponentEdit("hero", "bgColor", "#000000");
+        }}
+      >
+        commit
+      </button>
       <button
         onClick={() => {
           scheduleComponentEdit("hero", "bgColor", "#111111", 120);
@@ -52,6 +61,7 @@ function Harness() {
         second
       </button>
       <button onClick={() => flushScheduledEdits("hero")}>flush</button>
+      <button onClick={() => clearComponentEdits("hero")}>clear</button>
       <pre data-testid="snapshot">
         {JSON.stringify(getComponentEditsSnapshot("hero"))}
       </pre>
@@ -141,5 +151,42 @@ describe("AdminProvider", () => {
 
     expect(screen.getByTestId("edits")).toHaveTextContent("{}");
     expect(screen.getByTestId("snapshot")).toHaveTextContent("#111111");
+  });
+
+  it("clears pending scheduled edits so discarded values cannot reappear later", async () => {
+    render(
+      <AdminProvider>
+        <Harness />
+      </AdminProvider>,
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("is-admin")).toHaveTextContent("true");
+    });
+
+    fireEvent.click(screen.getByText("commit"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("edits")).toHaveTextContent("#000000");
+    });
+
+    vi.useFakeTimers();
+
+    fireEvent.click(screen.getByText("second"));
+    fireEvent.click(screen.getByText("clear"));
+
+    expect(screen.getByTestId("edits")).toHaveTextContent("{}");
+    expect(screen.getByTestId("snapshot")).toHaveTextContent("{}");
+
+    await act(async () => {
+      vi.advanceTimersByTime(120);
+    });
+
+    expect(screen.getByTestId("edits")).toHaveTextContent("{}");
+    expect(screen.getByTestId("snapshot")).toHaveTextContent("{}");
   });
 });
