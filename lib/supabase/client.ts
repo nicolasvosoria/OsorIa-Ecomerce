@@ -1,4 +1,5 @@
 import { createBrowserClient } from "@supabase/ssr"
+import { ECOMMERCE_SCHEMA } from "./contract"
 
 let supabaseClient: ReturnType<typeof createBrowserClient> | null = null
 
@@ -22,7 +23,7 @@ export function getSupabaseBrowserClient() {
 /** Cliente con schema ecommerce para consultar vistas/tablas legacy. No usar para supabase.auth. */
 export function getSupabaseEcommerce() {
   const client = getSupabaseBrowserClient()
-  return client ? client.schema("ecommerce") : null
+  return client ? client.schema(ECOMMERCE_SCHEMA) : null
 }
 
 export function refreshSupabaseClient() {

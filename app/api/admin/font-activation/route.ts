@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { ECOMMERCE_SCHEMA, ECOMMERCE_TABLES } from "@/lib/supabase/contract";
 import { requireAdminUser } from "@/lib/supabase/admin-route-auth";
 
 function getSupabaseServiceClient() {
@@ -10,7 +11,7 @@ function getSupabaseServiceClient() {
     return null;
   }
 
-  return createClient(supabaseUrl, serviceKey).schema("ecommerce") as any;
+  return createClient(supabaseUrl, serviceKey).schema(ECOMMERCE_SCHEMA) as any;
 }
 
 export async function POST(request: NextRequest) {
@@ -41,7 +42,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { data: targetFont, error: targetFontError } = await supabase
-      .from("app_fonts")
+      .from(ECOMMERCE_TABLES.appFonts)
       .select("id")
       .eq("font_name", fontName)
       .maybeSingle();
@@ -58,7 +59,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { error: deactivateError } = await supabase
-      .from("app_fonts")
+      .from(ECOMMERCE_TABLES.appFonts)
       .update({ is_active: false })
       .neq("is_active", false);
 
@@ -67,7 +68,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { error: activateError } = await supabase
-      .from("app_fonts")
+      .from(ECOMMERCE_TABLES.appFonts)
       .update({ is_active: true, updated_at: new Date().toISOString() })
       .eq("font_name", fontName);
 

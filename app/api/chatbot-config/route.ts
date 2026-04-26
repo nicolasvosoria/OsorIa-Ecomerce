@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
+import { ECOMMERCE_SCHEMA, ECOMMERCE_TABLES } from "@/lib/supabase/contract"
 
 async function getSupabaseServerClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -20,19 +21,19 @@ async function getSupabaseServerClient() {
       set(name: string, value: string, options: any) {
         try {
           cookieStore.set({ name, value, ...options })
-        } catch (error) {
+        } catch {
           // Las cookies pueden fallar durante el renderizado estático
         }
       },
       remove(name: string, options: any) {
         try {
           cookieStore.set({ name, value: '', ...options })
-        } catch (error) {
+        } catch {
           // Las cookies pueden fallar durante el renderizado estático
         }
       },
     },
-  })
+  }).schema(ECOMMERCE_SCHEMA)
 }
 
 async function getStoreIdFromServer(): Promise<string | null> {
@@ -45,7 +46,7 @@ async function getStoreIdFromServer(): Promise<string | null> {
     const cookieStore = await cookies()
     const storeIdCookie = cookieStore.get('store_id')
     if (storeIdCookie) return storeIdCookie.value
-  } catch (error) {
+  } catch {
     return 'default'
   }
   
@@ -66,7 +67,7 @@ export async function GET() {
     const storeId = await getStoreIdFromServer()
 
     let query = supabase
-      .from('stores')
+      .from(ECOMMERCE_TABLES.stores)
       .select('metadata')
       .eq('is_active', true)
       .is('deleted_at', null)
@@ -123,7 +124,7 @@ export async function POST(request: NextRequest) {
     const storeId = await getStoreIdFromServer()
 
     let query = supabase
-      .from('stores')
+      .from(ECOMMERCE_TABLES.stores)
       .select('id, metadata')
       .eq('is_active', true)
       .is('deleted_at', null)
@@ -148,7 +149,7 @@ export async function POST(request: NextRequest) {
     metadata.chatbot = config
 
     const { error: updateError } = await supabase
-      .from('stores')
+      .from(ECOMMERCE_TABLES.stores)
       .update({ 
         metadata,
         updated_at: new Date().toISOString()

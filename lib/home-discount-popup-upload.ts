@@ -1,4 +1,7 @@
-export const HOME_DISCOUNT_POPUP_UPLOAD_BUCKET = "marketing-assets";
+import { ECOMMERCE_STORAGE_BUCKETS } from "@/lib/supabase/contract";
+
+export const HOME_DISCOUNT_POPUP_UPLOAD_BUCKET =
+  ECOMMERCE_STORAGE_BUCKETS.marketingAssets;
 export const HOME_DISCOUNT_POPUP_UPLOAD_MAX_BYTES = 5 * 1024 * 1024;
 
 const ALLOWED_HOME_DISCOUNT_POPUP_IMAGE_TYPES = new Set([

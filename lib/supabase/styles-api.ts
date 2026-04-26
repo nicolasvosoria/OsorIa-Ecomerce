@@ -1,4 +1,5 @@
 import { getSupabaseEcommerce } from "./client";
+import { ECOMMERCE_SCHEMA, ECOMMERCE_TABLES, ECOMMERCE_VIEWS } from "./contract";
 import type { ComponentStyle } from "./types";
 import { requireAdmin } from "./permissions-api";
 import { getAdminRequestHeaders } from "./admin-request-headers";
@@ -25,7 +26,7 @@ export async function getComponentStyles() {
   }
 
   const { data, error } = await supabase
-    .from("component_styles_legacy")
+    .from(ECOMMERCE_VIEWS.componentStylesLegacy)
     .select("*")
     .eq("store_id", storeId)
     .order("component_name");
@@ -45,7 +46,7 @@ export async function getComponentStyleByName(componentName: string) {
   let storeId: string | null = null;
   if (componentName === "hero") {
     const { data: defaultStore } = await supabase
-      .from("stores_legacy")
+      .from(ECOMMERCE_VIEWS.storesLegacy)
       .select("id")
       .eq("subdomain", "default")
       .single();
@@ -63,7 +64,7 @@ export async function getComponentStyleByName(componentName: string) {
   }
 
   const { data, error } = await supabase
-    .from("component_styles_legacy")
+    .from(ECOMMERCE_VIEWS.componentStylesLegacy)
     .select("*")
     .eq("component_name", componentName)
     .eq("store_id", storeId)
@@ -136,8 +137,8 @@ export async function subscribeToStyleChanges(
         "postgres_changes",
         {
           event: "*",
-          schema: "ecommerce",
-          table: "component_styles",
+          schema: ECOMMERCE_SCHEMA,
+          table: ECOMMERCE_TABLES.componentStyles,
           filter: `component_name=eq.${componentName}`,
         },
         (payload: any) => {
@@ -150,7 +151,7 @@ export async function subscribeToStyleChanges(
       .subscribe();
 
     return channel;
-  } catch (error) {
+  } catch {
     // Falla silenciosamente si el realtime no está disponible
     // Esto no es crítico para la funcionalidad básica
     return {

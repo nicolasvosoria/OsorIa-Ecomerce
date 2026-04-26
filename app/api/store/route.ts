@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseEcommerce } from "@/lib/supabase/client";
+import { ECOMMERCE_VIEWS } from "@/lib/supabase/contract";
 import {
   parseStoreLookupParams,
   PUBLIC_STORE_SELECT,
@@ -34,7 +35,7 @@ export async function GET(request: NextRequest) {
 
     if (lookup.kind === "subdomain") {
       const { data, error } = await supabase
-        .from("stores_legacy")
+        .from(ECOMMERCE_VIEWS.storesLegacy)
         .select(PUBLIC_STORE_SELECT)
         .eq("subdomain", lookup.value)
         .eq("is_active", true)
@@ -54,7 +55,7 @@ export async function GET(request: NextRequest) {
       store = data;
     } else {
       const { data, error } = await supabase
-        .from("stores_legacy")
+        .from(ECOMMERCE_VIEWS.storesLegacy)
         .select(PUBLIC_STORE_SELECT)
         .eq("id", lookup.value)
         .eq("is_active", true)

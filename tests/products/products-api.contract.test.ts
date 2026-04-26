@@ -1,0 +1,311 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import {
+  createItem,
+  getProductStock,
+  getVariantStock,
+  incrementItemViewCount,
+  updateItem,
+} from "@/lib/supabase/products-api";
+
+const { getSupabaseEcommerceMock, getStoreIdMock } = vi.hoisted(() => ({
+  getSupabaseEcommerceMock: vi.fn(),
+  getStoreIdMock: vi.fn(),
+}));
+
+vi.mock("@/lib/supabase/client", () => ({
+  getSupabaseEcommerce: getSupabaseEcommerceMock,
+}));
+
+vi.mock("@/lib/utils/store", () => ({
+  getStoreId: getStoreIdMock,
+}));
+
+type ScriptedResponse = { data?: any; error?: any; count?: number };
+type QueryMode = "select" | "insert" | "update" | "upsert" | "delete";
+
+class QueryBuilder {
+  private mode: QueryMode = "select";
+
+  constructor(
+    private readonly state: MockSupabaseState,
+    private readonly table: string,
+  ) {}
+
+  select(): this {
+    if (this.mode !== "insert" && this.mode !== "upsert" && this.mode !== "update") {
+      this.mode = "select";
+    }
+    return this;
+  }
+
+  insert(payload: any): this {
+    this.mode = "insert";
+    this.state.record(this.state.inserts, this.table, payload);
+    return this;
+  }
+
+  upsert(payload: any): this {
+    this.mode = "upsert";
+    this.state.record(this.state.upserts, this.table, payload);
+    return this;
+  }
+
+  update(payload: any): this {
+    this.mode = "update";
+    this.state.record(this.state.updates, this.table, payload);
+    return this;
+  }
+
+  delete(): this {
+    this.mode = "delete";
+    this.state.record(this.state.deletes, this.table, true);
+    return this;
+  }
+
+  eq(column: string, value: unknown): this {
+    this.state.record(this.state.filters, this.table, { op: "eq", column, value });
+    return this;
+  }
+
+  neq(column: string, value: unknown): this {
+    this.state.record(this.state.filters, this.table, { op: "neq", column, value });
+    return this;
+  }
+
+  is(column: string, value: unknown): this {
+    this.state.record(this.state.filters, this.table, { op: "is", column, value });
+    return this;
+  }
+
+  order(): this {
+    return this;
+  }
+
+  single(): Promise<ScriptedResponse> {
+    return Promise.resolve(this.state.next(this.table, this.mode));
+  }
+
+  then<TResult1 = ScriptedResponse, TResult2 = never>(
+    onfulfilled?:
+      | ((value: ScriptedResponse) => TResult1 | PromiseLike<TResult1>)
+      | null,
+    onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null,
+  ): Promise<TResult1 | TResult2> {
+    return Promise.resolve(this.state.next(this.table, this.mode)).then(
+      onfulfilled,
+      onrejected,
+    );
+  }
+}
+
+class MockSupabaseState {
+  public readonly fromCalls: string[] = [];
+  public readonly rpcCalls: Array<{ fn: string; args: Record<string, unknown> }> =
+    [];
+  public readonly inserts: Record<string, any[]> = {};
+  public readonly upserts: Record<string, any[]> = {};
+  public readonly updates: Record<string, any[]> = {};
+  public readonly deletes: Record<string, any[]> = {};
+  public readonly filters: Record<string, any[]> = {};
+
+  constructor(private readonly script: Record<string, ScriptedResponse[]>) {}
+
+  from = (table: string) => {
+    this.fromCalls.push(table);
+    return new QueryBuilder(this, table);
+  };
+
+  rpc = (fn: string, args: Record<string, unknown>) => {
+    this.rpcCalls.push({ fn, args });
+    return Promise.resolve(this.next(`rpc:${fn}`, "select"));
+  };
+
+  record(target: Record<string, any[]>, table: string, payload: any) {
+    target[table] = target[table] || [];
+    target[table].push(payload);
+  }
+
+  next(table: string, mode: QueryMode): ScriptedResponse {
+    const key = `${table}:${mode}`;
+    const queue = this.script[key];
+    if (!queue || queue.length === 0) {
+      if (mode === "insert") return { data: [], error: null };
+      return { data: null, error: null, count: 0 };
+    }
+    return queue.shift()!;
+  }
+}
+
+describe("products-api contract", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getStoreIdMock.mockResolvedValue("store-1");
+  });
+
+  it("creates products in store_items and mirrors SEO, tags, and images into normalized tables", async () => {
+    const state = new MockSupabaseState({
+      "store_items:select": [{ data: null, error: null }],
+      "store_items:insert": [
+        {
+          data: {
+            id: "item-1",
+            item_name: "Café Especial",
+            item_categories: null,
+          },
+          error: null,
+        },
+      ],
+      "item_seo:upsert": [{ error: null }],
+      "item_tags:delete": [{ error: null }],
+      "item_tags:insert": [{ error: null }],
+      "item_images:insert": [{ error: null }],
+    });
+    getSupabaseEcommerceMock.mockReturnValue({ from: state.from });
+
+    const result = await createItem(
+      {
+        item_name: "Café Especial",
+        base_price: 12000,
+        seo_title: "Comprar Café Especial",
+        seo_description: "Café molido premium",
+        tags: [" café ", "premium"],
+        primary_image_url: "https://example.com/primary.webp",
+        primary_image_alt: "Café Especial",
+      },
+      ["https://example.com/extra.webp"],
+    );
+
+    expect(result.success).toBe(true);
+    expect(state.inserts.store_items[0]).toMatchObject({
+      store_id: "store-1",
+      item_slug: "cafe-especial",
+      seo_title: "Comprar Café Especial",
+      primary_image_url: "https://example.com/primary.webp",
+    });
+    expect(state.upserts.item_seo[0]).toMatchObject({
+      item_id: "item-1",
+      seo_title: "Comprar Café Especial",
+      seo_description: "Café molido premium",
+    });
+    expect(state.inserts.item_tags[0]).toEqual([
+      { item_id: "item-1", tag: "café" },
+      { item_id: "item-1", tag: "premium" },
+    ]);
+    expect(state.inserts.item_images[0]).toEqual([
+      {
+        item_id: "item-1",
+        image_url: "https://example.com/primary.webp",
+        image_alt: "Café Especial",
+        display_order: 1,
+        image_type: "product",
+      },
+      {
+        item_id: "item-1",
+        image_url: "https://example.com/extra.webp",
+        image_alt: "Café Especial - Imagen 2",
+        display_order: 2,
+        image_type: "product",
+      },
+    ]);
+  });
+
+  it("updates product slugs within the same store and refreshes normalized details", async () => {
+    const state = new MockSupabaseState({
+      "store_items_legacy:select": [
+        {
+          data: { id: "item-1", item_name: "Café Viejo", store_id: "store-1" },
+          error: null,
+        },
+      ],
+      "store_items:select": [{ data: null, error: null }],
+      "store_items:update": [
+        {
+          data: { id: "item-1", item_name: "Café Nuevo", item_categories: null },
+          error: null,
+        },
+      ],
+      "item_seo:upsert": [{ error: null }],
+      "item_tags:delete": [{ error: null }],
+      "item_images:delete": [{ error: null }],
+      "item_images:insert": [{ error: null }],
+    });
+    getSupabaseEcommerceMock.mockReturnValue({ from: state.from });
+
+    const result = await updateItem("item-1", {
+      item_name: "Café Nuevo",
+      seo_title: "Café Nuevo SEO",
+      primary_image_url: "https://example.com/new.webp",
+    });
+
+    expect(result.success).toBe(true);
+    expect(state.filters.store_items).toEqual(
+      expect.arrayContaining([
+        { op: "eq", column: "item_slug", value: "cafe-nuevo" },
+        { op: "eq", column: "store_id", value: "store-1" },
+        { op: "neq", column: "id", value: "item-1" },
+      ]),
+    );
+    expect(state.updates.store_items[0]).toMatchObject({
+      item_name: "Café Nuevo",
+      item_slug: "cafe-nuevo",
+      seo_title: "Café Nuevo SEO",
+    });
+    expect(state.upserts.item_seo[0]).toMatchObject({
+      item_id: "item-1",
+      seo_title: "Café Nuevo SEO",
+    });
+    expect(state.deletes.item_images).toEqual([true]);
+    expect(state.inserts.item_images[0][0]).toMatchObject({
+      item_id: "item-1",
+      image_url: "https://example.com/new.webp",
+      display_order: 1,
+    });
+  });
+
+  it("calls increment_item_views with the generated RPC argument name", async () => {
+    const state = new MockSupabaseState({
+      "rpc:increment_item_views:select": [{ error: null }],
+    });
+    getSupabaseEcommerceMock.mockReturnValue({ from: state.from, rpc: state.rpc });
+
+    const result = await incrementItemViewCount("item-1");
+
+    expect(result).toBe(true);
+    expect(state.rpcCalls).toEqual([
+      { fn: "increment_item_views", args: { p_item_id: "item-1" } },
+    ]);
+  });
+
+  it("reads product and variant stock from canonical inventory tables", async () => {
+    const state = new MockSupabaseState({
+      "store_items:select": [
+        {
+          data: {
+            track_inventory: true,
+            inventory_quantity: 7,
+            is_available_for_sale: true,
+            is_active: true,
+          },
+          error: null,
+        },
+      ],
+      "item_variants:select": [
+        {
+          data: {
+            track_inventory: true,
+            inventory_quantity: 3,
+            is_available: true,
+          },
+          error: null,
+        },
+      ],
+    });
+    getSupabaseEcommerceMock.mockReturnValue({ from: state.from });
+
+    await expect(getProductStock("item-1")).resolves.toBe(7);
+    await expect(getVariantStock("variant-1")).resolves.toBe(3);
+
+    expect(state.fromCalls).toEqual(["store_items", "item_variants"]);
+  });
+});

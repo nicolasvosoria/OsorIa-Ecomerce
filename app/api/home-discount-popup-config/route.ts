@@ -11,6 +11,7 @@ import {
   resolveHomeDiscountPopupStoreId,
 } from "@/lib/home-discount-popup-admin";
 import { requireAdminUser } from "@/lib/supabase/admin-route-auth";
+import { ECOMMERCE_TABLES } from "@/lib/supabase/contract";
 
 type PopupQuery = {
   select: (columns: string) => PopupQuery;
@@ -41,7 +42,7 @@ export async function loadHomeDiscountPopupConfig(
 ): Promise<{ storeId: string; config: HomeDiscountPopupConfig }> {
   const storeId = await resolveStoreId(ecommerceClient, storeLookup);
   const { data, error } = await ecommerceClient
-    .from("store_integrations")
+    .from(ECOMMERCE_TABLES.storeIntegrations)
     .select("metadata")
     .eq("store_id", storeId)
     .maybeSingle();
@@ -68,7 +69,7 @@ export async function saveHomeDiscountPopupConfig(
   const storeId = await resolveStoreId(ecommerceClient, storeLookup);
   const config = normalizeHomeDiscountPopupConfig(input);
   const { data, error: readError } = await ecommerceClient
-    .from("store_integrations")
+    .from(ECOMMERCE_TABLES.storeIntegrations)
     .select("metadata")
     .eq("store_id", storeId)
     .maybeSingle();
@@ -81,7 +82,7 @@ export async function saveHomeDiscountPopupConfig(
     asMetadataRecord((data as { metadata?: unknown } | null)?.metadata) || {};
 
   const { error: writeError } = await ecommerceClient
-    .from("store_integrations")
+    .from(ECOMMERCE_TABLES.storeIntegrations)
     .upsert(
       {
         store_id: storeId,

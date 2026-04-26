@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
+import { ECOMMERCE_TABLES } from "./contract";
 
 type AdminRouteAuthResult =
   | { userId: string }
@@ -162,7 +163,7 @@ export async function requireAdminUser(
 
   for (const user of authResolution.users) {
     const { data: profile, error: profileError } = await serviceSupabase
-      .from("user_profiles")
+      .from(ECOMMERCE_TABLES.userProfiles)
       .select("role")
       .eq("id", user.id)
       .single();

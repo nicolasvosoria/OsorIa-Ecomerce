@@ -1,5 +1,6 @@
 import type { UserProfile, AuthResult } from '@/lib/types/user'
 import { getSupabaseBrowserClient, getSupabaseEcommerce } from './client'
+import { ECOMMERCE_TABLES } from './contract'
 import { getUrl } from '@/lib/utils/url'
 
 // Helper para manejar timeouts
@@ -73,7 +74,7 @@ export async function signUp(
         const profilesClient = getSupabaseEcommerce()
         if (profilesClient) {
           const { error: insertError } = await profilesClient
-            .from('user_profiles')
+            .from(ECOMMERCE_TABLES.userProfiles)
             .insert({
               id: data.user!.id,
               email: data.user!.email || email,
@@ -149,7 +150,7 @@ export async function signIn(email: string, password: string): Promise<AuthResul
       const profilesClient = getSupabaseEcommerce()
       if (profilesClient) {
         const { error: insertError } = await profilesClient
-          .from('user_profiles')
+          .from(ECOMMERCE_TABLES.userProfiles)
           .insert({
             id: data.user!.id,
             email: data.user!.email || email,
@@ -300,7 +301,7 @@ export async function getUserProfile(userId: string): Promise<AuthResult> {
         }
 
         const queryPromise = supabase
-          .from('user_profiles')
+          .from(ECOMMERCE_TABLES.userProfiles)
           .select('*')
           .eq('id', userId)
           .single()
@@ -334,7 +335,7 @@ export async function getUserProfile(userId: string): Promise<AuthResult> {
 
             if (authUser && authUser.id === userId) {
               const { data: newProfile, error: insertError } = await supabase
-                .from('user_profiles')
+                .from(ECOMMERCE_TABLES.userProfiles)
                 .insert({
                   id: userId,
                   email: authUser.email || '',
@@ -452,7 +453,7 @@ export async function updateUserProfile(
     }
     const result = await withTimeout(
       supabase
-        .from('user_profiles')
+        .from(ECOMMERCE_TABLES.userProfiles)
         .update({
           ...updates,
           updated_at: new Date().toISOString(),
@@ -716,4 +717,3 @@ export function onAuthStateChange(callback: (user: UserProfile | null) => void) 
     }
   })
 }
-

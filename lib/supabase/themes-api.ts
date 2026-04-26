@@ -1,4 +1,5 @@
 import { getSupabaseEcommerce } from "./client";
+import { ECOMMERCE_TABLES, ECOMMERCE_VIEWS } from "./contract";
 import type { AppTheme } from "@/lib/types/theme";
 import { requireAdmin } from "./permissions-api";
 import { getAdminRequestHeaders } from "./admin-request-headers";
@@ -51,7 +52,7 @@ export async function getThemes(): Promise<AppTheme[]> {
     );
     const startTime = Date.now();
     const queryPromise = supabase
-      .from("app_themes")
+      .from(ECOMMERCE_TABLES.appThemes)
       .select("*")
       .order("theme_name");
 
@@ -126,7 +127,7 @@ export async function getActiveTheme(): Promise<AppTheme | null> {
   let storeId = normalizeRuntimeStoreId(await getStoreId());
   if (!storeId) {
     const { data: defaultStore } = await supabase
-      .from("stores_legacy")
+      .from(ECOMMERCE_VIEWS.storesLegacy)
       .select("id")
       .eq("subdomain", "default")
       .maybeSingle();
@@ -136,14 +137,14 @@ export async function getActiveTheme(): Promise<AppTheme | null> {
   // Nuevo esquema: tema activo por tienda en app_theme_versions
   if (storeId) {
     const { data: version } = await supabase
-      .from("app_theme_versions")
+      .from(ECOMMERCE_TABLES.appThemeVersions)
       .select("theme_id")
       .eq("store_id", storeId)
       .eq("is_current", true)
       .maybeSingle();
     if (version?.theme_id) {
       const { data: theme, error: themeError } = await supabase
-        .from("app_themes")
+        .from(ECOMMERCE_TABLES.appThemes)
         .select("*")
         .eq("id", version.theme_id)
         .maybeSingle();
@@ -158,7 +159,7 @@ export async function getActiveTheme(): Promise<AppTheme | null> {
 
   // Fallback: tema con is_active en app_themes (compatibilidad)
   const { data, error } = await supabase
-    .from("app_themes")
+    .from(ECOMMERCE_TABLES.appThemes)
     .select("*")
     .eq("is_active", true)
     .limit(1)
@@ -177,7 +178,7 @@ export async function getActiveTheme(): Promise<AppTheme | null> {
           "message" in error ? String((error as any).message) : undefined;
         errorDetails = "details" in error ? (error as any).details : undefined;
         errorHint = "hint" in error ? String((error as any).hint) : undefined;
-      } catch (e) {
+      } catch {
         errorMessage = String(error);
       }
     } else {
@@ -223,7 +224,7 @@ export async function getActiveTheme(): Promise<AppTheme | null> {
         },
         2,
       );
-    } catch (_) {
+    } catch {
       errorInfo.rawString = String(error);
     }
 

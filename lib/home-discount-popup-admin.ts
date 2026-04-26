@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
+import { ECOMMERCE_SCHEMA, ECOMMERCE_TABLES } from "@/lib/supabase/contract";
 
 type SupabaseServerClient = ReturnType<typeof createServerClient>;
 
@@ -46,7 +47,7 @@ export async function getHomeDiscountPopupServerClients() {
 
   return {
     authClient: client,
-    ecommerceClient: client.schema("ecommerce") as SupabaseServerClient,
+    ecommerceClient: client.schema(ECOMMERCE_SCHEMA) as SupabaseServerClient,
   };
 }
 
@@ -64,7 +65,7 @@ export function getHomeDiscountPopupServiceClients() {
 
   return {
     serviceClient: client,
-    ecommerceClient: client.schema("ecommerce") as SupabaseServerClient,
+    ecommerceClient: client.schema(ECOMMERCE_SCHEMA) as SupabaseServerClient,
   };
 }
 
@@ -98,7 +99,7 @@ export async function requireHomeDiscountPopupAdmin(
   }
 
   const { data: profile, error: profileError } = await ecommerceClient
-    .from("user_profiles")
+    .from(ECOMMERCE_TABLES.userProfiles)
     .select("role")
     .eq("id", user.id)
     .maybeSingle();
@@ -115,7 +116,7 @@ export async function resolveHomeDiscountPopupStoreId(
   storeLookup: string,
 ): Promise<string> {
   let query = ecommerceClient
-    .from("stores")
+    .from(ECOMMERCE_TABLES.stores)
     .select("id")
     .eq("is_active", true)
     .is("deleted_at", null);

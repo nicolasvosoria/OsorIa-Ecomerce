@@ -985,10 +985,13 @@ export function EditorPanel() {
           // Obtener el store_id del store por defecto desde Supabase
           const supabase = (
             await import("@/lib/supabase/client")
-          ).getSupabaseBrowserClient();
+          ).getSupabaseEcommerce();
           if (supabase) {
+            const { ECOMMERCE_VIEWS } = await import(
+              "@/lib/supabase/contract"
+            );
             const { data: defaultStore } = await supabase
-              .from("stores")
+              .from(ECOMMERCE_VIEWS.storesLegacy)
               .select("id")
               .eq("subdomain", "default")
               .single();

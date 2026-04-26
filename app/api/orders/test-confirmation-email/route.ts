@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
+import { ECOMMERCE_SCHEMA, ECOMMERCE_TABLES } from "@/lib/supabase/contract"
 
 /**
  * GET /api/orders/test-confirmation-email?to=email@ejemplo.com
@@ -26,9 +27,9 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const supabase = createClient(supabaseUrl, supabaseKey)
+    const supabase = createClient(supabaseUrl, supabaseKey).schema(ECOMMERCE_SCHEMA)
     const { data: orders, error: orderError } = await supabase
-      .from("orders")
+      .from(ECOMMERCE_TABLES.orders)
       .select("id, order_number, customer_email, customer_first_name, customer_last_name")
       .order("created_at", { ascending: false })
       .limit(1)

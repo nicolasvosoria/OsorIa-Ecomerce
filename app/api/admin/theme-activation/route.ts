@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
+import {
+  ECOMMERCE_SCHEMA,
+  ECOMMERCE_TABLES,
+  ECOMMERCE_VIEWS,
+} from "@/lib/supabase/contract";
 import { requireAdminUser } from "@/lib/supabase/admin-route-auth";
 
 function getSupabaseServiceClient() {
@@ -11,7 +16,7 @@ function getSupabaseServiceClient() {
     return null;
   }
 
-  return createClient(supabaseUrl, serviceKey).schema("ecommerce") as any;
+  return createClient(supabaseUrl, serviceKey).schema(ECOMMERCE_SCHEMA) as any;
 }
 
 async function getRuntimeStoreId() {
@@ -27,7 +32,7 @@ async function getRuntimeStoreId() {
 
 async function resolveDefaultStoreId(supabase: any) {
   const { data: defaultStore, error } = await supabase
-    .from("stores_legacy")
+    .from(ECOMMERCE_VIEWS.storesLegacy)
     .select("id")
     .eq("subdomain", "default")
     .single();
@@ -78,7 +83,7 @@ export async function POST(request: NextRequest) {
     const storeId = await resolveTargetStoreId(supabase);
 
     const { data: theme, error: themeError } = await supabase
-      .from("app_themes")
+      .from(ECOMMERCE_TABLES.appThemes)
       .select("id")
       .eq("theme_name", themeName)
       .single();
@@ -90,7 +95,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { error: deactivateError } = await supabase
-      .from("app_theme_versions")
+      .from(ECOMMERCE_TABLES.appThemeVersions)
       .update({ is_current: false })
       .eq("store_id", storeId);
     if (deactivateError) {
@@ -98,7 +103,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { data: existing, error: existingError } = await supabase
-      .from("app_theme_versions")
+      .from(ECOMMERCE_TABLES.appThemeVersions)
       .select("id")
       .eq("store_id", storeId)
       .eq("theme_id", theme.id)
@@ -109,7 +114,7 @@ export async function POST(request: NextRequest) {
 
     if (existing?.id) {
       const { error: activateError } = await supabase
-        .from("app_theme_versions")
+        .from(ECOMMERCE_TABLES.appThemeVersions)
         .update({ is_current: true })
         .eq("id", existing.id);
 
@@ -118,7 +123,7 @@ export async function POST(request: NextRequest) {
       }
     } else {
       const { error: insertError } = await supabase
-        .from("app_theme_versions")
+        .from(ECOMMERCE_TABLES.appThemeVersions)
         .insert({
           id: crypto.randomUUID(),
           store_id: storeId,
