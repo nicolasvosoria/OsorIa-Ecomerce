@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   createItem,
+  getCategories,
   getProductStock,
   getVariantStock,
   incrementItemViewCount,
@@ -79,6 +80,10 @@ class QueryBuilder {
   }
 
   order(): this {
+    return this;
+  }
+
+  range(): this {
     return this;
   }
 
@@ -261,6 +266,33 @@ describe("products-api contract", () => {
       image_url: "https://example.com/new.webp",
       display_order: 1,
     });
+  });
+
+  it("resolves the symbolic default store before filtering UUID store columns", async () => {
+    const state = new MockSupabaseState({
+      "stores_legacy:select": [{ data: { id: "store-uuid-1" }, error: null }],
+      "item_categories:select": [{ data: [], error: null }],
+    });
+    getSupabaseEcommerceMock.mockReturnValue({ from: state.from });
+
+    await getCategories(false, "default");
+
+    expect(state.filters.stores_legacy).toEqual(
+      expect.arrayContaining([
+        { op: "eq", column: "subdomain", value: "default" },
+        { op: "eq", column: "is_active", value: true },
+      ]),
+    );
+    expect(state.filters.item_categories).toEqual(
+      expect.arrayContaining([
+        { op: "eq", column: "store_id", value: "store-uuid-1" },
+      ]),
+    );
+    expect(state.filters.item_categories).not.toEqual(
+      expect.arrayContaining([
+        { op: "eq", column: "store_id", value: "default" },
+      ]),
+    );
   });
 
   it("calls increment_item_views with the generated RPC argument name", async () => {

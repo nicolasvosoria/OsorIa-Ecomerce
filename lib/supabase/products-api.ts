@@ -33,6 +33,37 @@ async function withTimeout<T>(
   ])
 }
 
+function isDefaultStoreAlias(storeId: string | null | undefined): boolean {
+  return !storeId || storeId === 'default'
+}
+
+async function resolveDefaultStoreId(supabase: ReturnType<typeof getSupabaseEcommerce>, operation: string): Promise<string | null> {
+  if (!supabase) return null
+
+  try {
+    const { data: defaultStore } = await supabase
+      .from(ECOMMERCE_VIEWS.storesLegacy)
+      .select('id')
+      .eq('subdomain', 'default')
+      .eq('is_active', true)
+      .is('deleted_at', null)
+      .single()
+
+    if (defaultStore?.id) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(`[Products] Usando tienda por defecto como fallback en ${operation}`)
+      }
+      return defaultStore.id
+    }
+
+    console.warn(`[Products] No se pudo obtener store_id para ${operation} y no hay tienda por defecto`)
+    return null
+  } catch (error) {
+    console.warn(`[Products] No se pudo obtener store_id para ${operation}:`, error)
+    return null
+  }
+}
+
 /**
  * Obtener todas las categorías activas
  */
@@ -53,26 +84,9 @@ export async function getCategories(includeInactive: boolean = false, storeId?: 
       }
     }
 
-    if (!currentStoreId) {
-      try {
-        const { data: defaultStore } = await supabase
-          .from(ECOMMERCE_VIEWS.storesLegacy)
-          .select('id')
-          .eq('subdomain', 'default')
-          .eq('is_active', true)
-          .is('deleted_at', null)
-          .single()
-        
-        if (defaultStore?.id) {
-          currentStoreId = defaultStore.id
-        } else {
-          console.warn('[Products] No se pudo obtener store_id para getCategories y no hay tienda por defecto')
-          return []
-        }
-      } catch (error) {
-        console.warn('[Products] No se pudo obtener store_id para getCategories:', error)
-        return []
-      }
+    if (isDefaultStoreAlias(currentStoreId)) {
+      currentStoreId = await resolveDefaultStoreId(supabase, 'getCategories')
+      if (!currentStoreId) return []
     }
 
     let query = supabase
@@ -250,31 +264,9 @@ export async function getItems(params: GetItemsParams = {}): Promise<GetItemsRes
     }
     
     // Si aún no hay store_id (por ejemplo, durante build time), intentar obtener el UUID de la tienda por defecto
-    if (!currentStoreId) {
-      try {
-        const { data: defaultStore } = await supabase
-          .from(ECOMMERCE_VIEWS.storesLegacy)
-          .select('id')
-          .eq('subdomain', 'default')
-          .eq('is_active', true)
-          .is('deleted_at', null)
-          .single()
-        
-        if (defaultStore?.id) {
-          if (process.env.NODE_ENV === 'development') {
-            console.warn('[Products] Usando tienda por defecto como fallback')
-          }
-          currentStoreId = defaultStore.id
-        } else {
-          // Si no hay tienda por defecto, retornar vacío
-          console.warn('[Products] No se pudo obtener store_id y no hay tienda por defecto')
-          return { items: [], total: 0, has_more: false }
-        }
-      } catch (error) {
-        // Si falla, retornar vacío
-        console.warn('[Products] No se pudo obtener store_id:', error)
-        return { items: [], total: 0, has_more: false }
-      }
+    if (isDefaultStoreAlias(currentStoreId)) {
+      currentStoreId = await resolveDefaultStoreId(supabase, 'getItems')
+      if (!currentStoreId) return { items: [], total: 0, has_more: false }
     }
 
     let query = supabase
@@ -444,29 +436,9 @@ export async function getItemBySlug(slug: string, storeId?: string | null): Prom
     }
     
     // Si aún no hay store_id (por ejemplo, durante build time), intentar obtener el UUID de la tienda por defecto
-    if (!currentStoreId) {
-      try {
-        const { data: defaultStore } = await supabase
-          .from(ECOMMERCE_VIEWS.storesLegacy)
-          .select('id')
-          .eq('subdomain', 'default')
-          .eq('is_active', true)
-          .is('deleted_at', null)
-          .single()
-        
-        if (defaultStore?.id) {
-          if (process.env.NODE_ENV === 'development') {
-            console.warn('[Products] Usando tienda por defecto como fallback en getItemBySlug')
-          }
-          currentStoreId = defaultStore.id
-        } else {
-          console.warn('[Products] No se pudo obtener store_id para getItemBySlug y no hay tienda por defecto')
-          return null
-        }
-      } catch (error) {
-        console.warn('[Products] No se pudo obtener store_id para getItemBySlug:', error)
-        return null
-      }
+    if (isDefaultStoreAlias(currentStoreId)) {
+      currentStoreId = await resolveDefaultStoreId(supabase, 'getItemBySlug')
+      if (!currentStoreId) return null
     }
 
     // Obtener el producto con su categoría, filtrando por tienda
@@ -563,26 +535,9 @@ export async function getItemById(itemId: string, storeId?: string): Promise<Sto
     let currentStoreId = storeId || await getStoreId()
     
     // Si no hay store_id (por ejemplo, durante build time), intentar obtener el UUID de la tienda por defecto
-    if (!currentStoreId) {
-      try {
-        const { data: defaultStore } = await supabase
-          .from(ECOMMERCE_VIEWS.storesLegacy)
-          .select('id')
-          .eq('subdomain', 'default')
-          .eq('is_active', true)
-          .is('deleted_at', null)
-          .single()
-        
-        if (defaultStore?.id) {
-          currentStoreId = defaultStore.id
-        } else {
-          console.warn('[Products] No se pudo obtener store_id para getItemById y no hay tienda por defecto')
-          return null
-        }
-      } catch (error) {
-        console.warn('[Products] No se pudo obtener store_id para getItemById:', error)
-        return null
-      }
+    if (isDefaultStoreAlias(currentStoreId)) {
+      currentStoreId = await resolveDefaultStoreId(supabase, 'getItemById')
+      if (!currentStoreId) return null
     }
 
     const result = await withTimeout(
