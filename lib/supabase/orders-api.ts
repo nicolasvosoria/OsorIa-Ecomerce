@@ -1,4 +1,5 @@
 import { getSupabaseEcommerce } from "./client";
+import { ECOMMERCE_TABLES } from "./contract";
 import { getStoreId } from "@/lib/utils/store";
 
 // Tipos para pedidos
@@ -49,12 +50,34 @@ export interface OrderAddress {
   id: string;
   order_id: string;
   address_type?: string | null;
+  addr_type?: string | null;
   address_line_1?: string | null;
+  address_line1?: string | null;
   city?: string | null;
   postal_code?: string | null;
   country?: string | null;
   created_at?: string;
   updated_at?: string;
+}
+
+function buildShippingAddressRow(orderId: string, orderData: CreateOrderData) {
+  return {
+    id: generateUuid(),
+    order_id: orderId,
+    address_type: "shipping",
+    address_line_1: orderData.shipping_address,
+    city: orderData.shipping_city,
+    postal_code: orderData.shipping_postal_code,
+    country: orderData.shipping_country || "Colombia",
+  };
+}
+
+function normalizeOrderAddress(row: any): OrderAddress {
+  return {
+    ...row,
+    address_type: row.address_type ?? row.addr_type ?? null,
+    address_line_1: row.address_line_1 ?? row.address_line1 ?? null,
+  } as OrderAddress;
 }
 
 export interface OrderItem {
@@ -259,7 +282,7 @@ async function fetchLatestPaymentTransaction(
 ): Promise<any | null> {
   const transactionResult = (await withTimeout(
     supabase
-      .from("payment_transactions")
+      .from(ECOMMERCE_TABLES.paymentTransactions)
       .select("*")
       .eq("order_id", orderId)
       .order("created_at", { ascending: false })
@@ -319,7 +342,7 @@ async function maybeInsertPaymentTransaction(
   }
 
   await withTimeout(
-    supabase.from("payment_transactions").insert({
+    supabase.from(ECOMMERCE_TABLES.paymentTransactions).insert({
       id: generateUuid(),
       order_id: order.id,
       provider:
@@ -343,7 +366,13 @@ async function maybeInsertPaymentTransaction(
         providerPayload.transaction_id ||
         providerPayload.reference ||
         null,
+      provider_txn_id:
+        providerPayload.provider_transaction_id ||
+        providerPayload.transaction_id ||
+        providerPayload.reference ||
+        null,
       metadata: providerPayload,
+      raw_response: providerPayload,
     }),
     15000,
     "createPaymentTransaction",
@@ -361,7 +390,7 @@ async function fetchOrderItems(
 ): Promise<OrderItem[]> {
   const itemsResult = (await withTimeout(
     supabase
-      .from("order_items")
+      .from(ECOMMERCE_TABLES.orderItems)
       .select("*")
       .eq("order_id", orderId)
       .order("created_at", { ascending: true }),
@@ -386,7 +415,7 @@ async function fetchOrderAddresses(
 ): Promise<OrderAddress[]> {
   const addressesResult = (await withTimeout(
     supabase
-      .from("order_addresses")
+      .from(ECOMMERCE_TABLES.orderAddresses)
       .select("*")
       .eq("order_id", orderId)
       .order("created_at", { ascending: true }),
@@ -402,7 +431,7 @@ async function fetchOrderAddresses(
     return [];
   }
 
-  return (addressesResult.data || []) as OrderAddress[];
+  return (addressesResult.data || []).map(normalizeOrderAddress);
 }
 
 async function hydrateOrderGraph(
@@ -430,7 +459,7 @@ async function resolveOrderStoreId(
     if (item.product_id) {
       const productStoreResult = (await withTimeout(
         supabase
-          .from("store_items")
+          .from(ECOMMERCE_TABLES.storeItems)
           .select("store_id")
           .eq("id", item.product_id)
           .single(),
@@ -446,7 +475,7 @@ async function resolveOrderStoreId(
     if (item.variant_id) {
       const variantStoreItemResult = (await withTimeout(
         supabase
-          .from("item_variants")
+          .from(ECOMMERCE_TABLES.itemVariants)
           .select("store_item_id")
           .eq("id", item.variant_id)
           .single(),
@@ -460,7 +489,7 @@ async function resolveOrderStoreId(
       ) {
         const storeByVariantResult = (await withTimeout(
           supabase
-            .from("store_items")
+            .from(ECOMMERCE_TABLES.storeItems)
             .select("store_id")
             .eq("id", variantStoreItemResult.data.store_item_id)
             .single(),
@@ -484,7 +513,7 @@ async function resolveOrderStoreId(
   }
 
   const defaultStoreResult = (await withTimeout(
-    supabase.from("stores").select("id").eq("is_default", true).limit(1),
+    supabase.from(ECOMMERCE_TABLES.stores).select("id").eq("is_default", true).limit(1),
     10000,
     "resolveDefaultStore",
   )) as { data: Array<{ id: string }> | null; error: any };
@@ -502,6 +531,7 @@ async function resolveOrderStoreId(
  */
 async function validateInventoryBeforeOrder(
   items: CreateOrderData["items"],
+  supabaseOverride?: any,
 ): Promise<InventoryValidationResult> {
   const result: InventoryValidationResult = {
     isValid: true,
@@ -509,7 +539,7 @@ async function validateInventoryBeforeOrder(
   };
 
   try {
-    const supabase = getSupabaseEcommerce();
+    const supabase = supabaseOverride ?? getSupabaseEcommerce();
     if (!supabase) {
       // Si no hay supabase, permitir la orden (para productos externos como Shopify)
       return result;
@@ -522,7 +552,7 @@ async function validateInventoryBeforeOrder(
         if (item.variant_id) {
           const variantResult = (await withTimeout(
             supabase
-              .from("item_variants")
+              .from(ECOMMERCE_TABLES.itemVariants)
               .select("track_inventory, inventory_quantity, is_available")
               .eq("id", item.variant_id)
               .single(),
@@ -578,7 +608,7 @@ async function validateInventoryBeforeOrder(
         else if (item.product_id) {
           const productResult = (await withTimeout(
             supabase
-              .from("store_items")
+              .from(ECOMMERCE_TABLES.storeItems)
               .select(
                 "track_inventory, inventory_quantity, is_available_for_sale, is_active",
               )
@@ -648,9 +678,12 @@ async function validateInventoryBeforeOrder(
  * Actualizar el inventario después de crear una orden
  * Resta las cantidades vendidas del stock disponible
  */
-async function updateInventoryAfterOrder(items: OrderItem[]): Promise<void> {
+async function updateInventoryAfterOrder(
+  items: OrderItem[],
+  supabaseOverride?: any,
+): Promise<void> {
   try {
-    const supabase = getSupabaseEcommerce();
+    const supabase = supabaseOverride ?? getSupabaseEcommerce();
     if (!supabase) {
       console.error(
         "[Orders] Supabase no configurado para actualizar inventario",
@@ -666,7 +699,7 @@ async function updateInventoryAfterOrder(items: OrderItem[]): Promise<void> {
           // Obtener la variante actual
           const variantResult = (await withTimeout(
             supabase
-              .from("item_variants")
+              .from(ECOMMERCE_TABLES.itemVariants)
               .select("track_inventory, inventory_quantity")
               .eq("id", item.variant_id)
               .single(),
@@ -690,7 +723,7 @@ async function updateInventoryAfterOrder(items: OrderItem[]): Promise<void> {
 
             const updateResult = (await withTimeout(
               supabase
-                .from("item_variants")
+                .from(ECOMMERCE_TABLES.itemVariants)
                 .update({ inventory_quantity: newQuantity })
                 .eq("id", item.variant_id),
               10000,
@@ -714,7 +747,7 @@ async function updateInventoryAfterOrder(items: OrderItem[]): Promise<void> {
           // Obtener el producto actual
           const productResult = (await withTimeout(
             supabase
-              .from("store_items")
+              .from(ECOMMERCE_TABLES.storeItems)
               .select("track_inventory, inventory_quantity")
               .eq("id", item.product_id)
               .single(),
@@ -738,7 +771,7 @@ async function updateInventoryAfterOrder(items: OrderItem[]): Promise<void> {
 
             const updateResult = (await withTimeout(
               supabase
-                .from("store_items")
+                .from(ECOMMERCE_TABLES.storeItems)
                 .update({ inventory_quantity: newQuantity })
                 .eq("id", item.product_id),
               10000,
@@ -777,9 +810,10 @@ async function updateInventoryAfterOrder(items: OrderItem[]): Promise<void> {
  */
 export async function createOrder(
   orderData: CreateOrderData,
+  supabaseOverride?: any,
 ): Promise<OrderWithItems | null> {
   try {
-    const supabase = getSupabaseEcommerce();
+    const supabase = supabaseOverride ?? getSupabaseEcommerce();
     if (!supabase) {
       console.error("[Orders] Supabase no configurado");
       return null;
@@ -788,6 +822,7 @@ export async function createOrder(
     // Validar inventario antes de crear la orden
     const validationResult = await validateInventoryBeforeOrder(
       orderData.items,
+      supabase,
     );
 
     if (!validationResult.isValid) {
@@ -811,7 +846,7 @@ export async function createOrder(
     // Crear el pedido
     const orderResult = (await withTimeout(
       supabase
-        .from("orders")
+        .from(ECOMMERCE_TABLES.orders)
         .insert({
           store_id: resolvedStoreId,
           customer_type: orderData.customer_type,
@@ -870,7 +905,7 @@ export async function createOrder(
     }));
 
     const itemsResult = (await withTimeout(
-      supabase.from("order_items").insert(itemsToInsert).select(),
+      supabase.from(ECOMMERCE_TABLES.orderItems).insert(itemsToInsert).select(),
       20000,
       "createOrderItems",
     )) as { data: any; error: any };
@@ -888,15 +923,9 @@ export async function createOrder(
     const orderItems = itemsResult.data as OrderItem[];
 
     await withTimeout(
-      supabase.from("order_addresses").insert({
-        id: generateUuid(),
-        order_id: order.id,
-        address_type: "shipping",
-        address_line_1: orderData.shipping_address,
-        city: orderData.shipping_city,
-        postal_code: orderData.shipping_postal_code,
-        country: orderData.shipping_country || "Colombia",
-      }),
+      supabase.from(ECOMMERCE_TABLES.orderAddresses).insert(
+        buildShippingAddressRow(order.id, orderData),
+      ),
       15000,
       "createOrderAddress",
     ).catch((addressError) => {
@@ -911,7 +940,7 @@ export async function createOrder(
     // Actualizar inventario después de crear la orden exitosamente
     // Ejecutamos de forma síncrona para asegurar consistencia de datos
     try {
-      await updateInventoryAfterOrder(orderItems);
+      await updateInventoryAfterOrder(orderItems, supabase);
     } catch (error: any) {
       // Si falla la actualización del inventario, registramos el error pero no fallamos la orden
       // Esto permite que la orden se cree exitosamente y se pueda corregir el inventario manualmente después
@@ -948,7 +977,7 @@ export async function getOrderById(
     }
 
     const orderResult = (await withTimeout(
-      supabase.from("orders").select("*").eq("id", orderId).single(),
+      supabase.from(ECOMMERCE_TABLES.orders).select("*").eq("id", orderId).single(),
       15000,
       "getOrderById",
     )) as { data: any; error: any };
@@ -980,7 +1009,7 @@ export async function getOrderByNumber(
 
     const orderResult = (await withTimeout(
       supabase
-        .from("orders")
+        .from(ECOMMERCE_TABLES.orders)
         .select("*")
         .eq("order_number", orderNumber)
         .single(),
@@ -1036,7 +1065,7 @@ export async function getOrders(
       payment_status,
     } = params;
 
-    let query = supabase.from("orders").select("*", { count: "exact" });
+    let query = supabase.from(ECOMMERCE_TABLES.orders).select("*", { count: "exact" });
 
     // Filtrar por estado si se especifica
     if (status) {
@@ -1098,7 +1127,7 @@ export async function getOrdersByEmail(
 
     const ordersResult = (await withTimeout(
       supabase
-        .from("orders")
+        .from(ECOMMERCE_TABLES.orders)
         .select("*")
         .eq("customer_email", email)
         .order("order_date", { ascending: false })
@@ -1170,7 +1199,7 @@ export async function updateOrderStatus(
     }
 
     const result = (await withTimeout(
-      supabase.from("orders").update(updateData).eq("id", orderId),
+      supabase.from(ECOMMERCE_TABLES.orders).update(updateData).eq("id", orderId),
       10000,
       "updateOrderStatus",
     )) as { error: any };

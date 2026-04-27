@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
+import {
+  ECOMMERCE_SCHEMA,
+  ECOMMERCE_TABLES,
+  ECOMMERCE_VIEWS,
+} from "@/lib/supabase/contract";
 import { requireAdminUser } from "@/lib/supabase/admin-route-auth";
 
 function getSupabaseServiceClient() {
@@ -11,7 +16,7 @@ function getSupabaseServiceClient() {
     return null;
   }
 
-  return createClient(supabaseUrl, serviceKey).schema("ecommerce") as any;
+  return createClient(supabaseUrl, serviceKey).schema(ECOMMERCE_SCHEMA) as any;
 }
 
 async function getRuntimeStoreId() {
@@ -27,7 +32,7 @@ async function getRuntimeStoreId() {
 
 async function resolveDefaultStoreId(supabase: any) {
   const { data: defaultStore, error } = await supabase
-    .from("stores_legacy")
+    .from(ECOMMERCE_VIEWS.storesLegacy)
     .select("id")
     .eq("subdomain", "default")
     .single();
@@ -88,7 +93,7 @@ export async function POST(request: NextRequest) {
     const storeId = await resolveTargetStoreId(componentName, supabase);
     const timestamp = new Date().toISOString();
     const { data: existing, error: checkError } = await supabase
-      .from("component_styles")
+      .from(ECOMMERCE_TABLES.componentStyles)
       .select("id")
       .eq("component_name", componentName)
       .eq("store_id", storeId)
@@ -98,7 +103,7 @@ export async function POST(request: NextRequest) {
       throw checkError;
     }
 
-    const table = supabase.from("component_styles");
+    const table = supabase.from(ECOMMERCE_TABLES.componentStyles);
     const result = existing
       ? await table
           .update({

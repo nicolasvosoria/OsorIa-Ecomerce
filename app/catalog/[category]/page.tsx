@@ -10,6 +10,7 @@ import { headers, cookies } from "next/headers"
 import { createServerClient } from "@supabase/ssr"
 import { notFound } from "next/navigation"
 import { getStoreIdServer } from "@/lib/utils/store-server"
+import { ECOMMERCE_SCHEMA, ECOMMERCE_VIEWS } from "@/lib/supabase/contract"
 
 // Helper para formatear precio
 function formatPrice(price: number | string, currencyCode: string = "COP"): string {
@@ -55,7 +56,7 @@ async function getSupabaseServerClient() {
         // No hacer nada en lectura
       },
     },
-  })
+  }).schema(ECOMMERCE_SCHEMA)
 }
 
 // Helper para obtener store_id desde headers o subdominio
@@ -76,7 +77,7 @@ async function getStoreIdFromRequest(): Promise<string | null> {
       const supabase = await getSupabaseServerClient()
       if (supabase) {
         const { data: store, error } = await supabase
-          .from('stores')
+          .from(ECOMMERCE_VIEWS.storesLegacy)
           .select('id')
           .eq('subdomain', subdomain)
           .eq('is_active', true)
@@ -285,4 +286,3 @@ export default async function CategoryPage({
     </main>
   )
 }
-

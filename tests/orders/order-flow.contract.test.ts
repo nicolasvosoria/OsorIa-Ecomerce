@@ -222,6 +222,14 @@ describe("orders-api live order contract", () => {
     );
 
     expect(state.inserts.order_addresses?.length).toBe(1);
+    expect(state.inserts.order_addresses?.[0]).toMatchObject({
+      order_id: "order-1",
+      address_type: "shipping",
+      address_line_1: "Calle 123",
+      city: "Bogotá",
+      postal_code: "110111",
+      country: "Colombia",
+    });
     expect(state.fromCalls).not.toContain("store_items_legacy");
   });
 
@@ -573,8 +581,8 @@ describe("orders-api live order contract", () => {
             {
               id: "addr-live-1",
               order_id: "order-live-1",
-              address_type: "shipping",
-              address_line_1: "Calle 123",
+              addr_type: "shipping",
+              address_line1: "Calle 123",
               city: "Bogotá",
               postal_code: "110111",
               country: "Colombia",
@@ -623,6 +631,10 @@ describe("orders-api live order contract", () => {
     expect(byId?.payment_status).toBe("pending");
     expect(byId?.payment_reference).toBe("manual-ref");
     expect(byId?.items).toHaveLength(1);
+    expect(byId?.addresses?.[0]).toMatchObject({
+      address_type: "shipping",
+      address_line_1: "Calle 123",
+    });
 
     expect(byNumber?.id).toBe("order-live-1");
     expect(adminList.orders).toHaveLength(1);

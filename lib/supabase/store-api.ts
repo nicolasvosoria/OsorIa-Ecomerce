@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr"
 import { cookies, headers } from "next/headers"
+import { ECOMMERCE_SCHEMA, ECOMMERCE_VIEWS } from "./contract"
 
 /**
  * Obtiene el cliente de Supabase para el servidor
@@ -22,21 +23,21 @@ async function getSupabaseServerClient() {
       set(name: string, value: string, options: any) {
         try {
           cookieStore.set({ name, value, ...options })
-        } catch (error) {
+        } catch {
           // Las cookies pueden fallar durante el renderizado estático
         }
       },
       remove(name: string, options: any) {
         try {
           cookieStore.set({ name, value: '', ...options })
-        } catch (error) {
+        } catch {
           // Las cookies pueden fallar durante el renderizado estático
         }
       },
     },
   })
   // Usar schema ecommerce para consultar tablas/vistas legacy del nuevo proyecto
-  return client.schema("ecommerce") as Awaited<ReturnType<typeof createServerClient>>
+  return client.schema(ECOMMERCE_SCHEMA) as Awaited<ReturnType<typeof createServerClient>>
 }
 
 /**
@@ -86,7 +87,7 @@ export async function getStoreFromServer(): Promise<{ id: string; subdomain: str
 
     // Vista legacy: stores_legacy ya incluye primary_color, secondary_color
     let query = supabase
-      .from('stores_legacy')
+      .from(ECOMMERCE_VIEWS.storesLegacy)
       .select('id, subdomain, store_name, primary_color, secondary_color')
       .eq('is_active', true)
       .is('deleted_at', null)
@@ -116,7 +117,7 @@ export async function getStoreFromServer(): Promise<{ id: string; subdomain: str
           errorMessage = 'message' in error ? String((error as any).message) : undefined
           errorDetails = 'details' in error ? (error as any).details : undefined
           errorHint = 'hint' in error ? String((error as any).hint) : undefined
-        } catch (e) {
+        } catch {
           // Si falla al acceder a las propiedades, usar valores por defecto
           errorMessage = String(error)
         }
@@ -160,7 +161,7 @@ export async function getStoreFromServer(): Promise<{ id: string; subdomain: str
           }
           return value
         }, 2)
-      } catch (e) {
+      } catch {
         errorInfo.fullError = String(error)
       }
 
@@ -188,4 +189,3 @@ export async function getStoreFromServer(): Promise<{ id: string; subdomain: str
     return null
   }
 }
-

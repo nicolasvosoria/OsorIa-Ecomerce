@@ -1,6 +1,6 @@
-import { getSupabaseBrowserClient, getSupabaseEcommerce } from './client'
+import { getSupabaseEcommerce } from './client'
+import { ECOMMERCE_FUNCTIONS, ECOMMERCE_SCHEMA, ECOMMERCE_TABLES, ECOMMERCE_VIEWS } from './contract'
 import type {
-  StoreItem,
   StoreItemWithDetails,
   ItemCategory,
   ItemVariant,
@@ -33,6 +33,37 @@ async function withTimeout<T>(
   ])
 }
 
+function isDefaultStoreAlias(storeId: string | null | undefined): boolean {
+  return !storeId || storeId === 'default'
+}
+
+async function resolveDefaultStoreId(supabase: ReturnType<typeof getSupabaseEcommerce>, operation: string): Promise<string | null> {
+  if (!supabase) return null
+
+  try {
+    const { data: defaultStore } = await supabase
+      .from(ECOMMERCE_VIEWS.storesLegacy)
+      .select('id')
+      .eq('subdomain', 'default')
+      .eq('is_active', true)
+      .is('deleted_at', null)
+      .single()
+
+    if (defaultStore?.id) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(`[Products] Usando tienda por defecto como fallback en ${operation}`)
+      }
+      return defaultStore.id
+    }
+
+    console.warn(`[Products] No se pudo obtener store_id para ${operation} y no hay tienda por defecto`)
+    return null
+  } catch (error) {
+    console.warn(`[Products] No se pudo obtener store_id para ${operation}:`, error)
+    return null
+  }
+}
+
 /**
  * Obtener todas las categorías activas
  */
@@ -48,35 +79,18 @@ export async function getCategories(includeInactive: boolean = false, storeId?: 
     if (currentStoreId === undefined) {
       try {
         currentStoreId = await getStoreId()
-      } catch (error: any) {
+      } catch {
         currentStoreId = null
       }
     }
 
-    if (!currentStoreId) {
-      try {
-        const { data: defaultStore } = await supabase
-          .from('stores_legacy')
-          .select('id')
-          .eq('subdomain', 'default')
-          .eq('is_active', true)
-          .is('deleted_at', null)
-          .single()
-        
-        if (defaultStore?.id) {
-          currentStoreId = defaultStore.id
-        } else {
-          console.warn('[Products] No se pudo obtener store_id para getCategories y no hay tienda por defecto')
-          return []
-        }
-      } catch (error) {
-        console.warn('[Products] No se pudo obtener store_id para getCategories:', error)
-        return []
-      }
+    if (isDefaultStoreAlias(currentStoreId)) {
+      currentStoreId = await resolveDefaultStoreId(supabase, 'getCategories')
+      if (!currentStoreId) return []
     }
 
     let query = supabase
-      .from('item_categories')
+      .from(ECOMMERCE_TABLES.itemCategories)
       .select('*')
       .eq('store_id', currentStoreId) // Filtrar por tienda
       .order('display_order', { ascending: true })
@@ -111,7 +125,7 @@ export async function getCategoryById(categoryId: string): Promise<ItemCategory 
     }
 
     const result = await withTimeout(
-      supabase.from('item_categories').select('*').eq('id', categoryId).single(),
+      supabase.from(ECOMMERCE_TABLES.itemCategories).select('*').eq('id', categoryId).single(),
       15000,
       'getCategoryById'
     ) as { data: any; error: any }
@@ -227,7 +241,8 @@ export async function getItems(params: GetItemsParams = {}): Promise<GetItemsRes
             })
             
             const { data: store } = await serverSupabase
-              .from('stores_legacy')
+              .schema(ECOMMERCE_SCHEMA)
+              .from(ECOMMERCE_VIEWS.storesLegacy)
               .select('id')
               .eq('subdomain', subdomain)
               .eq('is_active', true)
@@ -249,35 +264,13 @@ export async function getItems(params: GetItemsParams = {}): Promise<GetItemsRes
     }
     
     // Si aún no hay store_id (por ejemplo, durante build time), intentar obtener el UUID de la tienda por defecto
-    if (!currentStoreId) {
-      try {
-        const { data: defaultStore } = await supabase
-          .from('stores_legacy')
-          .select('id')
-          .eq('subdomain', 'default')
-          .eq('is_active', true)
-          .is('deleted_at', null)
-          .single()
-        
-        if (defaultStore?.id) {
-          if (process.env.NODE_ENV === 'development') {
-            console.warn('[Products] Usando tienda por defecto como fallback')
-          }
-          currentStoreId = defaultStore.id
-        } else {
-          // Si no hay tienda por defecto, retornar vacío
-          console.warn('[Products] No se pudo obtener store_id y no hay tienda por defecto')
-          return { items: [], total: 0, has_more: false }
-        }
-      } catch (error) {
-        // Si falla, retornar vacío
-        console.warn('[Products] No se pudo obtener store_id:', error)
-        return { items: [], total: 0, has_more: false }
-      }
+    if (isDefaultStoreAlias(currentStoreId)) {
+      currentStoreId = await resolveDefaultStoreId(supabase, 'getItems')
+      if (!currentStoreId) return { items: [], total: 0, has_more: false }
     }
 
     let query = supabase
-      .from('store_items_legacy')
+      .from(ECOMMERCE_VIEWS.storeItemsLegacy)
       .select('*, item_categories(*)', { count: 'exact' })
       .eq('store_id', currentStoreId!) // Filtrar por tienda (currentStoreId ya está validado)
       .eq('is_active', is_active)
@@ -420,7 +413,8 @@ export async function getItemBySlug(slug: string, storeId?: string | null): Prom
             })
             
             const { data: store } = await serverSupabase
-              .from('stores_legacy')
+              .schema(ECOMMERCE_SCHEMA)
+              .from(ECOMMERCE_VIEWS.storesLegacy)
               .select('id')
               .eq('subdomain', subdomain)
               .eq('is_active', true)
@@ -442,35 +436,15 @@ export async function getItemBySlug(slug: string, storeId?: string | null): Prom
     }
     
     // Si aún no hay store_id (por ejemplo, durante build time), intentar obtener el UUID de la tienda por defecto
-    if (!currentStoreId) {
-      try {
-        const { data: defaultStore } = await supabase
-          .from('stores_legacy')
-          .select('id')
-          .eq('subdomain', 'default')
-          .eq('is_active', true)
-          .is('deleted_at', null)
-          .single()
-        
-        if (defaultStore?.id) {
-          if (process.env.NODE_ENV === 'development') {
-            console.warn('[Products] Usando tienda por defecto como fallback en getItemBySlug')
-          }
-          currentStoreId = defaultStore.id
-        } else {
-          console.warn('[Products] No se pudo obtener store_id para getItemBySlug y no hay tienda por defecto')
-          return null
-        }
-      } catch (error) {
-        console.warn('[Products] No se pudo obtener store_id para getItemBySlug:', error)
-        return null
-      }
+    if (isDefaultStoreAlias(currentStoreId)) {
+      currentStoreId = await resolveDefaultStoreId(supabase, 'getItemBySlug')
+      if (!currentStoreId) return null
     }
 
     // Obtener el producto con su categoría, filtrando por tienda
     const result = await withTimeout(
       supabase
-        .from('store_items_legacy')
+        .from(ECOMMERCE_VIEWS.storeItemsLegacy)
         .select('*, item_categories(*)')
         .eq('item_slug', slug)
         .eq('store_id', currentStoreId) // Filtrar por tienda
@@ -508,7 +482,7 @@ export async function getItemBySlug(slug: string, storeId?: string | null): Prom
 
     // Obtener variantes
     const variantsResult = await withTimeout(
-      supabase.from('item_variants').select('*').eq('item_id', item.id).order('display_order', { ascending: true }),
+      supabase.from(ECOMMERCE_TABLES.itemVariants).select('*').eq('item_id', item.id).order('display_order', { ascending: true }),
       15000,
       'getItemVariants'
     ) as { data: any; error: any }
@@ -517,7 +491,7 @@ export async function getItemBySlug(slug: string, storeId?: string | null): Prom
     // Obtener imágenes
     const imagesResult = await withTimeout(
       supabase
-        .from('item_images')
+        .from(ECOMMERCE_TABLES.itemImages)
         .select('*')
         .or(`item_id.eq.${item.id},variant_id.in.(${(variantsData || []).map((v: any) => v.id).join(',')})`)
         .order('display_order', { ascending: true }),
@@ -528,7 +502,7 @@ export async function getItemBySlug(slug: string, storeId?: string | null): Prom
 
     // Obtener opciones
     const optionsResult = await withTimeout(
-      supabase.from('item_options_legacy').select('*').eq('item_id', item.id).order('display_order', { ascending: true }),
+      supabase.from(ECOMMERCE_VIEWS.itemOptionsLegacy).select('*').eq('item_id', item.id).order('display_order', { ascending: true }),
       15000,
       'getItemOptions'
     ) as { data: any; error: any }
@@ -561,31 +535,14 @@ export async function getItemById(itemId: string, storeId?: string): Promise<Sto
     let currentStoreId = storeId || await getStoreId()
     
     // Si no hay store_id (por ejemplo, durante build time), intentar obtener el UUID de la tienda por defecto
-    if (!currentStoreId) {
-      try {
-        const { data: defaultStore } = await supabase
-          .from('stores_legacy')
-          .select('id')
-          .eq('subdomain', 'default')
-          .eq('is_active', true)
-          .is('deleted_at', null)
-          .single()
-        
-        if (defaultStore?.id) {
-          currentStoreId = defaultStore.id
-        } else {
-          console.warn('[Products] No se pudo obtener store_id para getItemById y no hay tienda por defecto')
-          return null
-        }
-      } catch (error) {
-        console.warn('[Products] No se pudo obtener store_id para getItemById:', error)
-        return null
-      }
+    if (isDefaultStoreAlias(currentStoreId)) {
+      currentStoreId = await resolveDefaultStoreId(supabase, 'getItemById')
+      if (!currentStoreId) return null
     }
 
     const result = await withTimeout(
       supabase
-        .from('store_items_legacy')
+        .from(ECOMMERCE_VIEWS.storeItemsLegacy)
         .select('*, item_categories(*)')
         .eq('id', itemId)
         .eq('store_id', currentStoreId) // Filtrar por tienda
@@ -623,9 +580,9 @@ export async function getItemById(itemId: string, storeId?: string): Promise<Sto
 
     // Obtener variantes, imágenes y opciones (similar a getItemBySlug)
     const [variantsResult, imagesResult, optionsResult] = await Promise.all([
-      supabase.from('item_variants').select('*').eq('item_id', item.id).order('display_order', { ascending: true }),
-      supabase.from('item_images').select('*').eq('item_id', item.id).order('display_order', { ascending: true }),
-      supabase.from('item_options_legacy').select('*').eq('item_id', item.id).order('display_order', { ascending: true }),
+      supabase.from(ECOMMERCE_TABLES.itemVariants).select('*').eq('item_id', item.id).order('display_order', { ascending: true }),
+      supabase.from(ECOMMERCE_TABLES.itemImages).select('*').eq('item_id', item.id).order('display_order', { ascending: true }),
+      supabase.from(ECOMMERCE_VIEWS.itemOptionsLegacy).select('*').eq('item_id', item.id).order('display_order', { ascending: true }),
     ])
 
     return {
@@ -741,6 +698,107 @@ export interface CreateItemResult {
   item?: StoreItemWithDetails
 }
 
+type ProductImageInput = {
+  primary_image_url?: string | null
+  primary_image_alt?: string | null
+}
+
+function buildProductImageRows(
+  itemId: string,
+  itemName: string,
+  input: ProductImageInput,
+  additionalImages: string[] = []
+) {
+  const rows: Array<Record<string, any>> = []
+
+  if (input.primary_image_url) {
+    rows.push({
+      item_id: itemId,
+      image_url: input.primary_image_url,
+      image_alt: input.primary_image_alt || itemName,
+      display_order: 1,
+      image_type: 'product',
+    })
+  }
+
+  rows.push(
+    ...additionalImages.map((url, index) => ({
+      item_id: itemId,
+      image_url: url,
+      image_alt: `${itemName} - Imagen ${index + 2}`,
+      display_order: index + 2,
+      image_type: 'product',
+    }))
+  )
+
+  return rows
+}
+
+async function syncProductNormalizedDetails(
+  supabase: ReturnType<typeof getSupabaseEcommerce>,
+  item: { id: string; item_name: string },
+  data: Pick<CreateItemData, 'seo_title' | 'seo_description' | 'tags' | 'primary_image_url' | 'primary_image_alt'>,
+  additionalImages: string[] = [],
+  mode: 'create' | 'update' = 'create'
+) {
+  if (!supabase) return
+
+  if (data.seo_title !== undefined || data.seo_description !== undefined) {
+    const { error } = await supabase
+      .from(ECOMMERCE_TABLES.itemSeo)
+      .upsert({
+        item_id: item.id,
+        seo_title: data.seo_title || null,
+        seo_description: data.seo_description || null,
+        updated_at: new Date().toISOString(),
+      })
+
+    if (error) {
+      console.warn('[Products] No se pudo sincronizar item_seo:', error)
+    }
+  }
+
+  if (data.tags !== undefined) {
+    await supabase.from(ECOMMERCE_TABLES.itemTags).delete().eq('item_id', item.id)
+
+    const tagRows = (data.tags || [])
+      .map((tag) => tag.trim())
+      .filter(Boolean)
+      .map((tag) => ({ item_id: item.id, tag }))
+
+    if (tagRows.length > 0) {
+      const { error } = await supabase.from(ECOMMERCE_TABLES.itemTags).insert(tagRows)
+      if (error) {
+        console.warn('[Products] No se pudo sincronizar item_tags:', error)
+      }
+    }
+  }
+
+  const shouldSyncImages =
+    mode === 'create' ||
+    data.primary_image_url !== undefined ||
+    data.primary_image_alt !== undefined ||
+    additionalImages.length > 0
+
+  if (!shouldSyncImages) return
+
+  if (mode === 'update') {
+    await supabase.from(ECOMMERCE_TABLES.itemImages).delete().eq('item_id', item.id)
+  }
+
+  const imageRows = buildProductImageRows(item.id, item.item_name, data, additionalImages)
+  if (imageRows.length > 0) {
+    const { error } = await supabase.from(ECOMMERCE_TABLES.itemImages).insert(imageRows)
+    if (error) {
+      console.warn('[Products] No se pudo sincronizar item_images:', error)
+    }
+  }
+}
+
+export const __productsApiTestUtils = {
+  buildProductImageRows,
+}
+
 export async function createItem(
   data: CreateItemData,
   additionalImages: string[] = []
@@ -770,7 +828,7 @@ export async function createItem(
     if (!storeId) {
       try {
         const { data: defaultStore } = await supabase
-          .from('stores_legacy')
+          .from(ECOMMERCE_VIEWS.storesLegacy)
           .select('id')
           .eq('subdomain', 'default')
           .eq('is_active', true)
@@ -808,7 +866,7 @@ export async function createItem(
     // Verificar que el slug sea único
     if (slug) {
       const { data: existingItem } = await supabase
-        .from('store_items')
+        .from(ECOMMERCE_TABLES.storeItems)
         .select('id')
         .eq('item_slug', slug)
         .eq('store_id', storeId)
@@ -822,7 +880,7 @@ export async function createItem(
 
         while (exists) {
           const { data: checkItem } = await supabase
-            .from('store_items')
+            .from(ECOMMERCE_TABLES.storeItems)
             .select('id')
             .eq('item_slug', uniqueSlug)
             .eq('store_id', storeId)
@@ -876,7 +934,11 @@ export async function createItem(
 
     // Crear el producto
     const result = await withTimeout(
-      supabase.from('store_items').insert(itemData).select('*, item_categories(*)').single(),
+      supabase
+        .from(ECOMMERCE_TABLES.storeItems)
+        .insert(itemData)
+        .select('*, item_categories(*)')
+        .single(),
       20000,
       'createItem'
     ) as { data: any; error: any }
@@ -891,29 +953,7 @@ export async function createItem(
 
     const item = result.data as any
 
-    // Insertar imágenes adicionales en la tabla item_images
-    if (additionalImages.length > 0) {
-      const imagesToInsert = additionalImages.map((url, index) => ({
-        item_id: item.id,
-        image_url: url,
-        image_alt: `${item.item_name} - Imagen ${index + 2}`, // Alt text for additional images
-        display_order: index + 2, // Start from 2 for additional images
-        image_type: 'product',
-      }))
-
-      const imagesResult = await withTimeout(
-        supabase.from('item_images').insert(imagesToInsert),
-        15000,
-        'insertAdditionalImages'
-      ) as { error: any }
-      
-      const imagesError = imagesResult.error
-
-      if (imagesError) {
-        console.error('[Products] Error al insertar imágenes adicionales:', imagesError)
-        // No se retorna error fatal, el producto ya fue creado
-      }
-    }
+    await syncProductNormalizedDetails(supabase, item, data, additionalImages, 'create')
 
     return {
       success: true,
@@ -993,7 +1033,11 @@ export async function updateItem(
 
     // Obtener el producto actual para preservar valores no modificados
     const currentItemResult = await withTimeout(
-      supabase.from('store_items_legacy').select('*').eq('id', itemId).single(),
+      supabase
+        .from(ECOMMERCE_VIEWS.storeItemsLegacy)
+        .select('*')
+        .eq('id', itemId)
+        .single(),
       15000,
       'getCurrentItem'
     ) as { data: any; error: any }
@@ -1019,9 +1063,10 @@ export async function updateItem(
 
       // Verificar que el slug sea único (excepto para el producto actual)
       const { data: existingItem } = await supabase
-        .from('store_items')
+        .from(ECOMMERCE_TABLES.storeItems)
         .select('id')
         .eq('item_slug', slug)
+        .eq('store_id', currentItem.store_id)
         .neq('id', itemId)
         .single()
 
@@ -1033,9 +1078,10 @@ export async function updateItem(
 
         while (exists) {
           const { data: checkItem } = await supabase
-            .from('store_items')
+            .from(ECOMMERCE_TABLES.storeItems)
             .select('id')
             .eq('item_slug', uniqueSlug)
+            .eq('store_id', currentItem.store_id)
             .neq('id', itemId)
             .single()
 
@@ -1087,7 +1133,7 @@ export async function updateItem(
     // Actualizar el producto
     const result = await withTimeout(
       supabase
-        .from('store_items')
+        .from(ECOMMERCE_TABLES.storeItems)
         .update(updateData)
         .eq('id', itemId)
         .select('*, item_categories(*)')
@@ -1106,45 +1152,28 @@ export async function updateItem(
 
     const item = result.data as any
 
-    // Si hay imágenes adicionales, actualizar la tabla item_images
-    if (additionalImages.length > 0) {
-      // Primero, eliminar las imágenes adicionales existentes (mantener solo las que coinciden)
-      const { data: existingImages } = await supabase
-        .from('item_images')
-        .select('*')
-        .eq('item_id', itemId)
-        .order('display_order', { ascending: true })
-
-      // Eliminar todas las imágenes adicionales existentes
-      if (existingImages && existingImages.length > 0) {
-        await supabase
-          .from('item_images')
-          .delete()
-          .eq('item_id', itemId)
-      }
-
-      // Insertar las nuevas imágenes adicionales
-      const imagesToInsert = additionalImages.map((url, index) => ({
-        item_id: item.id,
-        image_url: url,
-        image_alt: `${item.item_name} - Imagen ${index + 2}`,
-        display_order: index + 2,
-        image_type: 'product',
-      }))
-
-      const imagesResult = await withTimeout(
-        supabase.from('item_images').insert(imagesToInsert),
-        15000,
-        'updateAdditionalImages'
-      ) as { error: any }
-      
-      const imagesError = imagesResult.error
-
-      if (imagesError) {
-        console.error('[Products] Error al actualizar imágenes adicionales:', imagesError)
-        // No se retorna error fatal, el producto ya fue actualizado
-      }
-    }
+    await syncProductNormalizedDetails(
+      supabase,
+      item,
+      {
+        seo_title: data.seo_title !== undefined ? data.seo_title : currentItem.seo_title,
+        seo_description:
+          data.seo_description !== undefined
+            ? data.seo_description
+            : currentItem.seo_description,
+        tags: data.tags,
+        primary_image_url:
+          data.primary_image_url !== undefined
+            ? data.primary_image_url
+            : currentItem.primary_image_url,
+        primary_image_alt:
+          data.primary_image_alt !== undefined
+            ? data.primary_image_alt
+            : currentItem.primary_image_alt,
+      },
+      additionalImages,
+      'update'
+    )
 
     return {
       success: true,
@@ -1176,7 +1205,7 @@ export async function incrementItemViewCount(itemId: string): Promise<boolean> {
     }
 
     const result = await withTimeout(
-      supabase.rpc('increment_item_views', { item_id: itemId }),
+      supabase.rpc(ECOMMERCE_FUNCTIONS.incrementItemViews, { p_item_id: itemId }),
       10000,
       'incrementItemViewCount'
     ) as { error: any }
@@ -1184,9 +1213,13 @@ export async function incrementItemViewCount(itemId: string): Promise<boolean> {
 
     if (error) {
       // Fallback: en schema ecommerce las vistas están en item_metrics (item_id, view_count)
-      const { data: metrics } = await supabase.from('item_metrics').select('view_count').eq('item_id', itemId).single()
+      const { data: metrics } = await supabase
+        .from(ECOMMERCE_TABLES.itemMetrics)
+        .select('view_count')
+        .eq('item_id', itemId)
+        .single()
       const newCount = (metrics?.view_count ?? 0) + 1
-      const { error: upsertError } = await supabase.from('item_metrics').upsert(
+      const { error: upsertError } = await supabase.from(ECOMMERCE_TABLES.itemMetrics).upsert(
         { item_id: itemId, view_count: newCount, updated_at: new Date().toISOString() },
         { onConflict: 'item_id' }
       )
@@ -1216,7 +1249,7 @@ export async function getProductStock(productId: string): Promise<number | null>
 
     const result = await withTimeout(
       supabase
-        .from('store_items')
+        .from(ECOMMERCE_TABLES.storeItems)
         .select('track_inventory, inventory_quantity, is_available_for_sale, is_active')
         .eq('id', productId)
         .single(),
@@ -1260,7 +1293,7 @@ export async function getVariantStock(variantId: string): Promise<number | null>
 
     const result = await withTimeout(
       supabase
-        .from('item_variants')
+        .from(ECOMMERCE_TABLES.itemVariants)
         .select('track_inventory, inventory_quantity, is_available')
         .eq('id', variantId)
         .single(),
@@ -1290,8 +1323,3 @@ export async function getVariantStock(variantId: string): Promise<number | null>
     return null
   }
 }
-
-
-
-
-

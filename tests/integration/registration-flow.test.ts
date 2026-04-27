@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { getSupabaseBrowserClient } from '@/lib/supabase/client'
+import { getSupabaseBrowserClient, getSupabaseEcommerce } from '@/lib/supabase/client'
 import { mockSupabaseClient } from '../__mocks__/supabase'
 
 // Mock del cliente de Supabase
 vi.mock('@/lib/supabase/client', () => ({
   getSupabaseBrowserClient: vi.fn(),
+  getSupabaseEcommerce: vi.fn(),
 }))
 
 // Mock de getUserProfile
@@ -21,9 +22,19 @@ import { signUp } from '@/lib/supabase/auth-api'
 import * as authApi from '@/lib/supabase/auth-api'
 
 describe('Flujo Completo de Registro - Integración', () => {
+  function mockProfileLookup(profile: Record<string, unknown>) {
+    vi.mocked(mockSupabaseClient.from).mockReturnValue({
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({ data: profile, error: null }),
+      insert: vi.fn().mockResolvedValue({ error: null }),
+    } as any)
+  }
+
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(getSupabaseBrowserClient).mockReturnValue(mockSupabaseClient as any)
+    vi.mocked(getSupabaseEcommerce).mockReturnValue(mockSupabaseClient as any)
   })
 
   it('debe completar el flujo completo de registro exitosamente', async () => {
@@ -52,6 +63,13 @@ describe('Flujo Completo de Registro - Integración', () => {
         session: mockSession,
       },
       error: null,
+    })
+
+    mockProfileLookup({
+      id: mockUser.id,
+      email: userData.email,
+      first_name: userData.firstName,
+      last_name: userData.lastName,
     })
 
     // Paso 3: Mock de perfil creado por trigger
@@ -114,6 +132,13 @@ describe('Flujo Completo de Registro - Integración', () => {
         session: null,
       },
       error: null,
+    })
+
+    mockProfileLookup({
+      id: mockUser.id,
+      email: userData.email,
+      first_name: userData.firstName,
+      last_name: userData.lastName,
     })
 
     vi.mocked(authApi.getUserProfile).mockResolvedValue({
@@ -235,7 +260,7 @@ describe('Flujo Completo de Registro - Integración', () => {
     })
     vi.mocked(mockSupabaseClient.from).mockImplementation(mockFrom)
 
-    const result = await signUp(
+    await signUp(
       userData.email,
       userData.password,
       userData.firstName,
@@ -246,4 +271,3 @@ describe('Flujo Completo de Registro - Integración', () => {
     expect(mockSupabaseClient.auth.signUp).toHaveBeenCalled()
   })
 })
-

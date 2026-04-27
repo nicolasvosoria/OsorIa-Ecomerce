@@ -6,6 +6,8 @@
  * IMPORTANTE: Durante build time (generateStaticParams, etc.), retorna null
  * para evitar errores. Las funciones que usen esto deben manejar el caso null.
  */
+import { resolveStoreLookupSubdomain } from "@/lib/utils/store-host";
+
 const SYMBOLIC_DEFAULT_STORE_ID = "default";
 
 export function normalizeRuntimeStoreId(
@@ -125,21 +127,5 @@ export function getSubdomain(): string | null {
     return null;
   }
 
-  const hostname = window.location.hostname;
-
-  if (hostname.includes("localhost") || hostname.includes("127.0.0.1")) {
-    return "default";
-  }
-
-  const parts = hostname.split(".");
-
-  if (parts.length >= 2) {
-    const subdomain = parts[0];
-    if (subdomain === "www") {
-      return parts.length > 2 ? parts[1] : null;
-    }
-    return subdomain;
-  }
-
-  return null;
+  return resolveStoreLookupSubdomain(window.location.hostname);
 }

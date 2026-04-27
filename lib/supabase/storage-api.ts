@@ -1,7 +1,8 @@
 import { getSupabaseBrowserClient } from "./client";
+import { ECOMMERCE_STORAGE_BUCKETS } from "./contract";
 import { isCurrentUserAdmin } from "./permissions-api";
 
-const BUCKET_NAME = "products";
+const BUCKET_NAME = ECOMMERCE_STORAGE_BUCKETS.products;
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB por defecto
 const MAX_PRODUCT_IMAGE_SIZE = 1 * 1024 * 1024; // 1MB para imágenes de productos
 const ALLOWED_TYPES = [

@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { getSupabaseBrowserClient } from '@/lib/supabase/client'
+import { getSupabaseBrowserClient, getSupabaseEcommerce } from '@/lib/supabase/client'
 import { mockSupabaseClient } from '../__mocks__/supabase'
 
 // Mock del cliente de Supabase
 vi.mock('@/lib/supabase/client', () => ({
   getSupabaseBrowserClient: vi.fn(),
+  getSupabaseEcommerce: vi.fn(),
 }))
 
 // Mock de getUserProfile
@@ -21,9 +22,25 @@ import { signUp } from '@/lib/supabase/auth-api'
 import * as authApi from '@/lib/supabase/auth-api'
 
 describe('signUp - Creación de cuentas nuevas', () => {
+  function mockProfileLookup(profile: Record<string, unknown>) {
+    vi.mocked(mockSupabaseClient.from).mockReturnValue({
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({ data: profile, error: null }),
+      insert: vi.fn().mockResolvedValue({ error: null }),
+    } as any)
+  }
+
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(getSupabaseBrowserClient).mockReturnValue(mockSupabaseClient as any)
+    vi.mocked(getSupabaseEcommerce).mockReturnValue(mockSupabaseClient as any)
+    mockProfileLookup({
+      id: 'user-123',
+      email: 'test@example.com',
+      first_name: 'Juan',
+      last_name: 'Pérez',
+    })
   })
 
   it('debe registrar un usuario exitosamente con todos los datos', async () => {
@@ -44,6 +61,13 @@ describe('signUp - Creación de cuentas nuevas', () => {
         session: mockSession,
       },
       error: null,
+    })
+
+    mockProfileLookup({
+      id: 'user-123',
+      email: 'test@example.com',
+      first_name: 'Juan',
+      last_name: 'Pérez',
     })
 
     // Mock de getUserProfile exitoso
@@ -94,6 +118,13 @@ describe('signUp - Creación de cuentas nuevas', () => {
         session: { user: mockUser, access_token: 'token' },
       },
       error: null,
+    })
+
+    mockProfileLookup({
+      id: 'user-456',
+      email: 'test2@example.com',
+      first_name: null,
+      last_name: null,
     })
 
     vi.mocked(authApi.getUserProfile).mockResolvedValue({
@@ -163,7 +194,7 @@ describe('signUp - Creación de cuentas nuevas', () => {
     }
     vi.mocked(mockSupabaseClient.from).mockReturnValue(fromChain as any)
 
-    const result = await signUp(
+    await signUp(
       'test3@example.com',
       'password123',
       'María',
@@ -189,6 +220,13 @@ describe('signUp - Creación de cuentas nuevas', () => {
       error: null,
     })
 
+    mockProfileLookup({
+      id: 'user-999',
+      email: 'test4@example.com',
+      first_name: null,
+      last_name: null,
+    })
+
     vi.mocked(authApi.getUserProfile).mockResolvedValue({
       success: true,
       user: {
@@ -207,6 +245,7 @@ describe('signUp - Creación de cuentas nuevas', () => {
 
   it('debe manejar cuando Supabase no está configurado', async () => {
     vi.mocked(getSupabaseBrowserClient).mockReturnValue(null)
+    vi.mocked(getSupabaseEcommerce).mockReturnValue(null)
 
     const result = await signUp('test@example.com', 'password123')
 
@@ -214,4 +253,3 @@ describe('signUp - Creación de cuentas nuevas', () => {
     expect(result.error).toBe('Supabase no configurado')
   })
 })
-

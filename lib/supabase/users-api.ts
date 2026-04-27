@@ -1,4 +1,5 @@
 import { getSupabaseEcommerce } from './client'
+import { ECOMMERCE_TABLES } from './contract'
 import type { UserProfile } from '@/lib/types/user'
 
 // Helper para manejar timeouts
@@ -48,7 +49,7 @@ export async function getUsers(params: GetUsersParams = {}): Promise<GetUsersRes
     } = params
 
     let query = supabase
-      .from('user_profiles')
+      .from(ECOMMERCE_TABLES.userProfiles)
       .select('*', { count: 'exact' })
 
     // Filtrar por rol si se especifica
@@ -94,7 +95,7 @@ export async function getUserById(userId: string): Promise<UserProfile | null> {
 
     const result = await withTimeout(
       supabase
-        .from('user_profiles')
+        .from(ECOMMERCE_TABLES.userProfiles)
         .select('*')
         .eq('id', userId)
         .single(),
@@ -113,5 +114,4 @@ export async function getUserById(userId: string): Promise<UserProfile | null> {
     return null
   }
 }
-
 

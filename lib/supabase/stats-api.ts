@@ -1,4 +1,5 @@
 import { getSupabaseEcommerce } from './client'
+import { ECOMMERCE_TABLES } from './contract'
 
 // Helper para manejar timeouts
 async function withTimeout<T>(
@@ -67,7 +68,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     const [productsResult, ordersTodayResult, usersResult, monthlySalesResult] = await Promise.all([
       withTimeout(
         supabase
-          .from('store_items_legacy')
+          .from(ECOMMERCE_TABLES.storeItems)
           .select('id', { count: 'exact', head: true })
           .eq('is_active', true),
         10000,
@@ -75,7 +76,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       ) as Promise<{ count: number | null; error: any }>,
       withTimeout(
         supabase
-          .from('orders_legacy')
+          .from(ECOMMERCE_TABLES.orders)
           .select('id', { count: 'exact', head: true })
           .gte('created_at', new Date().toISOString().split('T')[0] + 'T00:00:00.000Z'),
         10000,
@@ -83,21 +84,21 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       ) as Promise<{ count: number | null; error: any }>,
       withTimeout(
         supabase
-          .from('user_profiles')
+          .from(ECOMMERCE_TABLES.userProfiles)
           .select('id', { count: 'exact', head: true }),
         10000,
         'getUsersCount'
       ) as Promise<{ count: number | null; error: any }>,
       withTimeout(
         supabase
-          .from('orders_legacy')
+          .from(ECOMMERCE_TABLES.orders)
           .select('total_amount, currency_code')
           .gte('created_at', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString())
           .in('status', ['confirmed', 'processing', 'shipped', 'delivered'])
           .in('payment_status', ['paid']),
         10000,
         'getMonthlySales'
-      ) as Promise<{ data: any[] | null; error: any }>,
+      ) as Promise<{ data: Array<{ total_amount: unknown }> | null; error: any }>,
     ])
 
     // Procesar resultados
@@ -154,27 +155,27 @@ export async function getDetailedStats(days: number = 30): Promise<DetailedStats
 
     const salesByDayResult = await withTimeout(
       supabase
-        .from('orders_legacy')
+        .from(ECOMMERCE_TABLES.orders)
         .select('created_at, total_amount, id')
         .gte('created_at', startDateISO)
         .in('status', ['confirmed', 'processing', 'shipped', 'delivered'])
         .in('payment_status', ['paid']),
       15000,
       'getSalesByDay'
-    ) as Promise<{ data: any[] | null; error: any }>
+    ) as { data: Array<{ created_at: string; total_amount: unknown; id: string }> | null; error: any }
 
     const ordersByStatusResult = await withTimeout(
       supabase
-        .from('orders_legacy')
+        .from(ECOMMERCE_TABLES.orders)
         .select('status, id')
         .gte('created_at', startDateISO),
       15000,
       'getOrdersByStatus'
-    ) as Promise<{ data: any[] | null; error: any }>
+    ) as { data: Array<{ status: string | null; id: string }> | null; error: any }
 
     const topProductsResult = await withTimeout(
       supabase
-        .from('order_items')
+        .from(ECOMMERCE_TABLES.orderItems)
         .select(`
           id,
           quantity,
@@ -186,7 +187,7 @@ export async function getDetailedStats(days: number = 30): Promise<DetailedStats
         .gte('orders.created_at', startDateISO),
       15000,
       'getTopProducts'
-    ) as Promise<{ data: any[] | null; error: any }>
+    ) as { data: Array<{ id: string; quantity: unknown; unit_price: unknown; product_name: string | null; product_id: string | null }> | null; error: any }
 
     // Procesar ventas por día
     const salesByDayMap = new Map<string, { sales: number; orders: number }>()
@@ -294,5 +295,4 @@ export async function getDetailedStats(days: number = 30): Promise<DetailedStats
     }
   }
 }
-
 

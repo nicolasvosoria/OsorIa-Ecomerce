@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createServerClient } from "@supabase/ssr"
 import { createClient } from "@supabase/supabase-js"
 import { cookies } from "next/headers"
+import { ECOMMERCE_SCHEMA, ECOMMERCE_TABLES, ECOMMERCE_VIEWS } from "@/lib/supabase/contract"
 
 // En Vercel: dar más tiempo a la función (DeepSeek + Supabase pueden tardar). Plan Hobby máx 10s; Pro hasta 300s.
 export const maxDuration = 30
@@ -28,7 +29,7 @@ function getSupabaseServiceClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!supabaseUrl || !serviceKey) return null
-  return createClient(supabaseUrl, serviceKey)
+  return createClient(supabaseUrl, serviceKey).schema(ECOMMERCE_SCHEMA)
 }
 
 async function getSupabaseServerClient() {
@@ -49,19 +50,19 @@ async function getSupabaseServerClient() {
       set(name: string, value: string, options: any) {
         try {
           cookieStore.set({ name, value, ...options })
-        } catch (error) {
+        } catch {
           // Las cookies pueden fallar durante el renderizado estático
         }
       },
       remove(name: string, options: any) {
         try {
           cookieStore.set({ name, value: '', ...options })
-        } catch (error) {
+        } catch {
           // Las cookies pueden fallar durante el renderizado estático
         }
       },
     },
-  })
+  }).schema(ECOMMERCE_SCHEMA)
 }
 
 async function getStoreIdFromServer(): Promise<string | null> {
@@ -74,7 +75,7 @@ async function getStoreIdFromServer(): Promise<string | null> {
     const cookieStore = await cookies()
     const storeIdCookie = cookieStore.get('store_id')
     if (storeIdCookie) return storeIdCookie.value
-  } catch (error) {
+  } catch {
     return 'default'
   }
   
@@ -97,7 +98,7 @@ async function getChatbotConfig() {
     const storeId = await getStoreIdFromServer()
 
     let query = supabase
-      .from('stores')
+      .from(ECOMMERCE_TABLES.stores)
       .select('metadata')
       .eq('is_active', true)
       .is('deleted_at', null)
@@ -218,7 +219,7 @@ async function getEffectiveStoreUuid(supabase: NonNullable<Awaited<ReturnType<ty
   const storeId = await getStoreIdFromServer()
   if (storeId && storeId !== "default") return storeId
   const { data: defaultStore } = await supabase
-    .from("stores")
+    .from(ECOMMERCE_VIEWS.storesLegacy)
     .select("id")
     .eq("subdomain", "default")
     .eq("is_active", true)
@@ -236,7 +237,7 @@ async function getStoreProductsContext(): Promise<string> {
     const storeUuid = await getEffectiveStoreUuid(supabase)
 
     let query = supabase
-      .from("store_items")
+      .from(ECOMMERCE_TABLES.storeItems)
       .select("id, item_name, item_description, base_price, currency_code, metadata, item_slug")
       .eq("is_active", true)
       .eq("is_available_for_sale", true)
@@ -249,7 +250,7 @@ async function getStoreProductsContext(): Promise<string> {
     // Si no hay productos en la tienda actual, fallback: obtener de cualquier tienda (para no devolver prompt genérico)
     if ((error || !products || products.length === 0) && storeUuid) {
       const fallback = await supabase
-        .from("store_items")
+        .from(ECOMMERCE_TABLES.storeItems)
         .select("id, item_name, item_description, base_price, currency_code, metadata, item_slug")
         .eq("is_active", true)
         .eq("is_available_for_sale", true)
@@ -273,7 +274,7 @@ async function getAnyProductsContext(): Promise<string> {
   if (!supabase) return ""
   try {
     const { data: products, error } = await supabase
-      .from("store_items")
+      .from(ECOMMERCE_TABLES.storeItems)
       .select("id, item_name, item_description, base_price, currency_code, metadata, item_slug")
       .eq("is_active", true)
       .eq("is_available_for_sale", true)
@@ -296,7 +297,7 @@ async function searchRelevantProducts(userMessage: string): Promise<string> {
     const storeUuid = await getEffectiveStoreUuid(supabase)
 
     let query = supabase
-      .from("store_items")
+      .from(ECOMMERCE_TABLES.storeItems)
       .select("id, item_name, item_description, base_price, currency_code, metadata, item_slug")
       .eq("is_active", true)
       .eq("is_available_for_sale", true)
@@ -392,7 +393,7 @@ export async function GET() {
   }
   try {
     const { data: products, error } = await supabase
-      .from("store_items")
+      .from(ECOMMERCE_TABLES.storeItems)
       .select("id, item_name")
       .eq("is_active", true)
       .eq("is_available_for_sale", true)

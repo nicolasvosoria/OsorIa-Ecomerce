@@ -29,8 +29,6 @@ export default function CheckoutPage() {
     // Esto es importante porque después de completar una compra y volver,
     // no queremos mostrar datos de la compra anterior
     localStorage.removeItem("guest_customer_data")
-    setCustomerData(null)
-    setIsProcessing(false)
   }, [])
 
   // Determinar qué carrito usar (preferir Shopify, luego local)
@@ -94,8 +92,6 @@ export default function CheckoutPage() {
       throw new Error("El carrito está vacío")
     }
 
-    const { createOrder } = await import("@/lib/supabase/orders-api")
-    
     // Preparar los items del pedido según el tipo de carrito
     let orderItems: any[] = []
     let subtotal = 0
@@ -165,7 +161,7 @@ export default function CheckoutPage() {
     // Crear el pedido
     let order
     try {
-      order = await createOrder({
+      const orderPayload = {
         customer_type: userId ? "user" : "guest",
         user_id: userId || null,
         customer_email: data.email,
@@ -186,7 +182,26 @@ export default function CheckoutPage() {
         total_amount: total,
         currency_code: currencyCode,
         items: orderItems,
+      }
+
+      const response = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(orderPayload),
       })
+
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        const error = new Error(
+          payload?.error || "No se pudo crear el pedido",
+        )
+        if (payload?.validationResult) {
+          ;(error as any).validationResult = payload.validationResult
+        }
+        throw error
+      }
+
+      order = payload.order
 
       if (!order) {
         throw new Error("No se pudo crear el pedido")
@@ -498,4 +513,3 @@ export default function CheckoutPage() {
     </div>
   )
 }
-

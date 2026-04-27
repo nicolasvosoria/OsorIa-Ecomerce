@@ -1,4 +1,5 @@
 import { getSupabaseEcommerce } from "./client";
+import { ECOMMERCE_VIEWS } from "./contract";
 import type { AppFont } from "@/lib/types/font";
 import { requireAdmin } from "./permissions-api";
 import { getAdminRequestHeaders } from "./admin-request-headers";
@@ -60,7 +61,7 @@ export async function getFonts(): Promise<AppFont[]> {
       try {
         console.log("[Font] Probando conectividad con Supabase...");
         const testQuery = supabase
-          .from("app_fonts_legacy")
+          .from(ECOMMERCE_VIEWS.appFontsLegacy)
           .select("id")
           .limit(1);
         const testResult = await Promise.race([
@@ -87,7 +88,7 @@ export async function getFonts(): Promise<AppFont[]> {
     }
 
     const queryPromise = supabase
-      .from("app_fonts_legacy")
+      .from(ECOMMERCE_VIEWS.appFontsLegacy)
       .select("*")
       .order("font_name");
 
@@ -155,7 +156,7 @@ export async function getActiveFont(): Promise<AppFont | null> {
   }
 
   const { data, error } = await supabase
-    .from("app_fonts_legacy")
+    .from(ECOMMERCE_VIEWS.appFontsLegacy)
     .select("*")
     .eq("is_active", true)
     .single();

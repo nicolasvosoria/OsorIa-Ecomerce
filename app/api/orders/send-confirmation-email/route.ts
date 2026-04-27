@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getOrderById, type OrderWithItems } from "@/lib/supabase/orders-api";
+import { ECOMMERCE_SCHEMA, ECOMMERCE_TABLES } from "@/lib/supabase/contract";
 import { formatPrice } from "@/lib/shopify/utils";
 import {
   escapeHtml,
@@ -57,9 +58,11 @@ export async function GET(request: NextRequest) {
         },
       );
     }
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabase = createClient(supabaseUrl, supabaseKey).schema(
+      ECOMMERCE_SCHEMA,
+    );
     const { data: orders, error } = await supabase
-      .from("orders")
+      .from(ECOMMERCE_TABLES.orders)
       .select("id")
       .order("created_at", { ascending: false })
       .limit(1);

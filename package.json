@@ -13,6 +13,10 @@
     "test:full": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.quality.json",
     "typecheck:full": "tsc --noEmit",
+    "supabase:start": "supabase start",
+    "supabase:reset": "supabase db reset",
+    "supabase:verify": "psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -v ON_ERROR_STOP=1 -f supabase/checks/verify-ecommerce-contract.sql",
+    "supabase:types": "supabase gen types typescript --local --schema ecommerce > lib/supabase/database.types.ts",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage"
   },
@@ -106,8 +110,14 @@
     "eslint-config-next": "16.0.8",
     "jsdom": "^23.0.1",
     "postcss": "^8.5",
+    "supabase": "^2.95.3",
     "tailwindcss": "^4.1.13",
     "typescript": "^5",
     "vitest": "^1.0.4"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "supabase"
+    ]
   }
 }

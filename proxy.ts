@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { resolveStoreSubdomain } from '@/lib/utils/store-host'
 
 // Variable de entorno para deshabilitar multi-tenant temporalmente
 const DISABLE_SUBDOMAIN_MULTI_TENANT = process.env.DISABLE_SUBDOMAIN_MULTI_TENANT === 'true'
@@ -14,65 +15,6 @@ interface Store {
   domain: string
   is_active: boolean
   is_public: boolean
-}
-
-/**
- * Extrae el subdominio de la URL
- */
-function getSubdomain(hostname: string): string | null {
-  // En desarrollo local, detectar subdominios como reposteria.localhost
-  if (hostname.includes('localhost') || hostname.includes('127.0.0.1')) {
-    // Si es localhost con subdominio (ej: reposteria.localhost)
-    const parts = hostname.split('.')
-    if (parts.length > 1 && parts[0] !== 'localhost' && parts[0] !== '127') {
-      return parts[0] // Retornar el subdominio (ej: 'reposteria')
-    }
-    // Si es solo localhost sin subdominio, usar 'default'
-    return 'default'
-  }
-
-  // En Vercel, los dominios pueden ser:
-  // - tudominio.com (sin subdominio)
-  // - subdominio.tudominio.com (con subdominio)
-  // - proyecto.vercel.app (dominio de Vercel sin subdominio - 3 partes)
-  // - subdominio.proyecto.vercel.app (subdominio en Vercel - 4 partes)
-  
-  const parts = hostname.split('.')
-  
-  // Detectar dominios de Vercel: tienen 'vercel.app' al final
-  const isVercelDomain = parts.length >= 2 && 
-    (parts[parts.length - 2] === 'vercel' && parts[parts.length - 1] === 'app')
-  
-  if (isVercelDomain) {
-    // Si tiene exactamente 3 partes (proyecto.vercel.app), no hay subdominio real
-    if (parts.length === 3) {
-      return null // Se manejará como 'default' más abajo
-    }
-    // Si tiene 4 o más partes (subdominio.proyecto.vercel.app), hay subdominio real
-    if (parts.length >= 4) {
-      return parts[0] // Retornar el subdominio (ej: 'reposteria')
-    }
-  }
-  
-  // Para dominios personalizados o otros casos
-  if (parts.length >= 2) {
-    const subdomain = parts[0]
-    
-    // Ignorar 'www'
-    if (subdomain === 'www') {
-      return parts.length > 2 ? parts[1] : null
-    }
-    
-    // Si es un dominio de 2 partes (ej: tudominio.com), no hay subdominio
-    if (parts.length === 2) {
-      return null
-    }
-    
-    // Si tiene 3 o más partes (subdominio.tudominio.com), retornar el subdominio
-    return subdomain
-  }
-  
-  return null
 }
 
 // Caché simple en memoria para las tiendas (evita consultas repetidas)
@@ -171,7 +113,7 @@ export async function proxy(request: NextRequest) {
   }
 
   // Extraer subdominio
-  const subdomain = getSubdomain(hostname)
+  const subdomain = resolveStoreSubdomain(hostname)
 
   // Si no hay subdominio, usar tienda por defecto
   if (!subdomain) {
@@ -256,5 +198,4 @@ export const config = {
     '/((?!api|_next/static|_next/image|favicon.ico).*)',
   ],
 }
-
 

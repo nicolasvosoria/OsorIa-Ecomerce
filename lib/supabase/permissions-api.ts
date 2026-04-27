@@ -1,4 +1,5 @@
 import { getSupabaseBrowserClient, getSupabaseEcommerce } from "./client"
+import { ECOMMERCE_TABLES } from "./contract"
 import type { UserRole } from "@/lib/types/user"
 
 // Helper para manejar timeouts
@@ -95,7 +96,7 @@ export async function isCurrentUserAdmin(): Promise<boolean> {
         }
 
         const queryPromise = supabase
-          .from("user_profiles")
+          .from(ECOMMERCE_TABLES.userProfiles)
           .select("role")
           .eq("id", user.id)
           .single()
@@ -251,7 +252,7 @@ export async function getCurrentUserRole(): Promise<UserRole | null> {
 
         // Consultar perfil con timeout
         const queryPromise = supabase
-          .from("user_profiles")
+          .from(ECOMMERCE_TABLES.userProfiles)
           .select("role")
           .eq("id", user.id)
           .single()

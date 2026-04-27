@@ -1,4 +1,5 @@
 import { getSupabaseEcommerce } from "@/lib/supabase/client"
+import { ECOMMERCE_TABLES, ECOMMERCE_VIEWS } from "@/lib/supabase/contract"
 
 export interface ChatbotConfig {
   systemPrompt: string
@@ -41,7 +42,7 @@ export async function getChatbotConfig(): Promise<ChatbotConfig> {
       : 'default'
 
     let query = supabase
-      .from('stores_legacy')
+      .from(ECOMMERCE_VIEWS.storesLegacy)
       .select('metadata')
       .eq('is_active', true)
       .is('deleted_at', null)
@@ -93,7 +94,7 @@ export async function saveChatbotConfig(config: ChatbotConfig): Promise<{ succes
       : 'default'
 
     let query = supabase
-      .from('stores_legacy')
+      .from(ECOMMERCE_VIEWS.storesLegacy)
       .select('id, metadata')
       .eq('is_active', true)
       .is('deleted_at', null)
@@ -115,7 +116,7 @@ export async function saveChatbotConfig(config: ChatbotConfig): Promise<{ succes
     metadata.chatbot = config
 
     const { error: updateError } = await supabase
-      .from('stores')
+      .from(ECOMMERCE_TABLES.stores)
       .update({ 
         metadata,
         updated_at: new Date().toISOString()
