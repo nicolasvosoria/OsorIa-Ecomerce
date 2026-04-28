@@ -25,6 +25,15 @@ import {
   CarouselItem,
   type CarouselApi,
 } from "@/components/ui/carousel";
+import {
+  toHeroLayerModel,
+  type HeroHotspot,
+  type HeroHotspotAnchor,
+  type HeroLayerId,
+  type HeroProductPlacement,
+  type HeroSecondaryProductPreset,
+  type HeroSlideLayerFields,
+} from "@/lib/hero/hero-layer-model";
 
 // Helper para generar slug desde el título
 function generateSlug(title: string): string {
@@ -36,6 +45,34 @@ function generateSlug(title: string): string {
     .replace(/(^-|-$)/g, "");
 }
 
+const hotspotAnchorClass: Record<HeroHotspotAnchor, string> = {
+  "top-left": "left-4 top-4",
+  "top-right": "right-4 top-4",
+  "center-left": "left-4 top-1/2 -translate-y-1/2",
+  "center-right": "right-4 top-1/2 -translate-y-1/2",
+  "bottom-left": "bottom-4 left-4",
+  "bottom-right": "bottom-4 right-4",
+};
+
+const textSizeClasses: Record<NonNullable<HeroSlideLayerFields["textSize"]>, string> = {
+  compact: "text-3xl md:text-5xl lg:text-6xl",
+  balanced: "text-4xl md:text-6xl lg:text-7xl",
+  feature: "text-4xl md:text-6xl lg:text-[92px]",
+};
+
+const secondaryPresetPlacement: Record<
+  HeroSecondaryProductPreset,
+  { primary: HeroProductPlacement; secondary: HeroProductPlacement }
+> = {
+  "primary-right-secondary-left": { primary: "right", secondary: "left" },
+  "primary-left-secondary-right": { primary: "left", secondary: "right" },
+};
+
+const fullImageProductSideClasses: Record<HeroProductPlacement, string> = {
+  left: "md:left-8 md:right-auto",
+  right: "md:right-8 md:left-auto",
+};
+
 export function HeroBanner() {
   const { activeTheme } = useTheme();
   const { styles: styleData } = useComponentStyle("hero", {
@@ -46,7 +83,12 @@ export function HeroBanner() {
       "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua",
     buttonText: "Comprar ahora",
   });
-  const { componentEdits } = useAdmin();
+  const {
+    componentEdits,
+    selectedHeroLayer,
+    selectedHeroSlideIndex = 0,
+    selectedHeroHotspotId = null,
+  } = useAdmin();
   const [api, setApi] = useState<CarouselApi>();
   const autoplayRef = useRef<NodeJS.Timeout | null>(null);
   const [selectedFeature, setSelectedFeature] = useState<{
@@ -54,6 +96,9 @@ export function HeroBanner() {
     description: string;
   } | null>(null);
   const [isFeatureDialogOpen, setIsFeatureDialogOpen] = useState(false);
+  const [openHotspotId, setOpenHotspotId] = useState<string | null>(null);
+  const [hoveredHotspotId, setHoveredHotspotId] = useState<string | null>(null);
+  const [focusedHotspotId, setFocusedHotspotId] = useState<string | null>(null);
 
   // Determinar si el tema es oscuro para ajustar estilos
   const isDarkTheme = useMemo(() => {
@@ -89,19 +134,16 @@ export function HeroBanner() {
     styleData.buttonTextColor ??
     "var(--accent-foreground)";
   const barColor = edits.barColor ?? styleData.barColor;
-  const overlayColor =
-    edits.overlayColor ?? styleData.overlayColor ?? "#101828";
-  const overlayOpacity = Number(
-    edits.overlayOpacity ?? styleData.overlayOpacity ?? 0.45,
-  );
-  const layoutMode = edits.layoutMode ?? styleData.layoutMode ?? "split";
-  const imageFit = edits.imageFit ?? styleData.imageFit ?? "cover";
-  const imagePositionX =
-    edits.imagePositionX ?? styleData.imagePositionX ?? "center";
-  const imagePositionY =
-    edits.imagePositionY ?? styleData.imagePositionY ?? "center";
-  const fullImageContentAlign =
-    edits.fullImageContentAlign ?? styleData.fullImageContentAlign ?? "left";
+  const heroLayerModel = toHeroLayerModel({ ...styleData, ...edits });
+  const {
+    overlayColor,
+    overlayOpacity,
+    layoutMode,
+    imageFit,
+    imagePositionX,
+    imagePositionY,
+    contentAlign: fullImageContentAlign,
+  } = heroLayerModel;
 
   const fullImageFitClass =
     imageFit === "contain" ? "object-contain" : "object-cover";
@@ -211,47 +253,8 @@ export function HeroBanner() {
   };
 
   // Array de productos editables para el carrusel
-  const defaultProducts = [
-    {
-      label: "Electrónica",
-      title: "BALFE",
-      subtitle: "NUEVO MODELO",
-      description:
-        "Descubre la última tecnología en dispositivos electrónicos. Calidad premium y diseño innovador para una experiencia única.",
-      buttonText: "Comprar ahora",
-      image: "/black-smart-speaker.jpg",
-    },
-    {
-      label: "Audio",
-      title: "PREMIUM",
-      subtitle: "HEADPHONES",
-      description:
-        "Experimenta el sonido de alta calidad con nuestros auriculares premium. Diseño ergonómico y cancelación de ruido activa.",
-      buttonText: "Ver más",
-      image: "/premium-headphones.png",
-    },
-    {
-      label: "Accesorios",
-      title: "LAPTOP STAND",
-      subtitle: "ERGONÓMICO",
-      description:
-        "Mejora tu espacio de trabajo con nuestro soporte para laptop. Diseño moderno y ajustable para mayor comodidad.",
-      buttonText: "Comprar ahora",
-      image: "/laptop-stand.png",
-    },
-    {
-      label: "Proyección",
-      title: "MINI PROJECTOR",
-      subtitle: "PORTÁTIL",
-      description:
-        "Lleva el cine contigo. Proyector compacto con alta resolución y conectividad inalámbrica para tus presentaciones.",
-      buttonText: "Descubrir",
-      image: "/mini-projector.jpg",
-    },
-  ];
-
   // Usar productos editables si existen, sino usar los por defecto
-  const heroProducts = edits.products ?? styleData.products ?? defaultProducts;
+  const heroProducts = heroLayerModel.products;
 
   // Función helper para convertir hex a rgba
   const hexToRgba = (hex: string, alpha: number) => {
@@ -266,7 +269,7 @@ export function HeroBanner() {
       const g = parseInt(hexColor.slice(3, 5), 16);
       const b = parseInt(hexColor.slice(5, 7), 16);
       return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-    } catch (e) {
+    } catch {
       return `rgba(0, 0, 0, ${alpha})`;
     }
   };
@@ -275,9 +278,117 @@ export function HeroBanner() {
   // Para temas oscuros, esto asegura que se usen los colores correctos
   const accentColor = activeTheme?.colors.accent || "#005aa1";
   const secondaryColor = activeTheme?.colors.secondary || "#c4faff";
-  const clampedOverlayOpacity = Number.isFinite(overlayOpacity)
-    ? Math.min(Math.max(overlayOpacity, 0), 0.9)
-    : 0.45;
+  const clampedOverlayOpacity = overlayOpacity;
+
+  const getLayerAttributes = (layerId: HeroLayerId) => ({
+    "data-hero-layer": layerId,
+    "data-selected-hero-layer":
+      selectedHeroLayer === layerId ? "true" : undefined,
+  });
+
+  const renderHotspots = (hotspots: HeroHotspot[] = []) => {
+    if (hotspots.length === 0) return null;
+
+    return hotspots.map((hotspot) => {
+      const isOpen =
+        openHotspotId === hotspot.id ||
+        hoveredHotspotId === hotspot.id ||
+        focusedHotspotId === hotspot.id;
+      const detailsId = `hero-hotspot-details-${hotspot.id}`;
+
+      return (
+        <div
+          key={hotspot.id}
+          className={`absolute z-20 ${hotspotAnchorClass[hotspot.anchor]}`}
+          data-hero-hotspot-id={hotspot.id}
+          data-selected-hero-hotspot={
+            selectedHeroHotspotId === hotspot.id ? "true" : undefined
+          }
+          onClick={(event) => event.stopPropagation()}
+        >
+          <button
+            type="button"
+            aria-label={hotspot.label}
+            aria-expanded={isOpen}
+            aria-controls={detailsId}
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-foreground shadow-lg ring-2 ring-primary/30 transition hover:scale-105 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary"
+            onMouseEnter={() => setHoveredHotspotId(hotspot.id)}
+            onMouseLeave={() => setHoveredHotspotId(null)}
+            onFocus={() => setFocusedHotspotId(hotspot.id)}
+            onBlur={() => setFocusedHotspotId(null)}
+            onClick={(event) => {
+              event.stopPropagation();
+              setOpenHotspotId((current) =>
+                current === hotspot.id ? null : hotspot.id,
+              );
+            }}
+          >
+            <span className="h-3 w-3 rounded-full bg-primary" />
+          </button>
+          {isOpen && (
+            <div
+              id={detailsId}
+              role="status"
+              className="mt-2 w-56 rounded-xl bg-background p-3 text-left text-foreground shadow-xl"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <p className="text-sm font-semibold">{hotspot.label}</p>
+              {hotspot.description && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {hotspot.description}
+                </p>
+              )}
+              {hotspot.href && (
+                <Link
+                  href={hotspot.href}
+                  className="mt-2 inline-flex text-xs font-semibold text-primary"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  Ver detalle
+                </Link>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    });
+  };
+
+  const renderProductImageFrame = ({
+    src,
+    alt,
+    width,
+    height,
+    sizes,
+    priority,
+    imageClassName,
+    hotspots,
+  }: {
+    src: string;
+    alt: string;
+    width: number;
+    height: number;
+    sizes: string;
+    priority: boolean;
+    imageClassName: string;
+    hotspots?: HeroHotspot[];
+  }) => (
+    <div
+      data-hero-product-frame="primary"
+      className="relative inline-flex max-w-full items-center justify-center pointer-events-auto"
+    >
+      <Image
+        src={src}
+        alt={alt}
+        width={width}
+        height={height}
+        className={imageClassName}
+        sizes={sizes}
+        priority={priority}
+      />
+      {renderHotspots(hotspots)}
+    </div>
+  );
 
   // Auto-play: cambiar cada 10 segundos
   useEffect(() => {
@@ -324,9 +435,14 @@ export function HeroBanner() {
     <section
       data-component="hero"
       data-hero-layout={layoutMode}
+      data-hero-viewport-shell={
+        layoutMode === "full-image" ? "full-image" : undefined
+      }
+      data-hero-side-gutters={layoutMode === "full-image" ? "24px" : undefined}
+      onClick={() => setOpenHotspotId(null)}
       className={
         layoutMode === "full-image"
-          ? "container relative w-full overflow-hidden rounded-2xl md:rounded-3xl mx-auto mt-2 md:mt-4 mb-4 md:mb-8"
+          ? "container relative mx-6 w-auto max-w-none overflow-hidden rounded-2xl md:rounded-3xl mt-2 md:mt-4 mb-4 md:mb-8"
           : "container relative w-full overflow-hidden rounded-2xl md:rounded-3xl mx-auto px-2 md:px-4 mt-2 md:mt-4 mb-4 md:mb-8"
       }
       style={{
@@ -345,14 +461,7 @@ export function HeroBanner() {
         <CarouselContent>
           {heroProducts.map(
             (
-              product: {
-                label?: string;
-                title?: string;
-                subtitle?: string;
-                description?: string;
-                buttonText?: string;
-                image?: string;
-              },
+              product: HeroSlideLayerFields,
               index: number,
             ) => {
               // Usar valores del producto directamente (ya vienen editados)
@@ -361,15 +470,42 @@ export function HeroBanner() {
               const displaySubtitle = product.subtitle || "";
               const displayDescription = product.description || "";
               const displayButtonText = product.buttonText || "";
-              const displayImage = product.image || "/placeholder.svg";
+              const displayImage =
+                product.backgroundImage || product.image || "/placeholder.svg";
+              const productImage = product.productImage;
+              const productMediaImage = productImage || displayImage;
+              const slideTextColor = product.textColor || textColor;
+              const slideTitleSizeClass = textSizeClasses[product.textSize ?? "feature"];
+              const productPlacement = product.productPlacement ?? "right";
               const isFullImageLayout = layoutMode === "full-image";
+              const canRenderSecondaryProduct =
+                isFullImageLayout &&
+                fullImageContentAlign === "center" &&
+                Boolean(product.secondaryProductImage);
+              const secondaryPreset =
+                product.secondaryProductPreset ?? "primary-right-secondary-left";
+              const resolvedFullImageProductPlacement = canRenderSecondaryProduct
+                ? secondaryPresetPlacement[secondaryPreset].primary
+                : productPlacement;
+              const secondaryProductPlacement =
+                secondaryPresetPlacement[secondaryPreset].secondary;
+              const productMediaOrderClass =
+                productPlacement === "left"
+                  ? "order-first"
+                  : "order-first md:order-last";
 
               return (
-                <CarouselItem key={index} className="basis-full">
-                  <div
-                    className={
-                      isFullImageLayout
-                        ? "relative min-h-[460px] md:min-h-[560px] lg:min-h-[640px]"
+                <CarouselItem
+                  key={index}
+                  className="basis-full"
+                  data-selected-hero-slide={
+                    selectedHeroSlideIndex === index ? "true" : undefined
+                  }
+                >
+                      <div
+                        className={
+                          isFullImageLayout
+                        ? "relative h-auto min-h-[clamp(520px,calc(100dvh-96px),860px)]"
                         : "container mx-auto px-4 md:px-8 py-8 pb-20 md:py-16 lg:py-24"
                     }
                   >
@@ -377,6 +513,7 @@ export function HeroBanner() {
                       <>
                         <div className="absolute inset-0">
                           <Image
+                            {...getLayerAttributes("background")}
                             data-testid={
                               index === 0
                                 ? "hero-full-background-image"
@@ -390,7 +527,58 @@ export function HeroBanner() {
                             sizes="100vw"
                             priority={index === 0}
                           />
+                          {productImage && (
+                            <div
+                              {...getLayerAttributes("product")}
+                              data-testid={`hero-product-media-${index}`}
+                              data-product-placement={resolvedFullImageProductPlacement}
+                              data-secondary-preset={
+                                canRenderSecondaryProduct ? secondaryPreset : undefined
+                              }
+                              className="absolute inset-0 z-[2] pointer-events-none"
+                            >
+                              <div
+                                className={`absolute inset-x-6 bottom-6 mx-auto flex max-w-xl justify-center opacity-95 md:inset-y-10 md:w-1/2 md:items-center ${fullImageProductSideClasses[resolvedFullImageProductPlacement]}`}
+                              >
+                                {renderProductImageFrame({
+                                  src: productImage,
+                                  alt:
+                                    product.productAlt ||
+                                    displayTitle ||
+                                    "Hero product media",
+                                  width: 720,
+                                  height: 720,
+                                  imageClassName:
+                                    "max-h-[220px] w-auto object-contain md:max-h-[420px] lg:max-h-[520px]",
+                                  sizes: "(max-width: 768px) 80vw, 45vw",
+                                  priority: index === 0,
+                                  hotspots: product.hotspots,
+                                })}
+                              </div>
+                              {canRenderSecondaryProduct && product.secondaryProductImage && (
+                                <div
+                                  data-hero-secondary-product="true"
+                                  data-secondary-preset={secondaryPreset}
+                                  className={`absolute inset-x-6 bottom-6 mx-auto flex max-w-sm justify-center opacity-90 md:inset-y-16 md:w-1/3 md:items-center ${fullImageProductSideClasses[secondaryProductPlacement]}`}
+                                >
+                                  <Image
+                                    src={product.secondaryProductImage}
+                                    alt={
+                                      product.secondaryProductAlt ||
+                                      "Hero secondary product media"
+                                    }
+                                    width={520}
+                                    height={520}
+                                    className="max-h-[160px] w-auto object-contain md:max-h-[320px] lg:max-h-[400px]"
+                                    sizes="(max-width: 768px) 60vw, 30vw"
+                                    priority={index === 0}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          )}
                           <div
+                            {...getLayerAttributes("overlay")}
                             className="absolute inset-0"
                             style={{
                               backgroundColor: overlayColor,
@@ -404,16 +592,19 @@ export function HeroBanner() {
                               ? "hero-full-content-container"
                               : undefined
                           }
-                          className={`relative z-10 flex min-h-[460px] md:min-h-[560px] lg:min-h-[640px] items-center px-6 py-12 md:px-10 lg:px-16 ${fullImageContentPositionClass}`}
+                          data-hero-mobile-sizing="content-safe"
+                          className={`relative z-10 flex h-auto min-h-[clamp(520px,calc(100dvh-96px),860px)] items-center px-6 py-12 md:px-10 lg:px-16 ${fullImageContentPositionClass}`}
                         >
                           <div
+                            {...getLayerAttributes("content")}
+                            className={`max-w-3xl space-y-4 md:space-y-6 ${fullImageTextAlignClass}`}
+                            style={{ color: slideTextColor }}
                             data-testid={
                               index === 0
                                 ? "hero-full-content-block"
-                                : undefined
+                                : `hero-slide-content-${index}`
                             }
-                            className={`max-w-3xl space-y-4 md:space-y-6 ${fullImageTextAlignClass}`}
-                            style={{ color: textColor }}
+                            data-hero-text-size={product.textSize ?? "feature"}
                           >
                             <span
                               className="inline-block rounded-lg px-4 py-1 text-xs font-inter font-medium md:px-6 md:text-[14.21px]"
@@ -424,7 +615,7 @@ export function HeroBanner() {
                               {displayLabel}
                             </span>
                             <div>
-                              <h1 className="text-4xl md:text-6xl lg:text-[92px] font-inter font-medium tracking-tight leading-tight">
+                              <h1 className={`${slideTitleSizeClass} font-inter font-medium tracking-tight leading-tight`}>
                                 {displayTitle}
                               </h1>
                               <h2 className="text-2xl md:text-4xl lg:text-[51px] font-inter font-light tracking-tight">
@@ -437,21 +628,26 @@ export function HeroBanner() {
                             >
                               {displayDescription}
                             </p>
-                            <Button
-                              size="lg"
-                              className="mb-4 min-h-[44px] w-full touch-manipulation rounded px-6 text-sm font-inter font-medium transition-all duration-200 md:mb-0 md:w-auto md:px-8 md:text-[16px]"
-                              style={{
-                                backgroundColor: buttonColor,
-                                color: buttonTextColor,
-                              }}
-                              asChild
+                            <div
+                              {...getLayerAttributes("cta")}
+                              className={`relative z-20 mt-6 ${fullImageTextAlignClass}`}
                             >
-                              <Link
-                                href={`/products/${generateSlug(displayTitle)}`}
+                              <Button
+                                size="lg"
+                                className="mb-4 min-h-[44px] w-full touch-manipulation rounded px-6 text-sm font-inter font-medium transition-all duration-200 md:mb-0 md:w-auto md:px-8 md:text-[16px]"
+                                style={{
+                                  backgroundColor: buttonColor,
+                                  color: buttonTextColor,
+                                }}
+                                asChild
                               >
-                                {displayButtonText} →
-                              </Link>
-                            </Button>
+                                <Link
+                                  href={`/products/${generateSlug(displayTitle)}`}
+                                >
+                                  {displayButtonText} →
+                                </Link>
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       </>
@@ -459,7 +655,9 @@ export function HeroBanner() {
                       <div className="grid lg:grid-cols-2 gap-6 md:gap-12 items-center">
                         <div
                           className="space-y-4 md:space-y-6 text-center md:text-left"
-                          style={{ color: textColor }}
+                          style={{ color: slideTextColor }}
+                          data-testid={`hero-slide-content-${index}`}
+                          data-hero-text-size={product.textSize ?? "feature"}
                         >
                           <span
                             className="inline-block rounded text-xs md:text-[14.21px] font-inter font-medium rounded-lg px-4 md:px-6 py-1"
@@ -474,7 +672,7 @@ export function HeroBanner() {
                             {displayLabel}
                           </span>
                           <div>
-                            <h1 className="text-4xl md:text-6xl lg:text-[92px] font-inter font-medium tracking-tight leading-tight">
+                            <h1 className={`${slideTitleSizeClass} font-inter font-medium tracking-tight leading-tight`}>
                               {displayTitle}
                             </h1>
                             <h2 className="text-2xl md:text-4xl lg:text-[51px] font-inter font-light tracking-tight">
@@ -513,16 +711,23 @@ export function HeroBanner() {
                         </div>
 
                         {/* Right - Product Image */}
-                        <div className="relative h-[250px] md:h-[400px] lg:h-[500px] order-first md:order-last">
-                          <Image
-                            src={displayImage}
-                            alt={displayTitle || "Product image"}
-                            width={800}
-                            height={600}
-                            className="w-full h-full object-contain"
-                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 40vw"
-                            priority={index === 0}
-                          />
+                        <div
+                          {...getLayerAttributes("product")}
+                          data-testid={`hero-product-media-${index}`}
+                          data-product-placement={productPlacement}
+                          className={`relative h-[250px] md:h-[400px] lg:h-[500px] ${productMediaOrderClass}`}
+                        >
+                          {renderProductImageFrame({
+                            src: productMediaImage,
+                            alt: displayTitle || "Product image",
+                            width: 800,
+                            height: 600,
+                            imageClassName: "w-full h-full object-contain",
+                            sizes:
+                              "(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 40vw",
+                            priority: index === 0,
+                            hotspots: product.hotspots,
+                          })}
                           {/* Feature Callouts - Interactivos */}
                           {productFeatures[displayTitle]?.map(
                             (feature, featureIndex) => (

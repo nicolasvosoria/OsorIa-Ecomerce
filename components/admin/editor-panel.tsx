@@ -27,12 +27,32 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { updateComponentStyle } from "@/lib/supabase/styles-api";
 import { toast } from "sonner";
 import { ImageUpload } from "./image-upload";
 import { getStoreId } from "@/lib/utils/store";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  HERO_HOTSPOT_ANCHOR_OPTIONS,
+  HERO_PRODUCT_PLACEMENT_OPTIONS,
+  HERO_SECONDARY_PRODUCT_PRESET_OPTIONS,
+  HERO_TEXT_SIZE_OPTIONS,
+  createNextHeroHotspotId,
+  toHeroLayerModel,
+  updateHeroSlideLayer,
+  type HeroLayerId,
+  type HeroHotspot,
+} from "@/lib/hero/hero-layer-model";
+
+const HERO_LAYER_OPTIONS: Array<{ value: HeroLayerId; label: string }> = [
+  { value: "background", label: "Fondo" },
+  { value: "product", label: "Producto" },
+  { value: "content", label: "Contenido" },
+  { value: "overlay", label: "Contraste" },
+  { value: "cta", label: "Acción" },
+  { value: "hotspots", label: "Hotspots" },
+];
 
 const COMPONENT_FIELDS: Record<
   string,
@@ -726,6 +746,12 @@ export function EditorPanel() {
   const {
     selectedComponent,
     selectComponent,
+    selectedHeroLayer,
+    setSelectedHeroLayer,
+    selectedHeroSlideIndex,
+    setSelectedHeroSlideIndex,
+    selectedHeroHotspotId,
+    setSelectedHeroHotspotId,
     componentEdits,
     updateComponentEdit,
     scheduleComponentEdit,
@@ -738,7 +764,9 @@ export function EditorPanel() {
   const { styles: globalStyles, refreshStyles } = useStyles();
   const { store } = useStore();
   const [saving, setSaving] = useState(false);
-  const [localValues, setLocalValues] = useState<Record<string, any>>({});
+  const [localValueOverrides, setLocalValueOverrides] = useState<
+    Record<string, Record<string, any>>
+  >({});
   const [activeTab, setActiveTab] = useState("content");
 
   // Verificar si estamos editando Hero desde un subdominio que no sea default
@@ -752,55 +780,6 @@ export function EditorPanel() {
   const handleClosePanel = () => {
     toggleEditMode();
   };
-
-  // Efecto para cargar valores iniciales cuando cambia el componente seleccionado
-  // NO incluir componentEdits en las dependencias para evitar bucles infinitos
-  useEffect(() => {
-    if (selectedComponent) {
-      const config = COMPONENT_FIELDS[selectedComponent];
-      if (!config) {
-        console.warn(
-          "[Editor] No config found for component:",
-          selectedComponent,
-        );
-        return;
-      }
-
-      const currentStyles = globalStyles.get(selectedComponent) || {};
-      const edits = componentEdits.get(selectedComponent) || {};
-
-      // Combinar valores: defaults primero, luego estilos de BD, luego ediciones locales
-      const mergedValues = {
-        ...(config?.defaults || {}),
-        ...currentStyles,
-        ...edits,
-      };
-
-      // Solo actualizar si los valores realmente cambiaron para evitar bucles infinitos
-      setLocalValues((prev) => {
-        const prevStr = JSON.stringify(prev);
-        const newStr = JSON.stringify(mergedValues);
-        if (prevStr === newStr) {
-          return prev; // No actualizar si son iguales
-        }
-        return mergedValues;
-      });
-
-      console.log("[Editor] Loaded values for", selectedComponent, {
-        defaults: config?.defaults,
-        fromDB: currentStyles,
-        edits: edits,
-        merged: mergedValues,
-      });
-    } else {
-      // Limpiar valores cuando no hay componente seleccionado
-      setLocalValues({});
-    }
-    // Solo actualizar cuando cambia el componente seleccionado o los estilos globales
-    // NO incluir componentEdits para evitar bucles infinitos
-    // Los cambios en componentEdits se manejan directamente en handleInputChange
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedComponent, globalStyles]);
 
   // No mostrar el panel si no está en modo edición (después de todos los hooks)
   if (!isEditMode) {
@@ -889,15 +868,33 @@ export function EditorPanel() {
 
   const componentLabel =
     selectedComponent.charAt(0).toUpperCase() + selectedComponent.slice(1);
+  const currentStyles = globalStyles.get(selectedComponent) || {};
+  const componentLocalOverrides = localValueOverrides[selectedComponent] || {};
+  const componentEditValues = componentEdits.get(selectedComponent) || {};
+  const baseLocalValues = {
+    ...(config?.defaults || {}),
+    ...currentStyles,
+    ...componentLocalOverrides,
+  };
+  const effectiveLocalValues = {
+    ...baseLocalValues,
+    ...componentEditValues,
+  };
 
   const handleInputChange = (key: string, value: any) => {
     // Actualizar estado local de forma optimista
-    setLocalValues((prev) => {
-      // Solo actualizar si el valor realmente cambió
-      if (prev[key] === value) {
+    setLocalValueOverrides((prev) => {
+      const currentOverrides = prev[selectedComponent] || {};
+      if (currentOverrides[key] === value) {
         return prev;
       }
-      return { ...prev, [key]: value };
+      return {
+        ...prev,
+        [selectedComponent]: {
+          ...currentOverrides,
+          [key]: value,
+        },
+      };
     });
 
     const isColorField =
@@ -916,14 +913,14 @@ export function EditorPanel() {
     fieldKey: string,
     value: any,
   ) => {
-    const currentArray = localValues[arrayKey] || [];
+    const currentArray = effectiveLocalValues[arrayKey] || [];
     const updatedArray = [...currentArray];
     updatedArray[index] = { ...updatedArray[index], [fieldKey]: value };
     handleInputChange(arrayKey, updatedArray);
   };
 
   const handleAddArrayItem = (arrayKey: string, arrayFields: any[]) => {
-    const currentArray = localValues[arrayKey] || [];
+    const currentArray = effectiveLocalValues[arrayKey] || [];
     const newItem: Record<string, any> = {};
     arrayFields.forEach((field) => {
       newItem[field.key] = "";
@@ -932,11 +929,590 @@ export function EditorPanel() {
   };
 
   const handleRemoveArrayItem = (arrayKey: string, index: number) => {
-    const currentArray = localValues[arrayKey] || [];
+    const currentArray = effectiveLocalValues[arrayKey] || [];
     const updatedArray = currentArray.filter(
       (_: any, i: number) => i !== index,
     );
     handleInputChange(arrayKey, updatedArray);
+  };
+
+  const heroLayerModel =
+    selectedComponent === "hero" ? toHeroLayerModel(effectiveLocalValues) : null;
+  const activeHeroLayer: HeroLayerId = selectedHeroLayer ?? "background";
+  const activeHeroSlideIndex = heroLayerModel
+    ? Math.min(
+        Math.max(selectedHeroSlideIndex ?? 0, 0),
+        Math.max(heroLayerModel.products.length - 1, 0),
+      )
+    : 0;
+  const activeHeroSlide = heroLayerModel?.products[activeHeroSlideIndex] ?? {};
+
+  const handleHeroProductsChange = (
+    products: NonNullable<typeof heroLayerModel>["products"],
+  ) => {
+    handleInputChange("products", products);
+  };
+
+  const handleHeroSlideChange = (
+    fieldKey: string,
+    value: string | HeroHotspot[],
+    extraUpdates: Record<string, string | HeroHotspot[]> = {},
+  ) => {
+    if (!heroLayerModel) return;
+
+    const updatedModel = updateHeroSlideLayer(heroLayerModel, activeHeroSlideIndex, {
+      [fieldKey]: value,
+      ...extraUpdates,
+    });
+    handleHeroProductsChange(updatedModel.products);
+  };
+
+  const handleAddHeroSlide = () => {
+    if (!heroLayerModel) return;
+    const nextSlideNumber = heroLayerModel.products.length + 1;
+    const updatedProducts = [
+      ...heroLayerModel.products,
+      {
+        label: "Nuevo",
+        title: `Slide ${nextSlideNumber}`,
+        subtitle: "",
+        description: "",
+        buttonText: "Comprar ahora",
+        image: "",
+        backgroundImage: "",
+        textSize: "feature" as const,
+        productPlacement: "right" as const,
+        hotspots: [],
+      },
+    ];
+    handleHeroProductsChange(updatedProducts);
+    setSelectedHeroSlideIndex(updatedProducts.length - 1);
+    setSelectedHeroHotspotId(null);
+  };
+
+  const handleDeleteHeroSlide = () => {
+    if (!heroLayerModel || heroLayerModel.products.length <= 1) return;
+    const updatedProducts = heroLayerModel.products.filter(
+      (_slide, index) => index !== activeHeroSlideIndex,
+    );
+    handleHeroProductsChange(updatedProducts);
+    setSelectedHeroSlideIndex(
+      Math.min(activeHeroSlideIndex, Math.max(updatedProducts.length - 1, 0)),
+    );
+    setSelectedHeroHotspotId(null);
+  };
+
+  const handleAddHeroHotspot = () => {
+    if (!activeHeroSlide.productImage) return;
+    const activeHotspots = activeHeroSlide.hotspots ?? [];
+    const nextHotspot: HeroHotspot = {
+      id: createNextHeroHotspotId(activeHotspots),
+      label: "Nuevo hotspot",
+      description: "",
+      href: "",
+      anchor: "center-right",
+    };
+    const hotspots = [...activeHotspots, nextHotspot];
+    handleHeroSlideChange("hotspots", hotspots);
+    setSelectedHeroHotspotId(nextHotspot.id);
+  };
+
+  const handleHeroHotspotChange = (
+    hotspotId: string,
+    updates: Partial<HeroHotspot>,
+  ) => {
+    const hotspots = (activeHeroSlide.hotspots ?? []).map((hotspot) =>
+      hotspot.id === hotspotId ? { ...hotspot, ...updates } : hotspot,
+    );
+    handleHeroSlideChange("hotspots", hotspots);
+  };
+
+  const handleDeleteHeroHotspot = (hotspotId: string) => {
+    const hotspots = (activeHeroSlide.hotspots ?? []).filter(
+      (hotspot) => hotspot.id !== hotspotId,
+    );
+    handleHeroSlideChange("hotspots", hotspots);
+    if (selectedHeroHotspotId === hotspotId) {
+      setSelectedHeroHotspotId(null);
+    }
+  };
+
+  const renderHeroLayerControls = () => {
+    if (!heroLayerModel) return null;
+
+    if (activeHeroLayer === "background") {
+      return (
+        <div className="space-y-4">
+          <ImageUpload
+            value={activeHeroSlide.backgroundImage || activeHeroSlide.image || ""}
+            onChange={(url) =>
+              handleHeroSlideChange("backgroundImage", url, {
+                image: activeHeroSlide.image || url,
+              })
+            }
+            label="Imagen de fondo"
+            context="hero-background-image"
+          />
+          <div className="space-y-2">
+            <Label>Prominencia de imagen</Label>
+            <Select
+              value={heroLayerModel.imageFit}
+              onValueChange={(value) => handleInputChange("imageFit", value)}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="cover">Llenar el espacio</SelectItem>
+                <SelectItem value="contain">Mostrar completa</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Enfoque horizontal</Label>
+            <Select
+              value={heroLayerModel.imagePositionX}
+              onValueChange={(value) =>
+                handleInputChange("imagePositionX", value)
+              }
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="left">Izquierda</SelectItem>
+                <SelectItem value="center">Centro</SelectItem>
+                <SelectItem value="right">Derecha</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Enfoque vertical</Label>
+            <Select
+              value={heroLayerModel.imagePositionY}
+              onValueChange={(value) =>
+                handleInputChange("imagePositionY", value)
+              }
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="top">Arriba</SelectItem>
+                <SelectItem value="center">Centro</SelectItem>
+                <SelectItem value="bottom">Abajo</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      );
+    }
+
+    if (activeHeroLayer === "product") {
+      const canUseSecondaryProduct =
+        heroLayerModel.layoutMode === "full-image" &&
+        heroLayerModel.contentAlign === "center";
+
+      return (
+        <div className="space-y-4">
+          <ImageUpload
+            value={activeHeroSlide.productImage || ""}
+            onChange={(url) => handleHeroSlideChange("productImage", url)}
+            label="Imagen PNG del producto"
+            context="hero-product-image"
+          />
+          <div className="space-y-2">
+            <Label htmlFor="hero-product-alt">Texto alternativo del producto</Label>
+            <Input
+              id="hero-product-alt"
+              value={activeHeroSlide.productAlt || ""}
+              onChange={(event) =>
+                handleHeroSlideChange("productAlt", event.target.value)
+              }
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="hero-product-placement">Ubicación del producto</Label>
+            <Select
+              value={activeHeroSlide.productPlacement ?? "right"}
+              onValueChange={(value) =>
+                handleHeroSlideChange("productPlacement", value)
+              }
+            >
+              <SelectTrigger id="hero-product-placement" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {HERO_PRODUCT_PLACEMENT_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-3 rounded-lg border border-border p-3">
+            <div>
+              <h4 className="text-sm font-semibold">
+                Producto secundario opcional
+              </h4>
+              <p className="text-xs text-muted-foreground">
+                Un solo producto adicional, ubicado con composiciones nombradas.
+              </p>
+            </div>
+            {canUseSecondaryProduct ? (
+              <>
+                <ImageUpload
+                  value={activeHeroSlide.secondaryProductImage || ""}
+                  onChange={(url) =>
+                    handleHeroSlideChange("secondaryProductImage", url)
+                  }
+                  label="Imagen secundaria del producto"
+                  context="hero-secondary-product-image"
+                />
+                <div className="space-y-2">
+                  <Label htmlFor="hero-secondary-product-alt">
+                    Texto alternativo del producto secundario
+                  </Label>
+                  <Input
+                    id="hero-secondary-product-alt"
+                    value={activeHeroSlide.secondaryProductAlt || ""}
+                    onChange={(event) =>
+                      handleHeroSlideChange(
+                        "secondaryProductAlt",
+                        event.target.value,
+                      )
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="hero-secondary-product-preset">
+                    Composición secundaria
+                  </Label>
+                  <Select
+                    value={
+                      activeHeroSlide.secondaryProductPreset ??
+                      "primary-right-secondary-left"
+                    }
+                    onValueChange={(value) =>
+                      handleHeroSlideChange("secondaryProductPreset", value)
+                    }
+                  >
+                    <SelectTrigger
+                      id="hero-secondary-product-preset"
+                      className="w-full"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {HERO_SECONDARY_PRODUCT_PRESET_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            ) : (
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertDescription>
+                  El producto secundario está disponible solo en Full Image con
+                  mensaje centrado.
+                </AlertDescription>
+              </Alert>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    if (activeHeroLayer === "content") {
+      return (
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="hero-label">Etiqueta</Label>
+            <Input
+              id="hero-label"
+              value={activeHeroSlide.label || ""}
+              onChange={(event) =>
+                handleHeroSlideChange("label", event.target.value)
+              }
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="hero-title">Título</Label>
+            <Input
+              id="hero-title"
+              value={activeHeroSlide.title || ""}
+              onChange={(event) =>
+                handleHeroSlideChange("title", event.target.value)
+              }
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="hero-subtitle">Subtítulo</Label>
+            <Input
+              id="hero-subtitle"
+              value={activeHeroSlide.subtitle || ""}
+              onChange={(event) =>
+                handleHeroSlideChange("subtitle", event.target.value)
+              }
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="hero-description">Mensaje</Label>
+            <Textarea
+              id="hero-description"
+              value={activeHeroSlide.description || ""}
+              onChange={(event) =>
+                handleHeroSlideChange("description", event.target.value)
+              }
+              rows={3}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Alineación del mensaje</Label>
+            <Select
+              value={heroLayerModel.contentAlign}
+              onValueChange={(value) =>
+                handleInputChange("fullImageContentAlign", value)
+              }
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="left">Izquierda</SelectItem>
+                <SelectItem value="center">Centro</SelectItem>
+                <SelectItem value="right">Derecha</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="hero-slide-text-color">Color de texto del slide</Label>
+            <Input
+              id="hero-slide-text-color"
+              type="color"
+              value={activeHeroSlide.textColor || effectiveLocalValues.textColor || "#ffffff"}
+              onChange={(event) =>
+                handleHeroSlideChange("textColor", event.target.value)
+              }
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="hero-slide-text-size">Tamaño de texto</Label>
+            <Select
+              value={activeHeroSlide.textSize ?? "feature"}
+              onValueChange={(value) => handleHeroSlideChange("textSize", value)}
+            >
+              <SelectTrigger id="hero-slide-text-size" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {HERO_TEXT_SIZE_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      );
+    }
+
+    if (activeHeroLayer === "overlay") {
+      return (
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="hero-overlay-color">Contraste</Label>
+            <Input
+              id="hero-overlay-color"
+              type="color"
+              value={heroLayerModel.overlayColor}
+              onChange={(event) =>
+                handleInputChange("overlayColor", event.target.value)
+              }
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="hero-overlay-opacity">Intensidad</Label>
+            <Input
+              id="hero-overlay-opacity"
+              type="number"
+              min="0"
+              max="0.9"
+              step="0.05"
+              value={heroLayerModel.overlayOpacity}
+              onChange={(event) =>
+                handleInputChange("overlayOpacity", event.target.value)
+              }
+            />
+          </div>
+        </div>
+      );
+    }
+
+    if (activeHeroLayer === "hotspots") {
+      const canEditHotspots = Boolean(activeHeroSlide.productImage);
+      const hotspots = activeHeroSlide.hotspots ?? [];
+      const editableHotspot =
+        hotspots.find((hotspot) => hotspot.id === selectedHeroHotspotId) ??
+        hotspots[0];
+
+      return (
+        <div className="space-y-4">
+          {!canEditHotspots && (
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertDescription>
+                Para ubicar hotspots necesitás una imagen de producto en este
+                slide.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleAddHeroHotspot}
+            disabled={!canEditHotspots}
+            className="w-full"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Agregar hotspot
+          </Button>
+
+          {canEditHotspots && hotspots.length > 0 && (
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label htmlFor="hero-hotspot-active">Hotspot activo</Label>
+                <Select
+                  value={editableHotspot?.id}
+                  onValueChange={(value) => setSelectedHeroHotspotId(value)}
+                >
+                  <SelectTrigger id="hero-hotspot-active" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {hotspots.map((hotspot, index) => (
+                      <SelectItem key={hotspot.id} value={hotspot.id}>
+                        {hotspot.label || `Hotspot ${index + 1}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {editableHotspot && (
+                <div className="space-y-3 rounded-lg border border-border p-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="hero-hotspot-label">Etiqueta del hotspot</Label>
+                    <Input
+                      id="hero-hotspot-label"
+                      value={editableHotspot.label}
+                      onChange={(event) =>
+                        handleHeroHotspotChange(editableHotspot.id, {
+                          label: event.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="hero-hotspot-description">Detalle</Label>
+                    <Textarea
+                      id="hero-hotspot-description"
+                      value={editableHotspot.description || ""}
+                      onChange={(event) =>
+                        handleHeroHotspotChange(editableHotspot.id, {
+                          description: event.target.value,
+                        })
+                      }
+                      rows={2}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="hero-hotspot-link">Link opcional</Label>
+                    <Input
+                      id="hero-hotspot-link"
+                      value={editableHotspot.href || ""}
+                      onChange={(event) =>
+                        handleHeroHotspotChange(editableHotspot.id, {
+                          href: event.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="hero-hotspot-anchor">Ubicación del hotspot</Label>
+                    <Select
+                      value={editableHotspot.anchor}
+                      onValueChange={(value) =>
+                        handleHeroHotspotChange(editableHotspot.id, {
+                          anchor: value as HeroHotspot["anchor"],
+                        })
+                      }
+                    >
+                      <SelectTrigger id="hero-hotspot-anchor" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {HERO_HOTSPOT_ANCHOR_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => handleDeleteHeroHotspot(editableHotspot.id)}
+                    className="w-full text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Eliminar hotspot
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="hero-cta-text">Texto de la acción</Label>
+          <Input
+            id="hero-cta-text"
+            value={activeHeroSlide.buttonText || ""}
+            onChange={(event) =>
+              handleHeroSlideChange("buttonText", event.target.value)
+            }
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="hero-button-color">Color de acción</Label>
+          <Input
+            id="hero-button-color"
+            type="color"
+            value={
+              effectiveLocalValues.buttonColor ||
+              config.defaults?.buttonColor ||
+              "#005aa1"
+            }
+            onChange={(event) =>
+              handleInputChange("buttonColor", event.target.value)
+            }
+          />
+        </div>
+      </div>
+    );
   };
 
   const handleSave = async () => {
@@ -1052,12 +1628,10 @@ export function EditorPanel() {
       toast.success("Cambios guardados correctamente");
       clearComponentEdits(selectedComponent);
 
-      // Forzar re-render del componente actualizando localValues
-      const config = COMPONENT_FIELDS[selectedComponent];
-      const updatedStyles = globalStyles.get(selectedComponent) || {};
-      setLocalValues({
-        ...(config?.defaults || {}),
-        ...updatedStyles,
+      setLocalValueOverrides((prev) => {
+        const next = { ...prev };
+        delete next[selectedComponent];
+        return next;
       });
     } catch (error) {
       toast.error("Error al guardar los cambios");
@@ -1072,8 +1646,11 @@ export function EditorPanel() {
   };
 
   const handleReset = () => {
-    const currentStyles = globalStyles.get(selectedComponent) || {};
-    setLocalValues(currentStyles);
+    setLocalValueOverrides((prev) => {
+      const next = { ...prev };
+      delete next[selectedComponent];
+      return next;
+    });
     clearComponentEdits(selectedComponent);
     toast.info("Cambios descartados");
   };
@@ -1127,12 +1704,115 @@ export function EditorPanel() {
           </div>
         )}
 
-        {/* Tabs */}
-        <Tabs
-          value={activeTab}
-          onValueChange={setActiveTab}
-          className="flex-1 flex flex-col min-h-0"
-        >
+        {selectedComponent === "hero" ? (
+          <div className="flex-1 overflow-y-auto p-4 space-y-5 min-h-0 custom-scrollbar">
+            <div className="space-y-2">
+              <h3 className="text-base font-semibold">Editor del Hero</h3>
+              <p className="text-sm text-muted-foreground">
+                Primero definí el banner, después elegí el slide y por último
+                ajustá el componente actual con controles simples.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="hero-layout-mode">Tipo de banner</Label>
+              <Select
+                value={heroLayerModel?.layoutMode ?? "split"}
+                onValueChange={(value) => handleInputChange("layoutMode", value)}
+              >
+                <SelectTrigger id="hero-layout-mode" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="split">Split</SelectItem>
+                  <SelectItem value="full-image">Full Image</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-3 rounded-lg border border-border p-3">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <h4 className="text-sm font-semibold">Gestión de slides</h4>
+                  <p className="text-xs text-muted-foreground">
+                    Cada slide se guarda dentro de products[].
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleAddHeroSlide}
+                    aria-label="Agregar slide"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleDeleteHeroSlide}
+                    disabled={(heroLayerModel?.products.length ?? 0) <= 1}
+                    aria-label="Eliminar slide"
+                    className="text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="hero-slide-select">Slide activo</Label>
+                <Select
+                  value={String(activeHeroSlideIndex)}
+                  onValueChange={(value) => {
+                    setSelectedHeroSlideIndex(Number(value));
+                    setSelectedHeroHotspotId(null);
+                  }}
+                >
+                  <SelectTrigger id="hero-slide-select" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(heroLayerModel?.products ?? []).map((slide, index) => (
+                      <SelectItem key={index} value={String(index)}>
+                        {`Slide ${index + 1} - ${slide.title || slide.label || "sin título"}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="hero-layer-select">Componente del slide</Label>
+              <Select
+                value={activeHeroLayer}
+                onValueChange={(value) => setSelectedHeroLayer(value as HeroLayerId)}
+              >
+                <SelectTrigger id="hero-layer-select" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {HERO_LAYER_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-4 border-t border-border pt-4">
+              {renderHeroLayerControls()}
+            </div>
+          </div>
+        ) : (
+          <Tabs
+            value={activeTab}
+            onValueChange={setActiveTab}
+            className="flex-1 flex flex-col min-h-0"
+          >
           <TabsList className="mx-4 mt-4 flex-shrink-0">
             <TabsTrigger value="content" className="flex-1">
               <Type className="h-4 w-4 mr-2" />
@@ -1161,8 +1841,9 @@ export function EditorPanel() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {config.content.map((field) => {
-                  const layoutModeValue =
-                    localValues.layoutMode ?? config.defaults?.layoutMode;
+                    const layoutModeValue =
+                      effectiveLocalValues.layoutMode ??
+                      config.defaults?.layoutMode;
                   const isHeroFullImageControl =
                     selectedComponent === "hero" &&
                     [
@@ -1204,7 +1885,7 @@ export function EditorPanel() {
                             </Button>
                           </div>
                           <div className="max-h-[400px] overflow-y-auto pr-2 space-y-3 custom-scrollbar">
-                            {(localValues[field.key] || []).map(
+                            {(effectiveLocalValues[field.key] || []).map(
                               (item: any, index: number) => (
                                 <Card key={index} className="mb-3">
                                   <CardHeader className="pb-3">
@@ -1299,11 +1980,10 @@ export function EditorPanel() {
                               ),
                             )}
                           </div>
-                          {(!localValues[field.key] ||
-                            localValues[field.key].length === 0) && (
+                          {(!effectiveLocalValues[field.key] ||
+                            effectiveLocalValues[field.key].length === 0) && (
                             <div className="text-center py-4 text-sm text-muted-foreground">
-                              No hay items. Haz clic en "Agregar" para crear uno
-                              nuevo.
+                              No hay items. Usá Agregar para crear uno nuevo.
                             </div>
                           )}
                         </div>
@@ -1312,7 +1992,7 @@ export function EditorPanel() {
                           <Label htmlFor={field.key}>{field.label}</Label>
                           <Select
                             value={
-                              localValues[field.key] ||
+                              effectiveLocalValues[field.key] ||
                               config.defaults?.[field.key]
                             }
                             onValueChange={(value) =>
@@ -1339,7 +2019,7 @@ export function EditorPanel() {
                       ) : field.type === "image" ||
                         field.key.toLowerCase().includes("image") ? (
                         <ImageUpload
-                          value={localValues[field.key] || ""}
+                          value={effectiveLocalValues[field.key] || ""}
                           onChange={(url) => handleInputChange(field.key, url)}
                           label={field.label}
                           context={`${selectedComponent}-${field.key}`}
@@ -1370,7 +2050,7 @@ export function EditorPanel() {
                           <Label htmlFor={field.key}>{field.label}</Label>
                           <Textarea
                             id={field.key}
-                            value={localValues[field.key] || ""}
+                            value={effectiveLocalValues[field.key] || ""}
                             onChange={(e) =>
                               handleInputChange(field.key, e.target.value)
                             }
@@ -1383,7 +2063,7 @@ export function EditorPanel() {
                           <Input
                             id={field.key}
                             type={field.type}
-                            value={localValues[field.key] || ""}
+                            value={effectiveLocalValues[field.key] || ""}
                             onChange={(e) =>
                               handleInputChange(field.key, e.target.value)
                             }
@@ -1415,7 +2095,7 @@ export function EditorPanel() {
               <CardContent className="space-y-4">
                 {config.styles && config.styles.length > 0 ? (
                   config.styles.map((field) => {
-                    const currentValue = localValues[field.key] || "";
+                    const currentValue = effectiveLocalValues[field.key] || "";
                     const defaultValue = config.defaults?.[field.key] || "";
                     const displayValue = currentValue || defaultValue || "";
 
@@ -1423,13 +2103,13 @@ export function EditorPanel() {
                     if (selectedComponent === "site_background") {
                       if (
                         field.key === "backgroundColor" &&
-                        localValues.type === "image"
+                        effectiveLocalValues.type === "image"
                       ) {
                         return null; // Ocultar color si es imagen
                       }
                       if (
                         field.key === "backgroundImage" &&
-                        localValues.type === "color"
+                        effectiveLocalValues.type === "color"
                       ) {
                         return null; // Ocultar imagen si es color
                       }
@@ -1438,7 +2118,7 @@ export function EditorPanel() {
                         field.key === "backgroundRepeat" ||
                         field.key === "backgroundSize"
                       ) {
-                        if (localValues.type === "color") {
+                        if (effectiveLocalValues.type === "color") {
                           return null; // Ocultar opciones de imagen si es color
                         }
                       }
@@ -1566,7 +2246,8 @@ export function EditorPanel() {
               </CardContent>
             </Card>
           </TabsContent>
-        </Tabs>
+          </Tabs>
+        )}
 
         {/* Actions */}
         <div className="p-4 border-t border-border space-y-2 flex-shrink-0">
