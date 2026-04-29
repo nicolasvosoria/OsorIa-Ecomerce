@@ -74,7 +74,7 @@ export function HeroHotspots({
           aria-controls={detailsId}
           data-hero-hotspot-trigger="refined"
           data-hero-hotspot-size="compact-plus"
-          className="relative flex h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white text-foreground shadow-md ring-1 ring-black/10 transition-transform duration-150 hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 md:h-4 md:w-4"
+          className="relative flex h-2.5! w-2.5! -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white text-foreground shadow-md ring-1 ring-black/10 transition-transform duration-150 hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 md:h-4 md:w-4"
           onFocus={() => setFocusedHotspotId(hotspot.id)}
           onBlur={() => setFocusedHotspotId(null)}
           onClick={(event) => {

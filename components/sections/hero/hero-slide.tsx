@@ -14,7 +14,10 @@ import {
 } from "./hero-rendering";
 import { HeroFullImageBackground } from "./hero-background";
 import { HeroContentBlock } from "./hero-content-block";
-import { HeroFeatureCallouts, type HeroProductFeature } from "./feature-callouts";
+import {
+  HeroFeatureCallouts,
+  type HeroProductFeature,
+} from "./feature-callouts";
 import { HeroProductFrame } from "./product-frame";
 import {
   getHeroLayerAttributes,
@@ -125,7 +128,14 @@ function HeroFullImageSlide({
   overlayColor,
   overlayOpacity,
   ...hotspotProps
-}: Omit<HeroSlideProps, "layoutMode" | "textColor" | "isDarkTheme" | "hasActiveTheme" | "onSelectFeature"> & {
+}: Omit<
+  HeroSlideProps,
+  | "layoutMode"
+  | "textColor"
+  | "isDarkTheme"
+  | "hasActiveTheme"
+  | "onSelectFeature"
+> & {
   content: ReturnType<typeof resolveHeroSlideContent>;
 }) {
   const isFirstSlide = index === 0;
@@ -137,7 +147,8 @@ function HeroFullImageSlide({
   });
   const primaryFrame = frames.find((frame) => frame.target === "primary");
   const secondaryFrame = frames.find((frame) => frame.target === "secondary");
-  const secondaryPreset = slide.secondaryProductPreset ?? "primary-right-secondary-left";
+  const secondaryPreset =
+    slide.secondaryProductPreset ?? "primary-right-secondary-left";
 
   return (
     <div className="relative h-auto min-h-[clamp(520px,calc(100dvh-96px),860px)]">
@@ -150,8 +161,14 @@ function HeroFullImageSlide({
         overlayColor={overlayColor}
         overlayOpacity={overlayOpacity}
         priority={isFirstSlide}
-        backgroundLayerAttributes={getHeroLayerAttributes("background", selectedHeroLayer)}
-        overlayLayerAttributes={getHeroLayerAttributes("overlay", selectedHeroLayer)}
+        backgroundLayerAttributes={getHeroLayerAttributes(
+          "background",
+          selectedHeroLayer,
+        )}
+        overlayLayerAttributes={getHeroLayerAttributes(
+          "overlay",
+          selectedHeroLayer,
+        )}
       />
       <div
         data-hero-stage="foreground"
@@ -167,7 +184,7 @@ function HeroFullImageSlide({
             className="absolute inset-0 z-40 pointer-events-none"
           >
             <div
-              className={`absolute inset-x-6 bottom-6 mx-auto flex max-w-xl justify-center opacity-95 md:inset-y-10 md:w-1/2 md:items-center ${HERO_FULL_IMAGE_PRODUCT_SIDE_CLASSES[primaryFrame.placement]}`}
+              className={`absolute inset-x-6 bottom-16 mx-auto flex max-w-xl justify-center opacity-95 md:inset-y-10 md:w-1/2 md:items-center ${HERO_FULL_IMAGE_PRODUCT_SIDE_CLASSES[primaryFrame.placement]}`}
             >
               <HeroProductFrame
                 src={primaryFrame.src}
@@ -217,8 +234,14 @@ function HeroFullImageSlide({
             content={content}
             buttonColor={buttonColor}
             buttonTextColor={buttonTextColor}
-            contentLayerAttributes={getHeroLayerAttributes("content", selectedHeroLayer)}
-            ctaLayerAttributes={getHeroLayerAttributes("cta", selectedHeroLayer)}
+            contentLayerAttributes={getHeroLayerAttributes(
+              "content",
+              selectedHeroLayer,
+            )}
+            ctaLayerAttributes={getHeroLayerAttributes(
+              "cta",
+              selectedHeroLayer,
+            )}
             compositionStyle={getContentCompositionStyle(slide)}
             isFullImageLayout
             slideIndex={index}
@@ -241,7 +264,19 @@ function HeroSplitSlide({
   splitBadgeBackground,
   onSelectFeature,
   ...hotspotProps
-}: Omit<HeroSlideProps, "layoutMode" | "imageFit" | "backgroundMode" | "fullImageContentAlign" | "imagePosition" | "textColor" | "overlayColor" | "overlayOpacity" | "isDarkTheme" | "hasActiveTheme"> & {
+}: Omit<
+  HeroSlideProps,
+  | "layoutMode"
+  | "imageFit"
+  | "backgroundMode"
+  | "fullImageContentAlign"
+  | "imagePosition"
+  | "textColor"
+  | "overlayColor"
+  | "overlayOpacity"
+  | "isDarkTheme"
+  | "hasActiveTheme"
+> & {
   content: ReturnType<typeof resolveHeroSlideContent>;
   splitBadgeBackground: string;
 }) {
