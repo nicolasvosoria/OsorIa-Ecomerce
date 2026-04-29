@@ -6,6 +6,7 @@ import { HeroBanner } from "@/components/sections/hero-banner";
 import {
   HERO_SECONDARY_PRODUCT_PRESET_OPTIONS,
   createNextHeroHotspotId,
+  toFlatHeroVariables,
   toHeroLayerModel,
 } from "@/lib/hero/hero-layer-model";
 
@@ -275,6 +276,158 @@ describe("HeroBanner", () => {
     ]);
   });
 
+  it("normalizes hotspot precision, target defaults and product presence without viewport data", () => {
+    const model = toHeroLayerModel({
+      products: [
+        {
+          title: "PRECISION",
+          image: "/precision.jpg",
+          productPresence: "prominent",
+          hotspots: [
+            {
+              id: "legacy-anchor",
+              label: "Anchor seeded",
+              anchor: "top-left",
+            },
+            {
+              id: "clamped-secondary",
+              label: "Secondary clamp",
+              anchor: "bottom-right",
+              x: "125",
+              y: -12,
+              target: "secondary",
+            },
+            {
+              id: "invalid-target",
+              label: "Invalid target",
+              anchor: "center-left",
+              x: "not numeric",
+              y: Number.POSITIVE_INFINITY,
+              target: "canvas" as never,
+            },
+          ],
+        },
+        {
+          title: "LEGACY PRESENCE",
+          image: "/legacy.jpg",
+          hotspots: [{ id: "legacy-only", label: "Legacy", anchor: "bottom-left" }],
+        },
+      ],
+    });
+
+    expect(model.products[0]).toMatchObject({
+      productPresence: "prominent",
+      hotspots: [
+        {
+          id: "legacy-anchor",
+          anchor: "top-left",
+          x: 25,
+          y: 20,
+          target: "primary",
+        },
+        {
+          id: "clamped-secondary",
+          anchor: "bottom-right",
+          x: 100,
+          y: 0,
+          target: "secondary",
+        },
+        {
+          id: "invalid-target",
+          anchor: "center-left",
+          x: 25,
+          y: 50,
+          target: "primary",
+        },
+      ],
+    });
+    expect(model.products[1]).toMatchObject({
+      productPresence: "balanced",
+      hotspots: [{ id: "legacy-only", x: 25, y: 80, target: "primary" }],
+    });
+
+    const flatPayload = toFlatHeroVariables(model);
+    expect(flatPayload.products[0]).toMatchObject({
+      productPresence: "prominent",
+      hotspots: expect.arrayContaining([
+        expect.objectContaining({ id: "legacy-anchor", x: 25, y: 20, target: "primary" }),
+        expect.objectContaining({ id: "clamped-secondary", x: 100, y: 0, target: "secondary" }),
+      ]),
+    });
+  });
+
+  it("normalizes bounded product/content offsets and background mode while preserving legacy presence seeds", () => {
+    const model = toHeroLayerModel({
+      layoutMode: "full-image",
+      backgroundMode: "fill",
+      products: [
+        {
+          title: "EXPLICIT TRANSFORM",
+          image: "/explicit.jpg",
+          productPresence: "subtle",
+          productScale: "165",
+          productOffsetX: "-45",
+          productOffsetY: 35,
+          contentOffsetX: "24",
+          contentOffsetY: -22,
+        },
+        {
+          title: "LEGACY PROMINENT",
+          image: "/legacy.jpg",
+          productPresence: "prominent",
+          contentOffsetX: Number.NaN,
+          contentOffsetY: Number.POSITIVE_INFINITY,
+        },
+        {
+          title: "BAD VALUES",
+          image: "/bad.jpg",
+          productScale: Number.NaN,
+          productOffsetX: Number.POSITIVE_INFINITY,
+          productOffsetY: "not numeric",
+        },
+      ],
+    });
+
+    expect(model.backgroundMode).toBe("fill");
+    expect(model.products[0]).toMatchObject({
+      productPresence: "subtle",
+      productScale: 140,
+      productOffsetX: -20,
+      productOffsetY: 20,
+      contentOffsetX: 16,
+      contentOffsetY: -16,
+    });
+    expect(model.products[1]).toMatchObject({
+      productPresence: "prominent",
+      productScale: 110,
+      productOffsetX: 0,
+      productOffsetY: 0,
+      contentOffsetX: 0,
+      contentOffsetY: 0,
+    });
+    expect(model.products[2]).toMatchObject({
+      productPresence: "balanced",
+      productScale: 100,
+      productOffsetX: 0,
+      productOffsetY: 0,
+      contentOffsetX: 0,
+      contentOffsetY: 0,
+    });
+
+    expect(toFlatHeroVariables(model)).toMatchObject({
+      backgroundMode: "fill",
+      products: expect.arrayContaining([
+        expect.objectContaining({
+          productScale: 140,
+          productOffsetX: -20,
+          productOffsetY: 20,
+          contentOffsetX: 16,
+          contentOffsetY: -16,
+        }),
+      ]),
+    });
+  });
+
   it("keeps the existing split layout as the default mode", () => {
     mockUseComponentStyle.mockReturnValue({
       styles: {
@@ -385,8 +538,8 @@ describe("HeroBanner", () => {
 
     expect(layers).toEqual([
       "background",
-      "product",
       "overlay",
+      "product",
       "content",
       "cta",
     ]);
@@ -541,6 +694,294 @@ describe("HeroBanner", () => {
     expect(productFrame).toContainElement(
       productMedia.querySelector('[data-hero-hotspot-id="corner"]'),
     );
+  });
+
+  it("renders precision hotspots as percentages inside their targeted product frames", () => {
+    mockUseComponentStyle.mockReturnValue({
+      styles: {
+        layoutMode: "full-image",
+        fullImageContentAlign: "center",
+        products: [
+          {
+            title: "PRECISION",
+            backgroundImage: "/hero-bg.jpg",
+            productImage: "/primary.png",
+            productAlt: "Producto principal",
+            secondaryProductImage: "/secondary.png",
+            secondaryProductAlt: "Producto secundario",
+            productPresence: "prominent",
+            productScale: 124,
+            productOffsetX: 12,
+            productOffsetY: -8,
+            hotspots: [
+              {
+                id: "primary-chip",
+                label: "Chip principal",
+                anchor: "center-right",
+                x: 62,
+                y: 44,
+                target: "primary",
+              },
+              {
+                id: "secondary-chip",
+                label: "Chip secundario",
+                anchor: "bottom-left",
+                x: "18",
+                y: "76",
+                target: "secondary",
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    const { container } = render(<HeroBanner />);
+    const primaryFrame = container.querySelector('[data-hero-product-frame="primary"]');
+    const secondaryFrame = container.querySelector('[data-hero-product-frame="secondary"]');
+    const primaryHotspot = primaryFrame?.querySelector('[data-hero-hotspot-id="primary-chip"]');
+    const secondaryHotspot = secondaryFrame?.querySelector('[data-hero-hotspot-id="secondary-chip"]');
+
+    expect(primaryFrame).toContainElement(screen.getByAltText("Producto principal"));
+    expect(secondaryFrame).toContainElement(screen.getByAltText("Producto secundario"));
+    expect(primaryFrame).toContainElement(primaryHotspot as HTMLElement);
+    expect(primaryFrame).not.toContainElement(secondaryHotspot as HTMLElement);
+    expect(secondaryFrame).toContainElement(secondaryHotspot as HTMLElement);
+    expect(primaryHotspot).toHaveStyle({
+      left: "62%",
+      top: "44%",
+      transform: "translate(-50%, -50%)",
+    });
+    expect(secondaryHotspot).toHaveStyle({
+      left: "18%",
+      top: "76%",
+      transform: "translate(-50%, -50%)",
+    });
+    expect(screen.getByRole("button", { name: /chip principal/i })).toHaveAttribute(
+      "aria-controls",
+      "hero-hotspot-details-primary-chip",
+    );
+    expect(screen.getByTestId("hero-product-media-0")).toHaveAttribute(
+      "data-product-presence",
+      "prominent",
+    );
+    expect(primaryFrame).toHaveStyle({
+      "--hero-product-scale": "1.24",
+      "--hero-product-offset-x": "12%",
+      "--hero-product-offset-y": "-8%",
+    });
+  });
+
+  it("renders full-image fill backgrounds outside a capped foreground stage", () => {
+    mockUseComponentStyle.mockReturnValue({
+      styles: {
+        layoutMode: "full-image",
+        backgroundMode: "fill",
+        products: [
+          {
+            title: "STAGED HERO",
+            subtitle: "FOREGROUND",
+            description: "Capped foreground composition",
+            buttonText: "Comprar ahora",
+            backgroundImage: "/wide-bg.jpg",
+            productImage: "/stage-product.png",
+            productAlt: "Producto en stage",
+            productScale: 118,
+            productOffsetX: -10,
+            productOffsetY: 6,
+            contentOffsetX: 9,
+            contentOffsetY: -7,
+            hotspots: [
+              {
+                id: "stage-hotspot",
+                label: "Hotspot en stage",
+                description: "Detalle dentro del stage",
+                anchor: "center-right",
+                x: 60,
+                y: 40,
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    const { container } = render(<HeroBanner />);
+    const hero = container.querySelector('[data-component="hero"]');
+    const stage = container.querySelector("[data-hero-stage]");
+    const background = screen.getByTestId("hero-full-background-image");
+    const productLayer = screen.getByTestId("hero-product-media-0");
+    const productFrame = container.querySelector('[data-hero-product-frame="primary"]');
+
+    expect(hero).toHaveAttribute("data-hero-background-mode", "fill");
+    expect(stage).toHaveAttribute("data-hero-stage", "foreground");
+    expect(stage).toContainElement(productLayer);
+    expect(stage).toContainElement(screen.getByTestId("hero-full-content-container"));
+    expect(stage).not.toContainElement(background);
+    expect(background).toHaveAttribute("data-hero-background-fit", "fill");
+    expect(background).toHaveStyle({ objectFit: "fill" });
+    expect(productFrame).toHaveStyle({
+      "--hero-product-scale": "1.18",
+      "--hero-product-offset-x": "-10%",
+      "--hero-product-offset-y": "6%",
+    });
+    expect(screen.getByTestId("hero-full-content-block")).toHaveStyle({
+      "--hero-content-offset-x": "9%",
+      "--hero-content-offset-y": "-7%",
+      transform:
+        "translate(var(--hero-content-offset-x), var(--hero-content-offset-y))",
+    });
+  });
+
+  it("constrains stage background mode while keeping foreground coordinates unchanged", () => {
+    mockUseComponentStyle.mockReturnValue({
+      styles: {
+        layoutMode: "full-image",
+        backgroundMode: "stage",
+        imageFit: "contain",
+        products: [
+          {
+            title: "STAGE MODE",
+            subtitle: "CONTAINED",
+            description: "Stage-contained background",
+            buttonText: "Ver",
+            backgroundImage: "/contained-bg.jpg",
+            productImage: "/stage-product.png",
+            productScale: 105,
+            productOffsetX: 4,
+            productOffsetY: -3,
+            contentOffsetX: -5,
+            contentOffsetY: 6,
+          },
+        ],
+      },
+    });
+
+    const { container } = render(<HeroBanner />);
+    const background = screen.getByTestId("hero-full-background-image");
+    const backgroundStage = container.querySelector(
+      '[data-hero-background-stage="contained"]',
+    );
+    const foregroundStage = container.querySelector('[data-hero-stage="foreground"]');
+
+    expect(container.querySelector('[data-component="hero"]')).toHaveAttribute(
+      "data-hero-background-mode",
+      "stage",
+    );
+    expect(backgroundStage).toContainElement(background);
+    expect(foregroundStage).not.toContainElement(background);
+    expect(background).toHaveAttribute("data-hero-background-fit", "stage");
+    expect(background).toHaveStyle({ objectFit: "contain" });
+    expect(container.querySelector('[data-hero-product-frame="primary"]')).toHaveStyle({
+      "--hero-product-offset-x": "4%",
+      "--hero-product-offset-y": "-3%",
+    });
+    expect(screen.getByTestId("hero-full-content-block")).toHaveStyle({
+      "--hero-content-offset-x": "-5%",
+      "--hero-content-offset-y": "6%",
+    });
+  });
+
+  it("uses refined interactive hotspot triggers and keeps details reachable from trigger or bubble hover", () => {
+    mockUseComponentStyle.mockReturnValue({
+      styles: {
+        layoutMode: "split",
+        products: [
+          {
+            title: "PREMIUM",
+            buttonText: "Comprar",
+            image: "/premium-headphones.png",
+            productImage: "/premium-headphones.png",
+            hotspots: [
+              {
+                id: "refined",
+                label: "Detalle refinado",
+                description: "Burbuja legible",
+                anchor: "top-right",
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    const { container } = render(<HeroBanner />);
+    const hotspot = container.querySelector('[data-hero-hotspot-id="refined"]')!;
+    const button = screen.getByRole("button", { name: /detalle refinado/i });
+
+    expect(button).toHaveAttribute("data-hero-hotspot-trigger", "refined");
+    expect(button).toHaveAttribute("data-hero-hotspot-size", "compact-plus");
+    expect(within(button).getByTestId("hero-hotspot-plus-horizontal-refined")).toHaveAttribute(
+      "data-hero-hotspot-plus-bar",
+      "horizontal",
+    );
+    expect(within(button).getByTestId("hero-hotspot-plus-vertical-refined")).toHaveAttribute(
+      "data-hero-hotspot-plus-bar",
+      "vertical",
+    );
+    expect(within(button).getByTestId("hero-hotspot-pulse-refined")).toHaveAttribute(
+      "data-hero-hotspot-pulse",
+      "subtle",
+    );
+    expect(hotspot).toHaveAttribute("data-hero-hotspot-stack", "interactive");
+
+    fireEvent.mouseEnter(hotspot);
+    const details = screen.getByRole("status");
+    expect(details).toHaveAttribute("data-hero-hotspot-bubble", "readable");
+    expect(details).toHaveAttribute("data-hero-hotspot-bubble-position", "floating");
+    expect(details).toHaveTextContent("Burbuja legible");
+
+    fireEvent.mouseLeave(button, { relatedTarget: details });
+    expect(screen.getByText("Burbuja legible")).toBeInTheDocument();
+    fireEvent.mouseLeave(hotspot);
+    expect(screen.queryByText("Burbuja legible")).not.toBeInTheDocument();
+  });
+
+  it("keeps secondary-targeted hotspots in data but hides them without a secondary product frame", () => {
+    const model = toHeroLayerModel({
+      products: [
+        {
+          title: "PRIMARY ONLY",
+          backgroundImage: "/hero-bg.jpg",
+          productImage: "/primary.png",
+          hotspots: [
+            {
+              id: "hidden-secondary",
+              label: "Secondary only",
+              anchor: "top-right",
+              x: 90,
+              y: 12,
+              target: "secondary",
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(model.products[0].hotspots).toEqual([
+      expect.objectContaining({
+        id: "hidden-secondary",
+        x: 90,
+        y: 12,
+        target: "secondary",
+      }),
+    ]);
+
+    mockUseComponentStyle.mockReturnValue({
+      styles: {
+        layoutMode: "full-image",
+        products: model.products,
+      },
+    });
+
+    const { container } = render(<HeroBanner />);
+
+    expect(screen.getByTestId("hero-product-media-0")).toContainElement(
+      container.querySelector('[data-hero-product-frame="primary"]'),
+    );
+    expect(
+      container.querySelector('[data-hero-hotspot-id="hidden-secondary"]'),
+    ).not.toBeInTheDocument();
   });
 
   it("renders one semantic secondary product only for centered full-image compositions", () => {
@@ -867,6 +1308,7 @@ describe("HeroBanner", () => {
     mockUseComponentStyle.mockReturnValue({
       styles: {
         layoutMode: "full-image",
+        backgroundMode: "stage",
         imageFit: "contain",
         imagePositionX: "left",
         imagePositionY: "top",
@@ -887,8 +1329,11 @@ describe("HeroBanner", () => {
     render(<HeroBanner />);
 
     const backgroundImage = screen.getByTestId("hero-full-background-image");
-    expect(backgroundImage).toHaveClass("object-contain");
-    expect(backgroundImage).toHaveStyle({ objectPosition: "left top" });
+    expect(backgroundImage).toHaveAttribute("data-hero-background-fit", "stage");
+    expect(backgroundImage).toHaveStyle({
+      objectFit: "contain",
+      objectPosition: "left top",
+    });
 
     const contentContainer = screen.getByTestId("hero-full-content-container");
     expect(contentContainer).toHaveClass("justify-end");

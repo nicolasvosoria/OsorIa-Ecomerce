@@ -35,9 +35,19 @@ import { getStoreId } from "@/lib/utils/store";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   HERO_HOTSPOT_ANCHOR_OPTIONS,
+  HERO_HOTSPOT_ANCHOR_COORDINATES,
+  HERO_HOTSPOT_TARGET_OPTIONS,
+  HERO_BACKGROUND_MODE_OPTIONS,
+  HERO_CONTENT_OFFSET,
   HERO_PRODUCT_PLACEMENT_OPTIONS,
+  HERO_PRODUCT_OFFSET,
+  HERO_PRODUCT_SCALE,
   HERO_SECONDARY_PRODUCT_PRESET_OPTIONS,
   HERO_TEXT_SIZE_OPTIONS,
+  clampHeroHotspotCoordinate,
+  clampHeroContentOffset,
+  clampHeroProductOffset,
+  clampHeroProductScale,
   createNextHeroHotspotId,
   toHeroLayerModel,
   updateHeroSlideLayer,
@@ -159,6 +169,7 @@ const COMPONENT_FIELDS: Record<
     defaults: {
       layoutMode: "split",
       imageFit: "cover",
+      backgroundMode: "fill",
       imagePositionX: "center",
       imagePositionY: "center",
       fullImageContentAlign: "left",
@@ -955,8 +966,8 @@ export function EditorPanel() {
 
   const handleHeroSlideChange = (
     fieldKey: string,
-    value: string | HeroHotspot[],
-    extraUpdates: Record<string, string | HeroHotspot[]> = {},
+    value: string | number | HeroHotspot[],
+    extraUpdates: Record<string, string | number | HeroHotspot[]> = {},
   ) => {
     if (!heroLayerModel) return;
 
@@ -982,6 +993,12 @@ export function EditorPanel() {
         backgroundImage: "",
         textSize: "feature" as const,
         productPlacement: "right" as const,
+        productPresence: "balanced" as const,
+        productScale: HERO_PRODUCT_SCALE.default,
+        productOffsetX: HERO_PRODUCT_OFFSET.default,
+        productOffsetY: HERO_PRODUCT_OFFSET.default,
+        contentOffsetX: HERO_CONTENT_OFFSET.default,
+        contentOffsetY: HERO_CONTENT_OFFSET.default,
         hotspots: [],
       },
     ];
@@ -1011,6 +1028,8 @@ export function EditorPanel() {
       description: "",
       href: "",
       anchor: "center-right",
+      ...HERO_HOTSPOT_ANCHOR_COORDINATES["center-right"],
+      target: "primary",
     };
     const hotspots = [...activeHotspots, nextHotspot];
     handleHeroSlideChange("hotspots", hotspots);
@@ -1054,56 +1073,82 @@ export function EditorPanel() {
             context="hero-background-image"
           />
           <div className="space-y-2">
-            <Label>Prominencia de imagen</Label>
+            <Label htmlFor="hero-background-mode">Cobertura del fondo</Label>
             <Select
-              value={heroLayerModel.imageFit}
-              onValueChange={(value) => handleInputChange("imageFit", value)}
+              value={heroLayerModel.backgroundMode}
+              onValueChange={(value) => handleInputChange("backgroundMode", value)}
             >
-              <SelectTrigger className="w-full">
+              <SelectTrigger id="hero-background-mode" className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="cover">Llenar el espacio</SelectItem>
-                <SelectItem value="contain">Mostrar completa</SelectItem>
+                {HERO_BACKGROUND_MODE_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
+            <p className="text-xs text-muted-foreground">
+              Estirar ocupa todo el banner. Stage mantiene la proporción del
+              fondo dentro del escenario y habilita foco manual.
+            </p>
           </div>
-          <div className="space-y-2">
-            <Label>Enfoque horizontal</Label>
-            <Select
-              value={heroLayerModel.imagePositionX}
-              onValueChange={(value) =>
-                handleInputChange("imagePositionX", value)
-              }
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="left">Izquierda</SelectItem>
-                <SelectItem value="center">Centro</SelectItem>
-                <SelectItem value="right">Derecha</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Enfoque vertical</Label>
-            <Select
-              value={heroLayerModel.imagePositionY}
-              onValueChange={(value) =>
-                handleInputChange("imagePositionY", value)
-              }
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="top">Arriba</SelectItem>
-                <SelectItem value="center">Centro</SelectItem>
-                <SelectItem value="bottom">Abajo</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          {heroLayerModel.backgroundMode === "stage" && (
+            <>
+              <div className="space-y-2">
+                <Label>Prominencia de imagen</Label>
+                <Select
+                  value={heroLayerModel.imageFit}
+                  onValueChange={(value) => handleInputChange("imageFit", value)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cover">Llenar el espacio</SelectItem>
+                    <SelectItem value="contain">Mostrar completa</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Enfoque horizontal</Label>
+                <Select
+                  value={heroLayerModel.imagePositionX}
+                  onValueChange={(value) =>
+                    handleInputChange("imagePositionX", value)
+                  }
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="left">Izquierda</SelectItem>
+                    <SelectItem value="center">Centro</SelectItem>
+                    <SelectItem value="right">Derecha</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Enfoque vertical</Label>
+                <Select
+                  value={heroLayerModel.imagePositionY}
+                  onValueChange={(value) =>
+                    handleInputChange("imagePositionY", value)
+                  }
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="top">Arriba</SelectItem>
+                    <SelectItem value="center">Centro</SelectItem>
+                    <SelectItem value="bottom">Abajo</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </>
+          )}
         </div>
       );
     }
@@ -1150,6 +1195,81 @@ export function EditorPanel() {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+          <div className="space-y-3 rounded-lg border border-border p-3">
+            <div>
+              <h4 className="text-sm font-semibold">Composición del producto</h4>
+              <p className="text-xs text-muted-foreground">
+                Ajustes acotados para mover el producto dentro del stage con
+                valores normalizados.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="hero-product-scale">Escala del producto</Label>
+              <Input
+                id="hero-product-scale"
+                type="number"
+                min={HERO_PRODUCT_SCALE.min}
+                max={HERO_PRODUCT_SCALE.max}
+                step="1"
+                value={activeHeroSlide.productScale ?? HERO_PRODUCT_SCALE.default}
+                onChange={(event) =>
+                  handleHeroSlideChange(
+                    "productScale",
+                    clampHeroProductScale(
+                      event.target.value,
+                      activeHeroSlide.productScale ?? HERO_PRODUCT_SCALE.default,
+                    ),
+                  )
+                }
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="hero-product-offset-x">
+                  Desplazamiento horizontal
+                </Label>
+                <Input
+                  id="hero-product-offset-x"
+                  type="number"
+                  min={HERO_PRODUCT_OFFSET.min}
+                  max={HERO_PRODUCT_OFFSET.max}
+                  step="1"
+                  value={activeHeroSlide.productOffsetX ?? HERO_PRODUCT_OFFSET.default}
+                  onChange={(event) =>
+                    handleHeroSlideChange(
+                      "productOffsetX",
+                      clampHeroProductOffset(
+                        event.target.value,
+                        activeHeroSlide.productOffsetX ?? HERO_PRODUCT_OFFSET.default,
+                      ),
+                    )
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="hero-product-offset-y">
+                  Desplazamiento vertical
+                </Label>
+                <Input
+                  id="hero-product-offset-y"
+                  type="number"
+                  min={HERO_PRODUCT_OFFSET.min}
+                  max={HERO_PRODUCT_OFFSET.max}
+                  step="1"
+                  value={activeHeroSlide.productOffsetY ?? HERO_PRODUCT_OFFSET.default}
+                  onChange={(event) =>
+                    handleHeroSlideChange(
+                      "productOffsetY",
+                      clampHeroProductOffset(
+                        event.target.value,
+                        activeHeroSlide.productOffsetY ?? HERO_PRODUCT_OFFSET.default,
+                      ),
+                    )
+                  }
+                />
+              </div>
+            </div>
           </div>
           <div className="space-y-3 rounded-lg border border-border p-3">
             <div>
@@ -1319,6 +1439,61 @@ export function EditorPanel() {
               </SelectContent>
             </Select>
           </div>
+          <div className="space-y-3 rounded-lg border border-border p-3">
+            <div>
+              <h4 className="text-sm font-semibold">Composición del contenido</h4>
+              <p className="text-xs text-muted-foreground">
+                Ajustes acotados para mover el contenido dentro del stage con
+                valores normalizados.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="hero-content-offset-x">
+                  Mover contenido horizontal
+                </Label>
+                <Input
+                  id="hero-content-offset-x"
+                  type="number"
+                  min={HERO_CONTENT_OFFSET.min}
+                  max={HERO_CONTENT_OFFSET.max}
+                  step="1"
+                  value={activeHeroSlide.contentOffsetX ?? HERO_CONTENT_OFFSET.default}
+                  onChange={(event) =>
+                    handleHeroSlideChange(
+                      "contentOffsetX",
+                      clampHeroContentOffset(
+                        event.target.value,
+                        activeHeroSlide.contentOffsetX ?? HERO_CONTENT_OFFSET.default,
+                      ),
+                    )
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="hero-content-offset-y">
+                  Mover contenido vertical
+                </Label>
+                <Input
+                  id="hero-content-offset-y"
+                  type="number"
+                  min={HERO_CONTENT_OFFSET.min}
+                  max={HERO_CONTENT_OFFSET.max}
+                  step="1"
+                  value={activeHeroSlide.contentOffsetY ?? HERO_CONTENT_OFFSET.default}
+                  onChange={(event) =>
+                    handleHeroSlideChange(
+                      "contentOffsetY",
+                      clampHeroContentOffset(
+                        event.target.value,
+                        activeHeroSlide.contentOffsetY ?? HERO_CONTENT_OFFSET.default,
+                      ),
+                    )
+                  }
+                />
+              </div>
+            </div>
+          </div>
         </div>
       );
     }
@@ -1361,6 +1536,12 @@ export function EditorPanel() {
       const editableHotspot =
         hotspots.find((hotspot) => hotspot.id === selectedHeroHotspotId) ??
         hotspots[0];
+      const canUseSecondaryHotspot =
+        heroLayerModel.layoutMode === "full-image" &&
+        heroLayerModel.contentAlign === "center" &&
+        Boolean(activeHeroSlide.secondaryProductImage);
+      const hasUnavailableSecondaryTarget =
+        editableHotspot?.target === "secondary" && !canUseSecondaryHotspot;
 
       return (
         <div className="space-y-4">
@@ -1446,12 +1627,18 @@ export function EditorPanel() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="hero-hotspot-anchor">Ubicación del hotspot</Label>
+                    <Label htmlFor="hero-hotspot-anchor">Preset del hotspot</Label>
+                    <Label htmlFor="hero-hotspot-anchor" className="sr-only">
+                      Ubicación del hotspot
+                    </Label>
                     <Select
                       value={editableHotspot.anchor}
                       onValueChange={(value) =>
                         handleHeroHotspotChange(editableHotspot.id, {
                           anchor: value as HeroHotspot["anchor"],
+                          ...HERO_HOTSPOT_ANCHOR_COORDINATES[
+                            value as HeroHotspot["anchor"]
+                          ],
                         })
                       }
                     >
@@ -1466,6 +1653,84 @@ export function EditorPanel() {
                         ))}
                       </SelectContent>
                     </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="hero-hotspot-target">Producto objetivo</Label>
+                    <Select
+                      value={editableHotspot.target ?? "primary"}
+                      onValueChange={(value) =>
+                        handleHeroHotspotChange(editableHotspot.id, {
+                          target: value as HeroHotspot["target"],
+                        })
+                      }
+                    >
+                      <SelectTrigger id="hero-hotspot-target" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="primary">
+                          {HERO_HOTSPOT_TARGET_OPTIONS[0].label}
+                        </SelectItem>
+                        {canUseSecondaryHotspot ? (
+                          <SelectItem value="secondary">
+                            {HERO_HOTSPOT_TARGET_OPTIONS[1].label}
+                          </SelectItem>
+                        ) : (
+                          <SelectItem value="secondary" disabled>
+                            Secundario no disponible
+                          </SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {hasUnavailableSecondaryTarget && (
+                    <Alert>
+                      <Info className="h-4 w-4" />
+                      <AlertDescription>
+                        Este hotspot apunta al producto secundario, pero este
+                        slide no tiene un producto secundario disponible.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="hero-hotspot-x">Posición horizontal</Label>
+                      <Input
+                        id="hero-hotspot-x"
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="1"
+                        value={editableHotspot.x ?? 50}
+                        onChange={(event) =>
+                          handleHeroHotspotChange(editableHotspot.id, {
+                            x: clampHeroHotspotCoordinate(
+                              event.target.value,
+                              editableHotspot.x ?? 50,
+                            ),
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="hero-hotspot-y">Posición vertical</Label>
+                      <Input
+                        id="hero-hotspot-y"
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="1"
+                        value={editableHotspot.y ?? 50}
+                        onChange={(event) =>
+                          handleHeroHotspotChange(editableHotspot.id, {
+                            y: clampHeroHotspotCoordinate(
+                              event.target.value,
+                              editableHotspot.y ?? 50,
+                            ),
+                          })
+                        }
+                      />
+                    </div>
                   </div>
                   <Button
                     type="button"
@@ -1730,12 +1995,16 @@ export function EditorPanel() {
               </Select>
             </div>
 
-            <div className="space-y-3 rounded-lg border border-border p-3">
+            <div
+              className="space-y-3"
+              data-testid="hero-slide-management"
+              data-hero-slide-management="flat"
+            >
               <div className="flex items-center justify-between gap-2">
                 <div>
                   <h4 className="text-sm font-semibold">Gestión de slides</h4>
                   <p className="text-xs text-muted-foreground">
-                    Cada slide se guarda dentro de products[].
+                    Sumá, elegí o eliminá slides sin salir del panel lateral.
                   </p>
                 </div>
                 <div className="flex gap-2">

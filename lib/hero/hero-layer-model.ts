@@ -9,6 +9,7 @@ export type HeroLayerId =
 export type HeroLayoutMode = "split" | "full-image";
 
 export type HeroImageFit = "cover" | "contain";
+export type HeroBackgroundMode = "stage" | "fill";
 export type HeroHorizontalPosition = "left" | "center" | "right";
 export type HeroVerticalPosition = "top" | "center" | "bottom";
 export type HeroContentAlign = "left" | "center" | "right";
@@ -24,6 +25,8 @@ export type HeroHotspotAnchor =
   | "center-right"
   | "bottom-left"
   | "bottom-right";
+export type HeroHotspotTarget = "primary" | "secondary";
+export type HeroProductPresence = "subtle" | "balanced" | "prominent";
 
 export interface HeroHotspot {
   id: string;
@@ -31,6 +34,9 @@ export interface HeroHotspot {
   description?: string;
   href?: string;
   anchor: HeroHotspotAnchor;
+  x?: number;
+  y?: number;
+  target?: HeroHotspotTarget;
 }
 
 export interface HeroSlideLayerFields {
@@ -49,12 +55,19 @@ export interface HeroSlideLayerFields {
   textColor?: string;
   textSize?: HeroTextSize;
   productPlacement?: HeroProductPlacement;
+  productPresence?: HeroProductPresence;
+  productScale?: number;
+  productOffsetX?: number;
+  productOffsetY?: number;
+  contentOffsetX?: number;
+  contentOffsetY?: number;
   hotspots?: HeroHotspot[];
 }
 
 export interface HeroLayerModel {
   layoutMode: HeroLayoutMode;
   imageFit: HeroImageFit;
+  backgroundMode: HeroBackgroundMode;
   imagePositionX: HeroHorizontalPosition;
   imagePositionY: HeroVerticalPosition;
   contentAlign: HeroContentAlign;
@@ -145,6 +158,56 @@ export const HERO_HOTSPOT_ANCHOR_OPTIONS: Array<{
   { value: "bottom-right", label: "Abajo derecha" },
 ];
 
+export const HERO_HOTSPOT_TARGET_OPTIONS: Array<{
+  value: HeroHotspotTarget;
+  label: string;
+}> = [
+  { value: "primary", label: "Principal" },
+  { value: "secondary", label: "Secundario" },
+];
+
+export const HERO_PRODUCT_PRESENCE_OPTIONS: Array<{
+  value: HeroProductPresence;
+  label: string;
+}> = [
+  { value: "subtle", label: "Sutil" },
+  { value: "balanced", label: "Balanceada" },
+  { value: "prominent", label: "Prominente" },
+];
+
+export const HERO_BACKGROUND_MODE_OPTIONS: Array<{
+  value: HeroBackgroundMode;
+  label: string;
+}> = [
+  { value: "fill", label: "Estirar al banner completo" },
+  { value: "stage", label: "Mantener proporción dentro del stage" },
+];
+
+export const HERO_PRODUCT_SCALE = { min: 70, max: 140, default: 100 } as const;
+export const HERO_PRODUCT_OFFSET = { min: -20, max: 20, default: 0 } as const;
+export const HERO_CONTENT_OFFSET = { min: -16, max: 16, default: 0 } as const;
+
+export const HERO_PRODUCT_PRESENCE_DEFAULTS: Record<
+  HeroProductPresence,
+  { productScale: number; productOffsetX: number; productOffsetY: number }
+> = {
+  subtle: { productScale: 90, productOffsetX: 0, productOffsetY: 0 },
+  balanced: { productScale: 100, productOffsetX: 0, productOffsetY: 0 },
+  prominent: { productScale: 110, productOffsetX: 0, productOffsetY: 0 },
+};
+
+export const HERO_HOTSPOT_ANCHOR_COORDINATES: Record<
+  HeroHotspotAnchor,
+  { x: number; y: number }
+> = {
+  "top-left": { x: 25, y: 20 },
+  "top-right": { x: 75, y: 20 },
+  "center-left": { x: 25, y: 50 },
+  "center-right": { x: 75, y: 50 },
+  "bottom-left": { x: 25, y: 80 },
+  "bottom-right": { x: 75, y: 80 },
+};
+
 const HERO_TEXT_SIZE_VALUES = HERO_TEXT_SIZE_OPTIONS.map(
   (option) => option.value,
 ) as HeroTextSize[];
@@ -158,10 +221,20 @@ const HERO_SECONDARY_PRODUCT_PRESET_VALUES =
 const HERO_HOTSPOT_ANCHOR_VALUES = HERO_HOTSPOT_ANCHOR_OPTIONS.map(
   (option) => option.value,
 ) as HeroHotspotAnchor[];
+const HERO_HOTSPOT_TARGET_VALUES = HERO_HOTSPOT_TARGET_OPTIONS.map(
+  (option) => option.value,
+) as HeroHotspotTarget[];
+const HERO_PRODUCT_PRESENCE_VALUES = HERO_PRODUCT_PRESENCE_OPTIONS.map(
+  (option) => option.value,
+) as HeroProductPresence[];
+const HERO_BACKGROUND_MODE_VALUES = HERO_BACKGROUND_MODE_OPTIONS.map(
+  (option) => option.value,
+) as HeroBackgroundMode[];
 
 export const DEFAULT_HERO_LAYER_MODEL: HeroLayerModel = {
   layoutMode: "split",
   imageFit: "cover",
+  backgroundMode: "fill",
   imagePositionX: "center",
   imagePositionY: "center",
   contentAlign: "left",
@@ -197,6 +270,60 @@ export function clampOverlayOpacity(value: unknown): number {
   return Math.min(Math.max(numericValue, 0), 0.9);
 }
 
+export function clampHeroHotspotCoordinate(
+  value: unknown,
+  fallback: number,
+): number {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) {
+    return fallback;
+  }
+  return Math.min(Math.max(numericValue, 0), 100);
+}
+
+function clampBoundedNumber(
+  value: unknown,
+  fallback: number,
+  min: number,
+  max: number,
+): number {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) {
+    return fallback;
+  }
+  return Math.min(Math.max(numericValue, min), max);
+}
+
+export function clampHeroProductScale(value: unknown, fallback = HERO_PRODUCT_SCALE.default): number {
+  return clampBoundedNumber(
+    value,
+    fallback,
+    HERO_PRODUCT_SCALE.min,
+    HERO_PRODUCT_SCALE.max,
+  );
+}
+
+export function clampHeroProductOffset(value: unknown, fallback = HERO_PRODUCT_OFFSET.default): number {
+  return clampBoundedNumber(
+    value,
+    fallback,
+    HERO_PRODUCT_OFFSET.min,
+    HERO_PRODUCT_OFFSET.max,
+  );
+}
+
+export function clampHeroContentOffset(
+  value: unknown,
+  fallback = HERO_CONTENT_OFFSET.default,
+): number {
+  return clampBoundedNumber(
+    value,
+    fallback,
+    HERO_CONTENT_OFFSET.min,
+    HERO_CONTENT_OFFSET.max,
+  );
+}
+
 export function normalizeHeroSlide(
   slide: Partial<HeroSlideLayerFields> = {},
 ): HeroSlideLayerFields {
@@ -208,6 +335,12 @@ export function normalizeHeroSlide(
     slide.secondaryProductImage,
   );
   const secondaryProductAlt = normalizeOptionalString(slide.secondaryProductAlt);
+  const productPresence = pickUnion(
+    slide.productPresence,
+    HERO_PRODUCT_PRESENCE_VALUES,
+    "balanced" satisfies HeroProductPresence,
+  );
+  const compositionDefaults = HERO_PRODUCT_PRESENCE_DEFAULTS[productPresence];
 
   return {
     ...slide,
@@ -226,6 +359,21 @@ export function normalizeHeroSlide(
       HERO_PRODUCT_PLACEMENT_VALUES,
       "right" satisfies HeroProductPlacement,
     ),
+    productPresence,
+    productScale: clampHeroProductScale(
+      slide.productScale,
+      compositionDefaults.productScale,
+    ),
+    productOffsetX: clampHeroProductOffset(
+      slide.productOffsetX,
+      compositionDefaults.productOffsetX,
+    ),
+    productOffsetY: clampHeroProductOffset(
+      slide.productOffsetY,
+      compositionDefaults.productOffsetY,
+    ),
+    contentOffsetX: clampHeroContentOffset(slide.contentOffsetX),
+    contentOffsetY: clampHeroContentOffset(slide.contentOffsetY),
     secondaryProductPreset:
       slide.secondaryProductPreset || secondaryProductImage
         ? pickUnion(
@@ -259,6 +407,8 @@ export function normalizeHeroHotspots(value: unknown): HeroHotspot[] {
 
     const description = normalizeOptionalString(record.description);
     const href = normalizeOptionalString(record.href);
+    const coordinateDefaults =
+      HERO_HOTSPOT_ANCHOR_COORDINATES[anchor as HeroHotspotAnchor];
 
     return [
       {
@@ -267,6 +417,13 @@ export function normalizeHeroHotspots(value: unknown): HeroHotspot[] {
         ...(description ? { description } : {}),
         ...(href ? { href } : {}),
         anchor: anchor as HeroHotspotAnchor,
+        x: clampHeroHotspotCoordinate(record.x, coordinateDefaults.x),
+        y: clampHeroHotspotCoordinate(record.y, coordinateDefaults.y),
+        target: pickUnion(
+          record.target,
+          HERO_HOTSPOT_TARGET_VALUES,
+          "primary" satisfies HeroHotspotTarget,
+        ),
       },
     ];
   });
@@ -300,6 +457,11 @@ export function toHeroLayerModel(
       variables.imageFit,
       ["cover", "contain"] as const,
       DEFAULT_HERO_LAYER_MODEL.imageFit,
+    ),
+    backgroundMode: pickUnion(
+      variables.backgroundMode,
+      HERO_BACKGROUND_MODE_VALUES,
+      DEFAULT_HERO_LAYER_MODEL.backgroundMode,
     ),
     imagePositionX: pickUnion(
       variables.imagePositionX,
@@ -353,6 +515,7 @@ export function toFlatHeroVariables(model: HeroLayerModel): Record<string, any> 
   return {
     layoutMode: model.layoutMode,
     imageFit: model.imageFit,
+    backgroundMode: model.backgroundMode,
     imagePositionX: model.imagePositionX,
     imagePositionY: model.imagePositionY,
     fullImageContentAlign: model.contentAlign,

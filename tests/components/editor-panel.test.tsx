@@ -150,12 +150,65 @@ describe("EditorPanel", () => {
     render(<EditorPanel />);
 
     expect(screen.getByLabelText("Imagen de fondo")).toBeInTheDocument();
-    expect(screen.getByText("Enfoque horizontal")).toBeInTheDocument();
+    expect(screen.getByLabelText("Cobertura del fondo")).toHaveTextContent(
+      "Estirar al banner completo",
+    );
+    expect(screen.queryByText("Prominencia de imagen")).not.toBeInTheDocument();
+    expect(screen.queryByText("Enfoque horizontal")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByLabelText("Componente del slide"));
     fireEvent.click(screen.getByRole("option", { name: "Producto" }));
 
     expect(setSelectedHeroLayer).toHaveBeenCalledWith("product");
+  });
+
+  it("edits full-image background coverage from the side panel without exposing CSS sizing", () => {
+    const updateComponentEdit = vi.fn();
+    mockUseAdmin.mockReturnValue(heroAdminState({
+      selectedHeroLayer: "background",
+      updateComponentEdit,
+      componentEdits: new Map([
+        [
+          "hero",
+          {
+            layoutMode: "full-image",
+            backgroundMode: "fill",
+            products: [{ title: "Fondo", image: "/hero-bg.jpg" }],
+          },
+        ],
+      ]),
+    }));
+
+    render(<EditorPanel />);
+
+    expect(screen.getByLabelText("Cobertura del fondo")).toHaveTextContent(
+      "Estirar al banner completo",
+    );
+    expect(
+      screen.getByText(/estirar ocupa todo el banner/i),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("Cobertura del fondo"));
+    fireEvent.click(
+      screen.getByRole("option", { name: "Mantener proporción dentro del stage" }),
+    );
+
+    expect(updateComponentEdit).toHaveBeenLastCalledWith(
+      "hero",
+      "backgroundMode",
+      "stage",
+    );
+    expect(screen.queryByLabelText(/css/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/px|pixel/i)).not.toBeInTheDocument();
+  });
+
+  it("keeps slide management flat instead of wrapping it in a boxed card", () => {
+    render(<EditorPanel />);
+
+    const slideManagement = screen.getByTestId("hero-slide-management");
+
+    expect(slideManagement).toHaveAttribute("data-hero-slide-management", "flat");
+    expect(slideManagement.className).not.toContain("rounded-lg");
+    expect(slideManagement.className).not.toContain("border ");
   });
 
   it("opens the slide component dropdown from the keyboard", async () => {
@@ -285,6 +338,19 @@ describe("EditorPanel", () => {
       "products",
       [expect.objectContaining({ title: "Slide dos" })],
     );
+  });
+
+  it("shows slide management as a flat section without products copy or boxed card treatment", () => {
+    mockUseAdmin.mockReturnValue(heroAdminState());
+
+    render(<EditorPanel />);
+
+    const slideManagement = screen.getByTestId("hero-slide-management");
+
+    expect(slideManagement).toHaveAttribute("data-hero-slide-management", "flat");
+    expect(slideManagement).not.toHaveAttribute("data-hero-slide-management", "boxed-card");
+    expect(screen.queryByText(/products\[\]/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/sumá, elegí o eliminá slides/i)).toBeInTheDocument();
   });
 
   it("activates slide manager and hotspot controls from the keyboard", async () => {
@@ -614,6 +680,280 @@ describe("EditorPanel", () => {
     );
   });
 
+  it("edits hotspot target and bounded precision coordinates from the existing side panel", () => {
+    const updateComponentEdit = vi.fn();
+    mockUseAdmin.mockReturnValue(heroAdminState({
+      selectedHeroLayer: "hotspots",
+      selectedHeroHotspotId: "h-precision",
+      updateComponentEdit,
+      componentEdits: new Map([
+        [
+          "hero",
+          {
+            layoutMode: "full-image",
+            fullImageContentAlign: "center",
+            products: [
+              {
+                title: "Precision",
+                productImage: "/primary.png",
+                secondaryProductImage: "/secondary.png",
+                hotspots: [
+                  {
+                    id: "h-precision",
+                    label: "Driver",
+                    anchor: "center-right",
+                    x: 75,
+                    y: 50,
+                    target: "primary",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      ]),
+    }));
+
+    render(<EditorPanel />);
+
+    expect(screen.getByLabelText("Preset del hotspot")).toHaveTextContent(
+      "Centro derecha",
+    );
+    expect(screen.getByLabelText("Producto objetivo")).toHaveTextContent(
+      "Principal",
+    );
+    expect(screen.getByLabelText("Posición horizontal")).toHaveValue(75);
+    expect(screen.getByLabelText("Posición vertical")).toHaveValue(50);
+
+    fireEvent.click(screen.getByLabelText("Preset del hotspot"));
+    fireEvent.click(screen.getByRole("option", { name: "Abajo izquierda" }));
+    expect(updateComponentEdit).toHaveBeenLastCalledWith(
+      "hero",
+      "products",
+      expect.arrayContaining([
+        expect.objectContaining({
+          hotspots: [
+            expect.objectContaining({
+              id: "h-precision",
+              anchor: "bottom-left",
+              x: 25,
+              y: 80,
+            }),
+          ],
+        }),
+      ]),
+    );
+
+    fireEvent.click(screen.getByLabelText("Producto objetivo"));
+    fireEvent.click(screen.getByRole("option", { name: "Secundario" }));
+    expect(updateComponentEdit).toHaveBeenLastCalledWith(
+      "hero",
+      "products",
+      expect.arrayContaining([
+        expect.objectContaining({
+          hotspots: [expect.objectContaining({ id: "h-precision", target: "secondary" })],
+        }),
+      ]),
+    );
+
+    fireEvent.change(screen.getByLabelText("Posición horizontal"), {
+      target: { value: "120" },
+    });
+    expect(updateComponentEdit).toHaveBeenLastCalledWith(
+      "hero",
+      "products",
+      expect.arrayContaining([
+        expect.objectContaining({
+          hotspots: [expect.objectContaining({ id: "h-precision", x: 100 })],
+        }),
+      ]),
+    );
+
+    fireEvent.change(screen.getByLabelText("Posición vertical"), {
+      target: { value: "-5" },
+    });
+    expect(updateComponentEdit).toHaveBeenLastCalledWith(
+      "hero",
+      "products",
+      expect.arrayContaining([
+        expect.objectContaining({
+          hotspots: [expect.objectContaining({ id: "h-precision", y: 0 })],
+        }),
+      ]),
+    );
+
+    expect(screen.queryByText(/canvas/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/arrastr/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/px|pixel|css/i)).not.toBeInTheDocument();
+  });
+
+  it("surfaces unavailable secondary hotspot targets without adding canvas or extra targets", () => {
+    mockUseAdmin.mockReturnValue(heroAdminState({
+      selectedHeroLayer: "hotspots",
+      selectedHeroHotspotId: "h-secondary",
+      componentEdits: new Map([
+        [
+          "hero",
+          {
+            products: [
+              {
+                title: "Sin secundario",
+                productImage: "/primary.png",
+                hotspots: [
+                  {
+                    id: "h-secondary",
+                    label: "Solo secundario",
+                    anchor: "top-right",
+                    x: 90,
+                    y: 20,
+                    target: "secondary",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      ]),
+    }));
+
+    render(<EditorPanel />);
+
+    expect(
+      screen.getByText(/este hotspot apunta al producto secundario/i),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("Producto objetivo"));
+    expect(screen.getByRole("option", { name: "Principal" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /secundario no disponible/i })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /tercer producto/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/workspace|lienzo|canvas/i)).not.toBeInTheDocument();
+  });
+
+  it("edits bounded product scale and offsets through products state only", () => {
+    const updateComponentEdit = vi.fn();
+    mockUseAdmin.mockReturnValue(heroAdminState({
+      selectedHeroLayer: "product",
+      updateComponentEdit,
+      componentEdits: new Map([
+        [
+          "hero",
+          {
+            products: [
+              {
+                title: "Presence",
+                image: "/hero-bg.jpg",
+                productImage: "/primary.png",
+                productPresence: "prominent",
+                productScale: 110,
+                productOffsetX: 0,
+                productOffsetY: 0,
+              },
+            ],
+          },
+        ],
+      ]),
+    }));
+
+    render(<EditorPanel />);
+
+    expect(screen.queryByLabelText("Presencia del producto")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Escala del producto")).toHaveValue(110);
+    expect(screen.getByLabelText("Desplazamiento horizontal")).toHaveValue(0);
+    expect(screen.getByLabelText("Desplazamiento vertical")).toHaveValue(0);
+
+    fireEvent.change(screen.getByLabelText("Escala del producto"), {
+      target: { value: "155" },
+    });
+
+    expect(updateComponentEdit).toHaveBeenLastCalledWith(
+      "hero",
+      "products",
+      [expect.objectContaining({ productScale: 140 })],
+    );
+
+    fireEvent.change(screen.getByLabelText("Desplazamiento horizontal"), {
+      target: { value: "-35" },
+    });
+
+    expect(updateComponentEdit).toHaveBeenLastCalledWith(
+      "hero",
+      "products",
+      [expect.objectContaining({ productOffsetX: -20 })],
+    );
+
+    fireEvent.change(screen.getByLabelText("Desplazamiento vertical"), {
+      target: { value: "18" },
+    });
+
+    expect(updateComponentEdit).toHaveBeenLastCalledWith(
+      "hero",
+      "products",
+      [expect.objectContaining({ productOffsetY: 18 })],
+    );
+    expect(updateComponentEdit).not.toHaveBeenCalledWith(
+      "hero",
+      "productScale",
+      expect.anything(),
+    );
+    expect(screen.queryByLabelText(/px|pixel|css/i)).not.toBeInTheDocument();
+  });
+
+  it("edits bounded content offsets through products state only", () => {
+    const updateComponentEdit = vi.fn();
+    mockUseAdmin.mockReturnValue(heroAdminState({
+      selectedHeroLayer: "content",
+      updateComponentEdit,
+      componentEdits: new Map([
+        [
+          "hero",
+          {
+            products: [
+              {
+                title: "Contenido",
+                image: "/hero-bg.jpg",
+                contentOffsetX: 3,
+                contentOffsetY: -4,
+              },
+            ],
+          },
+        ],
+      ]),
+    }));
+
+    render(<EditorPanel />);
+
+    expect(screen.getByLabelText("Mover contenido horizontal")).toHaveValue(3);
+    expect(screen.getByLabelText("Mover contenido vertical")).toHaveValue(-4);
+    expect(
+      screen.getByText(/stage con valores normalizados/i),
+    ).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Mover contenido horizontal"), {
+      target: { value: "24" },
+    });
+
+    expect(updateComponentEdit).toHaveBeenLastCalledWith(
+      "hero",
+      "products",
+      [expect.objectContaining({ contentOffsetX: 16 })],
+    );
+
+    fireEvent.change(screen.getByLabelText("Mover contenido vertical"), {
+      target: { value: "-24" },
+    });
+
+    expect(updateComponentEdit).toHaveBeenLastCalledWith(
+      "hero",
+      "products",
+      [expect.objectContaining({ contentOffsetY: -16 })],
+    );
+    expect(updateComponentEdit).not.toHaveBeenCalledWith(
+      "hero",
+      "contentOffsetX",
+      expect.anything(),
+    );
+    expect(screen.queryByLabelText(/px|pixel|css/i)).not.toBeInTheDocument();
+  });
+
   it("saves enhanced layered Hero payload through updateComponentStyle and reloads it as editable data", async () => {
     const layeredProducts = [
       {
@@ -629,6 +969,12 @@ describe("EditorPanel", () => {
         secondaryProductImage: "/secondary-product.png",
         secondaryProductAlt: "Producto secundario persistido",
         secondaryProductPreset: "primary-left-secondary-right",
+        productPresence: "subtle",
+        productScale: 92,
+        productOffsetX: -12,
+        productOffsetY: 8,
+        contentOffsetX: 7,
+        contentOffsetY: -6,
         textColor: "#22cc88",
         textSize: "balanced",
         productPlacement: "left",
@@ -639,12 +985,16 @@ describe("EditorPanel", () => {
             description: "Detalle persistido",
             href: "/products/audio#driver",
             anchor: "bottom-right",
+            x: 31,
+            y: 74,
+            target: "secondary",
           },
         ],
       },
     ];
     const heroEdits = {
       fullImageContentAlign: "center",
+      backgroundMode: "fill",
       overlayColor: "#111827",
       overlayOpacity: "0.65",
       products: layeredProducts,
@@ -703,6 +1053,7 @@ describe("EditorPanel", () => {
         expect.objectContaining({
           layoutMode: "full-image",
           fullImageContentAlign: "center",
+          backgroundMode: "fill",
           overlayColor: "#111827",
           overlayOpacity: "0.65",
           products: layeredProducts,
@@ -724,6 +1075,12 @@ describe("EditorPanel", () => {
       secondaryProductImage: "/secondary-product.png",
       secondaryProductAlt: "Producto secundario persistido",
       secondaryProductPreset: "primary-left-secondary-right",
+      productPresence: "subtle",
+      productScale: 92,
+      productOffsetX: -12,
+      productOffsetY: 8,
+      contentOffsetX: 7,
+      contentOffsetY: -6,
       textColor: "#22cc88",
       textSize: "balanced",
       productPlacement: "left",
@@ -734,6 +1091,9 @@ describe("EditorPanel", () => {
           description: "Detalle persistido",
           href: "/products/audio#driver",
           anchor: "bottom-right",
+          x: 31,
+          y: 74,
+          target: "secondary",
         },
       ],
     });
@@ -778,6 +1138,8 @@ describe("EditorPanel", () => {
     expect(screen.getByLabelText("Tamaño de texto")).toHaveTextContent(
       "Balanceado",
     );
+    expect(screen.getByLabelText("Mover contenido horizontal")).toHaveValue(7);
+    expect(screen.getByLabelText("Mover contenido vertical")).toHaveValue(-6);
 
     mockUseAdmin.mockReturnValue({
       selectedComponent: "hero",
@@ -805,6 +1167,9 @@ describe("EditorPanel", () => {
     expect(screen.getByLabelText("Composición secundaria")).toHaveTextContent(
       "Principal izquierda, secundario derecha",
     );
+    expect(screen.getByLabelText("Escala del producto")).toHaveValue(92);
+    expect(screen.getByLabelText("Desplazamiento horizontal")).toHaveValue(-12);
+    expect(screen.getByLabelText("Desplazamiento vertical")).toHaveValue(8);
     expect(
       screen.getByLabelText("Texto alternativo del producto secundario"),
     ).toHaveValue("Producto secundario persistido");
@@ -839,6 +1204,11 @@ describe("EditorPanel", () => {
     expect(screen.getByLabelText("Ubicación del hotspot")).toHaveTextContent(
       "Abajo derecha",
     );
+    expect(screen.getByLabelText("Producto objetivo")).toHaveTextContent(
+      "Secundario",
+    );
+    expect(screen.getByLabelText("Posición horizontal")).toHaveValue(31);
+    expect(screen.getByLabelText("Posición vertical")).toHaveValue(74);
   });
 
   it("routes rapid color edits through the scheduled update path", () => {
