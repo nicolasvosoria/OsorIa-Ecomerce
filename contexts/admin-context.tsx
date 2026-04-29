@@ -9,12 +9,19 @@ import {
 } from "react";
 import { useAuth } from "@/contexts/auth-context";
 import { isCurrentUserAdmin } from "@/lib/supabase/permissions-api";
+import type { HeroLayerId } from "@/lib/hero/hero-layer-model";
 
 interface AdminContextType {
   isEditMode: boolean;
   isAdmin: boolean;
   selectedComponent: string | null;
   selectComponent: (componentName: string | null) => void;
+  selectedHeroLayer: HeroLayerId | null;
+  setSelectedHeroLayer: (layerId: HeroLayerId | null) => void;
+  selectedHeroSlideIndex: number;
+  setSelectedHeroSlideIndex: (slideIndex: number) => void;
+  selectedHeroHotspotId: string | null;
+  setSelectedHeroHotspotId: (hotspotId: string | null) => void;
   componentEdits: Map<string, Record<string, any>>;
   updateComponentEdit: (componentName: string, key: string, value: any) => void;
   scheduleComponentEdit: (
@@ -37,6 +44,12 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   const [selectedComponent, setSelectedComponent] = useState<string | null>(
     null,
   );
+  const [selectedHeroLayer, setSelectedHeroLayerState] =
+    useState<HeroLayerId | null>(null);
+  const [selectedHeroSlideIndex, setSelectedHeroSlideIndexState] = useState(0);
+  const [selectedHeroHotspotId, setSelectedHeroHotspotIdState] = useState<
+    string | null
+  >(null);
   const [componentEdits, setComponentEdits] = useState<
     Map<string, Record<string, any>>
   >(new Map());
@@ -49,6 +62,12 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     () => new Map<string, ReturnType<typeof setTimeout>>(),
   )[0];
 
+  const resetHeroSelection = () => {
+    setSelectedHeroLayerState(null);
+    setSelectedHeroSlideIndexState(0);
+    setSelectedHeroHotspotIdState(null);
+  };
+
   // Verificar si el usuario es admin cuando cambia la autenticación
   useEffect(() => {
     const checkAdminStatus = async () => {
@@ -60,6 +79,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
           if (!adminStatus) {
             setIsEditMode(false);
             setSelectedComponent(null);
+            resetHeroSelection();
           }
         } catch (error) {
           console.error("[Admin] Error verificando rol de admin:", error);
@@ -69,6 +89,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
         setIsAdmin(false);
         setIsEditMode(false);
         setSelectedComponent(null);
+        resetHeroSelection();
       }
     };
 
@@ -91,6 +112,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       if (!newValue) {
         // Si se desactiva, limpiar selección
         setSelectedComponent(null);
+        resetHeroSelection();
       }
       return newValue;
     });
@@ -99,6 +121,28 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   const selectComponent = (componentName: string | null) => {
     if (!isAdmin || !isEditMode) return;
     setSelectedComponent(componentName);
+    if (componentName !== "hero") {
+      resetHeroSelection();
+    }
+  };
+
+  const setSelectedHeroLayer = (layerId: HeroLayerId | null) => {
+    if (!isAdmin || !isEditMode || selectedComponent !== "hero") return;
+    setSelectedHeroLayerState(layerId);
+    if (layerId !== "hotspots") {
+      setSelectedHeroHotspotIdState(null);
+    }
+  };
+
+  const setSelectedHeroSlideIndex = (slideIndex: number) => {
+    if (!isAdmin || !isEditMode || selectedComponent !== "hero") return;
+    setSelectedHeroSlideIndexState(Math.max(0, slideIndex));
+    setSelectedHeroHotspotIdState(null);
+  };
+
+  const setSelectedHeroHotspotId = (hotspotId: string | null) => {
+    if (!isAdmin || !isEditMode || selectedComponent !== "hero") return;
+    setSelectedHeroHotspotIdState(hotspotId);
   };
 
   const updateComponentEdit = (
@@ -226,6 +270,12 @@ export function AdminProvider({ children }: { children: ReactNode }) {
         isAdmin,
         selectedComponent,
         selectComponent,
+        selectedHeroLayer,
+        setSelectedHeroLayer,
+        selectedHeroSlideIndex,
+        setSelectedHeroSlideIndex,
+        selectedHeroHotspotId,
+        setSelectedHeroHotspotId,
         componentEdits,
         updateComponentEdit,
         scheduleComponentEdit,
@@ -249,6 +299,12 @@ export function useAdmin() {
       isAdmin: false,
       selectedComponent: null,
       selectComponent: () => {},
+      selectedHeroLayer: null,
+      setSelectedHeroLayer: () => {},
+      selectedHeroSlideIndex: 0,
+      setSelectedHeroSlideIndex: () => {},
+      selectedHeroHotspotId: null,
+      setSelectedHeroHotspotId: () => {},
       componentEdits: new Map(),
       updateComponentEdit: () => {},
       scheduleComponentEdit: () => {},

@@ -32,11 +32,38 @@ function Harness() {
     flushScheduledEdits,
     clearComponentEdits,
     getComponentEditsSnapshot,
+    selectedComponent,
+    selectedHeroLayer,
+    selectedHeroSlideIndex,
+    selectedHeroHotspotId,
+    selectComponent,
+    setSelectedHeroLayer,
+    setSelectedHeroSlideIndex,
+    setSelectedHeroHotspotId,
+    toggleEditMode,
   } = useAdmin();
 
   return (
     <div>
       <div data-testid="is-admin">{String(isAdmin)}</div>
+      <div data-testid="selected-component">{selectedComponent ?? "none"}</div>
+      <div data-testid="selected-hero-layer">
+        {selectedHeroLayer ?? "none"}
+      </div>
+      <div data-testid="selected-hero-slide-index">
+        {String(selectedHeroSlideIndex)}
+      </div>
+      <div data-testid="selected-hero-hotspot-id">
+        {selectedHeroHotspotId ?? "none"}
+      </div>
+      <button onClick={() => toggleEditMode()}>toggle edit</button>
+      <button onClick={() => selectComponent("hero")}>select hero</button>
+      <button onClick={() => selectComponent("popular")}>select popular</button>
+      <button onClick={() => selectComponent(null)}>clear selection</button>
+      <button onClick={() => setSelectedHeroLayer("product")}>select layer</button>
+      <button onClick={() => setSelectedHeroLayer("hotspots")}>select hotspots layer</button>
+      <button onClick={() => setSelectedHeroSlideIndex(2)}>select slide</button>
+      <button onClick={() => setSelectedHeroHotspotId("hotspot-1")}>select hotspot</button>
       <button
         onClick={() => {
           updateComponentEdit("hero", "bgColor", "#000000");
@@ -188,5 +215,221 @@ describe("AdminProvider", () => {
 
     expect(screen.getByTestId("edits")).toHaveTextContent("{}");
     expect(screen.getByTestId("snapshot")).toHaveTextContent("{}");
+  });
+
+  it("keeps selectedHeroLayer transient and outside component edit payloads", async () => {
+    render(
+      <AdminProvider>
+        <Harness />
+      </AdminProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("is-admin")).toHaveTextContent("true");
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("toggle edit"));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText("select hero"));
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("selected-component")).toHaveTextContent("hero");
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText("select layer"));
+    });
+
+    expect(screen.getByTestId("selected-component")).toHaveTextContent("hero");
+    expect(screen.getByTestId("selected-hero-layer")).toHaveTextContent(
+      "product",
+    );
+    expect(screen.getByTestId("edits")).toHaveTextContent("{}");
+    expect(screen.getByTestId("snapshot")).not.toHaveTextContent(
+      "selectedHeroLayer",
+    );
+  });
+
+  it("resets selectedHeroLayer when hero selection clears or edit mode closes", async () => {
+    render(
+      <AdminProvider>
+        <Harness />
+      </AdminProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("is-admin")).toHaveTextContent("true");
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("toggle edit"));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText("select hero"));
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("selected-component")).toHaveTextContent("hero");
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText("select layer"));
+    });
+
+    expect(screen.getByTestId("selected-hero-layer")).toHaveTextContent(
+      "product",
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("select popular"));
+    });
+    expect(screen.getByTestId("selected-component")).toHaveTextContent(
+      "popular",
+    );
+    expect(screen.getByTestId("selected-hero-layer")).toHaveTextContent(
+      "none",
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("select hero"));
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("selected-component")).toHaveTextContent("hero");
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText("select layer"));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText("clear selection"));
+    });
+    expect(screen.getByTestId("selected-hero-layer")).toHaveTextContent(
+      "none",
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("select hero"));
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("selected-component")).toHaveTextContent("hero");
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText("select layer"));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText("toggle edit"));
+    });
+    expect(screen.getByTestId("selected-component")).toHaveTextContent("none");
+    expect(screen.getByTestId("selected-hero-layer")).toHaveTextContent(
+      "none",
+    );
+  });
+
+  it("keeps selectedHeroSlideIndex and selectedHeroHotspotId transient and outside edit payloads", async () => {
+    render(
+      <AdminProvider>
+        <Harness />
+      </AdminProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("is-admin")).toHaveTextContent("true");
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("toggle edit"));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText("select hero"));
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("selected-component")).toHaveTextContent("hero");
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText("select slide"));
+      fireEvent.click(screen.getByText("select hotspots layer"));
+      fireEvent.click(screen.getByText("select hotspot"));
+    });
+
+    expect(screen.getByTestId("selected-hero-slide-index")).toHaveTextContent("2");
+    expect(screen.getByTestId("selected-hero-hotspot-id")).toHaveTextContent(
+      "hotspot-1",
+    );
+    expect(screen.getByTestId("edits")).toHaveTextContent("{}");
+    expect(screen.getByTestId("snapshot")).not.toHaveTextContent(
+      "selectedHeroSlideIndex",
+    );
+    expect(screen.getByTestId("snapshot")).not.toHaveTextContent(
+      "selectedHeroHotspotId",
+    );
+  });
+
+  it("resets slide and hotspot selection on component switch, hero deselect and edit mode close", async () => {
+    render(
+      <AdminProvider>
+        <Harness />
+      </AdminProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("is-admin")).toHaveTextContent("true");
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("toggle edit"));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText("select hero"));
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("selected-component")).toHaveTextContent("hero");
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText("select slide"));
+      fireEvent.click(screen.getByText("select hotspot"));
+    });
+
+    expect(screen.getByTestId("selected-hero-slide-index")).toHaveTextContent("2");
+    expect(screen.getByTestId("selected-hero-hotspot-id")).toHaveTextContent(
+      "hotspot-1",
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("select popular"));
+    });
+    expect(screen.getByTestId("selected-hero-slide-index")).toHaveTextContent("0");
+    expect(screen.getByTestId("selected-hero-hotspot-id")).toHaveTextContent(
+      "none",
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("select hero"));
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("selected-component")).toHaveTextContent("hero");
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText("select slide"));
+      fireEvent.click(screen.getByText("select hotspot"));
+      fireEvent.click(screen.getByText("clear selection"));
+    });
+    expect(screen.getByTestId("selected-hero-slide-index")).toHaveTextContent("0");
+    expect(screen.getByTestId("selected-hero-hotspot-id")).toHaveTextContent(
+      "none",
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("select hero"));
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("selected-component")).toHaveTextContent("hero");
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText("select slide"));
+      fireEvent.click(screen.getByText("select hotspot"));
+      fireEvent.click(screen.getByText("toggle edit"));
+    });
+    expect(screen.getByTestId("selected-hero-slide-index")).toHaveTextContent("0");
+    expect(screen.getByTestId("selected-hero-hotspot-id")).toHaveTextContent(
+      "none",
+    );
   });
 });
