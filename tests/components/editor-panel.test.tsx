@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { EditorPanel } from "@/components/admin/editor-panel";
 import { updateComponentStyle } from "@/lib/supabase/styles-api";
+import type { HeroStyleInput } from "@/lib/hero/hero-layer-model";
 
 const mockUseAdmin = vi.fn();
 const mockUseStyles = vi.fn();
@@ -77,7 +78,7 @@ describe("EditorPanel", () => {
     });
   });
 
-  const heroAdminState = (overrides: Record<string, any> = {}) => ({
+  const heroAdminState = (overrides: Record<string, unknown> = {}) => ({
     selectedComponent: "hero",
     selectComponent: vi.fn(),
     selectedHeroLayer: "background",
@@ -86,12 +87,12 @@ describe("EditorPanel", () => {
     setSelectedHeroSlideIndex: vi.fn(),
     selectedHeroHotspotId: null,
     setSelectedHeroHotspotId: vi.fn(),
-    componentEdits: new Map(),
+    componentEdits: new Map<string, HeroStyleInput>(),
     updateComponentEdit: vi.fn(),
     scheduleComponentEdit: vi.fn(),
     flushScheduledEdits: vi.fn(),
     clearComponentEdits: vi.fn(),
-    getComponentEditsSnapshot: vi.fn(() => ({})),
+    getComponentEditsSnapshot: vi.fn((): HeroStyleInput => ({})),
     isEditMode: true,
     toggleEditMode: vi.fn(),
     ...overrides,
@@ -1061,10 +1062,9 @@ describe("EditorPanel", () => {
       );
     });
 
-    const savedPayload = updateComponentStyleMock.mock.calls[0][1] as Record<
-      string,
-      any
-    >;
+    const savedPayload = updateComponentStyleMock.mock.calls[0][1] as HeroStyleInput & {
+      products: Array<Record<string, unknown>>;
+    };
     expect(savedPayload).not.toHaveProperty("selectedHeroLayer");
     expect(savedPayload.products[0]).toMatchObject({
       title: "HERO GUARDADO",

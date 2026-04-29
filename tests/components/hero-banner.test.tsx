@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { createElement } from "react";
+import { createElement, type ReactNode } from "react";
 import { HeroBanner } from "@/components/sections/hero-banner";
 import {
   HERO_SECONDARY_PRODUCT_PRESET_OPTIONS,
@@ -9,13 +9,19 @@ import {
   toFlatHeroVariables,
   toHeroLayerModel,
 } from "@/lib/hero/hero-layer-model";
+import {
+  createHeroAdminMock,
+  createHeroThemeMock,
+  type MockNextImageProps,
+  type MockNextLinkProps,
+} from "@/tests/fixtures/hero";
 
 const mockUseComponentStyle = vi.fn();
 const mockUseAdmin = vi.fn();
 const mockUseTheme = vi.fn();
 
 vi.mock("next/image", () => ({
-  default: ({ alt, ...props }: any) => {
+  default: ({ alt, ...props }: MockNextImageProps) => {
     const imageProps = { ...props };
     delete imageProps.fill;
     delete imageProps.priority;
@@ -25,7 +31,7 @@ vi.mock("next/image", () => ({
 }));
 
 vi.mock("next/link", () => ({
-  default: ({ children, href, ...props }: any) => (
+  default: ({ children, href, ...props }: MockNextLinkProps) => (
     <a href={href} {...props}>
       {children}
     </a>
@@ -33,7 +39,7 @@ vi.mock("next/link", () => ({
 }));
 
 vi.mock("@/contexts/styles-context", () => ({
-  useComponentStyle: (...args: any[]) => mockUseComponentStyle(...args),
+  useComponentStyle: (...args: unknown[]) => mockUseComponentStyle(...args),
 }));
 
 vi.mock("@/contexts/admin-context", () => ({
@@ -45,44 +51,30 @@ vi.mock("@/contexts/theme-context", () => ({
 }));
 
 vi.mock("@/components/ui/carousel", () => ({
-  Carousel: ({ children }: any) => <div>{children}</div>,
-  CarouselContent: ({ children }: any) => <div>{children}</div>,
-  CarouselItem: ({ children }: any) => <div>{children}</div>,
+  Carousel: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  CarouselContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  CarouselItem: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
 
 vi.mock("@/components/ui/dialog", () => ({
-  Dialog: ({ children }: any) => <div>{children}</div>,
-  DialogContent: ({ children }: any) => <div>{children}</div>,
-  DialogDescription: ({ children }: any) => <div>{children}</div>,
-  DialogHeader: ({ children }: any) => <div>{children}</div>,
-  DialogTitle: ({ children }: any) => <div>{children}</div>,
+  Dialog: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  DialogContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  DialogDescription: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  DialogHeader: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  DialogTitle: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
 
 vi.mock("@/components/ui/tooltip", () => ({
-  Tooltip: ({ children }: any) => <div>{children}</div>,
-  TooltipContent: ({ children }: any) => <div>{children}</div>,
-  TooltipTrigger: ({ children }: any) => <div>{children}</div>,
+  Tooltip: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  TooltipContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  TooltipTrigger: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
 
 describe("HeroBanner", () => {
   beforeEach(() => {
-    mockUseTheme.mockReturnValue({
-      activeTheme: {
-        theme_name: "Claro",
-        colors: {
-          background: "#ffffff",
-          accent: "#005aa1",
-          secondary: "#c4faff",
-        },
-      },
-    });
+    mockUseTheme.mockReturnValue(createHeroThemeMock());
 
-    mockUseAdmin.mockReturnValue({
-      componentEdits: new Map(),
-      selectedHeroLayer: null,
-      selectedHeroSlideIndex: 0,
-      selectedHeroHotspotId: null,
-    });
+    mockUseAdmin.mockReturnValue(createHeroAdminMock());
   });
 
   it("normalizes semantic slide fields and drops invalid hotspot records", () => {
@@ -770,6 +762,9 @@ describe("HeroBanner", () => {
       "--hero-product-offset-x": "12%",
       "--hero-product-offset-y": "-8%",
     });
+    expect(primaryFrame?.className).toContain(
+      "md:[transform:translate(var(--hero-product-offset-x),var(--hero-product-offset-y))_scale(var(--hero-product-scale))]",
+    );
   });
 
   it("renders full-image fill backgrounds outside a capped foreground stage", () => {
@@ -825,12 +820,16 @@ describe("HeroBanner", () => {
       "--hero-product-offset-x": "-10%",
       "--hero-product-offset-y": "6%",
     });
+    expect(productFrame?.className).toContain(
+      "md:[transform:translate(var(--hero-product-offset-x),var(--hero-product-offset-y))_scale(var(--hero-product-scale))]",
+    );
     expect(screen.getByTestId("hero-full-content-block")).toHaveStyle({
       "--hero-content-offset-x": "9%",
       "--hero-content-offset-y": "-7%",
-      transform:
-        "translate(var(--hero-content-offset-x), var(--hero-content-offset-y))",
     });
+    expect(screen.getByTestId("hero-full-content-block").className).toContain(
+      "md:[transform:translate(var(--hero-content-offset-x),var(--hero-content-offset-y))]",
+    );
   });
 
   it("constrains stage background mode while keeping foreground coordinates unchanged", () => {
@@ -880,6 +879,41 @@ describe("HeroBanner", () => {
       "--hero-content-offset-x": "-5%",
       "--hero-content-offset-y": "6%",
     });
+  });
+
+  it("keeps composition offsets desktop-only and hides secondary product on mobile", () => {
+    mockUseComponentStyle.mockReturnValue({
+      styles: {
+        layoutMode: "full-image",
+        fullImageContentAlign: "center",
+        products: [
+          {
+            title: "MOBILE SAFE",
+            backgroundImage: "/hero-bg.jpg",
+            productImage: "/primary.png",
+            secondaryProductImage: "/secondary.png",
+            productOffsetX: 10,
+            productOffsetY: -6,
+            contentOffsetX: 8,
+            contentOffsetY: -5,
+          },
+        ],
+      },
+    });
+
+    const { container } = render(<HeroBanner />);
+    const primaryFrame = container.querySelector('[data-hero-product-frame="primary"]');
+    const contentBlock = screen.getByTestId("hero-full-content-block");
+    const secondaryProduct = container.querySelector('[data-hero-secondary-product="true"]');
+
+    expect(primaryFrame?.className).toContain(
+      "md:[transform:translate(var(--hero-product-offset-x),var(--hero-product-offset-y))_scale(var(--hero-product-scale))]",
+    );
+    expect(contentBlock.className).toContain(
+      "md:[transform:translate(var(--hero-content-offset-x),var(--hero-content-offset-y))]",
+    );
+    expect(secondaryProduct?.className).toContain("hidden");
+    expect(secondaryProduct?.className).toContain("md:flex");
   });
 
   it("uses refined interactive hotspot triggers and keeps details reachable from trigger or bubble hover", () => {

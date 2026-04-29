@@ -39,6 +39,8 @@ import {
   HERO_HOTSPOT_TARGET_OPTIONS,
   HERO_BACKGROUND_MODE_OPTIONS,
   HERO_CONTENT_OFFSET,
+  DEFAULT_HERO_LAYER_MODEL,
+  DEFAULT_HERO_PRODUCTS,
   HERO_PRODUCT_PLACEMENT_OPTIONS,
   HERO_PRODUCT_OFFSET,
   HERO_PRODUCT_SCALE,
@@ -48,21 +50,21 @@ import {
   clampHeroContentOffset,
   clampHeroProductOffset,
   clampHeroProductScale,
-  createNextHeroHotspotId,
   toHeroLayerModel,
-  updateHeroSlideLayer,
   type HeroLayerId,
   type HeroHotspot,
+  type HeroSlideUpdateValue,
 } from "@/lib/hero/hero-layer-model";
-
-const HERO_LAYER_OPTIONS: Array<{ value: HeroLayerId; label: string }> = [
-  { value: "background", label: "Fondo" },
-  { value: "product", label: "Producto" },
-  { value: "content", label: "Contenido" },
-  { value: "overlay", label: "Contraste" },
-  { value: "cta", label: "Acción" },
-  { value: "hotspots", label: "Hotspots" },
-];
+import {
+  addHeroSlide,
+  createHeroHotspotDraft,
+  deleteHeroHotspot,
+  deleteHeroSlide,
+  getActiveHeroSlideIndex,
+  updateHeroHotspot,
+  updateHeroSlide,
+} from "./hero-editor/hero-editor-state";
+import { HeroEditorPanel } from "./hero-editor/hero-editor-panel";
 
 const COMPONENT_FIELDS: Record<
   string,
@@ -167,57 +169,20 @@ const COMPONENT_FIELDS: Record<
       },
     ],
     defaults: {
-      layoutMode: "split",
-      imageFit: "cover",
-      backgroundMode: "fill",
-      imagePositionX: "center",
-      imagePositionY: "center",
-      fullImageContentAlign: "left",
-      products: [
-        {
-          label: "Electrónica",
-          title: "BALFE",
-          subtitle: "NUEVO MODELO",
-          description:
-            "Descubre la última tecnología en dispositivos electrónicos. Calidad premium y diseño innovador para una experiencia única.",
-          buttonText: "Comprar ahora",
-          image: "/black-smart-speaker.jpg",
-        },
-        {
-          label: "Audio",
-          title: "PREMIUM",
-          subtitle: "HEADPHONES",
-          description:
-            "Experimenta el sonido de alta calidad con nuestros auriculares premium. Diseño ergonómico y cancelación de ruido activa.",
-          buttonText: "Ver más",
-          image: "/premium-headphones.png",
-        },
-        {
-          label: "Accesorios",
-          title: "LAPTOP STAND",
-          subtitle: "ERGONÓMICO",
-          description:
-            "Mejora tu espacio de trabajo con nuestro soporte para laptop. Diseño moderno y ajustable para mayor comodidad.",
-          buttonText: "Comprar ahora",
-          image: "/laptop-stand.png",
-        },
-        {
-          label: "Proyección",
-          title: "MINI PROJECTOR",
-          subtitle: "PORTÁTIL",
-          description:
-            "Lleva el cine contigo. Proyector compacto con alta resolución y conectividad inalámbrica para tus presentaciones.",
-          buttonText: "Descubrir",
-          image: "/mini-projector.jpg",
-        },
-      ],
+      layoutMode: DEFAULT_HERO_LAYER_MODEL.layoutMode,
+      imageFit: DEFAULT_HERO_LAYER_MODEL.imageFit,
+      backgroundMode: DEFAULT_HERO_LAYER_MODEL.backgroundMode,
+      imagePositionX: DEFAULT_HERO_LAYER_MODEL.imagePositionX,
+      imagePositionY: DEFAULT_HERO_LAYER_MODEL.imagePositionY,
+      fullImageContentAlign: DEFAULT_HERO_LAYER_MODEL.contentAlign,
+      products: DEFAULT_HERO_PRODUCTS,
       bgColor: "#4a5568",
       textColor: "#ffffff",
       buttonColor: "#005aa1",
       buttonTextColor: "#ffffff",
       barColor: "#005aa1",
-      overlayColor: "#101828",
-      overlayOpacity: "0.45",
+      overlayColor: DEFAULT_HERO_LAYER_MODEL.overlayColor,
+      overlayOpacity: String(DEFAULT_HERO_LAYER_MODEL.overlayOpacity),
     },
   },
   popular: {
@@ -951,10 +916,7 @@ export function EditorPanel() {
     selectedComponent === "hero" ? toHeroLayerModel(effectiveLocalValues) : null;
   const activeHeroLayer: HeroLayerId = selectedHeroLayer ?? "background";
   const activeHeroSlideIndex = heroLayerModel
-    ? Math.min(
-        Math.max(selectedHeroSlideIndex ?? 0, 0),
-        Math.max(heroLayerModel.products.length - 1, 0),
-      )
+    ? getActiveHeroSlideIndex(heroLayerModel.products, selectedHeroSlideIndex)
     : 0;
   const activeHeroSlide = heroLayerModel?.products[activeHeroSlideIndex] ?? {};
 
@@ -966,71 +928,38 @@ export function EditorPanel() {
 
   const handleHeroSlideChange = (
     fieldKey: string,
-    value: string | number | HeroHotspot[],
-    extraUpdates: Record<string, string | number | HeroHotspot[]> = {},
+    value: HeroSlideUpdateValue,
+    extraUpdates: Record<string, HeroSlideUpdateValue> = {},
   ) => {
     if (!heroLayerModel) return;
 
-    const updatedModel = updateHeroSlideLayer(heroLayerModel, activeHeroSlideIndex, {
+    const updatedProducts = updateHeroSlide(heroLayerModel.products, activeHeroSlideIndex, {
       [fieldKey]: value,
       ...extraUpdates,
     });
-    handleHeroProductsChange(updatedModel.products);
+    handleHeroProductsChange(updatedProducts);
   };
 
   const handleAddHeroSlide = () => {
     if (!heroLayerModel) return;
-    const nextSlideNumber = heroLayerModel.products.length + 1;
-    const updatedProducts = [
-      ...heroLayerModel.products,
-      {
-        label: "Nuevo",
-        title: `Slide ${nextSlideNumber}`,
-        subtitle: "",
-        description: "",
-        buttonText: "Comprar ahora",
-        image: "",
-        backgroundImage: "",
-        textSize: "feature" as const,
-        productPlacement: "right" as const,
-        productPresence: "balanced" as const,
-        productScale: HERO_PRODUCT_SCALE.default,
-        productOffsetX: HERO_PRODUCT_OFFSET.default,
-        productOffsetY: HERO_PRODUCT_OFFSET.default,
-        contentOffsetX: HERO_CONTENT_OFFSET.default,
-        contentOffsetY: HERO_CONTENT_OFFSET.default,
-        hotspots: [],
-      },
-    ];
-    handleHeroProductsChange(updatedProducts);
-    setSelectedHeroSlideIndex(updatedProducts.length - 1);
-    setSelectedHeroHotspotId(null);
+    const result = addHeroSlide(heroLayerModel.products);
+    handleHeroProductsChange(result.products);
+    setSelectedHeroSlideIndex(result.nextSlideIndex);
+    setSelectedHeroHotspotId(result.nextHotspotId);
   };
 
   const handleDeleteHeroSlide = () => {
     if (!heroLayerModel || heroLayerModel.products.length <= 1) return;
-    const updatedProducts = heroLayerModel.products.filter(
-      (_slide, index) => index !== activeHeroSlideIndex,
-    );
-    handleHeroProductsChange(updatedProducts);
-    setSelectedHeroSlideIndex(
-      Math.min(activeHeroSlideIndex, Math.max(updatedProducts.length - 1, 0)),
-    );
-    setSelectedHeroHotspotId(null);
+    const result = deleteHeroSlide(heroLayerModel.products, activeHeroSlideIndex);
+    handleHeroProductsChange(result.products);
+    setSelectedHeroSlideIndex(result.nextSlideIndex);
+    setSelectedHeroHotspotId(result.nextHotspotId);
   };
 
   const handleAddHeroHotspot = () => {
     if (!activeHeroSlide.productImage) return;
     const activeHotspots = activeHeroSlide.hotspots ?? [];
-    const nextHotspot: HeroHotspot = {
-      id: createNextHeroHotspotId(activeHotspots),
-      label: "Nuevo hotspot",
-      description: "",
-      href: "",
-      anchor: "center-right",
-      ...HERO_HOTSPOT_ANCHOR_COORDINATES["center-right"],
-      target: "primary",
-    };
+    const nextHotspot = createHeroHotspotDraft(activeHotspots);
     const hotspots = [...activeHotspots, nextHotspot];
     handleHeroSlideChange("hotspots", hotspots);
     setSelectedHeroHotspotId(nextHotspot.id);
@@ -1040,15 +969,18 @@ export function EditorPanel() {
     hotspotId: string,
     updates: Partial<HeroHotspot>,
   ) => {
-    const hotspots = (activeHeroSlide.hotspots ?? []).map((hotspot) =>
-      hotspot.id === hotspotId ? { ...hotspot, ...updates } : hotspot,
+    const hotspots = updateHeroHotspot(
+      activeHeroSlide.hotspots ?? [],
+      hotspotId,
+      updates,
     );
     handleHeroSlideChange("hotspots", hotspots);
   };
 
   const handleDeleteHeroHotspot = (hotspotId: string) => {
-    const hotspots = (activeHeroSlide.hotspots ?? []).filter(
-      (hotspot) => hotspot.id !== hotspotId,
+    const hotspots = deleteHeroHotspot(
+      activeHeroSlide.hotspots ?? [],
+      hotspotId,
     );
     handleHeroSlideChange("hotspots", hotspots);
     if (selectedHeroHotspotId === hotspotId) {
@@ -1970,112 +1902,21 @@ export function EditorPanel() {
         )}
 
         {selectedComponent === "hero" ? (
-          <div className="flex-1 overflow-y-auto p-4 space-y-5 min-h-0 custom-scrollbar">
-            <div className="space-y-2">
-              <h3 className="text-base font-semibold">Editor del Hero</h3>
-              <p className="text-sm text-muted-foreground">
-                Primero definí el banner, después elegí el slide y por último
-                ajustá el componente actual con controles simples.
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="hero-layout-mode">Tipo de banner</Label>
-              <Select
-                value={heroLayerModel?.layoutMode ?? "split"}
-                onValueChange={(value) => handleInputChange("layoutMode", value)}
-              >
-                <SelectTrigger id="hero-layout-mode" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="split">Split</SelectItem>
-                  <SelectItem value="full-image">Full Image</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div
-              className="space-y-3"
-              data-testid="hero-slide-management"
-              data-hero-slide-management="flat"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <h4 className="text-sm font-semibold">Gestión de slides</h4>
-                  <p className="text-xs text-muted-foreground">
-                    Sumá, elegí o eliminá slides sin salir del panel lateral.
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleAddHeroSlide}
-                    aria-label="Agregar slide"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleDeleteHeroSlide}
-                    disabled={(heroLayerModel?.products.length ?? 0) <= 1}
-                    aria-label="Eliminar slide"
-                    className="text-destructive hover:text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="hero-slide-select">Slide activo</Label>
-                <Select
-                  value={String(activeHeroSlideIndex)}
-                  onValueChange={(value) => {
-                    setSelectedHeroSlideIndex(Number(value));
-                    setSelectedHeroHotspotId(null);
-                  }}
-                >
-                  <SelectTrigger id="hero-slide-select" className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(heroLayerModel?.products ?? []).map((slide, index) => (
-                      <SelectItem key={index} value={String(index)}>
-                        {`Slide ${index + 1} - ${slide.title || slide.label || "sin título"}`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="hero-layer-select">Componente del slide</Label>
-              <Select
-                value={activeHeroLayer}
-                onValueChange={(value) => setSelectedHeroLayer(value as HeroLayerId)}
-              >
-                <SelectTrigger id="hero-layer-select" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {HERO_LAYER_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-4 border-t border-border pt-4">
-              {renderHeroLayerControls()}
-            </div>
-          </div>
+          <HeroEditorPanel
+            heroLayerModel={heroLayerModel}
+            activeHeroSlideIndex={activeHeroSlideIndex}
+            activeHeroLayer={activeHeroLayer}
+            onLayoutModeChange={(value) => handleInputChange("layoutMode", value)}
+            onAddSlide={handleAddHeroSlide}
+            onDeleteSlide={handleDeleteHeroSlide}
+            onSelectSlide={(index) => {
+              setSelectedHeroSlideIndex(index);
+              setSelectedHeroHotspotId(null);
+            }}
+            onSelectLayer={setSelectedHeroLayer}
+          >
+            {renderHeroLayerControls()}
+          </HeroEditorPanel>
         ) : (
           <Tabs
             value={activeTab}
