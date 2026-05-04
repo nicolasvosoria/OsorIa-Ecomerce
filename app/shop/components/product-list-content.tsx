@@ -76,14 +76,20 @@ export function ProductListContent({ products, collections }: ProductListContent
 
   // Get current color filters from URL
   const [colorFilters] = useQueryState('fcolor', parseAsArrayOf(parseAsString).withDefault([]));
+  const [kindFilter] = useQueryState('kind', parseAsString.withDefault('all'));
 
   // Apply client-side filtering whenever products or color filters change
   const filteredProducts = useMemo(() => {
+    const kindFilteredProducts =
+      kindFilter === 'combo'
+        ? products.filter(product => product.productKind === 'combo' || product.tags.includes('combo'))
+        : products;
+
     if (!colorFilters || colorFilters.length === 0) {
-      return products;
+      return kindFilteredProducts;
     }
-    return filterProductsByColors(products, colorFilters);
-  }, [products, colorFilters]);
+    return filterProductsByColors(kindFilteredProducts, colorFilters);
+  }, [products, colorFilters, kindFilter]);
 
   // Set both original and filtered products in the provider whenever they change
   useEffect(() => {

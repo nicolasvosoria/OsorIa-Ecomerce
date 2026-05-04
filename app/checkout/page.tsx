@@ -135,27 +135,55 @@ export default function CheckoutPage() {
       currencyCode = cart.cost.totalAmount.currencyCode
     } else if (hasLocalItems) {
       // Procesar items del carrito local
-      orderItems = localCart.items.map((item) => {
+      orderItems = await Promise.all(localCart.items.map(async (item) => {
+        if (item.itemKind === "combo" && item.comboId) {
+          const { buildComboOrderSnapshotById } = await import("@/lib/supabase/combos-api")
+          const snapshot = await buildComboOrderSnapshotById(item.comboId, item.quantity)
+          if (!snapshot || !snapshot.availability.isAvailable) {
+            throw new Error(`No hay suficiente stock disponible para el combo ${item.name}`)
+          }
+
+          return {
+            product_id: undefined,
+            product_name: item.name,
+            product_sku: undefined,
+            variant_id: undefined,
+            variant_title: "Combo",
+            unit_price: snapshot.chargedUnitPrice,
+            quantity: item.quantity,
+            total_price: snapshot.chargedLineTotal,
+            currency_code: snapshot.pricing.currencyCode,
+            product_image_url: item.image || undefined,
+            product_slug: item.productSlug,
+            selected_options: {},
+            metadata: {
+              item_kind: "combo",
+              combo_id: item.comboId,
+              combo_snapshot: snapshot,
+            },
+          }
+        }
+
         const itemSubtotal = localCart.getItemSubtotal(item)
         const unitPrice = item.quantity > 0 ? itemSubtotal / item.quantity : 0
         return {
-          product_id: typeof item.id === "string" ? item.id : undefined,
+          product_id: item.productId || (typeof item.id === "string" ? item.id : undefined),
           product_name: item.name,
           product_sku: undefined,
-          variant_id: undefined,
+          variant_id: item.variantId,
           variant_title: undefined,
           unit_price: unitPrice,
           quantity: item.quantity,
           total_price: itemSubtotal,
-          currency_code: "COP",
+          currency_code: item.currencyCode || "COP",
           product_image_url: item.image || undefined,
-          product_slug: undefined,
+          product_slug: item.productSlug,
           selected_options: {},
         }
-      })
-      subtotal = localCart.getTotal()
-      total = localCart.getTotal()
-      currencyCode = "COP"
+      }))
+      subtotal = orderItems.reduce((sum, item) => sum + item.total_price, 0)
+      total = subtotal
+      currencyCode = orderItems[0]?.currency_code || "COP"
     }
 
     // Crear el pedido
@@ -451,6 +479,15 @@ export default function CheckoutPage() {
                         <p className="text-xs text-muted-foreground">
                           Cantidad: {item.quantity}
                         </p>
+                        {item.itemKind === "combo" && item.comboDetails && (
+                          <ul className="mt-1 text-[11px] text-muted-foreground">
+                            {item.comboDetails.components.map((component) => (
+                              <li key={`${component.productId}-${component.variantId || "base"}`}>
+                                {component.quantity}× {component.productName}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
                       </div>
                       <p className="text-sm font-semibold ml-4">
                         {formatPrice(

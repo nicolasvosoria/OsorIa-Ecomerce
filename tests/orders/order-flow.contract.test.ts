@@ -58,6 +58,14 @@ class QueryBuilder {
     return this;
   }
 
+  in(): this {
+    return this;
+  }
+
+  maybeSingle(): Promise<ScriptedResponse> {
+    return Promise.resolve(this.state.next(this.table, this.mode));
+  }
+
   order(): this {
     return this;
   }
@@ -285,6 +293,256 @@ describe("orders-api live order contract", () => {
 
     const insertedOrder = state.inserts.orders?.[0];
     expect(insertedOrder.store_id).toBe("store-uuid-2");
+  });
+
+  it("recalculates combo order snapshot and deducts every tracked component", async () => {
+    const state = new MockSupabaseState({
+      "product_combos:select": [
+        {
+          data: [
+            {
+              id: "combo-1",
+              name: "Combo Café",
+              slug: "combo-cafe",
+              description: "Café + mug",
+              image_url: "/combo.jpg",
+              is_active: true,
+              discount_type: "percentage",
+              discount_value: 10,
+              currency_code: "COP",
+            },
+          ],
+          error: null,
+        },
+      ],
+      "product_combo_components:select": [
+        {
+          data: [
+            {
+              combo_id: "combo-1",
+              product_id: "store-item-1",
+              variant_id: null,
+              quantity: 2,
+            },
+            {
+              combo_id: "combo-1",
+              product_id: "store-item-2",
+              variant_id: "variant-2",
+              quantity: 1,
+            },
+          ],
+          error: null,
+        },
+      ],
+      "store_items:select": [
+        {
+          data: [
+            {
+              id: "store-item-1",
+              store_id: "store-uuid-1",
+              item_name: "Café 250g",
+              base_price: 30000,
+              currency_code: "COP",
+              track_inventory: true,
+              inventory_quantity: 10,
+              is_active: true,
+              is_available_for_sale: true,
+            },
+            {
+              id: "store-item-2",
+              store_id: "store-uuid-1",
+              item_name: "Mug",
+              base_price: 20000,
+              currency_code: "COP",
+              track_inventory: false,
+              inventory_quantity: 0,
+              is_active: true,
+              is_available_for_sale: true,
+            },
+          ],
+          error: null,
+        },
+        { data: { track_inventory: true, inventory_quantity: 10 }, error: null },
+      ],
+      "stores:select": [{ data: [{ id: "store-uuid-1" }], error: null }],
+      "item_variants:select": [
+        {
+          data: [
+            {
+              id: "variant-2",
+              item_id: "store-item-2",
+              variant_code: "Blanco",
+              price: 20000,
+              track_inventory: true,
+              inventory_quantity: 4,
+              is_available: true,
+            },
+          ],
+          error: null,
+        },
+        { data: { track_inventory: true, inventory_quantity: 4 }, error: null },
+      ],
+      "orders:insert": [
+        {
+          data: {
+            id: "order-combo-1",
+            order_number: "A-COMBO",
+            payment_method: "cash_on_delivery",
+            payment_status: "pending",
+            payment_reference: null,
+            created_at: "2026-05-04T00:00:00.000Z",
+            updated_at: "2026-05-04T00:00:00.000Z",
+            ...baseOrderData,
+          },
+          error: null,
+        },
+      ],
+      "order_items:insert": [
+        {
+          data: [
+            {
+              id: "combo-order-item-1",
+              order_id: "order-combo-1",
+              product_id: null,
+              product_name: "Combo Café",
+              quantity: 2,
+              unit_price: 72000,
+              total_price: 144000,
+              currency_code: "COP",
+              metadata: {
+                item_kind: "combo",
+                combo_id: "combo-1",
+                combo_snapshot: {
+                  id: "combo-1",
+                  name: "Combo Café",
+                  orderedQuantity: 2,
+                  chargedUnitPrice: 72000,
+                  chargedLineTotal: 144000,
+                  pricing: {
+                    componentSubtotal: 80000,
+                    discountType: "percentage",
+                    discountValue: 10,
+                    discountAmount: 8000,
+                    finalUnitPrice: 72000,
+                    currencyCode: "COP",
+                    components: [
+                      {
+                        productId: "store-item-1",
+                        productName: "Café 250g",
+                        unitPrice: 30000,
+                        quantity: 2,
+                        lineSubtotal: 60000,
+                      },
+                      {
+                        productId: "store-item-2",
+                        productName: "Mug",
+                        variantId: "variant-2",
+                        unitPrice: 20000,
+                        quantity: 1,
+                        lineSubtotal: 20000,
+                      },
+                    ],
+                  },
+                  availability: { isAvailable: true, derivedStock: 4, blockingComponents: [] },
+                  components: [
+                    { productId: "store-item-1", productName: "Café 250g", quantity: 2 },
+                    { productId: "store-item-2", productName: "Mug", variantId: "variant-2", quantity: 1 },
+                  ],
+                },
+              },
+            },
+          ],
+          error: null,
+        },
+      ],
+      "order_combo_snapshots:insert": [{ data: [{ id: "snapshot-1" }], error: null }],
+      "order_addresses:insert": [{ data: [{ id: "addr-combo" }], error: null }],
+      "store_items:update": [{ error: null }],
+      "item_variants:update": [{ error: null }],
+    });
+
+    getSupabaseEcommerceMock.mockReturnValue({ from: state.from });
+
+    const created = await createOrder({
+      ...baseOrderData,
+      subtotal: 0,
+      total_amount: 0,
+      items: [
+        {
+          product_name: "Combo Café",
+          unit_price: 0,
+          quantity: 2,
+          total_price: 0,
+          metadata: {
+            item_kind: "combo",
+            combo_id: "combo-1",
+          },
+        },
+      ],
+    });
+
+    expect(created?.items[0].unit_price).toBe(72000);
+    expect(state.inserts.orders?.[0]).toMatchObject({
+      subtotal: 144000,
+      total_amount: 144000,
+    });
+    expect(state.inserts.order_combo_snapshots?.[0][0]).toMatchObject({
+      order_id: "order-combo-1",
+      order_item_id: "combo-order-item-1",
+      combo_id: "combo-1",
+      component_subtotal: 80000,
+      discount_amount: 8000,
+      charged_unit_price: 72000,
+      charged_line_total: 144000,
+    });
+    expect(state.updates.store_items?.[0]).toEqual({ inventory_quantity: 6 });
+    expect(state.updates.item_variants?.[0]).toEqual({ inventory_quantity: 2 });
+  });
+
+  it("does not trust client-supplied combo snapshots to skip normal inventory validation", async () => {
+    const state = new MockSupabaseState({
+      "store_items:select": [
+        {
+          data: {
+            track_inventory: true,
+            inventory_quantity: 0,
+            is_available_for_sale: true,
+            is_active: true,
+          },
+          error: null,
+        },
+      ],
+    });
+
+    getSupabaseEcommerceMock.mockReturnValue({ from: state.from });
+
+    await expect(
+      createOrder({
+        ...baseOrderData,
+        items: [
+          {
+            product_id: "store-item-1",
+            product_name: "Campera",
+            unit_price: 100000,
+            quantity: 1,
+            total_price: 100000,
+            metadata: {
+              item_kind: "combo",
+              combo_snapshot: {
+                availability: { isAvailable: true, blockingComponents: [] },
+                components: [],
+              },
+              comboSnapshot: {
+                availability: { isAvailable: true, blockingComponents: [] },
+                components: [],
+              },
+            },
+          },
+        ],
+      }),
+    ).rejects.toThrow("No hay suficiente stock disponible");
+
+    expect(state.inserts.orders).toBeUndefined();
   });
 
   it("decrements product and variant inventory on writable base tables", async () => {

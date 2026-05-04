@@ -13,7 +13,7 @@ import {
   BreadcrumbPage,
 } from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
-import { ShoppingCart, Heart, Check, AlertCircle } from 'lucide-react';
+import { Check, AlertCircle, PackageCheck } from 'lucide-react';
 import { AddToCart } from '@/components/cart/add-to-cart';
 import { WishlistButton } from '@/components/wishlist/wishlist-button';
 import { adaptSupabaseProduct } from '@/lib/products/adapter';
@@ -74,8 +74,7 @@ export async function generateMetadata(props: { params: Promise<{ slug: string }
           }
         : undefined,
     };
-  } catch (error) {
-    // Si falla durante el build, retornar metadata básica
+  } catch {
     return {
       title: 'Producto',
     };
@@ -128,6 +127,7 @@ async function ProductContent({ slug }: { slug: string }) {
   );
 
   const hasVariants = product.variants && product.variants.length > 0;
+  const isCombo = product.item_kind === 'combo' && product.combo;
   // Determinar disponibilidad: si track_inventory es true, verificar cantidad; si no, solo verificar flags
   const isAvailable = product.is_available_for_sale && product.is_active && 
     (product.track_inventory ? product.inventory_quantity > 0 : true);
@@ -177,6 +177,12 @@ async function ProductContent({ slug }: { slug: string }) {
             {/* Título y código */}
             <div>
               <h1 className="text-3xl md:text-4xl font-bold mb-2">{product.item_name}</h1>
+              {isCombo && (
+                <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-sm font-semibold text-primary">
+                  <PackageCheck className="h-4 w-4" />
+                  Combo con descuento
+                </div>
+              )}
               {product.item_code && (
                 <p className="text-sm text-muted-foreground">Código: {product.item_code}</p>
               )}
@@ -208,6 +214,15 @@ async function ProductContent({ slug }: { slug: string }) {
                   Ahorra {formatPrice((product.compare_at_price! - product.base_price).toString(), product.currency_code)} ({discountPercentage}% de descuento)
                 </p>
               )}
+              {isCombo && product.combo && (
+                <div className="rounded-lg border bg-muted/40 p-3 text-sm">
+                  <p className="font-semibold">Precio del combo recalculado con precios actuales</p>
+                  <p className="text-muted-foreground">
+                    Subtotal componentes: {formatPrice(product.combo.pricing.componentSubtotal.toString(), product.currency_code)}
+                    {' · '}Descuento: {formatPrice(product.combo.pricing.discountAmount.toString(), product.currency_code)}
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Estado de disponibilidad */}
@@ -232,8 +247,37 @@ async function ProductContent({ slug }: { slug: string }) {
               </p>
             )}
 
+            {isCombo && product.combo && (
+              <div className="space-y-3 rounded-lg border p-4">
+                <h3 className="text-lg font-semibold">Incluye</h3>
+                <ul className="space-y-2">
+                  {product.combo.components.map((component) => (
+                    <li
+                      key={`${component.productId}-${component.variantId || 'base'}`}
+                      className="flex justify-between gap-3 text-sm"
+                    >
+                      <span>
+                        {component.quantity}× {component.productName}
+                        {component.variantTitle && (
+                          <span className="text-muted-foreground"> · {component.variantTitle}</span>
+                        )}
+                      </span>
+                      <span className="font-medium">
+                        {formatPrice(component.lineSubtotal.toString(), product.currency_code)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                {!product.combo.availability.isAvailable && (
+                  <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+                    {product.combo.availability.blockingComponents.map((component) => component.message).join('. ')}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Variantes y opciones */}
-            {hasVariants && product.variants && (
+            {!isCombo && hasVariants && product.variants && (
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold">Variantes disponibles</h3>
                 <div className="grid grid-cols-2 gap-2">
@@ -382,4 +426,3 @@ export default async function ProductDetailPage(props: { params: Promise<{ slug:
     </Suspense>
   );
 }
-

@@ -8,6 +8,7 @@ import { ProductImage } from './product-image';
 import { Button } from '@/components/ui/button';
 import { ArrowRightIcon } from 'lucide-react';
 import { WishlistButton } from '@/components/wishlist/wishlist-button';
+import { Badge } from '@/components/ui/badge';
 
 export const ProductCard = ({ product }: { product: Product }) => {
   const hasNoOptions = product.options.length === 0;
@@ -22,6 +23,9 @@ export const ProductCard = ({ product }: { product: Product }) => {
       <div className="absolute top-3 right-3 z-20 pointer-events-auto">
         <WishlistButton product={product} />
       </div>
+      {product.productKind === 'combo' && (
+        <Badge className="absolute left-3 top-3 z-20 bg-primary text-primary-foreground">Combo</Badge>
+      )}
       
       <Link
         href={`/products/${product.handle}`}
@@ -51,6 +55,9 @@ export const ProductCard = ({ product }: { product: Product }) => {
         <div className="flex absolute inset-x-3 bottom-3 flex-col gap-8 px-2 py-3 rounded-md transition-all duration-300 pointer-events-none bg-popover md:opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 md:translate-y-1/3 group-hover:translate-y-0 group-focus-visible:translate-y-0 group-hover:pointer-events-auto group-focus-visible:pointer-events-auto max-md:pointer-events-auto">
           <div className="grid grid-cols-2 gap-x-4 gap-y-8 items-end">
             <p className="text-lg font-semibold text-pretty">{product.title}</p>
+            {product.productKind === 'combo' && (
+              <Badge variant="outline" className="w-fit">Combo</Badge>
+            )}
             <div className="flex gap-2 items-center place-self-end text-lg font-semibold">
               {formatPrice(product.priceRange.minVariantPrice.amount, product.priceRange.minVariantPrice.currencyCode)}
               {product.compareAtPrice && (

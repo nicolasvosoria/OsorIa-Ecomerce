@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import Link from "next/link"
-import { Search, Heart, ShoppingCart, Palette, AlignLeft, Menu, X, LogIn, LogOut, User, Eye, EyeOff, CreditCard, Building2, Wallet, LayoutDashboard, Edit } from "lucide-react"
+import { Search, Heart, ShoppingCart, Palette, AlignLeft, Menu, LogIn, LogOut, User, Eye, EyeOff, CreditCard, Building2, Wallet, LayoutDashboard, Edit } from "lucide-react"
 import { VisaIcon, MasterCardIcon, AmexIcon } from "@/components/icons/cc-icons"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -24,7 +24,6 @@ import {
   SheetContent,
   SheetHeader,
   SheetTitle,
-  SheetClose,
 } from "@/components/ui/sheet"
 import {
   Dialog,
@@ -1073,6 +1072,15 @@ export function Header() {
                             {item.category}
                           </p>
                         )}
+                        {item.itemKind === "combo" && item.comboDetails && (
+                          <ul className="mb-2 space-y-0.5 text-xs" style={{ color: "var(--muted-foreground)" }}>
+                            {item.comboDetails.components.map((component) => (
+                              <li key={`${component.productId}-${component.variantId || "base"}`}>
+                                {component.quantity}× {component.productName}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
                         <div className="flex items-center gap-2 mb-2">
                           {item.salePrice && item.originalPrice && (
                             <span
@@ -1163,6 +1171,7 @@ export function Header() {
                     <div key={item.id} className="flex items-center justify-between text-sm">
                       <span style={{ color: "var(--muted-foreground)" }}>
                         {item.name} x{item.quantity}
+                        {item.itemKind === "combo" ? " (combo)" : ""}
                       </span>
                       <span style={{ color: "var(--foreground)", fontWeight: 500 }}>
                         ${getItemSubtotal(item).toFixed(2)}

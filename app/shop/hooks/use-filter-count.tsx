@@ -6,6 +6,7 @@ import { useParams } from 'next/navigation';
 export function useFilterCount() {
   const params = useParams<{ collection: string }>();
   const [color] = useQueryState('fcolor', parseAsArrayOf(parseAsString).withDefault([]));
+  const [kind] = useQueryState('kind', parseAsString.withDefault('all'));
 
   // Count active filters
   let count = 0;
@@ -13,6 +14,10 @@ export function useFilterCount() {
   // Count color filters
   if (color.length > 0) {
     count += color.length;
+  }
+
+  if (kind === 'combo') {
+    count += 1;
   }
 
   // Count collection filter (if not on "all" products)

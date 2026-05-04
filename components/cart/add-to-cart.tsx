@@ -46,6 +46,10 @@ function isSupabaseProduct(productId: string): boolean {
   return !productId.startsWith('gid://shopify/');
 }
 
+function isComboProduct(product: Product): boolean {
+  return product.productKind === 'combo' || product.tags.includes('combo');
+}
+
 export function AddToCartButton({
   product,
   selectedVariant,
@@ -91,11 +95,12 @@ export function AddToCartButton({
       if (isSupabaseProduct(product.id)) {
         const variantId = resolvedVariant.id;
         const productId = product.id;
+        const isCombo = isComboProduct(product);
         
         // Determinar si es una variante o el producto base
         // Si variantId !== productId, es una variante real
         // Si variantId === productId, es el producto base o una variante por defecto
-        const isRealVariant = variantId !== productId && product.variants && product.variants.length > 1;
+        const isRealVariant = !isCombo && variantId !== productId && product.variants && product.variants.length > 1;
         
         // Validar stock antes de agregar al carrito
         try {
@@ -175,8 +180,14 @@ export function AddToCartButton({
           category: product.categoryId,
           originalPrice: originalPrice,
           salePrice: salePrice,
-          productId: product.id,
+          productId: isCombo ? undefined : product.id,
           variantId: isRealVariant ? variantId : undefined,
+          productSlug: product.handle,
+          itemKind: isCombo ? 'combo' : 'product',
+          comboId: isCombo ? product.id : undefined,
+          comboDetails: product.comboDetails,
+          unitPriceAmount: Number(variantPrice),
+          currencyCode: resolvedVariant.price.currencyCode,
         }, quantity);
         
         // Mostrar notificación de éxito

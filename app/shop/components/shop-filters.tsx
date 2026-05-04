@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { SidebarLinks } from '@/components/layout/sidebar/product-sidebar-links';
 import { CategoryFilter } from './category-filter';
 import { ColorFilter } from './color-filter';
+import { ComboFilter } from './combo-filter';
 import { useProducts } from '../providers/products-provider';
 import { useFilterCount } from '../hooks/use-filter-count';
 
@@ -36,6 +37,7 @@ export function DesktopFilters({ collections, className }: { collections: Collec
         </div>
         <Suspense fallback={null}>
           <CategoryFilter collections={collections} />
+          <ComboFilter />
           <ColorFilter products={originalProducts} />
         </Suspense>
       </div>

@@ -153,12 +153,20 @@ export default function AdminProductsPage() {
                 </p>
               </div>
             </div>
-            <Button asChild size="sm" className="shrink-0 gap-1.5 sm:gap-2">
-              <Link href="/admin/products/create">
-                <Plus className="h-4 w-4 shrink-0" />
-                <span className="hidden sm:inline">Nuevo Producto</span>
-              </Link>
-            </Button>
+            <div className="flex gap-2">
+              <Button asChild size="sm" variant="outline" className="shrink-0 gap-1.5 sm:gap-2">
+                <Link href="/admin/products/combos">
+                  <Package className="h-4 w-4 shrink-0" />
+                  <span className="hidden sm:inline">Combos</span>
+                </Link>
+              </Button>
+              <Button asChild size="sm" className="shrink-0 gap-1.5 sm:gap-2">
+                <Link href="/admin/products/create">
+                  <Plus className="h-4 w-4 shrink-0" />
+                  <span className="hidden sm:inline">Nuevo Producto</span>
+                </Link>
+              </Button>
+            </div>
           </div>
         </div>
       </header>
@@ -268,6 +276,9 @@ export default function AdminProductsPage() {
                             {product.is_featured && (
                               <Badge variant="outline" className="w-fit">Destacado</Badge>
                             )}
+                            {product.item_kind === 'combo' && (
+                              <Badge variant="outline" className="w-fit">Combo</Badge>
+                            )}
                             {!product.is_available_for_sale && (
                               <Badge variant="outline" className="w-fit">No disponible</Badge>
                             )}
@@ -283,7 +294,7 @@ export default function AdminProductsPage() {
                               </Button>
                             )}
                             <Button variant="ghost" size="icon" asChild>
-                              <Link href={`/admin/products/${product.id}/edit`}>
+                              <Link href={product.item_kind === 'combo' ? `/admin/products/combos` : `/admin/products/${product.id}/edit`}>
                                 <Edit className="h-4 w-4" />
                               </Link>
                             </Button>
@@ -304,5 +315,3 @@ export default function AdminProductsPage() {
     </div>
   )
 }
-
-

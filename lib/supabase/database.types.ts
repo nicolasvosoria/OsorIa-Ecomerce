@@ -650,6 +650,121 @@ export type Database = {
           },
         ]
       }
+      product_combos: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          discount_type: "percentage" | "fixed_cop"
+          discount_value: number
+          id: string
+          image_url: string | null
+          is_active: boolean
+          metadata: Json
+          name: string
+          slug: string
+          store_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          discount_type: "percentage" | "fixed_cop"
+          discount_value?: number
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          metadata?: Json
+          name: string
+          slug: string
+          store_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          discount_type?: "percentage" | "fixed_cop"
+          discount_value?: number
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          metadata?: Json
+          name?: string
+          slug?: string
+          store_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_combos_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_combos_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores_legacy"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_combo_components: {
+        Row: {
+          combo_id: string
+          created_at: string | null
+          display_order: number
+          id: string
+          product_id: string
+          quantity: number
+          updated_at: string | null
+          variant_id: string | null
+        }
+        Insert: {
+          combo_id: string
+          created_at?: string | null
+          display_order?: number
+          id?: string
+          product_id: string
+          quantity: number
+          updated_at?: string | null
+          variant_id?: string | null
+        }
+        Update: {
+          combo_id?: string
+          created_at?: string | null
+          display_order?: number
+          id?: string
+          product_id?: string
+          quantity?: number
+          updated_at?: string | null
+          variant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_combo_components_combo_id_fkey"
+            columns: ["combo_id"]
+            isOneToOne: false
+            referencedRelation: "product_combos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_combo_components_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "store_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_combo_components_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "item_variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       item_variants: {
         Row: {
           compare_at_price: number | null
@@ -760,6 +875,85 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders_legacy"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      order_combo_snapshots: {
+        Row: {
+          charged_line_total: number
+          charged_unit_price: number
+          combo_id: string | null
+          combo_name: string
+          combo_slug: string | null
+          component_subtotal: number
+          created_at: string | null
+          currency_code: string
+          discount_amount: number
+          discount_type: "percentage" | "fixed_cop"
+          discount_value: number
+          id: string
+          order_id: string
+          order_item_id: string
+          ordered_quantity: number
+          snapshot: Json
+        }
+        Insert: {
+          charged_line_total?: number
+          charged_unit_price?: number
+          combo_id?: string | null
+          combo_name: string
+          combo_slug?: string | null
+          component_subtotal?: number
+          created_at?: string | null
+          currency_code?: string
+          discount_amount?: number
+          discount_type: "percentage" | "fixed_cop"
+          discount_value?: number
+          id?: string
+          order_id: string
+          order_item_id: string
+          ordered_quantity: number
+          snapshot: Json
+        }
+        Update: {
+          charged_line_total?: number
+          charged_unit_price?: number
+          combo_id?: string | null
+          combo_name?: string
+          combo_slug?: string | null
+          component_subtotal?: number
+          created_at?: string | null
+          currency_code?: string
+          discount_amount?: number
+          discount_type?: "percentage" | "fixed_cop"
+          discount_value?: number
+          id?: string
+          order_id?: string
+          order_item_id?: string
+          ordered_quantity?: number
+          snapshot?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_combo_snapshots_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_combo_snapshots_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: true
+            referencedRelation: "order_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_combo_snapshots_combo_id_fkey"
+            columns: ["combo_id"]
+            isOneToOne: false
+            referencedRelation: "product_combos"
             referencedColumns: ["id"]
           },
         ]
