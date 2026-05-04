@@ -1,5 +1,86 @@
 // Tipos para la base de datos de productos genéricos
 
+export type ProductMetadataJsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | ProductMetadataJsonValue[]
+  | { [key: string]: ProductMetadataJsonValue }
+
+export type ProductMetadata = Record<string, ProductMetadataJsonValue>
+
+export const PRODUCT_AI_DETAILS_METADATA_KEY = 'ai_details' as const
+
+function isPlainProductMetadata(value: unknown): value is ProductMetadata {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
+export function normalizeProductMetadata(metadata: unknown): ProductMetadata {
+  const nextMetadata = isPlainProductMetadata(metadata) ? { ...metadata } : {}
+  const aiDetails = nextMetadata[PRODUCT_AI_DETAILS_METADATA_KEY]
+
+  if (typeof aiDetails === 'string' && aiDetails.trim()) {
+    nextMetadata[PRODUCT_AI_DETAILS_METADATA_KEY] = aiDetails.trim()
+  } else if (PRODUCT_AI_DETAILS_METADATA_KEY in nextMetadata) {
+    delete nextMetadata[PRODUCT_AI_DETAILS_METADATA_KEY]
+  }
+
+  return nextMetadata
+}
+
+export function getProductAiDetails(metadata: unknown): string {
+  const value = normalizeProductMetadata(metadata)[PRODUCT_AI_DETAILS_METADATA_KEY]
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+export function mergeProductAiDetailsMetadata(
+  metadata: unknown,
+  aiDetails: string
+): ProductMetadata {
+  const nextMetadata = normalizeProductMetadata(metadata)
+  const trimmedAiDetails = aiDetails.trim()
+
+  if (trimmedAiDetails) {
+    nextMetadata[PRODUCT_AI_DETAILS_METADATA_KEY] = trimmedAiDetails
+  } else {
+    delete nextMetadata[PRODUCT_AI_DETAILS_METADATA_KEY]
+  }
+
+  return nextMetadata
+}
+
+export function buildProductAiDetailsMetadataPatch(aiDetails: string): ProductMetadata {
+  const trimmedAiDetails = aiDetails.trim()
+
+  return {
+    [PRODUCT_AI_DETAILS_METADATA_KEY]: trimmedAiDetails || null,
+  }
+}
+
+export function mergeProductMetadataForUpdate(
+  existingMetadata: unknown,
+  metadataPatch: unknown
+): ProductMetadata {
+  const nextMetadata = normalizeProductMetadata(existingMetadata)
+  const patch = isPlainProductMetadata(metadataPatch) ? { ...metadataPatch } : {}
+
+  for (const [key, value] of Object.entries(patch)) {
+    if (key === PRODUCT_AI_DETAILS_METADATA_KEY) {
+      if (typeof value === 'string' && value.trim()) {
+        nextMetadata[key] = value.trim()
+      } else {
+        delete nextMetadata[key]
+      }
+      continue
+    }
+
+    nextMetadata[key] = value
+  }
+
+  return nextMetadata
+}
+
 export interface ItemCategory {
   id: string
   category_name: string
@@ -31,7 +112,7 @@ export interface StoreItem {
   item_slug?: string
   seo_title?: string
   seo_description?: string
-  metadata?: Record<string, any>
+  metadata?: ProductMetadata
   tags?: string[]
   primary_image_url?: string
   primary_image_alt?: string
@@ -54,7 +135,7 @@ export interface ItemVariant {
   is_default: boolean
   image_url?: string
   image_alt?: string
-  metadata?: Record<string, any>
+  metadata?: ProductMetadata
   created_at: string
   updated_at: string
 }
@@ -110,8 +191,5 @@ export interface GetItemsResult {
   total: number
   has_more: boolean
 }
-
-
-
 
 

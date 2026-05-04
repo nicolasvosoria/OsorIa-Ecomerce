@@ -1,6 +1,9 @@
 import { getSupabaseEcommerce } from './client'
 import { ECOMMERCE_FUNCTIONS, ECOMMERCE_SCHEMA, ECOMMERCE_TABLES, ECOMMERCE_VIEWS } from './contract'
-import type {
+import {
+  mergeProductMetadataForUpdate,
+  normalizeProductMetadata,
+  type ProductMetadata,
   StoreItemWithDetails,
   ItemCategory,
   ItemVariant,
@@ -684,7 +687,7 @@ export interface CreateItemData {
   item_slug?: string
   seo_title?: string
   seo_description?: string
-  metadata?: Record<string, any>
+  metadata?: ProductMetadata
   tags?: string[]
   primary_image_url?: string
   primary_image_alt?: string
@@ -924,7 +927,7 @@ export async function createItem(
       item_slug: slug || null,
       seo_title: data.seo_title || null,
       seo_description: data.seo_description || null,
-      metadata: data.metadata || {},
+      metadata: normalizeProductMetadata(data.metadata),
       tags: data.tags || [],
       primary_image_url: data.primary_image_url || null,
       primary_image_alt: data.primary_image_alt || null,
@@ -995,7 +998,7 @@ export interface UpdateItemData {
   item_slug?: string
   seo_title?: string
   seo_description?: string
-  metadata?: Record<string, any>
+  metadata?: ProductMetadata
   tags?: string[]
   primary_image_url?: string
   primary_image_alt?: string
@@ -1031,12 +1034,30 @@ export async function updateItem(
       }
     }
 
-    // Obtener el producto actual para preservar valores no modificados
+    let currentStoreId: string | null = null
+    try {
+      currentStoreId = await getStoreId()
+    } catch {
+      currentStoreId = null
+    }
+
+    if (isDefaultStoreAlias(currentStoreId)) {
+      currentStoreId = await resolveDefaultStoreId(supabase, 'updateItem')
+      if (!currentStoreId) {
+        return {
+          success: false,
+          error: 'No se pudo resolver la tienda actual',
+        }
+      }
+    }
+
+    // Obtener el producto actual para preservar valores no modificados y asegurar aislamiento por tienda
     const currentItemResult = await withTimeout(
       supabase
         .from(ECOMMERCE_VIEWS.storeItemsLegacy)
         .select('*')
         .eq('id', itemId)
+        .eq('store_id', currentStoreId)
         .single(),
       15000,
       'getCurrentItem'
@@ -1124,7 +1145,9 @@ export async function updateItem(
     if (slug !== undefined) updateData.item_slug = slug || null
     if (data.seo_title !== undefined) updateData.seo_title = data.seo_title || null
     if (data.seo_description !== undefined) updateData.seo_description = data.seo_description || null
-    if (data.metadata !== undefined) updateData.metadata = data.metadata || {}
+    if (data.metadata !== undefined) {
+      updateData.metadata = mergeProductMetadataForUpdate(currentItem.metadata, data.metadata)
+    }
     if (data.tags !== undefined) updateData.tags = data.tags || []
     if (data.primary_image_url !== undefined) updateData.primary_image_url = data.primary_image_url || null
     if (data.primary_image_alt !== undefined) updateData.primary_image_alt = data.primary_image_alt || null
@@ -1136,6 +1159,7 @@ export async function updateItem(
         .from(ECOMMERCE_TABLES.storeItems)
         .update(updateData)
         .eq('id', itemId)
+        .eq('store_id', currentStoreId)
         .select('*, item_categories(*)')
         .single(),
       20000,
