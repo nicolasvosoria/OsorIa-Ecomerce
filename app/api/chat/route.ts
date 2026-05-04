@@ -10,6 +10,8 @@ export const maxDuration = 30
 
 const DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
 const DEEPSEEK_MODEL = "deepseek-chat"
+const PRODUCT_SEARCH_PAGE_SIZE = 1000
+const PRODUCT_SEARCH_CONTEXT_LIMIT = 15
 
 // Prompt por defecto del sistema para el chatbot
 const DEFAULT_SYSTEM_PROMPT = `Eres un asistente virtual amigable y profesional de una tienda en línea. Tu objetivo es ayudar a los clientes con:
@@ -328,6 +330,35 @@ async function getStoreProductsContext(): Promise<string> {
   }
 }
 
+async function getAllStoreProductSearchCandidates(
+  supabase: NonNullable<Awaited<ReturnType<typeof getSupabaseForProducts>>>,
+  storeUuid: string,
+): Promise<ChatProductRow[] | null> {
+  const products: ChatProductRow[] = []
+  let pageStart = 0
+
+  while (true) {
+    const { data: page, error } = await supabase
+      .from(ECOMMERCE_TABLES.storeItems)
+      .select("id, item_name, item_description, base_price, currency_code, metadata, item_slug")
+      .eq("store_id", storeUuid)
+      .eq("is_active", true)
+      .eq("is_available_for_sale", true)
+      .order("display_order", { ascending: true })
+      .range(pageStart, pageStart + PRODUCT_SEARCH_PAGE_SIZE - 1)
+
+    if (error) return null
+    if (!page || page.length === 0) break
+
+    products.push(...page)
+
+    if (page.length < PRODUCT_SEARCH_PAGE_SIZE) break
+    pageStart += PRODUCT_SEARCH_PAGE_SIZE
+  }
+
+  return products
+}
+
 // Función para buscar productos relevantes según la pregunta del usuario (términos sin acentos para mejor coincidencia)
 async function searchRelevantProducts(userMessage: string): Promise<string> {
   try {
@@ -337,17 +368,10 @@ async function searchRelevantProducts(userMessage: string): Promise<string> {
     const storeUuid = await getEffectiveStoreUuid(supabase)
     if (!storeUuid) return ""
 
-    const { data: products, error } = await supabase
-      .from(ECOMMERCE_TABLES.storeItems)
-      .select("id, item_name, item_description, base_price, currency_code, metadata, item_slug")
-      .eq("store_id", storeUuid)
-      .eq("is_active", true)
-      .eq("is_available_for_sale", true)
-      .order("display_order", { ascending: true })
-      .limit(100)
-    if (error || !products || products.length === 0) return ""
+    const products = await getAllStoreProductSearchCandidates(supabase, storeUuid)
+    if (!products || products.length === 0) return ""
 
-    const matchingProducts = searchProductsInMemory(products, userMessage, 15)
+    const matchingProducts = searchProductsInMemory(products, userMessage, PRODUCT_SEARCH_CONTEXT_LIMIT)
     if (matchingProducts.length === 0) return ""
 
     return buildProductsContextFromList(matchingProducts, true)
