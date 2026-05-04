@@ -24,7 +24,10 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { createItem, getCategories } from "@/lib/supabase/products-api"
-import type { ItemCategory } from "@/lib/types/products"
+import {
+  mergeProductAiDetailsMetadata,
+  type ItemCategory,
+} from "@/lib/types/products"
 import { MultiImageUpload } from "@/components/admin/multi-image-upload"
 import { toast } from "sonner"
 
@@ -119,11 +122,7 @@ export default function CreateProductPage() {
       const primaryImage = images.length > 0 ? images[0] : undefined
       const additionalImages = images.length > 1 ? images.slice(1) : []
 
-      // Preparar metadata con ai_details si existe
-      const metadata: Record<string, any> = {}
-      if (formData.ai_details.trim()) {
-        metadata.ai_details = formData.ai_details.trim()
-      }
+      const metadata = mergeProductAiDetailsMetadata({}, formData.ai_details)
 
       const result = await createItem(
         {
@@ -146,7 +145,7 @@ export default function CreateProductPage() {
           primary_image_url: primaryImage,
           primary_image_alt: formData.item_name.trim(),
           display_order: parseInt(formData.display_order) || 0,
-          metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+          metadata,
         },
         additionalImages
       )
@@ -327,9 +326,7 @@ export default function CreateProductPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="ai_details">
-                      Detalles y Características para el Asistente Virtual
-                    </Label>
+                    <Label htmlFor="ai_details">Detalles para el asistente virtual</Label>
                     <Textarea
                       id="ai_details"
                       value={formData.ai_details}
@@ -339,8 +336,8 @@ export default function CreateProductPage() {
                       className="font-mono text-sm"
                     />
                     <p className="text-xs text-muted-foreground">
-                      Información detallada sobre características, especificaciones técnicas, materiales, compatibilidad, etc. 
-                      Esta información será utilizada por el asistente virtual para responder preguntas específicas sobre el producto.
+                      Contexto privado para respuestas del asistente sobre este producto. No guardes secretos,
+                      datos personales sensibles, costos, tokens ni información interna de márgenes.
                     </p>
                   </div>
                 </CardContent>
@@ -609,5 +606,3 @@ export default function CreateProductPage() {
     </div>
   )
 }
-
-

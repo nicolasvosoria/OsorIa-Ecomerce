@@ -13,10 +13,11 @@ import {
   BreadcrumbPage,
 } from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
-import { ShoppingCart, Heart, Check, AlertCircle } from 'lucide-react';
+import { Check, AlertCircle } from 'lucide-react';
 import { AddToCart } from '@/components/cart/add-to-cart';
 import { WishlistButton } from '@/components/wishlist/wishlist-button';
 import { adaptSupabaseProduct } from '@/lib/products/adapter';
+import { PRODUCT_AI_DETAILS_METADATA_KEY } from '@/lib/types/products';
 import { cn } from '@/lib/utils';
 import { ProductImageGallery } from './components/product-image-gallery';
 import { RelatedProductsCarousel } from './components/related-products-carousel';
@@ -74,8 +75,7 @@ export async function generateMetadata(props: { params: Promise<{ slug: string }
           }
         : undefined,
     };
-  } catch (error) {
-    // Si falla durante el build, retornar metadata básica
+  } catch {
     return {
       title: 'Producto',
     };
@@ -143,6 +143,20 @@ async function ProductContent({ slug }: { slug: string }) {
   const minPrice = Math.min(...prices);
   const maxPrice = Math.max(...prices);
   const hasPriceRange = minPrice !== maxPrice;
+  const publicMetadataEntries = Object.entries(product.metadata || {}).filter(
+    ([key]) => key !== PRODUCT_AI_DETAILS_METADATA_KEY,
+  );
+  const publicRelatedProducts = relatedProducts.map((item) => ({
+    id: item.id,
+    item_slug: item.item_slug,
+    item_name: item.item_name,
+    base_price: item.base_price,
+    compare_at_price: item.compare_at_price,
+    currency_code: item.currency_code,
+    primary_image_url: item.primary_image_url,
+    primary_image_alt: item.primary_image_alt,
+    images: item.images?.map((image) => ({ image_url: image.image_url })) || [],
+  }));
 
   return (
     <div className="min-h-screen bg-background">
@@ -328,11 +342,11 @@ async function ProductContent({ slug }: { slug: string }) {
                 </div>
               )}
 
-              {product.metadata && Object.keys(product.metadata).length > 0 && (
+              {publicMetadataEntries.length > 0 && (
                 <div>
                   <h4 className="text-sm font-semibold mb-2">Especificaciones</h4>
                   <dl className="space-y-2">
-                    {Object.entries(product.metadata).map(([key, value]) => (
+                    {publicMetadataEntries.map(([key, value]) => (
                       <div key={key} className="flex justify-between">
                         <dt className="text-sm text-muted-foreground capitalize">
                           {key.replace(/_/g, ' ')}:
@@ -359,8 +373,8 @@ async function ProductContent({ slug }: { slug: string }) {
         )}
 
         {/* Productos relacionados */}
-        {relatedProducts.length > 0 && (
-          <RelatedProductsCarousel products={relatedProducts} />
+        {publicRelatedProducts.length > 0 && (
+          <RelatedProductsCarousel products={publicRelatedProducts} />
         )}
       </div>
     </div>
