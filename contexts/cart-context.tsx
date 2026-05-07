@@ -13,6 +13,12 @@ export interface CartItem {
   salePrice?: string
   productId?: string  // ID del producto en Supabase (para validación de stock)
   variantId?: string  // ID de la variante en Supabase (si aplica)
+  productSlug?: string
+  itemKind?: "product" | "combo"
+  comboId?: string
+  comboDetails?: import("@/lib/combos/types").ComboCatalogDetails
+  unitPriceAmount?: number
+  currencyCode?: string
 }
 
 interface CartContextType {
@@ -97,6 +103,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }
 
   const getItemSubtotal = (item: CartItem) => {
+    if (typeof item.unitPriceAmount === "number") {
+      return item.unitPriceAmount * item.quantity
+    }
     const priceStr = item.salePrice || item.price
     const priceNum = parsePriceString(priceStr)
     return priceNum * item.quantity
@@ -131,7 +140,6 @@ export function useCart() {
   }
   return context
 }
-
 
 
 

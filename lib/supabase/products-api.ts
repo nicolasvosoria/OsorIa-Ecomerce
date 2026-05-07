@@ -9,6 +9,13 @@ import type {
   GetItemsParams,
   GetItemsResult,
 } from '@/lib/types/products'
+import {
+  comboToStoreItem,
+  getComboById,
+  getComboBySlug,
+  getComboStock as getDerivedComboStock,
+  listCombos,
+} from './combos-api'
 
 // Importación dinámica de getStoreId para evitar problemas con análisis estático de Next.js
 async function getStoreId(): Promise<string | null> {
@@ -165,6 +172,7 @@ export async function getItems(params: GetItemsParams = {}): Promise<GetItemsRes
       offset = 0,
       order_by = 'display_order',
       order_direction = 'asc',
+      item_kind = 'all',
     } = params
 
     // Obtener store_id si no se proporciona en params
@@ -269,7 +277,14 @@ export async function getItems(params: GetItemsParams = {}): Promise<GetItemsRes
       if (!currentStoreId) return { items: [], total: 0, has_more: false }
     }
 
-    let query = supabase
+    const shouldFetchProducts = item_kind === 'all' || item_kind === 'products'
+    const shouldFetchCombos = item_kind === 'all' || item_kind === 'combos'
+
+    let itemsWithDetails: StoreItemWithDetails[] = []
+    let total = 0
+
+    if (shouldFetchProducts) {
+      let query = supabase
       .from(ECOMMERCE_VIEWS.storeItemsLegacy)
       .select('*, item_categories(*)', { count: 'exact' })
       .eq('store_id', currentStoreId!) // Filtrar por tienda (currentStoreId ya está validado)
@@ -277,48 +292,81 @@ export async function getItems(params: GetItemsParams = {}): Promise<GetItemsRes
       .eq('is_available_for_sale', is_available_for_sale)
 
     // Filtros opcionales
-    if (category_id) {
-      query = query.eq('category_id', category_id)
+      if (category_id) {
+        query = query.eq('category_id', category_id)
+      }
+
+      if (is_featured !== undefined) {
+        query = query.eq('is_featured', is_featured)
+      }
+
+      if (search) {
+        query = query.or(`item_name.ilike.%${search}%,item_description.ilike.%${search}%,item_code.ilike.%${search}%`)
+      }
+
+      if (tags && tags.length > 0) {
+        query = query.contains('tags', tags)
+      }
+
+      // Ordenamiento
+      query = query.order(order_by, { ascending: order_direction === 'asc' })
+
+      // Paginación
+      query = query.range(offset, offset + limit - 1)
+
+      const result = await withTimeout(query, 20000, 'getItems') as { data: any; error: any; count: number | null }
+      const { data, error, count } = result
+
+      if (error) {
+        console.error('[Products] Error al obtener productos:', error)
+        return { items: [], total: 0, has_more: false }
+      }
+
+      const items = (data as any[]) || []
+      total = count || 0
+
+      // Transformar datos para incluir categoría
+      itemsWithDetails = items.map((item: any) => ({
+        ...item,
+        item_kind: 'product',
+        category: item.item_categories ? (item.item_categories as ItemCategory) : undefined,
+      }))
     }
 
-    if (is_featured !== undefined) {
-      query = query.eq('is_featured', is_featured)
+    if (shouldFetchCombos && !category_id && is_featured === undefined) {
+      const combos = await listCombos({
+        store_id: currentStoreId,
+        includeInactive: is_active === false,
+      })
+      const comboItems = combos
+        .filter((combo) => (is_available_for_sale === false ? !combo.availability.isAvailable : combo.availability.isAvailable))
+        .filter((combo) => {
+          if (!search) return true
+          const normalizedSearch = search.toLowerCase()
+          return (
+            combo.name.toLowerCase().includes(normalizedSearch) ||
+            (combo.description || '').toLowerCase().includes(normalizedSearch)
+          )
+        })
+        .map(comboToStoreItem)
+
+      itemsWithDetails = [...itemsWithDetails, ...comboItems]
+      total += comboItems.length
     }
 
-    if (search) {
-      query = query.or(`item_name.ilike.%${search}%,item_description.ilike.%${search}%,item_code.ilike.%${search}%`)
-    }
+    const sortedItems = [...itemsWithDetails].sort((a, b) => {
+      const direction = order_direction === 'asc' ? 1 : -1
+      const aValue = a[order_by] ?? 0
+      const bValue = b[order_by] ?? 0
+      if (typeof aValue === 'number' && typeof bValue === 'number') return (aValue - bValue) * direction
+      return String(aValue).localeCompare(String(bValue)) * direction
+    })
 
-    if (tags && tags.length > 0) {
-      query = query.contains('tags', tags)
-    }
-
-    // Ordenamiento
-    query = query.order(order_by, { ascending: order_direction === 'asc' })
-
-    // Paginación
-    query = query.range(offset, offset + limit - 1)
-
-    const result = await withTimeout(query, 20000, 'getItems') as { data: any; error: any; count: number | null }
-    const { data, error, count } = result
-
-    if (error) {
-      console.error('[Products] Error al obtener productos:', error)
-      return { items: [], total: 0, has_more: false }
-    }
-
-    const items = (data as any[]) || []
-    const total = count || 0
+    const pagedItems = shouldFetchProducts ? sortedItems : sortedItems.slice(offset, offset + limit)
     const has_more = offset + limit < total
 
-    // Transformar datos para incluir categoría
-    const itemsWithDetails: StoreItemWithDetails[] = items.map((item: any) => ({
-      ...item,
-      category: item.item_categories ? (item.item_categories as ItemCategory) : undefined,
-    }))
-
     return {
-      items: itemsWithDetails,
+      items: pagedItems,
       total,
       has_more,
     }
@@ -470,12 +518,14 @@ export async function getItemBySlug(slug: string, storeId?: string | null): Prom
         // Si el error está vacío, probablemente el producto no existe
         console.log(`[Products] Producto no encontrado con slug: "${slug}"`)
       }
-      return null
+      const comboFallback = await getComboBySlug(slug, currentStoreId)
+      return comboFallback ? comboToStoreItem(comboFallback) : null
     }
 
     if (!itemData) {
       console.log(`[Products] No se encontró producto con slug: "${slug}"`)
-      return null
+      const comboFallback = await getComboBySlug(slug, currentStoreId)
+      return comboFallback ? comboToStoreItem(comboFallback) : null
     }
 
     const item = itemData as any
@@ -568,12 +618,14 @@ export async function getItemById(itemId: string, storeId?: string): Promise<Sto
         // Si el error está vacío, probablemente el producto no existe
         console.log(`[Products] Producto no encontrado con ID: "${itemId}"`)
       }
-      return null
+      const comboFallback = await getComboById(itemId)
+      return comboFallback ? comboToStoreItem(comboFallback) : null
     }
 
     if (!itemData) {
       console.log(`[Products] No se encontró producto con ID: "${itemId}"`)
-      return null
+      const comboFallback = await getComboById(itemId)
+      return comboFallback ? comboToStoreItem(comboFallback) : null
     }
 
     const item = itemData as any
@@ -1258,7 +1310,7 @@ export async function getProductStock(productId: string): Promise<number | null>
     ) as { data: any; error: any }
 
     if (result.error || !result.data) {
-      return null
+      return getDerivedComboStock(productId)
     }
 
     const product = result.data

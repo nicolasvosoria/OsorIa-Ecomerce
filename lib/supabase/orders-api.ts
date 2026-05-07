@@ -1,6 +1,8 @@
 import { getSupabaseEcommerce } from "./client";
 import { ECOMMERCE_TABLES } from "./contract";
 import { getStoreId } from "@/lib/utils/store";
+import { buildComboOrderSnapshotById } from "./combos-api";
+import type { ComboOrderSnapshot } from "@/lib/combos/types";
 
 // Tipos para pedidos
 export interface Order {
@@ -98,6 +100,50 @@ export interface OrderItem {
   metadata?: Record<string, any>;
   created_at: string;
   updated_at: string;
+}
+
+function getComboIdFromOrderItem(item: { metadata?: Record<string, any> }): string | null {
+  const metadata = item.metadata || {};
+  if (metadata.item_kind === "combo" && typeof metadata.combo_id === "string") {
+    return metadata.combo_id;
+  }
+  if (typeof metadata.comboId === "string") {
+    return metadata.comboId;
+  }
+  return null;
+}
+
+function getComboSnapshotFromMetadata(item: { metadata?: Record<string, any> }): ComboOrderSnapshot | null {
+  const snapshot = item.metadata?.combo_snapshot || item.metadata?.comboSnapshot;
+  return snapshot && typeof snapshot === "object" ? (snapshot as ComboOrderSnapshot) : null;
+}
+
+function hasComboIntent(metadata?: Record<string, any>): boolean {
+  if (!metadata || typeof metadata !== "object") return false;
+  return (
+    metadata.item_kind === "combo" ||
+    typeof metadata.combo_id === "string" ||
+    typeof metadata.comboId === "string" ||
+    metadata.combo_snapshot !== undefined ||
+    metadata.comboSnapshot !== undefined
+  );
+}
+
+function stripUntrustedComboSnapshotMetadata<T extends { metadata?: Record<string, any> }>(
+  item: T,
+): T {
+  if (!item.metadata || typeof item.metadata !== "object") {
+    return item;
+  }
+
+  const safeMetadata = { ...item.metadata };
+  delete safeMetadata.combo_snapshot;
+  delete safeMetadata.comboSnapshot;
+
+  return {
+    ...item,
+    metadata: safeMetadata,
+  };
 }
 
 export interface CreateOrderData {
@@ -525,6 +571,100 @@ async function resolveOrderStoreId(
   return defaultStoreResult.data?.[0]?.id || null;
 }
 
+async function prepareComboOrderItems(
+  items: CreateOrderData["items"],
+  supabase: any,
+): Promise<CreateOrderData["items"]> {
+  const preparedItems: CreateOrderData["items"] = [];
+  const validationErrors: InventoryValidationResult["errors"] = [];
+
+  for (const item of items) {
+    const safeItem = stripUntrustedComboSnapshotMetadata(item);
+    const comboId = getComboIdFromOrderItem(safeItem);
+    if (!comboId) {
+      if (hasComboIntent(item.metadata)) {
+        validationErrors.push({
+          product_name: item.product_name,
+          product_id: item.product_id,
+          variant_id: item.variant_id,
+          requested_quantity: item.quantity,
+          available_quantity: 0,
+          message: `${item.product_name} no tiene un combo válido asociado`,
+        });
+        continue;
+      }
+      preparedItems.push(safeItem);
+      continue;
+    }
+
+    const snapshot = await buildComboOrderSnapshotById(
+      comboId,
+      item.quantity,
+      supabase,
+    );
+
+    if (!snapshot || !snapshot.availability.isAvailable) {
+      const blockingComponents = snapshot?.availability.blockingComponents || [];
+      if (blockingComponents.length === 0) {
+        validationErrors.push({
+          product_name: item.product_name,
+          requested_quantity: item.quantity,
+          available_quantity: 0,
+          message: `${item.product_name} no está disponible como combo`,
+        });
+      } else {
+        for (const component of blockingComponents) {
+          validationErrors.push({
+            product_name: component.productName,
+            product_id: component.productId,
+            variant_id: component.variantId || undefined,
+            requested_quantity: component.requiredQuantity,
+            available_quantity: component.availableQuantity,
+            message: component.message,
+          });
+        }
+      }
+      continue;
+    }
+
+    preparedItems.push({
+      ...safeItem,
+      product_id: undefined,
+      variant_id: undefined,
+      variant_title: "Combo",
+      unit_price: snapshot.chargedUnitPrice,
+      total_price: snapshot.chargedLineTotal,
+      currency_code: snapshot.pricing.currencyCode,
+      product_slug: snapshot.slug || item.product_slug,
+      product_image_url: snapshot.imageUrl || item.product_image_url,
+      selected_options: {
+        ...(item.selected_options || {}),
+        item_kind: "combo",
+      },
+      metadata: {
+        ...(safeItem.metadata || {}),
+        item_kind: "combo",
+        combo_id: comboId,
+        combo_snapshot: snapshot,
+      },
+    });
+  }
+
+  if (validationErrors.length > 0) {
+    const validationResult: InventoryValidationResult = {
+      isValid: false,
+      errors: validationErrors,
+    };
+    const error = new Error(
+      `No hay suficiente stock disponible:\n${validationErrors.map((err) => err.message).join("\n")}`,
+    );
+    (error as any).validationResult = validationResult;
+    throw error;
+  }
+
+  return preparedItems;
+}
+
 /**
  * Validar inventario antes de crear una orden
  * Verifica que todos los productos tengan suficiente stock disponible
@@ -548,6 +688,24 @@ async function validateInventoryBeforeOrder(
     // Validar cada item
     for (const item of items) {
       try {
+        const comboSnapshot = getComboSnapshotFromMetadata(item);
+        if (comboSnapshot) {
+          if (!comboSnapshot.availability.isAvailable) {
+            result.isValid = false;
+            for (const component of comboSnapshot.availability.blockingComponents) {
+              result.errors.push({
+                product_name: component.productName,
+                product_id: component.productId,
+                variant_id: component.variantId || undefined,
+                requested_quantity: component.requiredQuantity,
+                available_quantity: component.availableQuantity,
+                message: component.message,
+              });
+            }
+          }
+          continue;
+        }
+
         // Si hay variant_id, validar inventario de la variante
         if (item.variant_id) {
           const variantResult = (await withTimeout(
@@ -694,6 +852,65 @@ async function updateInventoryAfterOrder(
     // Procesar cada item de la orden
     for (const item of items) {
       try {
+        const comboSnapshot = getComboSnapshotFromMetadata(item);
+        if (comboSnapshot) {
+          for (const component of comboSnapshot.components) {
+            const deductedQuantity = component.quantity * item.quantity;
+
+            if (component.variantId) {
+              const variantResult = (await withTimeout(
+                supabase
+                  .from(ECOMMERCE_TABLES.itemVariants)
+                  .select("track_inventory, inventory_quantity")
+                  .eq("id", component.variantId)
+                  .single(),
+                10000,
+                "getComboVariantForInventory",
+              )) as { data: any; error: any };
+
+              if (!variantResult.error && variantResult.data?.track_inventory) {
+                const currentQuantity = variantResult.data.inventory_quantity || 0;
+                await withTimeout(
+                  supabase
+                    .from(ECOMMERCE_TABLES.itemVariants)
+                    .update({
+                      inventory_quantity: Math.max(0, currentQuantity - deductedQuantity),
+                    })
+                    .eq("id", component.variantId),
+                  10000,
+                  "updateComboVariantInventory",
+                );
+              }
+              continue;
+            }
+
+            const productResult = (await withTimeout(
+              supabase
+                .from(ECOMMERCE_TABLES.storeItems)
+                .select("track_inventory, inventory_quantity")
+                .eq("id", component.productId)
+                .single(),
+              10000,
+              "getComboProductForInventory",
+            )) as { data: any; error: any };
+
+            if (!productResult.error && productResult.data?.track_inventory) {
+              const currentQuantity = productResult.data.inventory_quantity || 0;
+              await withTimeout(
+                supabase
+                  .from(ECOMMERCE_TABLES.storeItems)
+                  .update({
+                    inventory_quantity: Math.max(0, currentQuantity - deductedQuantity),
+                  })
+                  .eq("id", component.productId),
+                10000,
+                "updateComboProductInventory",
+              );
+            }
+          }
+          continue;
+        }
+
         // Si hay variant_id, actualizar inventario de la variante
         if (item.variant_id) {
           // Obtener la variante actual
@@ -819,9 +1036,29 @@ export async function createOrder(
       return null;
     }
 
+    const sanitizedItems = orderData.items.map(stripUntrustedComboSnapshotMetadata);
+    const preparedItems = await prepareComboOrderItems(sanitizedItems, supabase);
+    const recalculatedSubtotal = preparedItems.reduce(
+      (sum, item) => sum + Number(item.total_price || 0),
+      0,
+    );
+    const hasComboItems = preparedItems.some((item) => getComboIdFromOrderItem(item));
+    const normalizedOrderData: CreateOrderData = hasComboItems
+      ? {
+          ...orderData,
+          items: preparedItems,
+          subtotal: recalculatedSubtotal,
+          total_amount:
+            recalculatedSubtotal +
+            (orderData.shipping_cost || 0) +
+            (orderData.tax_amount || 0) -
+            (orderData.discount_amount || 0),
+        }
+      : { ...orderData, items: preparedItems };
+
     // Validar inventario antes de crear la orden
     const validationResult = await validateInventoryBeforeOrder(
-      orderData.items,
+      normalizedOrderData.items,
       supabase,
     );
 
@@ -840,7 +1077,7 @@ export async function createOrder(
 
     const resolvedStoreId = await resolveOrderStoreId(
       supabase,
-      orderData.items,
+      normalizedOrderData.items,
     );
 
     // Crear el pedido
@@ -850,27 +1087,27 @@ export async function createOrder(
         .insert({
           store_id: resolvedStoreId,
           customer_type: orderData.customer_type,
-          user_id: orderData.user_id || null,
-          customer_email: orderData.customer_email,
-          customer_first_name: orderData.customer_first_name,
-          customer_last_name: orderData.customer_last_name,
-          customer_phone: orderData.customer_phone || null,
-          shipping_address: orderData.shipping_address,
-          shipping_city: orderData.shipping_city,
-          shipping_postal_code: orderData.shipping_postal_code,
-          shipping_country: orderData.shipping_country || "Colombia",
-          shipping_notes: orderData.shipping_notes || null,
-          payment_method: orderData.payment_method || null,
-          payment_status: orderData.payment_status || "pending",
-          payment_reference: orderData.payment_reference || null,
-          subtotal: orderData.subtotal,
-          shipping_cost: orderData.shipping_cost || 0,
-          tax_amount: orderData.tax_amount || 0,
-          discount_amount: orderData.discount_amount || 0,
-          total_amount: orderData.total_amount,
-          currency_code: orderData.currency_code || "COP",
-          notes: orderData.notes || null,
-          metadata: orderData.metadata || {},
+          user_id: normalizedOrderData.user_id || null,
+          customer_email: normalizedOrderData.customer_email,
+          customer_first_name: normalizedOrderData.customer_first_name,
+          customer_last_name: normalizedOrderData.customer_last_name,
+          customer_phone: normalizedOrderData.customer_phone || null,
+          shipping_address: normalizedOrderData.shipping_address,
+          shipping_city: normalizedOrderData.shipping_city,
+          shipping_postal_code: normalizedOrderData.shipping_postal_code,
+          shipping_country: normalizedOrderData.shipping_country || "Colombia",
+          shipping_notes: normalizedOrderData.shipping_notes || null,
+          payment_method: normalizedOrderData.payment_method || null,
+          payment_status: normalizedOrderData.payment_status || "pending",
+          payment_reference: normalizedOrderData.payment_reference || null,
+          subtotal: normalizedOrderData.subtotal,
+          shipping_cost: normalizedOrderData.shipping_cost || 0,
+          tax_amount: normalizedOrderData.tax_amount || 0,
+          discount_amount: normalizedOrderData.discount_amount || 0,
+          total_amount: normalizedOrderData.total_amount,
+          currency_code: normalizedOrderData.currency_code || "COP",
+          notes: normalizedOrderData.notes || null,
+          metadata: normalizedOrderData.metadata || {},
         })
         .select()
         .single(),
@@ -886,7 +1123,7 @@ export async function createOrder(
     const order = orderResult.data as Order;
 
     // Crear los items del pedido
-    const itemsToInsert = orderData.items.map((item) => ({
+    const itemsToInsert = normalizedOrderData.items.map((item) => ({
       id: generateUuid(),
       order_id: order.id,
       product_id: item.product_id || null,
@@ -922,9 +1159,49 @@ export async function createOrder(
 
     const orderItems = itemsResult.data as OrderItem[];
 
+    const comboSnapshotRows = orderItems
+      .map((orderItem) => {
+        const snapshot = getComboSnapshotFromMetadata(orderItem);
+        if (!snapshot) return null;
+
+        return {
+          order_id: order.id,
+          order_item_id: orderItem.id,
+          combo_id: snapshot.id,
+          combo_name: snapshot.name,
+          combo_slug: snapshot.slug || null,
+          ordered_quantity: snapshot.orderedQuantity,
+          component_subtotal: snapshot.pricing.componentSubtotal,
+          discount_type: snapshot.pricing.discountType,
+          discount_value: snapshot.pricing.discountValue,
+          discount_amount: snapshot.pricing.discountAmount,
+          charged_unit_price: snapshot.chargedUnitPrice,
+          charged_line_total: snapshot.chargedLineTotal,
+          currency_code: snapshot.pricing.currencyCode,
+          snapshot,
+        };
+      })
+      .filter((row): row is NonNullable<typeof row> => row !== null);
+
+    if (comboSnapshotRows.length > 0) {
+      const snapshotResult = await withTimeout(
+        supabase
+          .from(ECOMMERCE_TABLES.orderComboSnapshots)
+          .insert(comboSnapshotRows),
+        15000,
+        "createOrderComboSnapshots",
+      ) as { error: any };
+
+      if (snapshotResult.error) {
+        throw new Error(
+          `No se pudo persistir order_combo_snapshots: ${snapshotResult.error.message || snapshotResult.error}`,
+        );
+      }
+    }
+
     await withTimeout(
       supabase.from(ECOMMERCE_TABLES.orderAddresses).insert(
-        buildShippingAddressRow(order.id, orderData),
+        buildShippingAddressRow(order.id, normalizedOrderData),
       ),
       15000,
       "createOrderAddress",
@@ -935,7 +1212,7 @@ export async function createOrder(
       );
     });
 
-    await maybeInsertPaymentTransaction(supabase, order, orderData.metadata);
+    await maybeInsertPaymentTransaction(supabase, order, normalizedOrderData.metadata);
 
     // Actualizar inventario después de crear la orden exitosamente
     // Ejecutamos de forma síncrona para asegurar consistencia de datos
@@ -959,6 +1236,9 @@ export async function createOrder(
     };
   } catch (error: any) {
     console.error("[Orders] Error inesperado al crear pedido:", error);
+    if (error?.validationResult) {
+      throw error;
+    }
     return null;
   }
 }

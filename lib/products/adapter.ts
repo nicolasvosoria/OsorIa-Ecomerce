@@ -6,8 +6,6 @@
 import type {
   StoreItemWithDetails,
   ItemCategory,
-  ItemVariant,
-  ItemImage,
   ItemOption,
 } from '@/lib/types/products';
 import type { Product, Collection, ProductVariant, ProductOption, Money, Image } from '@/lib/shopify/types';
@@ -145,6 +143,14 @@ function adaptImages(item: StoreItemWithDetails): Image[] {
 
 // Calcular precio mínimo y máximo de las variantes
 function calculatePriceRange(item: StoreItemWithDetails): { minVariantPrice: Money; maxVariantPrice: Money } {
+  if (item.item_kind === 'combo' && item.combo) {
+    const price = formatMoney(item.combo.pricing.finalUnitPrice, item.combo.pricing.currencyCode);
+    return {
+      minVariantPrice: price,
+      maxVariantPrice: price,
+    };
+  }
+
   if (!item.variants || item.variants.length === 0) {
     const price = formatMoney(item.base_price, item.currency_code);
     return {
@@ -181,11 +187,14 @@ export function adaptSupabaseProduct(item: StoreItemWithDetails): Product {
   const featuredImage = getFirstImage(item);
   const priceRange = calculatePriceRange(item);
   const description = item.item_description || item.item_name;
+  const isCombo = item.item_kind === 'combo' && Boolean(item.combo);
 
   return {
     id: item.id,
     title: item.item_name,
     handle: item.item_slug || item.id,
+    productKind: isCombo ? 'combo' : 'product',
+    comboDetails: item.combo,
     categoryId: item.category?.id,
     description: description.length > 200 ? description.substring(0, 200) + '...' : description,
     descriptionHtml: item.item_description_html || `<p>${description}</p>`,
@@ -200,8 +209,18 @@ export function adaptSupabaseProduct(item: StoreItemWithDetails): Product {
       description: item.seo_description || description,
     },
     options: adaptOptions(item.options),
-    tags: item.tags || [],
-    variants: adaptVariants(item),
+    tags: isCombo ? [...new Set([...(item.tags || []), 'combo'])] : item.tags || [],
+    variants: isCombo
+      ? [
+          {
+            id: item.id,
+            title: 'Combo',
+            availableForSale: item.is_available_for_sale && item.is_active,
+            price: priceRange.minVariantPrice,
+            selectedOptions: [],
+          },
+        ]
+      : adaptVariants(item),
     images: adaptImages(item),
     availableForSale: item.is_available_for_sale && item.is_active,
   };
@@ -238,5 +257,4 @@ export function adaptSupabaseProducts(items: StoreItemWithDetails[]): Product[] 
 export function adaptSupabaseCategories(categories: ItemCategory[]): Collection[] {
   return categories.map(adaptSupabaseCategory);
 }
-
 

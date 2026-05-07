@@ -1,3 +1,5 @@
+import type { ComboCatalogDetails } from '@/lib/combos/types';
+
 export interface ShopifyProduct {
   id: string;
   title: string;
@@ -135,6 +137,8 @@ export type Product = {
   id: string;
   title: string;
   handle: string;
+  productKind?: 'product' | 'combo';
+  comboDetails?: ComboCatalogDetails;
   categoryId?: string;
   description: string;
   descriptionHtml: string;

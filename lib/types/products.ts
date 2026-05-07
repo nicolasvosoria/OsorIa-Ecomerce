@@ -1,3 +1,5 @@
+import type { ComboCatalogDetails } from '@/lib/combos/types'
+
 // Tipos para la base de datos de productos genéricos
 
 export interface ItemCategory {
@@ -89,10 +91,13 @@ export interface StoreItemWithDetails extends StoreItem {
   variants?: ItemVariant[]
   images?: ItemImage[]
   options?: ItemOption[]
+  item_kind?: 'product' | 'combo'
+  combo?: ComboCatalogDetails
 }
 
 export interface GetItemsParams {
   store_id?: string // ID de la tienda para filtrar productos
+  item_kind?: 'all' | 'products' | 'combos'
   category_id?: string
   is_active?: boolean
   is_featured?: boolean
@@ -110,7 +115,6 @@ export interface GetItemsResult {
   total: number
   has_more: boolean
 }
-
 
 
 

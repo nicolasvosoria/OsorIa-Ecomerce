@@ -7,6 +7,7 @@ import { Collection } from '@/lib/shopify/types';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer';
 import { CategoryFilter } from './category-filter';
 import { ColorFilter } from './color-filter';
+import { ComboFilter } from './combo-filter';
 import { useFilterCount } from '../hooks/use-filter-count';
 import { useProducts } from '../providers/products-provider';
 import { ResultsCount } from './results-count';
@@ -64,6 +65,7 @@ export function MobileFilters({ collections, className }: MobileFiltersProps) {
           </DrawerHeader>
           <div className="overflow-y-auto flex-1 px-4 pb-4 space-y-6">
             <CategoryFilter collections={collections} />
+            <ComboFilter />
             <ColorFilter products={originalProducts} />
           </div>
         </DrawerContent>
