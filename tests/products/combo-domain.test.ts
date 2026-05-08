@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { getSupabaseEcommerce } from '@/lib/supabase/client'
-import { hydrateCombos, updateCombo } from '@/lib/supabase/combos-api'
+import { comboToStoreItem, hydrateCombos, normalizeComboSlug, updateCombo } from '@/lib/supabase/combos-api'
 import {
   calculateComboPricing,
   deriveComboAvailability,
@@ -147,6 +147,11 @@ describe('combo domain pricing and stock', () => {
     expect(pricing.finalUnitPrice).toBe(0)
   })
 
+  it('normalizes combo slugs before they are used as product routes', () => {
+    expect(normalizeComboSlug(' Combo Test ')).toBe('combo-test')
+    expect(normalizeComboSlug('Combo Café Premium!!')).toBe('combo-cafe-premium')
+  })
+
   it('derives combo stock as the minimum purchasable component ratio', () => {
     const availability = deriveComboAvailability(components)
 
@@ -282,6 +287,68 @@ describe('combo domain pricing and stock', () => {
 
     expect(combo.availability.isAvailable).toBe(false)
     expect(combo.isActive).toBe(false)
+  })
+
+  it('maps combo category metadata into catalog items so category filters can include combos', async () => {
+    const supabase = createComboHydrationSupabase({
+      product_combo_components: [
+        {
+          data: [
+            { combo_id: 'combo-categorized', product_id: 'coffee-250g', variant_id: null, quantity: 1 },
+            { combo_id: 'combo-categorized', product_id: 'mug', variant_id: null, quantity: 1 },
+          ],
+          error: null,
+        },
+      ],
+      store_items: [
+        {
+          data: [
+            {
+              id: 'coffee-250g',
+              item_name: 'Café 250g',
+              base_price: 30000,
+              currency_code: 'COP',
+              track_inventory: true,
+              inventory_quantity: 10,
+              is_active: true,
+              is_available_for_sale: true,
+            },
+            {
+              id: 'mug',
+              item_name: 'Mug',
+              base_price: 20000,
+              currency_code: 'COP',
+              track_inventory: true,
+              inventory_quantity: 10,
+              is_active: true,
+              is_available_for_sale: true,
+            },
+          ],
+          error: null,
+        },
+      ],
+    })
+
+    const [combo] = await hydrateCombos(
+      [
+        {
+          id: 'combo-categorized',
+          name: 'Combo categorizado',
+          slug: 'combo-categorizado',
+          discount_type: 'percentage',
+          discount_value: 0,
+          is_active: true,
+          metadata: { category_id: 'category-cafe' },
+        },
+      ],
+      supabase,
+    )
+
+    expect(combo.categoryId).toBe('category-cafe')
+    expect(comboToStoreItem(combo)).toEqual(expect.objectContaining({
+      category_id: 'category-cafe',
+      item_slug: 'combo-categorizado',
+    }))
   })
 
   it('defers combo image upload until save and surfaces storage failure before persistence', async () => {

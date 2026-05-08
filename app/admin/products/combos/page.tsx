@@ -16,13 +16,13 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { createCombo, listCombos, updateCombo } from "@/lib/supabase/combos-api"
-import { getItemById, getItems } from "@/lib/supabase/products-api"
+import { getCategories, getItemById, getItems } from "@/lib/supabase/products-api"
 import { uploadImage, deleteImage } from "@/lib/supabase/storage-api"
 import { cleanupDeferredUploadedImage, resolveDeferredImageUpload } from "@/lib/products/deferred-image-upload"
 import { formatPrice } from "@/lib/shopify/utils"
 import { DeferredImageUpload } from "../components/deferred-image-upload"
 import type { ComboCatalogDetails, ComboDiscountType } from "@/lib/combos/types"
-import type { StoreItemWithDetails } from "@/lib/types/products"
+import type { ItemCategory, StoreItemWithDetails } from "@/lib/types/products"
 
 type ComponentDraft = {
   product_id: string
@@ -34,6 +34,7 @@ type ComboFormState = {
   id?: string
   name: string
   slug: string
+  category_id: string
   description: string
   image_url: string
   is_active: boolean
@@ -45,6 +46,7 @@ type ComboFormState = {
 const emptyForm: ComboFormState = {
   name: "",
   slug: "",
+  category_id: "",
   description: "",
   image_url: "",
   is_active: true,
@@ -65,6 +67,7 @@ export default function AdminCombosPage() {
   const router = useRouter()
   const [combos, setCombos] = useState<ComboCatalogDetails[]>([])
   const [products, setProducts] = useState<StoreItemWithDetails[]>([])
+  const [categories, setCategories] = useState<ItemCategory[]>([])
   const [form, setForm] = useState<ComboFormState>(emptyForm)
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -78,9 +81,10 @@ export default function AdminCombosPage() {
     if (!isAdmin) return
     setIsLoadingData(true)
     try {
-      const [comboRows, productRows] = await Promise.all([
+      const [comboRows, productRows, categoryRows] = await Promise.all([
         listCombos({ includeInactive: true }),
         getItems({ limit: 100, item_kind: "products", is_active: true, is_available_for_sale: true }),
+        getCategories(false),
       ])
 
       const productsWithVariants = await Promise.all(
@@ -89,6 +93,7 @@ export default function AdminCombosPage() {
 
       setCombos(comboRows)
       setProducts(productsWithVariants)
+      setCategories(categoryRows)
     } catch (error) {
       console.error("[Admin Combos] Error cargando combos:", error)
       toast.error("Error al cargar combos")
@@ -125,6 +130,7 @@ export default function AdminCombosPage() {
       id: combo.id,
       name: combo.name,
       slug: combo.slug || "",
+      category_id: combo.categoryId || "",
       description: combo.description || "",
       image_url: combo.imageUrl || "",
       is_active: combo.isActive,
@@ -178,6 +184,7 @@ export default function AdminCombosPage() {
       const payload = {
         name: form.name,
         slug: form.slug || undefined,
+        category_id: form.category_id || null,
         description: form.description || undefined,
         image_url: imageResult.imageUrl,
         is_active: form.is_active,
@@ -276,6 +283,19 @@ export default function AdminCombosPage() {
               <div className="space-y-2">
                 <Label htmlFor="slug">Slug</Label>
                 <Input id="slug" value={form.slug} onChange={(event) => setForm({ ...form, slug: event.target.value })} placeholder="combo-cafe-premium" />
+                <p className="text-xs text-muted-foreground">Se normaliza al guardar; por ejemplo, “combo test” queda como “combo-test”.</p>
+              </div>
+              <div className="space-y-2">
+                <Label>Categoría</Label>
+                <Select value={form.category_id || "__none"} onValueChange={(value) => setForm({ ...form, category_id: value === "__none" ? "" : value })}>
+                  <SelectTrigger><SelectValue placeholder="Selecciona una categoría" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none">Sin categoría</SelectItem>
+                    {categories.map((category) => (
+                      <SelectItem key={category.id} value={category.id}>{category.category_name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="description">Descripción</Label>

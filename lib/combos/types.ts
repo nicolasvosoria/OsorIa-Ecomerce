@@ -52,6 +52,7 @@ export interface ComboCatalogDetails {
   id: string
   name: string
   slug?: string | null
+  categoryId?: string | null
   description?: string | null
   imageUrl?: string | null
   isActive: boolean
