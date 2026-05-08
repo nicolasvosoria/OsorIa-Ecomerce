@@ -107,9 +107,13 @@ export function AddToCartButton({
           const { getProductStock, getVariantStock } = await import('@/lib/supabase/products-api');
           
           let stock: number | null = null;
-          
+
+          if (isCombo) {
+            const { getComboStock } = await import('@/lib/supabase/combos-api');
+            stock = await getComboStock(productId);
+          }
           // Si es una variante real, obtener stock de la variante
-          if (isRealVariant) {
+          else if (isRealVariant) {
             stock = await getVariantStock(variantId);
           } else {
             // Es el producto base o variante por defecto, obtener stock del producto

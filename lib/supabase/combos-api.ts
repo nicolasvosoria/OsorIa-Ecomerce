@@ -590,16 +590,7 @@ export async function updateCombo(comboId: string, data: UpdateComboData): Promi
     existingComponentRows = existingResult.data || []
   }
 
-  if (Object.keys(updateData).length > 0) {
-    const result = await withTimeout(
-      supabase.from(ECOMMERCE_TABLES.productCombos).update(updateData).eq('id', comboId),
-      20000,
-      'updateCombo',
-    ) as { error: any }
-
-    if (result.error) return { success: false, error: result.error.message || 'Error al actualizar el combo' }
-  }
-
+  let componentsWereReplaced = false
   if (replacementRows) {
     const deleteResult = await withTimeout(
       supabase.from(ECOMMERCE_TABLES.productComboComponents).delete().eq('combo_id', comboId),
@@ -620,6 +611,28 @@ export async function updateCombo(comboId: string, data: UpdateComboData): Promi
     if (insertResult.error) {
       await restoreComboComponents(supabase, existingComponentRows).catch(() => undefined)
       return { success: false, error: insertResult.error.message || 'Error al guardar componentes del combo' }
+    }
+
+    componentsWereReplaced = true
+  }
+
+  if (Object.keys(updateData).length > 0) {
+    const result = await withTimeout(
+      supabase.from(ECOMMERCE_TABLES.productCombos).update(updateData).eq('id', comboId),
+      20000,
+      'updateCombo',
+    ) as { error: any }
+
+    if (result.error) {
+      if (componentsWereReplaced) {
+        await withTimeout(
+          supabase.from(ECOMMERCE_TABLES.productComboComponents).delete().eq('combo_id', comboId),
+          20000,
+          'rollbackComboComponentsAfterUpdateFailure',
+        ).catch(() => undefined)
+        await restoreComboComponents(supabase, existingComponentRows).catch(() => undefined)
+      }
+      return { success: false, error: result.error.message || 'Error al actualizar el combo' }
     }
   }
 

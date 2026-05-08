@@ -545,6 +545,95 @@ describe("orders-api live order contract", () => {
     expect(state.inserts.orders).toBeUndefined();
   });
 
+  it("rejects stale cart combo items when the combo becomes inactive before checkout", async () => {
+    const state = new MockSupabaseState({
+      "product_combos:select": [
+        {
+          data: [
+            {
+              id: "combo-inactive",
+              name: "Combo Inactivo",
+              slug: "combo-inactivo",
+              is_active: false,
+              discount_type: "percentage",
+              discount_value: 0,
+              currency_code: "COP",
+            },
+          ],
+          error: null,
+        },
+      ],
+      "product_combo_components:select": [
+        {
+          data: [
+            {
+              combo_id: "combo-inactive",
+              product_id: "store-item-1",
+              variant_id: null,
+              quantity: 1,
+            },
+            {
+              combo_id: "combo-inactive",
+              product_id: "store-item-2",
+              variant_id: null,
+              quantity: 1,
+            },
+          ],
+          error: null,
+        },
+      ],
+      "store_items:select": [
+        {
+          data: [
+            {
+              id: "store-item-1",
+              item_name: "Café 250g",
+              base_price: 30000,
+              currency_code: "COP",
+              track_inventory: true,
+              inventory_quantity: 10,
+              is_active: true,
+              is_available_for_sale: true,
+            },
+            {
+              id: "store-item-2",
+              item_name: "Mug",
+              base_price: 20000,
+              currency_code: "COP",
+              track_inventory: true,
+              inventory_quantity: 10,
+              is_active: true,
+              is_available_for_sale: true,
+            },
+          ],
+          error: null,
+        },
+      ],
+    });
+
+    getSupabaseEcommerceMock.mockReturnValue({ from: state.from });
+
+    await expect(
+      createOrder({
+        ...baseOrderData,
+        items: [
+          {
+            product_name: "Combo Inactivo",
+            unit_price: 50000,
+            quantity: 1,
+            total_price: 50000,
+            metadata: {
+              item_kind: "combo",
+              combo_id: "combo-inactive",
+            },
+          },
+        ],
+      }),
+    ).rejects.toThrow("No hay suficiente stock disponible");
+
+    expect(state.inserts.orders).toBeUndefined();
+  });
+
   it("decrements product and variant inventory on writable base tables", async () => {
     const state = new MockSupabaseState({
       "store_items:select": [

@@ -17,7 +17,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { createCombo, listCombos, updateCombo } from "@/lib/supabase/combos-api"
 import { getItemById, getItems } from "@/lib/supabase/products-api"
+import { uploadImage, deleteImage } from "@/lib/supabase/storage-api"
+import { cleanupDeferredUploadedImage, resolveDeferredImageUpload } from "@/lib/products/deferred-image-upload"
 import { formatPrice } from "@/lib/shopify/utils"
+import { DeferredImageUpload } from "../components/deferred-image-upload"
 import type { ComboCatalogDetails, ComboDiscountType } from "@/lib/combos/types"
 import type { StoreItemWithDetails } from "@/lib/types/products"
 
@@ -63,6 +66,7 @@ export default function AdminCombosPage() {
   const [combos, setCombos] = useState<ComboCatalogDetails[]>([])
   const [products, setProducts] = useState<StoreItemWithDetails[]>([])
   const [form, setForm] = useState<ComboFormState>(emptyForm)
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLoadingData, setIsLoadingData] = useState(true)
 
@@ -116,6 +120,7 @@ export default function AdminCombosPage() {
   }
 
   const startEdit = (combo: ComboCatalogDetails) => {
+    setSelectedImageFile(null)
     setForm({
       id: combo.id,
       name: combo.name,
@@ -133,7 +138,10 @@ export default function AdminCombosPage() {
     })
   }
 
-  const resetForm = () => setForm(emptyForm)
+  const resetForm = () => {
+    setSelectedImageFile(null)
+    setForm(emptyForm)
+  }
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -157,12 +165,21 @@ export default function AdminCombosPage() {
     }
 
     setIsSubmitting(true)
+    let uploadedImageUrl: string | undefined
     try {
+      const imageResult = await resolveDeferredImageUpload({
+        file: selectedImageFile,
+        imageUrl: form.image_url,
+        context: "product-images",
+        uploadImage,
+      })
+      uploadedImageUrl = imageResult.uploadedUrl
+
       const payload = {
         name: form.name,
         slug: form.slug || undefined,
         description: form.description || undefined,
-        image_url: form.image_url || undefined,
+        image_url: imageResult.imageUrl,
         is_active: form.is_active,
         discount_type: form.discount_type,
         discount_value: Number(form.discount_value || 0),
@@ -171,6 +188,7 @@ export default function AdminCombosPage() {
       const result = form.id ? await updateCombo(form.id, payload) : await createCombo(payload)
 
       if (!result.success) {
+        await cleanupDeferredUploadedImage(uploadedImageUrl, deleteImage)
         toast.error(result.error || "No se pudo guardar el combo")
         return
       }
@@ -179,6 +197,7 @@ export default function AdminCombosPage() {
       resetForm()
       await loadData()
     } catch (error: any) {
+      await cleanupDeferredUploadedImage(uploadedImageUrl, deleteImage)
       console.error("[Admin Combos] Error guardando combo:", error)
       toast.error(error.message || "Error al guardar el combo")
     } finally {
@@ -262,10 +281,15 @@ export default function AdminCombosPage() {
                 <Label htmlFor="description">Descripción</Label>
                 <Textarea id="description" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} rows={3} />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="image_url">Imagen URL</Label>
-                <Input id="image_url" value={form.image_url} onChange={(event) => setForm({ ...form, image_url: event.target.value })} />
-              </div>
+              <DeferredImageUpload
+                imageUrl={form.image_url}
+                selectedFile={selectedImageFile}
+                onImageUrlChange={(imageUrl) => setForm({ ...form, image_url: imageUrl })}
+                onFileChange={setSelectedImageFile}
+                onValidationError={(message) => toast.error(message)}
+                label="Imagen del combo"
+                maxSizeMB={1}
+              />
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label>Tipo descuento</Label>
