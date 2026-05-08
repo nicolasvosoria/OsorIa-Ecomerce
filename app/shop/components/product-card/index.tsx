@@ -14,8 +14,14 @@ export const ProductCard = ({ product }: { product: Product }) => {
   const hasNoOptions = product.options.length === 0;
   const hasOneOptionWithOneValue = product.options.length === 1 && product.options[0].values.length === 1;
   const justHasColorOption = product.options.length === 1 && product.options[0].name.toLowerCase() === 'color';
+  const formattedPrice = formatPrice(
+    product.priceRange.minVariantPrice.amount,
+    product.priceRange.minVariantPrice.currencyCode,
+  );
+  const isCombo = product.productKind === 'combo';
 
   const renderInCardAddToCart = hasNoOptions || hasOneOptionWithOneValue || justHasColorOption;
+  const showVariantSelector = renderInCardAddToCart && !isCombo;
 
   return (
     <div className="relative w-full aspect-[3/4] md:aspect-square bg-muted group overflow-hidden">
@@ -23,14 +29,14 @@ export const ProductCard = ({ product }: { product: Product }) => {
       <div className="absolute top-3 right-3 z-20 pointer-events-auto">
         <WishlistButton product={product} />
       </div>
-      {product.productKind === 'combo' && (
+      {isCombo && (
         <Badge className="absolute left-3 top-3 z-20 bg-primary text-primary-foreground">Combo</Badge>
       )}
       
       <Link
         href={`/products/${product.handle}`}
         className="block size-full focus-visible:outline-none"
-        aria-label={`View details for ${product.title}, price ${product.priceRange.minVariantPrice}`}
+        aria-label={`View details for ${product.title}, price ${formattedPrice}`}
         prefetch
       >
         <Suspense fallback={null}>
@@ -55,7 +61,7 @@ export const ProductCard = ({ product }: { product: Product }) => {
         <div className="flex absolute inset-x-3 bottom-3 flex-col gap-8 px-2 py-3 rounded-md transition-all duration-300 pointer-events-none bg-popover md:opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 md:translate-y-1/3 group-hover:translate-y-0 group-focus-visible:translate-y-0 group-hover:pointer-events-auto group-focus-visible:pointer-events-auto max-md:pointer-events-auto">
           <div className="grid grid-cols-2 gap-x-4 gap-y-8 items-end">
             <p className="text-lg font-semibold text-pretty">{product.title}</p>
-            {product.productKind === 'combo' && (
+            {isCombo && (
               <Badge variant="outline" className="w-fit">Combo</Badge>
             )}
             <div className="flex gap-2 items-center place-self-end text-lg font-semibold">
@@ -66,12 +72,18 @@ export const ProductCard = ({ product }: { product: Product }) => {
                 </span>
               )}
             </div>
-            {renderInCardAddToCart ? (
+            {showVariantSelector ? (
               <Suspense fallback={null}>
                 <div className="self-center">
                   <VariantSelector product={product} />
                 </div>
               </Suspense>
+            ) : isCombo ? (
+              <Button className="col-start-1" size="sm" variant="outline" asChild>
+                <Link href={`/products/${product.handle}`}>
+                  Ver detalle
+                </Link>
+              </Button>
             ) : (
               <></>
             )}
