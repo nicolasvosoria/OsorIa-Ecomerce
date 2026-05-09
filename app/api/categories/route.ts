@@ -6,7 +6,7 @@ import { getStoreId } from '@/lib/utils/store'
  * API Route para obtener categorías activas
  * GET /api/categories
  */
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     // Obtener store_id
     let storeId: string | null = null

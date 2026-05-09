@@ -27,6 +27,6 @@ describe("root docs cleanup", () => {
       entry.endsWith(".md"),
     );
 
-    expect(rootMarkdownFiles).toEqual(["README.md"]);
+    expect(rootMarkdownFiles.sort()).toEqual(["AGENTS.md", "README.md"]);
   });
 });

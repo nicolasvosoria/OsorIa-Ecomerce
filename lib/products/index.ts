@@ -3,16 +3,12 @@
  * Funciones para obtener productos y categorías de la base de datos
  */
 
-import { cacheLife, cacheTag } from 'next/cache';
-import { TAGS } from '@/lib/constants';
 import {
   getItems,
   getItemBySlug,
   getCategories,
-  getCategoryById,
   getFeaturedItems,
   searchItems,
-  getItemsByCategory,
   type GetItemsParams,
 } from '@/lib/supabase/products-api';
 import {

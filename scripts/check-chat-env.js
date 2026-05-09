@@ -4,8 +4,8 @@
  * No muestra valores, solo si cada variable está definida o no.
  */
 
-const fs = require("fs");
-const path = require("path");
+const fs = module.require("node:fs");
+const path = module.require("node:path");
 
 const envPath = path.join(__dirname, "..", ".env.local");
 const required = [

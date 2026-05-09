@@ -10,6 +10,7 @@ import { SidebarLinks } from '../sidebar/product-sidebar-links';
 import { ShopLinks } from '../shop-links';
 import { Collection } from '@/lib/shopify/types';
 import { useBodyScrollLock } from '@/lib/hooks/use-body-scroll-lock';
+import { deferStateUpdate } from '@/lib/react/defer-state-update';
 
 interface MobileMenuProps {
   collections: Collection[];
@@ -36,7 +37,7 @@ export default function MobileMenu({ collections }: MobileMenuProps) {
 
   // Close menu when route changes
   useEffect(() => {
-    closeMobileMenu();
+    deferStateUpdate(closeMobileMenu);
   }, [pathname]);
 
   return (

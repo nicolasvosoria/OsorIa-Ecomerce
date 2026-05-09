@@ -192,7 +192,7 @@ export function Chatbot({ isOpen, onClose }: ChatbotProps) {
       }
 
       setMessages((prev) => [...prev, botResponse])
-    } catch (error) {
+    } catch {
       const isSimpleGreeting = /^(hola|hi|hey|buenas|gracias|adios|chao)$/i.test(currentInput.trim())
       const text = isSimpleGreeting ? findAnswer(currentInput) : "El asistente no pudo responder. Inténtalo de nuevo."
       const botResponse: Message = {
@@ -370,4 +370,3 @@ export function Chatbot({ isOpen, onClose }: ChatbotProps) {
     </div>
   )
 }
-

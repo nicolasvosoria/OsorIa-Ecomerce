@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState, useRef, type ReactNode 
 import { isCurrentUserAdmin, getCurrentUserRole } from "@/lib/supabase/permissions-api"
 import { useAuth } from "@/contexts/auth-context"
 import type { UserRole } from "@/lib/types/user"
+import { deferStateUpdate } from "@/lib/react/defer-state-update"
 
 interface AdminPermissionsContextType {
   isAdmin: boolean
@@ -128,7 +129,7 @@ export function AdminPermissionsProvider({ children }: { children: ReactNode }) 
     }
 
     if (authLoading) {
-      setLoading(true)
+      deferStateUpdate(() => setLoading(true))
       return
     }
 
@@ -136,22 +137,28 @@ export function AdminPermissionsProvider({ children }: { children: ReactNode }) 
     if (!isAuthenticated) {
       if (verifiedAsAdminRef.current || hasChecked) {
         console.log("[AdminPermissions] Usuario desautenticado, reseteando estado")
-        setIsAdmin(false)
-        setRole(null)
-        setHasChecked(false)
+        deferStateUpdate(() => {
+          setIsAdmin(false)
+          setRole(null)
+          setHasChecked(false)
+        })
         verifiedAsAdminRef.current = false // Resetear ref
       }
-      setLoading(false)
+      deferStateUpdate(() => setLoading(false))
       return
     }
 
     // Solo verificar si no se ha verificado aún o si se reseteó el estado
     if (!hasChecked) {
-      refreshPermissions()
+      deferStateUpdate(() => {
+        void refreshPermissions()
+      })
     } else if (hasChecked && !isAdmin && !verifiedAsAdminRef.current) {
       // Ya se verificó y no es admin, mantener estado
-      setLoading(false)
+      deferStateUpdate(() => setLoading(false))
     }
+    // refreshPermissions intentionally stays outside deps to avoid repeated permission checks.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, isAuthenticated]) // Solo depender de authLoading e isAuthenticated para evitar loops
 
 

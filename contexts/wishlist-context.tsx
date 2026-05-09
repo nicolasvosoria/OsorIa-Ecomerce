@@ -1,6 +1,7 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react"
+import { deferStateUpdate } from "@/lib/react/defer-state-update"
 
 export interface WishlistItem {
   id: string
@@ -34,7 +35,7 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
       const stored = localStorage.getItem(WISHLIST_STORAGE_KEY)
       if (stored) {
         const parsed = JSON.parse(stored)
-        setItems(parsed)
+        deferStateUpdate(() => setItems(parsed))
       }
     } catch (error) {
       console.error('Error loading wishlist from localStorage:', error)
@@ -99,7 +100,6 @@ export function useWishlist() {
   }
   return context
 }
-
 
 
 

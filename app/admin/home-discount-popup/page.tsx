@@ -28,6 +28,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useAdminPermissions } from "@/contexts/admin-permissions-context";
+import { deferStateUpdate } from "@/lib/react/defer-state-update";
 import {
   normalizeHomeDiscountPopupConfig,
   parseDateTimeLocalValue,
@@ -107,15 +108,28 @@ export default function HomeDiscountPopupConfigPage() {
   }, [isAdmin]);
 
   useEffect(() => {
+    let isActive = true;
+
     if (!pendingImageFile) {
-      setPreviewImageUrl(null);
-      return;
+      deferStateUpdate(() => {
+        if (isActive) {
+          setPreviewImageUrl(null);
+        }
+      });
+      return () => {
+        isActive = false;
+      };
     }
 
     const objectUrl = URL.createObjectURL(pendingImageFile);
-    setPreviewImageUrl(objectUrl);
+    deferStateUpdate(() => {
+      if (isActive) {
+        setPreviewImageUrl(objectUrl);
+      }
+    });
 
     return () => {
+      isActive = false;
       URL.revokeObjectURL(objectUrl);
     };
   }, [pendingImageFile]);
@@ -136,8 +150,12 @@ export default function HomeDiscountPopupConfigPage() {
         const formData = new FormData();
         formData.append("file", pendingImageFile);
 
-        const { ["Content-Type"]: _contentType, ...authHeaders } =
-          await getAdminRequestHeaders();
+        const adminHeaders = await getAdminRequestHeaders();
+        const authHeaders = Object.fromEntries(
+          Object.entries(adminHeaders).filter(
+            ([header]) => header.toLowerCase() !== "content-type",
+          ),
+        );
         const uploadResponse = await fetch(
           "/api/admin/home-discount-popup/upload",
           {

@@ -104,7 +104,7 @@ export function DynamicFavicon() {
     
     // Aplicar favicon inmediatamente usando el hostname
     updateFavicon(initialSubdomain)
-  }, []) // Solo ejecutar una vez al montar
+  }, [initialSubdomain]) // Solo ejecutar una vez al montar
 
   // Actualizar cuando el store se carga completamente (por si hay diferencias)
   useEffect(() => {
@@ -118,4 +118,3 @@ export function DynamicFavicon() {
 
   return null
 }
-

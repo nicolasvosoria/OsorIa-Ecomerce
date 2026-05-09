@@ -9,6 +9,7 @@ export function ApplyStylesScript() {
   const runtimeDefaultTheme = JSON.stringify(DEFAULT_RUNTIME_THEME);
 
   return (
+    // eslint-disable-next-line @next/next/no-before-interactive-script-outside-document -- Runtime theme must be applied before hydration to avoid unstyled flashes.
     <Script
       id="apply-styles-script"
       strategy="beforeInteractive"

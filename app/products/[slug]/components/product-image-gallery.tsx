@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import useEmblaCarousel from 'embla-carousel-react';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { deferStateUpdate } from '@/lib/react/defer-state-update';
 
 interface ProductImage {
   url: string;
@@ -51,7 +52,7 @@ export function ProductImageGallery({ images, discountPercentage }: ProductImage
 
   useEffect(() => {
     if (!emblaApi) return;
-    onSelect();
+    deferStateUpdate(onSelect);
     emblaApi.on('select', onSelect);
     emblaApi.on('reInit', onSelect);
 
@@ -210,4 +211,3 @@ export function ProductImageGallery({ images, discountPercentage }: ProductImage
     </div>
   );
 }
-

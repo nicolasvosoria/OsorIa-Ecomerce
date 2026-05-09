@@ -97,7 +97,7 @@ export function DynamicTitle() {
     
     const title = getTitleForSubdomain(initialSubdomain)
     setTitle(title)
-  }, []) // Solo ejecutar una vez al montar
+  }, [initialSubdomain]) // Solo ejecutar una vez al montar
 
   // Actualizar cuando el store se carga completamente
   useEffect(() => {
@@ -146,10 +146,9 @@ export function DynamicTitle() {
       }
       clearInterval(intervalId)
     }
-  }, [targetTitleRef.current])
+  }, [])
 
   return null
 }
-
 
 

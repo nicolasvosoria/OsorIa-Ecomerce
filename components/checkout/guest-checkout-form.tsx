@@ -4,11 +4,8 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Loader } from "@/components/ui/loader"
-import { useRouter } from "next/navigation"
-import { useCart } from "@/components/cart/cart-context"
 import { toast } from "sonner"
 
 export interface GuestCustomerData {

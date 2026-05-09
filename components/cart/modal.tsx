@@ -1,7 +1,6 @@
 'use client';
 
 import { ArrowRight, PlusCircleIcon } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { useCart } from './cart-context';

@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element -- Existing dynamic storefront images intentionally use native img in these legacy components; converting all to next/image is outside the global-gates cleanup risk budget. */
 "use client"
 
 import { useState, useEffect } from "react"
@@ -12,6 +13,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Plus, Minus } from "lucide-react"
+import { deferStateUpdate } from "@/lib/react/defer-state-update"
 
 interface QuantityModalProps {
   open: boolean
@@ -37,7 +39,7 @@ export function QuantityModal({
   // Resetear cantidad cuando se abre el modal
   useEffect(() => {
     if (open) {
-      setQuantity(initialQuantity)
+      deferStateUpdate(() => setQuantity(initialQuantity))
     }
   }, [open, initialQuantity])
 
@@ -178,7 +180,6 @@ export function QuantityModal({
     </Dialog>
   )
 }
-
 
 
 

@@ -12,7 +12,7 @@ import { Globe } from "lucide-react"
 import { useComponentStyle } from "@/contexts/styles-context"
 
 export function LanguageSelector() {
-  const { language, setLanguage, availableLanguages, t } = useLanguage()
+  const { language, setLanguage, availableLanguages } = useLanguage()
   const currentLang = availableLanguages.find(lang => lang.code === language)
   const { styles: styleData } = useComponentStyle("header", {
     iconColor: "#1a1a1a",

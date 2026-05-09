@@ -25,7 +25,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { toast } from "sonner"
-import type { ChatbotConfig } from "@/lib/supabase/chatbot-api"
+import { DEFAULT_CHATBOT_CONFIG, type ChatbotConfig } from "@/lib/supabase/chatbot-api"
+import { getAdminRequestHeaders } from "@/lib/supabase/admin-request-headers"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
 export default function ChatbotConfigPage() {
@@ -33,12 +34,7 @@ export default function ChatbotConfigPage() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
-  const [config, setConfig] = useState<ChatbotConfig>({
-    systemPrompt: "",
-    tone: "friendly",
-    temperature: 0.7,
-    maxTokens: 500,
-  })
+  const [config, setConfig] = useState<ChatbotConfig>(DEFAULT_CHATBOT_CONFIG)
 
   useEffect(() => {
     if (!loading && !isAdmin) {
@@ -52,7 +48,8 @@ export default function ChatbotConfigPage() {
 
       setIsLoading(true)
       try {
-        const response = await fetch("/api/chatbot-config")
+        const headers = await getAdminRequestHeaders()
+        const response = await fetch("/api/chatbot-config", { headers })
         if (response.ok) {
           const data = await response.json()
           if (data.config) {
@@ -73,18 +70,11 @@ export default function ChatbotConfigPage() {
   }, [isAdmin])
 
   const handleSave = async () => {
-    if (!config.systemPrompt.trim()) {
-      toast.error("El prompt del sistema es requerido")
-      return
-    }
-
     setIsSaving(true)
     try {
       const response = await fetch("/api/chatbot-config", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: await getAdminRequestHeaders(),
         body: JSON.stringify({ config }),
       })
 
@@ -171,13 +161,13 @@ export default function ChatbotConfigPage() {
                   className="text-lg sm:text-xl md:text-2xl font-bold truncate"
                   style={{ color: "var(--foreground)" }}
                 >
-                  Configuración del Asistente Virtual
+                  Chat / Asistente IA
                 </h1>
                 <p 
                   className="text-xs sm:text-sm mt-1 truncate"
                   style={{ color: "var(--muted-foreground)" }}
                 >
-                  Personaliza el comportamiento y tono del chatbot
+                  Configura la guía que usará el asistente para clientes de esta tienda
                 </p>
               </div>
             </div>
@@ -193,25 +183,36 @@ export default function ChatbotConfigPage() {
           </div>
         ) : (
           <div className="space-y-6">
-            {/* Prompt del Sistema */}
+            {/* Guía del asistente */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <MessageSquare className="h-5 w-5" />
-                  Prompt del Sistema
+                  Guía del asistente para clientes
                 </CardTitle>
                 <CardDescription>
-                  Define las instrucciones que seguirá el asistente virtual. Este prompt establece el contexto y comportamiento del chatbot.
+                  Escribe la guía general que seguirá el asistente en las conversaciones
+                  de clientes de esta tienda. Puede tener varios párrafos.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="systemPrompt">Instrucciones del Sistema</Label>
+                  <Label htmlFor="assistantGuide">Guía del asistente para clientes</Label>
                   <Textarea
-                    id="systemPrompt"
-                    value={config.systemPrompt}
-                    onChange={(e) => setConfig({ ...config, systemPrompt: e.target.value })}
-                    placeholder="Eres un asistente virtual amigable y profesional de una tienda en línea..."
+                    id="assistantGuide"
+                    value={config.assistantGuide}
+                    onChange={(e) =>
+                      setConfig({
+                        ...config,
+                        assistantGuide: e.target.value,
+                        systemPrompt: e.target.value,
+                      })
+                    }
+                    placeholder={
+                      "Describe el tono del asistente (ej. cercano, profesional o breve).\n\n" +
+                      "Indica qué información sí puede usar: productos reales del catálogo, detalles visibles, promociones configuradas y pasos de compra confirmados.\n\n" +
+                      "Indica qué no debe decir: precios, stock, tiempos de envío, políticas, garantías o descuentos que no estén disponibles en los datos reales de la tienda."
+                    }
                     className="min-h-[200px] font-mono text-sm"
                     style={{
                       backgroundColor: "var(--background)",
@@ -220,7 +221,8 @@ export default function ChatbotConfigPage() {
                     }}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Describe el rol, objetivos y comportamiento esperado del asistente.
+                    Si dejas la guía vacía, el chat usará una guía genérica segura
+                    para ecommerce que no inventa precios, stock, envíos ni políticas.
                   </p>
                 </div>
               </CardContent>
@@ -360,7 +362,7 @@ export default function ChatbotConfigPage() {
               </Button>
               <Button 
                 onClick={handleSave}
-                disabled={isSaving || !config.systemPrompt.trim()}
+                disabled={isSaving}
                 style={{
                   backgroundColor: "var(--accent)",
                   color: "var(--accent-foreground)",
@@ -374,7 +376,7 @@ export default function ChatbotConfigPage() {
                 ) : (
                   <>
                     <Save className="h-4 w-4 mr-2" />
-                    Guardar Configuración
+                    Guardar guía
                   </>
                 )}
               </Button>

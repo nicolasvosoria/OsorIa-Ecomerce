@@ -2,27 +2,24 @@ import { NextRequest, NextResponse } from "next/server"
 import { createServerClient } from "@supabase/ssr"
 import { createClient } from "@supabase/supabase-js"
 import { cookies } from "next/headers"
-import { ECOMMERCE_SCHEMA, ECOMMERCE_TABLES, ECOMMERCE_VIEWS } from "@/lib/supabase/contract"
+import {
+  appendLengthInstruction,
+  buildChatbotStoreLookups,
+  buildChatbotSystemPrompt,
+  DEFAULT_CHATBOT_CONFIG,
+  loadChatbotConfigForStore,
+  resolveChatbotStore,
+  type ChatbotConfig,
+  type ChatbotPersistenceClient,
+  type ChatbotStoreLookup,
+} from "@/lib/supabase/chatbot-api"
+import { ECOMMERCE_SCHEMA, ECOMMERCE_TABLES } from "@/lib/supabase/contract"
 
 // En Vercel: dar más tiempo a la función (DeepSeek + Supabase pueden tardar). Plan Hobby máx 10s; Pro hasta 300s.
 export const maxDuration = 30
 
 const DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
 const DEEPSEEK_MODEL = "deepseek-chat"
-
-// Prompt por defecto del sistema para el chatbot
-const DEFAULT_SYSTEM_PROMPT = `Eres un asistente virtual amigable y profesional de una tienda en línea. Tu objetivo es ayudar a los clientes con:
-
-1. Información sobre productos y catálogo
-2. Proceso de compra y carrito de compras
-3. Métodos de pago disponibles
-4. Información sobre envíos y entregas
-5. Horarios de atención
-6. Registro de cuenta y login
-7. Personalización de temas y fuentes
-8. Cualquier otra consulta relacionada con la tienda
-
-Sé conciso, amigable y profesional. Responde en español. Si no sabes algo específico, ofrece contactar con el equipo de soporte.`
 
 /** Cliente con service_role para leer catálogo (evita RLS). Usar solo para consultas de productos en el chat. */
 function getSupabaseServiceClient() {
@@ -65,88 +62,49 @@ async function getSupabaseServerClient() {
   }).schema(ECOMMERCE_SCHEMA)
 }
 
-async function getStoreIdFromServer(): Promise<string | null> {
-  const disableMultiTenant = process.env.DISABLE_SUBDOMAIN_MULTI_TENANT === 'true'
-  if (disableMultiTenant) {
-    return process.env.DEFAULT_STORE_ID || 'default'
+async function getRequestStoreLookups(request: NextRequest): Promise<ChatbotStoreLookup[]> {
+  if (process.env.DISABLE_SUBDOMAIN_MULTI_TENANT === "true") {
+    return buildChatbotStoreLookups({
+      storeId: process.env.DEFAULT_STORE_ID || "default",
+      host: request.headers.get("host"),
+    })
   }
 
   try {
     const cookieStore = await cookies()
-    const storeIdCookie = cookieStore.get('store_id')
-    if (storeIdCookie) return storeIdCookie.value
+
+    return buildChatbotStoreLookups({
+      forwardedStoreId: request.headers.get("x-store-id"),
+      storeId: cookieStore.get("store_id")?.value ?? null,
+      host: request.headers.get("host"),
+    })
   } catch {
-    return 'default'
+    return buildChatbotStoreLookups({
+      forwardedStoreId: request.headers.get("x-store-id"),
+      host: request.headers.get("host"),
+    })
   }
-  
-  return 'default'
 }
 
 // Función para obtener la configuración del chatbot
-async function getChatbotConfig() {
+async function getChatbotConfig(
+  request: NextRequest,
+): Promise<{ config: ChatbotConfig; storeId: string | null }> {
   try {
-    const supabase = await getSupabaseServerClient()
+    const supabase = getSupabaseServiceClient() ?? (await getSupabaseServerClient())
     if (!supabase) {
-      return {
-        systemPrompt: DEFAULT_SYSTEM_PROMPT,
-        tone: "friendly",
-        temperature: 0.7,
-        maxTokens: 500,
-      }
+      return { config: { ...DEFAULT_CHATBOT_CONFIG }, storeId: null }
     }
 
-    const storeId = await getStoreIdFromServer()
+    const { storeId, config } = await loadChatbotConfigForStore(
+      supabase as unknown as ChatbotPersistenceClient,
+      await getRequestStoreLookups(request),
+    )
 
-    let query = supabase
-      .from(ECOMMERCE_TABLES.stores)
-      .select('metadata')
-      .eq('is_active', true)
-      .is('deleted_at', null)
-
-    if (storeId === 'default') {
-      query = query.eq('subdomain', 'default')
-    } else {
-      query = query.eq('id', storeId)
-    }
-
-    const { data, error } = await query.single()
-
-    if (error || !data) {
-      return {
-        systemPrompt: DEFAULT_SYSTEM_PROMPT,
-        tone: "friendly",
-        temperature: 0.7,
-        maxTokens: 500,
-      }
-    }
-
-    const metadata = (data.metadata as Record<string, any>) || {}
-    const chatbotConfig = metadata.chatbot
-
-    if (!chatbotConfig) {
-      return {
-        systemPrompt: DEFAULT_SYSTEM_PROMPT,
-        tone: "friendly",
-        temperature: 0.7,
-        maxTokens: 500,
-      }
-    }
-
-    // Combinar con valores por defecto
-    return {
-      systemPrompt: chatbotConfig.systemPrompt || DEFAULT_SYSTEM_PROMPT,
-      tone: chatbotConfig.tone || "friendly",
-      temperature: chatbotConfig.temperature ?? 0.7,
-      maxTokens: chatbotConfig.maxTokens ?? 500,
-    }
+    return { config, storeId }
   } catch (error) {
     console.error("[Chat API] Error al obtener configuración:", error)
-    return {
-      systemPrompt: DEFAULT_SYSTEM_PROMPT,
-      tone: "friendly",
-      temperature: 0.7,
-      maxTokens: 500,
-    }
+    return { config: { ...DEFAULT_CHATBOT_CONFIG }, storeId: null }
   }
 }
 
@@ -180,14 +138,28 @@ function normalizeForSearch(text: string): string {
 }
 
 // Construir el texto de contexto a partir de una lista de productos
-function buildProductsContextFromList(products: any[], strictCatalog: boolean): string {
+type StoreProductContextRow = {
+  item_name: string | null
+  item_description: string | null
+  base_price: number | string | null
+  currency_code: string | null
+  metadata: unknown
+}
+
+function buildProductsContextFromList(
+  products: StoreProductContextRow[],
+  strictCatalog: boolean,
+): string {
   if (!products || products.length === 0) return ""
 
-  const productsInfo = products.map((product: any) => {
-    const metadata = (product.metadata as Record<string, any>) || {}
-    const aiDetails = metadata.ai_details || ""
+  const productsInfo = products.map((product) => {
+    const metadata =
+      product.metadata && typeof product.metadata === "object" && !Array.isArray(product.metadata)
+        ? (product.metadata as Record<string, unknown>)
+        : {}
+    const aiDetails = typeof metadata.ai_details === "string" ? metadata.ai_details : ""
 
-    let productInfo = `- ${product.item_name}`
+    let productInfo = `- ${product.item_name ?? "Producto sin nombre"}`
     if (product.base_price) {
       productInfo += ` (Precio: ${product.base_price} ${product.currency_code || "COP"})`
     }
@@ -215,50 +187,40 @@ async function getSupabaseForProducts() {
 }
 
 // Resolver el UUID de la tienda actual (para consultas). Supabase debe ser no null al llamar.
-async function getEffectiveStoreUuid(supabase: NonNullable<Awaited<ReturnType<typeof getSupabaseServerClient>>>): Promise<string | null> {
-  const storeId = await getStoreIdFromServer()
-  if (storeId && storeId !== "default") return storeId
-  const { data: defaultStore } = await supabase
-    .from(ECOMMERCE_VIEWS.storesLegacy)
-    .select("id")
-    .eq("subdomain", "default")
-    .eq("is_active", true)
-    .is("deleted_at", null)
-    .single()
-  return defaultStore?.id ?? null
+async function getEffectiveStoreUuid(
+  supabase: ChatbotPersistenceClient,
+  lookups: ChatbotStoreLookup[],
+): Promise<string | null> {
+  try {
+    const store = await resolveChatbotStore(
+      supabase,
+      lookups,
+    )
+    return store.id
+  } catch (error) {
+    console.error("[Chat API] Error al resolver tienda para catálogo:", error)
+    return null
+  }
 }
 
-// Obtener productos de la tienda sin filtro de búsqueda. Si la tienda no tiene productos, intenta con cualquier tienda (fallback).
-async function getStoreProductsContext(): Promise<string> {
+// Obtener productos de la tienda sin filtro de búsqueda, siempre acotados a la tienda resuelta.
+async function getStoreProductsContext(storeUuid: string | null): Promise<string> {
   try {
     const supabase = await getSupabaseForProducts()
     if (!supabase) return ""
 
-    const storeUuid = await getEffectiveStoreUuid(supabase)
+    if (!storeUuid) return ""
 
-    let query = supabase
+    const query = supabase
       .from(ECOMMERCE_TABLES.storeItems)
       .select("id, item_name, item_description, base_price, currency_code, metadata, item_slug")
       .eq("is_active", true)
       .eq("is_available_for_sale", true)
+      .eq("store_id", storeUuid)
       .order("display_order", { ascending: true })
       .limit(30)
 
-    if (storeUuid) query = query.eq("store_id", storeUuid)
-
-    let { data: products, error } = await query
-    // Si no hay productos en la tienda actual, fallback: obtener de cualquier tienda (para no devolver prompt genérico)
-    if ((error || !products || products.length === 0) && storeUuid) {
-      const fallback = await supabase
-        .from(ECOMMERCE_TABLES.storeItems)
-        .select("id, item_name, item_description, base_price, currency_code, metadata, item_slug")
-        .eq("is_active", true)
-        .eq("is_available_for_sale", true)
-        .order("display_order", { ascending: true })
-        .limit(30)
-      products = fallback.data
-      error = fallback.error
-    }
+    const { data: products, error } = await query
     if (error || !products || products.length === 0) return ""
 
     return buildProductsContextFromList(products, true)
@@ -268,42 +230,24 @@ async function getStoreProductsContext(): Promise<string> {
   }
 }
 
-/** Último recurso: obtener productos con service_role sin filtro de tienda (para evitar "catálogo no disponible"). */
-async function getAnyProductsContext(): Promise<string> {
-  const supabase = getSupabaseServiceClient()
-  if (!supabase) return ""
-  try {
-    const { data: products, error } = await supabase
-      .from(ECOMMERCE_TABLES.storeItems)
-      .select("id, item_name, item_description, base_price, currency_code, metadata, item_slug")
-      .eq("is_active", true)
-      .eq("is_available_for_sale", true)
-      .order("display_order", { ascending: true })
-      .limit(30)
-    if (error || !products || products.length === 0) return ""
-    return buildProductsContextFromList(products, true)
-  } catch (error) {
-    console.error("[Chat API] Error en getAnyProductsContext:", error)
-    return ""
-  }
-}
-
 // Función para buscar productos relevantes según la pregunta del usuario (términos sin acentos para mejor coincidencia)
-async function searchRelevantProducts(userMessage: string): Promise<string> {
+async function searchRelevantProducts(
+  userMessage: string,
+  storeUuid: string | null,
+): Promise<string> {
   try {
     const supabase = await getSupabaseForProducts()
     if (!supabase) return ""
 
-    const storeUuid = await getEffectiveStoreUuid(supabase)
+    if (!storeUuid) return ""
 
     let query = supabase
       .from(ECOMMERCE_TABLES.storeItems)
       .select("id, item_name, item_description, base_price, currency_code, metadata, item_slug")
       .eq("is_active", true)
       .eq("is_available_for_sale", true)
+      .eq("store_id", storeUuid)
       .limit(15)
-
-    if (storeUuid) query = query.eq("store_id", storeUuid)
 
     const originalWords = userMessage.trim().split(/\s+/).filter((w) => w.length > 2)
     const normalizedMessage = normalizeForSearch(userMessage)
@@ -348,19 +292,6 @@ function trimToLastCompleteSentence(text: string, maxTokens: number): string {
   const maxChars = Math.floor(maxTokens * 3)
   if (t.length > maxChars) return t.slice(0, maxChars).trim()
   return text
-}
-
-// Función para ajustar el prompt según el tono
-function adjustPromptForTone(prompt: string, tone: string): string {
-  const toneInstructions: Record<string, string> = {
-    professional: "Mantén un tono profesional, formal y respetuoso en todas tus respuestas.",
-    friendly: "Mantén un tono amigable, cálido y cercano en todas tus respuestas.",
-    casual: "Mantén un tono casual, relajado y conversacional en todas tus respuestas.",
-    formal: "Mantén un tono formal, estricto y protocolario en todas tus respuestas.",
-  }
-
-  const toneInstruction = toneInstructions[tone] || toneInstructions.friendly
-  return `${prompt}\n\n${toneInstruction}`
 }
 
 /** GET: comprobar si el servidor tiene configuradas las variables del chat (útil en Vercel). */
@@ -446,52 +377,41 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Obtener configuración del chatbot
-    const config = await getChatbotConfig()
+    // Obtener configuración del chatbot y tienda resuelta
+    const storeLookups = await getRequestStoreLookups(request)
+    const { config, storeId } = await getChatbotConfig(request)
     
     // Obtener el último mensaje del usuario
     const lastUserMessage = messages
       .filter((msg: { sender: string }) => msg.sender === "user")
       .pop()?.text || ""
 
-    // Cuando preguntan por productos/catálogo, SIEMPRE usar solo los productos de la tienda (BD)
+    // Cuando preguntan por productos/catálogo, SIEMPRE usar solo los productos reales de la tienda resuelta.
+    const productSupabase = await getSupabaseForProducts()
+    const storeUuid = productSupabase
+      ? storeId ?? (await getEffectiveStoreUuid(
+          productSupabase as unknown as ChatbotPersistenceClient,
+          storeLookups,
+        ))
+      : null
+
+    const isProductQuestion = lastUserMessage ? isProductRelatedQuestion(lastUserMessage) : false
     let productsContext = ""
     if (lastUserMessage) {
-      if (isProductRelatedQuestion(lastUserMessage)) {
-        productsContext = await searchRelevantProducts(lastUserMessage)
-        if (!productsContext) productsContext = await getStoreProductsContext()
-        // Último recurso: service_role sin filtro de tienda (por si RLS o cookie deja la tienda sin productos)
-        if (!productsContext) productsContext = await getAnyProductsContext()
-      } else {
-        productsContext = await searchRelevantProducts(lastUserMessage)
-        if (!productsContext) productsContext = await getStoreProductsContext()
-      }
+      productsContext = await searchRelevantProducts(lastUserMessage, storeUuid)
+      if (!productsContext) productsContext = await getStoreProductsContext(storeUuid)
     }
 
-    // Combinar instrucciones del sistema de la tienda (tono, estilo, temas) con el catálogo real cuando exista.
-    const isProductQuestion = lastUserMessage ? isProductRelatedQuestion(lastUserMessage) : false
-    let systemPrompt: string
-    if (productsContext) {
-      // Instrucciones de la tienda (cómo responder, tono, qué temas cubrir) + catálogo real
-      const storeInstructions = adjustPromptForTone(config.systemPrompt, config.tone)
-      systemPrompt =
-        storeInstructions +
-        "\n\n--- Catálogo de la tienda (usa SOLO esta información para productos) ---\n" +
-        "Para preguntas sobre productos o catálogo, usa ÚNICAMENTE la siguiente lista. No inventes productos ni descripciones que no estén aquí. Responde con nombre, precio y 'Detalles y características' cuando existan.\n" +
-        productsContext
-    } else if (isProductQuestion) {
-      systemPrompt =
-        DEFAULT_SYSTEM_PROMPT +
-        "\n\nSi te preguntan por productos o catálogo, responde que en este momento no tienes el catálogo disponible y que pueden navegar por la tienda o intentar de nuevo en unos segundos."
-    } else {
-      systemPrompt = adjustPromptForTone(config.systemPrompt, config.tone)
-    }
+    // Combinar la guía de la tienda con el catálogo real cuando exista. La guía nunca reemplaza datos reales.
+    let systemPrompt = buildChatbotSystemPrompt({
+      config,
+      productsContext,
+      isProductQuestion,
+    })
 
     // Límite de tokens: pedir al modelo que no supere el tope y que siempre cierre con oración completa
     const maxTokens = config.maxTokens ?? 500
-    const approxWords = Math.floor(maxTokens * 0.75)
-    const lengthInstruction = `\n\nLímite de longitud: tu respuesta debe tener como máximo aproximadamente ${approxWords} palabras. Es obligatorio que termines siempre con una oración completa (punto, exclamación o interrogación); nunca cortes a mitad de palabra ni dejes una frase a medias. Si no te caben todos los ítems, cierra la lista con el último que completes entero.`
-    systemPrompt = systemPrompt + lengthInstruction
+    systemPrompt = appendLengthInstruction(systemPrompt, maxTokens)
 
     // Pequeño margen extra de tokens para que la última oración pueda completarse (luego recortamos si hace falta)
     const maxTokensForApi = maxTokens + 80

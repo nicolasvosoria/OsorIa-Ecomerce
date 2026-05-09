@@ -6,6 +6,7 @@ import useEmblaCarousel from 'embla-carousel-react';
 import { Product } from '@/lib/shopify/types';
 import { Badge } from '@/components/ui/badge';
 import { useProductImages, useSelectedVariant } from '@/components/products/variant-selector';
+import { deferStateUpdate } from '@/lib/react/defer-state-update';
 
 interface MobileGallerySliderProps {
   product: Product;
@@ -38,7 +39,7 @@ export function MobileGallerySlider({ product }: MobileGallerySliderProps) {
     if (!emblaApi) return;
 
     onInit();
-    onSelect(emblaApi);
+    deferStateUpdate(() => onSelect(emblaApi));
     emblaApi.on('reInit', onInit);
     emblaApi.on('select', onSelect);
   }, [emblaApi, onInit, onSelect]);

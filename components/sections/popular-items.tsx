@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element -- Existing dynamic storefront images intentionally use native img in these legacy components; converting all to next/image is outside the global-gates cleanup risk budget. */
 "use client"
 
 import { useEffect, useRef, useState, useMemo } from "react"
@@ -18,6 +19,7 @@ import { useCart } from "@/contexts/cart-context"
 import { toast } from "sonner"
 import { QuantityModal } from "@/components/cart/quantity-modal"
 import { useLanguage } from "@/contexts/language-context"
+import { deferStateUpdate } from "@/lib/react/defer-state-update"
 
 // Helper para generar slug desde el título
 function generateSlug(title: string): string {
@@ -37,10 +39,12 @@ function ItemImageWithFallback({ src, alt }: { src: string; alt: string }) {
   // Actualizar imgSrc cuando cambia src (importante para evitar imágenes antiguas)
   useEffect(() => {
     if (src !== imgSrc && !hasError) {
-      setImgSrc(src)
-      setHasError(false) // Resetear error cuando cambia la fuente
+      deferStateUpdate(() => {
+        setImgSrc(src)
+        setHasError(false) // Resetear error cuando cambia la fuente
+      })
     }
-  }, [src])
+  }, [hasError, imgSrc, src])
 
   const handleError = () => {
     if (!hasError && imgSrc !== "/placeholder.svg") {
@@ -89,7 +93,7 @@ export function PopularItems({ initialProducts }: PopularItemsProps = {}) {
   const [quantityModalOpen, setQuantityModalOpen] = useState(false)
   const [selectedItem, setSelectedItem] = useState<{ id: string; name: string; price: string; image: string } | null>(null)
   const { store } = useStore()
-  const { styles: styleData, loading: stylesLoading } = useComponentStyle("popular", {
+  const { styles: styleData } = useComponentStyle("popular", {
     title: "Lo más vendido",
     priceLabel: "Desde $29",
   })
@@ -98,7 +102,7 @@ export function PopularItems({ initialProducts }: PopularItemsProps = {}) {
   const { t, language } = useLanguage()
   
   // Combinar estilos de BD con ediciones locales para mostrar cambios en tiempo real
-  const edits = componentEdits.get("popular") || {}
+  const edits = useMemo(() => componentEdits.get("popular") || {}, [componentEdits])
   const title = edits.title ?? styleData.title ?? "Lo más vendido"
   const bgColor = edits.bgColor ?? styleData.bgColor
   const textColor = edits.textColor ?? styleData.textColor
@@ -117,7 +121,7 @@ export function PopularItems({ initialProducts }: PopularItemsProps = {}) {
   
   // Obtener items editables desde estilos o ediciones locales, o usar productos de BD
   // Si es repostería, usar imágenes de repostería, si no, usar imágenes de tecnología
-  const defaultItems = isReposteria ? [
+  const defaultItems = useMemo(() => (isReposteria ? [
     {
       title: "Cupcakes Decorados",
       price: "Desde $25",
@@ -196,10 +200,10 @@ export function PopularItems({ initialProducts }: PopularItemsProps = {}) {
       image: "/modern-phone-case-product.jpg",
       slug: "funda-telefono-moderna", // Slug real en la BD
     },
-  ]
+  ]), [isReposteria])
   
   // Imágenes de repostería para reemplazar cuando hay productos de BD
-  const reposteriaImages = [
+  const reposteriaImages = useMemo(() => [
     "/reposteria/cupcakes-decorados.jpg",
     "/reposteria/tarta-berries.jpg",
     "/reposteria/macarons-colores.jpg",
@@ -207,7 +211,7 @@ export function PopularItems({ initialProducts }: PopularItemsProps = {}) {
     "/reposteria/galletas-chocolate.jpg",
     "/reposteria/pastel-cumpleanos.jpg",
     "/reposteria/pastel-boda.jpg",
-  ]
+  ], [])
 
   // Priorizar: productos de BD > ediciones locales/estilos guardados > defaults
   // SIEMPRE usar productos de BD cuando estén disponibles para asegurar que tengan página real
@@ -246,7 +250,7 @@ export function PopularItems({ initialProducts }: PopularItemsProps = {}) {
     // (solo como último recurso, pero estos también tienen slugs ahora)
     console.log('[PopularItems] Usando items por defecto (último recurso)')
     return defaultItems
-  }, [initialProducts, edits.items, styleData.items, isReposteria])
+  }, [defaultItems, edits.items, initialProducts, isReposteria, reposteriaImages, styleData.items])
   
   const [api, setApi] = useState<CarouselApi>()
   const autoplayRef = useRef<NodeJS.Timeout | null>(null)

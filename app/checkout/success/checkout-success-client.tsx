@@ -16,6 +16,7 @@ import {
 import type { GuestCustomerData } from "@/components/checkout/guest-checkout-form";
 import { useCart as useLocalCart } from "@/contexts/cart-context";
 import { useCart as useShopifyCart } from "@/components/cart/cart-context";
+import { deferStateUpdate } from "@/lib/react/defer-state-update";
 
 interface CheckoutSuccessClientProps {
   initialOrderNumber: string | null;
@@ -49,21 +50,23 @@ export function CheckoutSuccessClient({
     const orderFromStorage = localStorage.getItem("last_order_number");
     const currentOrderNumber =
       initialOrderNumber || orderFromUrl || orderFromStorage;
-    setOrderNumber(currentOrderNumber);
+    deferStateUpdate(() => {
+      setOrderNumber(currentOrderNumber);
 
-    if (initialCustomerData) {
-      setCustomerData(initialCustomerData);
-      return;
-    }
-
-    const savedData = localStorage.getItem("guest_customer_data");
-    if (savedData) {
-      try {
-        setCustomerData(JSON.parse(savedData));
-      } catch (error) {
-        console.error("Error parsing customer data:", error);
+      if (initialCustomerData) {
+        setCustomerData(initialCustomerData);
+        return;
       }
-    }
+
+      const savedData = localStorage.getItem("guest_customer_data");
+      if (savedData) {
+        try {
+          setCustomerData(JSON.parse(savedData));
+        } catch (error) {
+          console.error("Error parsing customer data:", error);
+        }
+      }
+    });
   }, [initialCustomerData, initialOrderNumber, searchParams]);
 
   useEffect(() => {

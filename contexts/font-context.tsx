@@ -15,6 +15,7 @@ import {
 } from "@/lib/supabase/fonts-api";
 import type { AppFont } from "@/lib/types/font";
 import { applyRuntimeFont } from "@/lib/theme-font/bootstrap";
+import { deferStateUpdate } from "@/lib/react/defer-state-update";
 
 interface FontContextType {
   fonts: AppFont[];
@@ -128,10 +129,12 @@ export function FontProvider({ children }: { children: ReactNode }) {
       console.log(
         "[Font] Provider montado, iniciando carga de fuentes (independiente de autenticación)...",
       );
-      refreshFonts();
+      deferStateUpdate(() => {
+        void refreshFonts();
+      });
     } else {
       // Durante SSR, usar valores por defecto
-      setLoading(false);
+      deferStateUpdate(() => setLoading(false));
     }
   }, []);
 

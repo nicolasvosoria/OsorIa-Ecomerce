@@ -9,7 +9,7 @@ import { TAGS } from '@/lib/constants'
  * API Route para vaciar el carrito de Shopify
  * POST /api/cart/clear
  */
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   try {
     // Obtener el carrito actual
     const cart = await getCart()

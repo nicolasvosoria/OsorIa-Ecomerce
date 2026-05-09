@@ -11,7 +11,6 @@ import {
   ShoppingCart, 
   Eye,
   ArrowLeft,
-  Package,
   Download,
 } from "lucide-react"
 import Link from "next/link"
@@ -74,20 +73,6 @@ export default function AdminOrdersPage() {
       loadOrders()
     }
   }, [isAdmin])
-
-  const getStatusBadge = (status: Order['status']) => {
-    const variants: Record<Order['status'], { variant: "default" | "secondary" | "destructive" | "outline", label: string }> = {
-      pending: { variant: "secondary", label: "Pendiente" },
-      confirmed: { variant: "default", label: "Confirmado" },
-      processing: { variant: "default", label: "Procesando" },
-      shipped: { variant: "outline", label: "Enviado" },
-      delivered: { variant: "default", label: "Entregado" },
-      returned: { variant: "outline", label: "Devuelto" },
-      cancelled: { variant: "destructive", label: "Cancelado" },
-    }
-    const config = variants[status] || { variant: "secondary" as const, label: status }
-    return <Badge variant={config.variant}>{config.label}</Badge>
-  }
 
   const getPaymentStatusBadge = (status: Order['payment_status']) => {
     const variants: Record<Order['payment_status'], { variant: "default" | "secondary" | "destructive" | "outline", label: string }> = {
@@ -527,4 +512,3 @@ export default function AdminOrdersPage() {
     </div>
   )
 }
-
