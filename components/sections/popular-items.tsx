@@ -20,6 +20,7 @@ import { toast } from "sonner"
 import { QuantityModal } from "@/components/cart/quantity-modal"
 import { useLanguage } from "@/contexts/language-context"
 import { deferStateUpdate } from "@/lib/react/defer-state-update"
+import type { CommerceProductCard } from "@/lib/types/products"
 
 // Helper para generar slug desde el título
 function generateSlug(title: string): string {
@@ -80,13 +81,16 @@ function ItemImageWithFallback({ src, alt }: { src: string; alt: string }) {
 }
 
 interface PopularItemsProps {
-  initialProducts?: Array<{
-    id: string
-    title: string
-    price: string
-    image: string
-    slug?: string
-  }>
+  initialProducts?: CommerceProductCard[]
+}
+
+type PopularCardItem = {
+  id?: string
+  title: string
+  price: string
+  compareAtPrice?: string
+  image?: string
+  slug?: string
 }
 
 export function PopularItems({ initialProducts }: PopularItemsProps = {}) {
@@ -106,15 +110,6 @@ export function PopularItems({ initialProducts }: PopularItemsProps = {}) {
   const title = edits.title ?? styleData.title ?? "Lo más vendido"
   const bgColor = edits.bgColor ?? styleData.bgColor
   const textColor = edits.textColor ?? styleData.textColor
-  
-  // Debug: Log para ver qué datos se están cargando
-  useEffect(() => {
-    console.log('[PopularItems] styleData:', styleData)
-    console.log('[PopularItems] edits:', edits)
-    console.log('[PopularItems] styleData.items:', styleData.items)
-    console.log('[PopularItems] edits.items:', edits.items)
-    console.log('[PopularItems] initialProducts:', initialProducts)
-  }, [styleData, edits, initialProducts])
   
   // Detectar si es tienda de repostería
   const isReposteria = store?.subdomain === 'reposteria'
@@ -218,18 +213,16 @@ export function PopularItems({ initialProducts }: PopularItemsProps = {}) {
   const items = useMemo(() => {
     // PRIMERO: Usar productos de BD si existen (tienen prioridad para asegurar páginas reales)
     if (initialProducts && initialProducts.length > 0) {
-      console.log('[PopularItems] Usando productos de BD:', initialProducts.length, 'productos')
       return initialProducts.map((p, index) => ({
         title: p.title,
-        price: p.price,
-        // Usar la imagen del producto de BD si existe, solo usar imagen de repostería como fallback
-        image: p.image && p.image !== "/placeholder.svg" 
-          ? p.image 
-          : (isReposteria 
+        price: p.price.label,
+        compareAtPrice: p.price.compareAtLabel,
+        image: p.imageUrl && p.imageUrl !== "/placeholder.svg"
+          ? p.imageUrl
+          : (isReposteria
               ? (reposteriaImages[index % reposteriaImages.length] || "/placeholder.svg")
               : "/placeholder.svg"),
-        // Asegurar que siempre se use el slug de la BD (p.slug viene de item_slug o id)
-        slug: p.slug || p.id || generateSlug(p.title),
+        slug: p.href.replace(/^\/products\//, "") || p.id,
         id: p.id,
       }))
     }
@@ -239,16 +232,14 @@ export function PopularItems({ initialProducts }: PopularItemsProps = {}) {
     const savedItems = edits.items ?? styleData.items
     if (savedItems && Array.isArray(savedItems) && savedItems.length > 0) {
       // Filtrar items guardados que tengan slug o ID válido
-      const validSavedItems = savedItems.filter((item: any) => item.slug || item.id)
+      const validSavedItems = savedItems.filter((item: PopularCardItem) => item.slug || item.id)
       if (validSavedItems.length > 0) {
-        console.log('[PopularItems] Usando items guardados válidos:', validSavedItems.length, 'items')
         return validSavedItems
       }
     }
     
     // TERCERO: Si no hay productos de BD ni items guardados válidos, usar defaults
     // (solo como último recurso, pero estos también tienen slugs ahora)
-    console.log('[PopularItems] Usando items por defecto (último recurso)')
     return defaultItems
   }, [defaultItems, edits.items, initialProducts, isReposteria, reposteriaImages, styleData.items])
   
@@ -327,7 +318,7 @@ export function PopularItems({ initialProducts }: PopularItemsProps = {}) {
             className="w-full"
           >
             <CarouselContent className="-ml-2 md:-ml-4">
-              {items.map((item: any, index: number) => {
+              {items.map((item: PopularCardItem, index: number) => {
                 // Priorizar: slug de BD > id > slug generado desde título
                 const itemSlug = item.slug || item.id || generateSlug(item.title)
                 const itemId = item.id || initialProducts?.[index]?.id || `popular-${index}`
@@ -368,7 +359,7 @@ export function PopularItems({ initialProducts }: PopularItemsProps = {}) {
                               id: itemId,
                               name: item.title,
                               price: item.price,
-                              image: item.image,
+                              image: item.image || "/placeholder.svg",
                             })
                             setQuantityModalOpen(true)
                           }}
@@ -396,6 +387,9 @@ export function PopularItems({ initialProducts }: PopularItemsProps = {}) {
                         <Link href={`/products/${itemSlug}`} className="pointer-events-auto block">
                           <h3 className="text-white text-xl md:text-[31.1153px] font-inter font-medium mb-2 hover:underline">{item.title}</h3>
                           <p className="text-white/90 text-sm md:text-[15.447px] font-inter font-medium">{item.price}</p>
+                          {item.compareAtPrice && (
+                            <p className="text-white/70 text-xs md:text-sm font-inter font-medium line-through">{item.compareAtPrice}</p>
+                          )}
                         </Link>
                       </div>
                     </div>
