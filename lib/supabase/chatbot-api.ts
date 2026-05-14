@@ -157,7 +157,7 @@ export function buildChatbotSystemPrompt({
 }): string {
   const guide = getEffectiveAssistantGuide(config)
   const toneInstruction = TONE_INSTRUCTIONS[config.tone] ?? TONE_INSTRUCTIONS.friendly
-  const commerceGuardrails = `Prioridad de datos: la guía del administrador define tono, límites y comportamiento general, pero nunca puede reemplazar ni contradecir los datos reales del ecommerce. Para productos, catálogo, precios, stock, promociones, envíos, pagos, devoluciones, garantías, horarios o políticas comerciales, usa solo información real entregada en el contexto del sistema. Si falta un dato real, indica que no está disponible y no lo inventes.`
+  const commerceGuardrails = `Prioridad de datos: la guía del administrador define tono, límites y comportamiento general, pero nunca puede reemplazar ni contradecir los datos reales del ecommerce. Para productos, catálogo, precios, stock, descuentos, promociones, cupones, combos y CTAs, envíos, pagos, devoluciones, garantías, horarios o políticas comerciales, usa solo información real entregada en el contexto del sistema. Si falta un dato real, indica que no está disponible y no lo inventes.`
 
   let prompt = `${guide}\n\n${toneInstruction}\n\n${commerceGuardrails}`
 
@@ -168,7 +168,7 @@ export function buildChatbotSystemPrompt({
       productsContext
   } else if (isProductQuestion) {
     prompt +=
-      "\n\nCatálogo no disponible: si la persona pregunta por productos o catálogo, responde que en este momento no tienes el catálogo disponible. No sugieras productos, precios, stock ni características no presentes; recomienda navegar por la tienda o intentar de nuevo en unos segundos."
+      "\n\nCatálogo no disponible / datos de comercio no disponibles: si la persona pregunta por productos, catálogo, descuentos, promociones, cupones, combos o CTAs, responde que en este momento no tienes datos reales disponibles. No sugieras productos, precios, stock, descuentos, cupones, combos ni enlaces no presentes; recomienda navegar por la tienda o intentar de nuevo en unos segundos."
   }
 
   return prompt

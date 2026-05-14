@@ -174,9 +174,12 @@ export function Chatbot({ isOpen, onClose }: ChatbotProps) {
         // La API falló: no mostrar respuestas genéricas que parezcan válidas
         const fallback = findAnswer(currentInput)
         const isSimpleGreeting = /^(hola|hi|hey|buenas|gracias|adios|chao)$/i.test(currentInput.trim())
+        const wantsPromotion = /descuento|descuentos|oferta|ofertas|promo|promoción|promocion|promociones|cupón|cupon|cupones|combo|combos/i.test(currentInput)
         const wantsStoreOrCatalog = /catalogo|catálogo|productos|tienda|qué tienen|que tienen|cuéntame|hablame|información|informacion/i.test(currentInput)
         if (isSimpleGreeting) {
           botResponseText = fallback
+        } else if (wantsPromotion) {
+          botResponseText = "No puedo confirmar promociones, descuentos, cupones o combos en este momento porque el asistente no pudo consultar datos reales. Revisa la tienda o intenta de nuevo en unos segundos."
         } else if (wantsStoreOrCatalog) {
           botResponseText = "No pude conectar con el asistente en este momento. Comprueba tu conexión e inténtalo de nuevo. Si estás en un despliegue (Vercel), verifica que las variables SUPABASE_SERVICE_ROLE_KEY y DEEPSEEK_API_KEY estén configuradas."
         } else {
@@ -194,7 +197,12 @@ export function Chatbot({ isOpen, onClose }: ChatbotProps) {
       setMessages((prev) => [...prev, botResponse])
     } catch {
       const isSimpleGreeting = /^(hola|hi|hey|buenas|gracias|adios|chao)$/i.test(currentInput.trim())
-      const text = isSimpleGreeting ? findAnswer(currentInput) : "El asistente no pudo responder. Inténtalo de nuevo."
+      const wantsPromotion = /descuento|descuentos|oferta|ofertas|promo|promoción|promocion|promociones|cupón|cupon|cupones|combo|combos/i.test(currentInput)
+      const text = isSimpleGreeting
+        ? findAnswer(currentInput)
+        : wantsPromotion
+          ? "No puedo confirmar promociones, descuentos, cupones o combos en este momento porque el asistente no pudo consultar datos reales. Revisa la tienda o intenta de nuevo en unos segundos."
+          : "El asistente no pudo responder. Inténtalo de nuevo."
       const botResponse: Message = {
         id: (Date.now() + 1).toString(),
         text,

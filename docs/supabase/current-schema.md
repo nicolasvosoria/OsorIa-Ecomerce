@@ -181,3 +181,9 @@ Este lane implementa un **contrato runtime app-side** para tolerar payloads lega
   - La mutación real se ejecuta server-side con `SUPABASE_SERVICE_ROLE_KEY` sobre `ecommerce.component_styles`.
 - Objetivo: reparar el `42501 permission denied for table component_styles` sin ampliar grants ni ejecutar SQL en vivo.
 - Alcance: este cambio no toca `public.*`, no cambia RLS/policies y no altera la ruta legacy de lectura.
+
+## Assistant commerce context runtime note (issue #43)
+
+- The storefront assistant commerce-context work is runtime-only.
+- It reads existing ecommerce products, combos, inventory fields, and `store_integrations.metadata.homeDiscountPopup` data.
+- No Supabase migration, policy change, table change, seed, or backfill is required for this issue.
