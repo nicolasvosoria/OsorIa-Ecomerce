@@ -35,7 +35,7 @@ export function ProductCard({ product }: { product: Product }) {
           {product.badge && (
             <Badge className="absolute top-2 right-2 bg-primary text-primary-foreground">{product.badge}</Badge>
           )}
-          {product.originalPrice && <Badge className="absolute top-2 left-2 bg-destructive text-white">VENTA</Badge>}
+          {product.originalPrice && <Badge className="absolute top-2 left-2 bg-destructive text-destructive-foreground">VENTA</Badge>}
         </div>
       </Link>
       <div className="p-4">

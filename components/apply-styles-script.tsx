@@ -3,10 +3,15 @@
  * Aplica estilos desde localStorage para evitar el "flash" de contenido sin estilo
  */
 import Script from "next/script";
+import {
+  CRITICAL_THEME_CSS_VARIABLES,
+  THEME_CONTRAST_HELPER_SOURCE,
+} from "@/lib/theme-font/contrast";
 import { DEFAULT_RUNTIME_THEME } from "@/lib/theme-font/runtime-contract";
 
 export function ApplyStylesScript() {
   const runtimeDefaultTheme = JSON.stringify(DEFAULT_RUNTIME_THEME);
+  const criticalThemeCssVariables = JSON.stringify(CRITICAL_THEME_CSS_VARIABLES);
 
   return (
     // eslint-disable-next-line @next/next/no-before-interactive-script-outside-document -- Runtime theme must be applied before hydration to avoid unstyled flashes.
@@ -60,6 +65,8 @@ export function ApplyStylesScript() {
     
     // Tema por defecto "Claro Original" - se usa solo si no hay tema guardado
     const defaultTheme = ${runtimeDefaultTheme};
+    const expectedThemeCssVariables = ${criticalThemeCssVariables};
+${THEME_CONTRAST_HELPER_SOURCE}
     
     // Aplicar tema desde localStorage (que será actualizado por el ThemeProvider con el tema activo de BD)
     // Si no hay tema guardado, usar el por defecto
@@ -78,26 +85,16 @@ export function ApplyStylesScript() {
     
     // Aplicar el tema (guardado o por defecto)
     if (themeToApply.colors) {
-      const colors = themeToApply.colors;
       const body = document.body;
+      const resolvedVariables = resolveThemeCssVariables(themeToApply);
       
-      root.style.setProperty('--primary', colors.primary);
-      root.style.setProperty('--secondary', colors.secondary);
-      root.style.setProperty('--accent', colors.accent);
-      root.style.setProperty('--background', colors.background);
-      root.style.setProperty('--foreground', colors.foreground);
-      root.style.setProperty('--card', colors.card);
-      root.style.setProperty('--card-foreground', colors.cardForeground);
-      root.style.setProperty('--border', colors.border);
-      root.style.setProperty('--muted', colors.muted);
-      root.style.setProperty('--muted-foreground', colors.mutedForeground);
-      root.style.setProperty('--primary-foreground', colors.foreground);
-      root.style.setProperty('--secondary-foreground', colors.foreground);
-      root.style.setProperty('--accent-foreground', colors.foreground);
+      expectedThemeCssVariables.forEach(function(name) {
+        root.style.setProperty(name, resolvedVariables[name]);
+      });
       
       // Aplicar color de fondo al body para temas oscuros
       // Esto evita el "flash" de fondo blanco antes de que React se monte
-      body.style.backgroundColor = colors.background;
+      body.style.backgroundColor = resolvedVariables['--background'];
       
       // Marcar qué tema fue aplicado
       window.__osoria_applied_theme = themeToApply.theme_name;
