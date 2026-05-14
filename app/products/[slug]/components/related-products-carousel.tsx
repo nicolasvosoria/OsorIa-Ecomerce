@@ -10,20 +10,9 @@ import {
   CarouselPrevious,
 } from "@/components/ui/carousel"
 import { formatPrice } from "@/lib/shopify/utils"
+import type { RelatedProductCard } from "@/lib/products/public-product-payload"
 
-type RelatedProduct = {
-  id: string
-  item_slug?: string | null
-  item_name: string
-  base_price: number
-  compare_at_price?: number | null
-  currency_code: string
-  primary_image_url?: string | null
-  primary_image_alt?: string | null
-  images?: Array<{ image_url?: string }>
-}
-
-export function RelatedProductsCarousel({ products }: { products: RelatedProduct[] }) {
+export function RelatedProductsCarousel({ products }: { products: RelatedProductCard[] }) {
   if (products.length === 0) return null
 
   return (

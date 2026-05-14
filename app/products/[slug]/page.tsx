@@ -20,6 +20,8 @@ import { adaptSupabaseProduct } from '@/lib/products/adapter';
 import { cn } from '@/lib/utils';
 import { ProductImageGallery } from './components/product-image-gallery';
 import { RelatedProductsCarousel } from './components/related-products-carousel';
+import { PublicProductMetadata } from '@/components/products/public-product-metadata';
+import { toRelatedProductCards } from '@/lib/products/public-product-payload';
 
 // Generar parámetros estáticos para productos
 // Con cacheComponents habilitado, debe retornar al menos un resultado
@@ -372,21 +374,7 @@ async function ProductContent({ slug }: { slug: string }) {
                 </div>
               )}
 
-              {product.metadata && Object.keys(product.metadata).length > 0 && (
-                <div>
-                  <h4 className="text-sm font-semibold mb-2">Especificaciones</h4>
-                  <dl className="space-y-2">
-                    {Object.entries(product.metadata).map(([key, value]) => (
-                      <div key={key} className="flex justify-between">
-                        <dt className="text-sm text-muted-foreground capitalize">
-                          {key.replace(/_/g, ' ')}:
-                        </dt>
-                        <dd className="text-sm font-medium">{String(value)}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                </div>
-              )}
+              <PublicProductMetadata metadata={product.metadata} />
             </div>
           </div>
         </div>
@@ -404,7 +392,7 @@ async function ProductContent({ slug }: { slug: string }) {
 
         {/* Productos relacionados */}
         {relatedProducts.length > 0 && (
-          <RelatedProductsCarousel products={relatedProducts} />
+          <RelatedProductsCarousel products={toRelatedProductCards(relatedProducts)} />
         )}
       </div>
     </div>

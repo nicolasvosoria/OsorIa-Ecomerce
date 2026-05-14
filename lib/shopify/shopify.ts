@@ -18,10 +18,9 @@ async function shopifyFetch<T>({
   query: string;
   variables?: Record<string, any>;
 }): Promise<{ data: T; errors?: any[] }> {
-  // Si Shopify no está configurado, retornar datos vacíos en lugar de fallar
+  // Si Shopify no está configurado, retornar datos vacíos en lugar de fallar.
+  // El ecommerce actual usa Supabase como catálogo principal, por lo que este fallback es esperado.
   if (!SHOPIFY_ENABLED) {
-    console.warn('[Shopify] ⚠️ Shopify no está configurado. NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN no está definido. Retornando datos vacíos.');
-    // Retornar estructura vacía según el tipo esperado
     return { data: {} as T };
   }
 

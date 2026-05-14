@@ -6,9 +6,10 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  // Deshabilitar Turbopack temporalmente para evitar problemas con fuentes de Google
-  // Puedes habilitarlo de nuevo cuando se solucione el bug
-  // turbopack: {},
+  // Fijar root del workspace para evitar warnings por lockfiles externos en entornos compartidos.
+  turbopack: {
+    root: process.cwd(),
+  },
   images: {
     unoptimized: true,
     formats: ['image/avif', 'image/webp'],

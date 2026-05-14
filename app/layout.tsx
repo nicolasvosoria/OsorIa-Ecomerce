@@ -37,11 +37,14 @@ import { RouteAwareChrome } from "@/components/layout/route-aware-chrome"
 const V0Setup = dynamic(() => import("@/components/v0-setup"))
 
 const isV0 = process.env["VERCEL_URL"]?.includes("vusercontent.net") ?? false
+const metadataBaseUrl = process.env.NEXT_PUBLIC_SITE_URL
+  ?? (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000")
 
 // Variables CSS para fuentes (definidas en globals.css)
 // Ya no usamos next/font/google para evitar problemas con Turbopack
 
 export const metadata: Metadata = {
+  metadataBase: new URL(metadataBaseUrl),
   title: "Ecommerce",
   description:
     "Ecommerce parametrizable.",

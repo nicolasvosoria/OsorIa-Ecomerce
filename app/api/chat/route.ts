@@ -179,6 +179,10 @@ function buildProductsContextFromList(
   return `\n\nInformación de productos de la tienda (usa SOLO esta información):\n${productsInfo}\n\nInstrucciones: Responde usando únicamente los productos listados. Para características, especificaciones, materiales o detalles, usa la sección "Detalles y características" cuando exista; si no, usa la descripción y el nombre.${strictInstruction}`
 }
 
+export const __chatRouteTestUtils = {
+  buildProductsContextFromList,
+}
+
 // Cliente para leer productos: preferir service_role (evita RLS), si no hay, usar anon.
 async function getSupabaseForProducts() {
   const service = getSupabaseServiceClient()
