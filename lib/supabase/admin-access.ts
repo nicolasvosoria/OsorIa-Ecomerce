@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import type { NextRequest } from "next/server";
 import { ECOMMERCE_TABLES } from "./contract";
+import { normalizeAuthReturnPath } from "@/lib/auth-return-intent";
 
 export type AdminAccessResult =
   | { status: "admin"; userId: string }
@@ -12,40 +13,8 @@ type AuthenticatedUser = {
   id: string;
 };
 
-function isAdminRoute(pathname: string) {
-  return pathname === "/admin" || pathname.startsWith("/admin/");
-}
-
 export function normalizeSafeAdminPath(candidate: string | null | undefined) {
-  if (!candidate) {
-    return null;
-  }
-
-  let parsed: URL;
-  try {
-    parsed = new URL(candidate, "http://osoria.local");
-  } catch {
-    return null;
-  }
-
-  if (parsed.origin !== "http://osoria.local") {
-    return null;
-  }
-
-  if (!candidate.startsWith("/") || candidate.startsWith("//")) {
-    return null;
-  }
-
-  const pathname = parsed.pathname;
-  if (!isAdminRoute(pathname)) {
-    return null;
-  }
-
-  if (pathname === "/auth/callback" || parsed.searchParams.has("admin_access")) {
-    return null;
-  }
-
-  return `${pathname}${parsed.search}`;
+  return normalizeAuthReturnPath(candidate);
 }
 
 function createRequestAuthClient(request: NextRequest) {
