@@ -17,13 +17,15 @@ interface AdminPermissionsContextType {
 const AdminPermissionsContext = createContext<AdminPermissionsContextType | undefined>(undefined)
 
 export function AdminPermissionsProvider({ children }: { children: ReactNode }) {
-  const { isLoading: authLoading, isAuthenticated } = useAuth()
+  const { isLoading: authLoading, isAuthenticated, user } = useAuth()
+  const currentUserId = user?.id ?? null
   const [isAdmin, setIsAdmin] = useState(false)
   const [role, setRole] = useState<UserRole | null>(null)
   const [loading, setLoading] = useState(true)
   const [hasChecked, setHasChecked] = useState(false) // Indica si ya se verificó al menos una vez
   const refreshRef = useRef(false) // Ref para evitar múltiples llamadas simultáneas
   const verifiedAsAdminRef = useRef(false) // Ref para rastrear si ya se verificó como admin exitosamente
+  const checkedUserIdRef = useRef<string | null>(null) // Evita reutilizar permisos de otro usuario autenticado
 
   const refreshPermissions = async () => {
     // Evitar múltiples verificaciones simultáneas
@@ -120,14 +122,6 @@ export function AdminPermissionsProvider({ children }: { children: ReactNode }) 
 
   // Esperar a que la autenticación esté lista antes de comprobar permisos (evita "no tienes permisos" al entrar)
   useEffect(() => {
-    // Si ya se verificó exitosamente como admin y el usuario sigue autenticado, no verificar de nuevo
-    // Esto evita verificaciones innecesarias al navegar entre páginas
-    if (verifiedAsAdminRef.current && isAuthenticated && !authLoading) {
-      console.log("[AdminPermissions] Ya verificado como admin, omitiendo verificación adicional")
-      setLoading(false) // Asegurar que loading esté en false
-      return
-    }
-
     if (authLoading) {
       deferStateUpdate(() => setLoading(true))
       return
@@ -135,7 +129,7 @@ export function AdminPermissionsProvider({ children }: { children: ReactNode }) 
 
     // Si el usuario se desautenticó, resetear estado
     if (!isAuthenticated) {
-      if (verifiedAsAdminRef.current || hasChecked) {
+      if (verifiedAsAdminRef.current || hasChecked || checkedUserIdRef.current !== null) {
         console.log("[AdminPermissions] Usuario desautenticado, reseteando estado")
         deferStateUpdate(() => {
           setIsAdmin(false)
@@ -143,8 +137,32 @@ export function AdminPermissionsProvider({ children }: { children: ReactNode }) 
           setHasChecked(false)
         })
         verifiedAsAdminRef.current = false // Resetear ref
+        checkedUserIdRef.current = null
       }
       deferStateUpdate(() => setLoading(false))
+      return
+    }
+
+    // Si cambió el usuario autenticado, negar hasta volver a verificar ese usuario.
+    if (checkedUserIdRef.current !== currentUserId) {
+      console.log("[AdminPermissions] Usuario autenticado cambió, revalidando permisos")
+      checkedUserIdRef.current = currentUserId
+      verifiedAsAdminRef.current = false
+      deferStateUpdate(() => {
+        setIsAdmin(false)
+        setRole(null)
+        setHasChecked(false)
+        setLoading(true)
+        void refreshPermissions()
+      })
+      return
+    }
+
+    // Si ya se verificó exitosamente como admin y el usuario sigue autenticado, no verificar de nuevo
+    // Esto evita verificaciones innecesarias al navegar entre páginas
+    if (verifiedAsAdminRef.current && isAuthenticated && !authLoading) {
+      console.log("[AdminPermissions] Ya verificado como admin, omitiendo verificación adicional")
+      setLoading(false) // Asegurar que loading esté en false
       return
     }
 
@@ -159,7 +177,7 @@ export function AdminPermissionsProvider({ children }: { children: ReactNode }) 
     }
     // refreshPermissions intentionally stays outside deps to avoid repeated permission checks.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoading, isAuthenticated]) // Solo depender de authLoading e isAuthenticated para evitar loops
+  }, [authLoading, isAuthenticated, currentUserId]) // Revalidar cuando cambia el usuario autenticado, no solo el booleano de sesión
 
 
   return (
