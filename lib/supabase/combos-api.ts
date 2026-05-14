@@ -15,6 +15,7 @@ export interface CreateComboData {
   store_id?: string
   name: string
   slug?: string
+  category_id?: string | null
   description?: string
   image_url?: string
   is_active?: boolean
@@ -46,13 +47,51 @@ function getClient(supabaseOverride?: any) {
   return supabaseOverride ?? getSupabaseEcommerce()
 }
 
-function generateSlug(name: string) {
-  return name
+export function normalizeComboSlug(value: string) {
+  return value
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
+}
+
+function generateSlug(name: string) {
+  return normalizeComboSlug(name)
+}
+
+function comboCategoryId(combo: any): string | null {
+  const categoryId = combo?.category_id ?? combo?.metadata?.category_id
+  return typeof categoryId === 'string' && categoryId.trim() ? categoryId.trim() : null
+}
+
+async function fetchComboMetadata(supabase: any, comboId: string): Promise<Record<string, any>> {
+  const result = await withTimeout(
+    supabase.from(ECOMMERCE_TABLES.productCombos).select('metadata').eq('id', comboId).single(),
+    15000,
+    'fetchComboMetadata',
+  ) as { data: any | null; error: any }
+
+  if (result.error) return {}
+  return result.data?.metadata && typeof result.data.metadata === 'object' ? result.data.metadata : {}
+}
+
+function candidateSlugs(slug: string) {
+  const candidates = new Set<string>()
+  if (slug) candidates.add(slug)
+  try {
+    const decoded = decodeURIComponent(slug)
+    if (decoded) {
+      candidates.add(decoded)
+      const normalizedDecoded = normalizeComboSlug(decoded)
+      if (normalizedDecoded) candidates.add(normalizedDecoded)
+    }
+  } catch {
+    // Keep original candidate only.
+  }
+  const normalized = normalizeComboSlug(slug)
+  if (normalized) candidates.add(normalized)
+  return Array.from(candidates)
 }
 
 async function resolveStoreId(supabase: any, explicitStoreId?: string | null): Promise<string | null> {
@@ -231,6 +270,7 @@ export async function hydrateCombos(
       id: combo.id,
       name: combo.name,
       slug: combo.slug,
+      categoryId: comboCategoryId(combo),
       description: combo.description,
       imageUrl: combo.image_url,
       isActive: combo.is_active !== false,
@@ -247,6 +287,7 @@ export async function hydrateCombos(
 
 export async function listCombos(params: {
   store_id?: string | null
+  category_id?: string | null
   includeInactive?: boolean
   supabaseOverride?: any
 } = {}): Promise<ComboCatalogDetails[]> {
@@ -257,7 +298,9 @@ export async function listCombos(params: {
   if (!storeId) return []
 
   const combos = await fetchCombos(supabase, undefined, storeId, params.includeInactive)
-  return hydrateCombos(combos, supabase)
+  const hydrated = await hydrateCombos(combos, supabase)
+  if (!params.category_id) return hydrated
+  return hydrated.filter((combo) => combo.categoryId === params.category_id)
 }
 
 export async function getComboById(
@@ -289,14 +332,23 @@ export async function getComboBySlug(
     supabase
       .from(ECOMMERCE_TABLES.productCombos)
       .select('*')
-      .eq('slug', slug)
+      .in('slug', candidateSlugs(slug))
       .eq('store_id', resolvedStoreId)
+      .limit(1)
       .maybeSingle(),
     15000,
     'getComboBySlug',
   ) as { data: any | null; error: any }
 
-  if (result.error || !result.data) return null
+  if (result.error) return null
+  if (!result.data) {
+    const normalizedCandidates = new Set(candidateSlugs(slug).map((candidate) => normalizeComboSlug(candidate)).filter(Boolean))
+    const combos = await fetchCombos(supabase, undefined, resolvedStoreId, includeInactive)
+    const matchedCombo = combos.find((combo) => normalizedCandidates.has(normalizeComboSlug(combo.slug || '')))
+    if (!matchedCombo) return null
+    const [combo] = await hydrateCombos([matchedCombo], supabase)
+    return combo || null
+  }
   if (!includeInactive && result.data.is_active === false) return null
 
   const [combo] = await hydrateCombos([result.data], supabase)
@@ -314,7 +366,7 @@ export function comboToStoreItem(combo: ComboCatalogDetails): StoreItemWithDetai
     item_name: combo.name,
     item_description: combo.description || undefined,
     item_description_html: combo.description ? `<p>${combo.description}</p>` : undefined,
-    category_id: undefined,
+    category_id: combo.categoryId || undefined,
     base_price: finalPrice,
     compare_at_price: componentSubtotal > finalPrice ? componentSubtotal : undefined,
     currency_code: combo.pricing.currencyCode,
@@ -324,12 +376,13 @@ export function comboToStoreItem(combo: ComboCatalogDetails): StoreItemWithDetai
     track_inventory: true,
     inventory_quantity: combo.availability.derivedStock ?? 999999,
     low_stock_threshold: 1,
-    item_slug: combo.slug || combo.id,
+    item_slug: normalizeComboSlug(combo.slug || combo.name || combo.id) || combo.id,
     seo_title: combo.name,
     seo_description: combo.description || undefined,
     metadata: {
       item_kind: 'combo',
       combo_id: combo.id,
+      category_id: combo.categoryId || null,
       combo_discount_type: combo.pricing.discountType,
       combo_discount_value: combo.pricing.discountValue,
     },
@@ -506,7 +559,7 @@ export async function createCombo(data: CreateComboData): Promise<ComboMutationR
     return { success: false, error: componentValidation.error }
   }
 
-  const slug = data.slug?.trim() || generateSlug(data.name)
+  const slug = normalizeComboSlug(data.slug?.trim() || data.name)
   const result = await withTimeout(
     supabase
       .from(ECOMMERCE_TABLES.productCombos)
@@ -519,6 +572,9 @@ export async function createCombo(data: CreateComboData): Promise<ComboMutationR
         is_active: data.is_active ?? true,
         discount_type: data.discount_type,
         discount_value: Number(data.discount_value || 0),
+        metadata: {
+          category_id: data.category_id || null,
+        },
       })
       .select()
       .single(),
@@ -559,12 +615,22 @@ export async function updateCombo(comboId: string, data: UpdateComboData): Promi
 
   const updateData: Record<string, unknown> = {}
   if (data.name !== undefined) updateData.name = data.name.trim()
-  if (data.slug !== undefined) updateData.slug = data.slug.trim() || (data.name ? generateSlug(data.name) : undefined)
+  if (data.slug !== undefined || data.name !== undefined) {
+    const nextSlug = data.slug?.trim() || (data.name ? data.name : '')
+    if (nextSlug) updateData.slug = normalizeComboSlug(nextSlug)
+  }
   if (data.description !== undefined) updateData.description = data.description?.trim() || null
   if (data.image_url !== undefined) updateData.image_url = data.image_url?.trim() || null
   if (data.is_active !== undefined) updateData.is_active = data.is_active
   if (data.discount_type !== undefined) updateData.discount_type = data.discount_type
   if (data.discount_value !== undefined) updateData.discount_value = Number(data.discount_value || 0)
+  if (data.category_id !== undefined) {
+    const currentMetadata = await fetchComboMetadata(supabase, comboId)
+    updateData.metadata = {
+      ...currentMetadata,
+      category_id: data.category_id || null,
+    }
+  }
 
   let replacementRows: any[] | null = null
   let existingComponentRows: any[] = []
@@ -590,16 +656,7 @@ export async function updateCombo(comboId: string, data: UpdateComboData): Promi
     existingComponentRows = existingResult.data || []
   }
 
-  if (Object.keys(updateData).length > 0) {
-    const result = await withTimeout(
-      supabase.from(ECOMMERCE_TABLES.productCombos).update(updateData).eq('id', comboId),
-      20000,
-      'updateCombo',
-    ) as { error: any }
-
-    if (result.error) return { success: false, error: result.error.message || 'Error al actualizar el combo' }
-  }
-
+  let componentsWereReplaced = false
   if (replacementRows) {
     const deleteResult = await withTimeout(
       supabase.from(ECOMMERCE_TABLES.productComboComponents).delete().eq('combo_id', comboId),
@@ -620,6 +677,28 @@ export async function updateCombo(comboId: string, data: UpdateComboData): Promi
     if (insertResult.error) {
       await restoreComboComponents(supabase, existingComponentRows).catch(() => undefined)
       return { success: false, error: insertResult.error.message || 'Error al guardar componentes del combo' }
+    }
+
+    componentsWereReplaced = true
+  }
+
+  if (Object.keys(updateData).length > 0) {
+    const result = await withTimeout(
+      supabase.from(ECOMMERCE_TABLES.productCombos).update(updateData).eq('id', comboId),
+      20000,
+      'updateCombo',
+    ) as { error: any }
+
+    if (result.error) {
+      if (componentsWereReplaced) {
+        await withTimeout(
+          supabase.from(ECOMMERCE_TABLES.productComboComponents).delete().eq('combo_id', comboId),
+          20000,
+          'rollbackComboComponentsAfterUpdateFailure',
+        ).catch(() => undefined)
+        await restoreComboComponents(supabase, existingComponentRows).catch(() => undefined)
+      }
+      return { success: false, error: result.error.message || 'Error al actualizar el combo' }
     }
   }
 

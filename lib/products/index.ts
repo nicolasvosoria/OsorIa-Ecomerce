@@ -197,5 +197,3 @@ export async function searchProducts(searchTerm: string, limit: number = 20): Pr
     return [];
   }
 }
-
-

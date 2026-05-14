@@ -333,9 +333,10 @@ export async function getItems(params: GetItemsParams = {}): Promise<GetItemsRes
       }))
     }
 
-    if (shouldFetchCombos && !category_id && is_featured === undefined) {
+    if (shouldFetchCombos && is_featured === undefined) {
       const combos = await listCombos({
         store_id: currentStoreId,
+        category_id,
         includeInactive: is_active === false,
       })
       const comboItems = combos

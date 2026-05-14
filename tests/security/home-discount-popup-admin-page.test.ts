@@ -187,9 +187,7 @@ describe("home discount popup admin page", () => {
       "/api/admin/home-discount-popup/upload",
       expect.anything(),
     );
-    expect(
-      screen.getByText(/hay una nueva imagen pendiente/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/hay una nueva imagen pendiente/i)).not.toBeNull();
   });
 
   it("uploads the pending image on save and then persists the popup config", async () => {
@@ -307,9 +305,8 @@ describe("home discount popup admin page", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(
       screen.getByText("Texto sin guardar para preview", { selector: "p" }),
-    ).toBeInTheDocument();
-    expect(screen.getByAltText("Promo preview")).toHaveAttribute(
-      "src",
+    ).not.toBeNull();
+    expect(screen.getByAltText("Promo preview").getAttribute("src")).toBe(
       "blob:preview-image",
     );
   });
