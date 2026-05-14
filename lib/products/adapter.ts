@@ -4,6 +4,9 @@
  */
 
 import type {
+  CommerceProductBadge,
+  CommerceProductCard,
+  CommerceProductPrice,
   StoreItemWithDetails,
   ItemCategory,
   ItemOption,
@@ -15,6 +18,75 @@ function formatMoney(amount: number, currencyCode: string = 'COP'): Money {
   return {
     amount: amount.toString(),
     currencyCode,
+  };
+}
+
+export function formatCommercePrice(amount: number, currencyCode: string = 'COP'): string {
+  return new Intl.NumberFormat('es-CO', {
+    style: 'currency',
+    currency: currencyCode,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
+export function normalizeCommercePrice(
+  amount: number,
+  currencyCode: string = 'COP',
+  compareAtAmount?: number | null,
+): CommerceProductPrice {
+  const hasDiscount = typeof compareAtAmount === 'number' && compareAtAmount > amount;
+
+  return {
+    amount,
+    currencyCode,
+    label: formatCommercePrice(amount, currencyCode),
+    compareAtAmount: hasDiscount ? compareAtAmount : undefined,
+    compareAtLabel: hasDiscount ? formatCommercePrice(compareAtAmount, currencyCode) : undefined,
+    hasDiscount,
+  };
+}
+
+function getCommerceImageUrl(item: StoreItemWithDetails): string {
+  if (item.primary_image_url && item.primary_image_url.trim() !== '') {
+    return item.primary_image_url;
+  }
+
+  const firstImage = item.images?.find((image) => image.image_url?.trim());
+  return firstImage?.image_url || '/placeholder.svg';
+}
+
+function getCommerceBadges(item: StoreItemWithDetails, price: CommerceProductPrice): CommerceProductBadge[] {
+  if (item.item_kind === 'combo') {
+    return [{ label: 'Combo', tone: 'combo' }];
+  }
+
+  if (price.hasDiscount) {
+    return [{ label: 'Oferta', tone: 'sale' }];
+  }
+
+  return [];
+}
+
+export function toCommerceProductCard(item: StoreItemWithDetails): CommerceProductCard {
+  const price = normalizeCommercePrice(
+    item.base_price,
+    item.currency_code || 'COP',
+    item.compare_at_price,
+  );
+
+  return {
+    id: item.id,
+    title: item.item_name,
+    description: item.item_description,
+    href: `/products/${item.item_slug || item.id}`,
+    imageUrl: getCommerceImageUrl(item),
+    imageAlt: item.primary_image_alt || item.item_name,
+    category: item.category?.category_name,
+    price,
+    badges: getCommerceBadges(item, price),
+    ctaLabel: 'Ver detalles',
+    availableForSale: item.is_available_for_sale && item.is_active,
   };
 }
 
@@ -257,4 +329,3 @@ export function adaptSupabaseProducts(items: StoreItemWithDetails[]): Product[] 
 export function adaptSupabaseCategories(categories: ItemCategory[]): Collection[] {
   return categories.map(adaptSupabaseCategory);
 }
-
