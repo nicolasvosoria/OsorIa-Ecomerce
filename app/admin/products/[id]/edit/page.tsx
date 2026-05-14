@@ -171,9 +171,9 @@ export default function EditProductPage() {
       return
     }
 
-    // Validar imágenes: máximo 3
-    if (images.length > 3) {
-      toast.error("Solo se permiten máximo 3 imágenes")
+    // Validar imágenes: máximo 5
+    if (images.length > 5) {
+      toast.error("Solo se permiten máximo 5 imágenes")
       return
     }
 
@@ -181,7 +181,7 @@ export default function EditProductPage() {
 
     try {
       // Separar la primera imagen (primary) de las adicionales
-      const primaryImage = images.length > 0 ? images[0] : undefined
+      const primaryImage = images.length > 0 ? images[0] : null
       const additionalImages = images.length > 1 ? images.slice(1) : []
 
       // Preparar metadata con ai_details si existe
@@ -217,7 +217,7 @@ export default function EditProductPage() {
           seo_description: formData.seo_description.trim() || undefined,
           tags: formData.tags ? formData.tags.split(',').map(tag => tag.trim()).filter(Boolean) : undefined,
           primary_image_url: primaryImage,
-          primary_image_alt: formData.item_name.trim(),
+          primary_image_alt: primaryImage ? formData.item_name.trim() : null,
           display_order: parseInt(formData.display_order) || 0,
           metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
         },
@@ -567,7 +567,7 @@ export default function EditProductPage() {
                 <CardHeader>
                   <CardTitle>Imágenes del Producto</CardTitle>
                   <CardDescription>
-                    Máximo 3 imágenes. Cada imagen debe pesar 1 MB o menos.
+                    Máximo 5 imágenes. Cada imagen debe pesar 1 MB o menos.
                     La primera imagen será la imagen principal.
                   </CardDescription>
                 </CardHeader>
@@ -575,7 +575,7 @@ export default function EditProductPage() {
                   <MultiImageUpload
                     images={images}
                     onChange={setImages}
-                    maxImages={3}
+                    maxImages={5}
                     maxSizeMB={1}
                     context="product-images"
                     label="Imágenes del Producto"
