@@ -3,6 +3,8 @@
 import { useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { getCurrentUser } from "@/lib/supabase/auth-api"
+import { getAuthReturnPath, resolvePostAuthDestination } from "@/lib/auth-return-intent"
 
 function AuthCallbackContent() {
   const router = useRouter()
@@ -29,6 +31,16 @@ function AuthCallbackContent() {
           return
         }
 
+        const returnPath = getAuthReturnPath(searchParams)
+
+        const pushPostAuthDestination = async () => {
+          const currentUser = await getCurrentUser()
+          router.push(resolvePostAuthDestination({
+            returnPath,
+            user: currentUser.success ? currentUser.user : null,
+          }))
+        }
+
         if (code) {
           // Intercambiar el código por una sesión
           const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
@@ -41,7 +53,8 @@ function AuthCallbackContent() {
 
           if (data.session) {
             // Sesión creada (p. ej. tras confirmar correo), redirigir a página de éxito
-            router.push("/auth/cuenta-confirmada")
+            // salvo que exista un destino admin seguro permitido para el usuario.
+            await pushPostAuthDestination()
             return
           }
         }
@@ -57,7 +70,8 @@ function AuthCallbackContent() {
 
         if (session) {
           // Ya hay sesión (p. ej. llegó sin code), redirigir a éxito o inicio
-          router.push("/auth/cuenta-confirmada")
+          // salvo que exista un destino admin seguro permitido para el usuario.
+          await pushPostAuthDestination()
         } else {
           // No hay sesión, redirigir al login
           router.push("/?error=no_session")
