@@ -35,6 +35,28 @@ export interface HomeDiscountPopupEligibilityResult {
   reason?: "inactive" | "route" | "schedule" | "cooldown" | "invalid_cta";
 }
 
+export type HomeDiscountPopupAdminIssueCode =
+  | "inactive"
+  | "missing_title"
+  | "missing_text"
+  | "missing_cta_text"
+  | "missing_coupon"
+  | "missing_redirect_url"
+  | "invalid_date_range"
+  | "not_started"
+  | "expired";
+
+export interface HomeDiscountPopupAdminIssue {
+  code: HomeDiscountPopupAdminIssueCode;
+  message: string;
+  action: string;
+}
+
+export interface HomeDiscountPopupAdminStatus {
+  publishable: boolean;
+  issues: HomeDiscountPopupAdminIssue[];
+}
+
 const DEFAULT_DELAY_SECONDS = 4;
 const DEFAULT_FREQUENCY_HOURS = 24;
 const DEFAULT_VISIBLE_DURATION_SECONDS = 15;
@@ -332,5 +354,95 @@ export function projectPublicHomeDiscountPopupConfig(
   return {
     ...config,
     fingerprint: getHomeDiscountPopupFingerprint(config),
+  };
+}
+
+export function validateHomeDiscountPopupAdminStatus(
+  config: HomeDiscountPopupConfig,
+  now: Date = new Date(),
+): HomeDiscountPopupAdminStatus {
+  const issues: HomeDiscountPopupAdminIssue[] = [];
+
+  if (!config.active) {
+    issues.push({
+      code: "inactive",
+      message: "El popup está desactivado.",
+      action: "Activa el popup cuando quieras publicarlo en la home.",
+    });
+  }
+
+  if (!config.title) {
+    issues.push({
+      code: "missing_title",
+      message: "Falta el título del popup.",
+      action: "Agrega un título visible para la campaña.",
+    });
+  }
+
+  if (!config.text) {
+    issues.push({
+      code: "missing_text",
+      message: "Falta el mensaje principal.",
+      action: "Agrega el texto que verá el visitante.",
+    });
+  }
+
+  if (!config.ctaText) {
+    issues.push({
+      code: "missing_cta_text",
+      message: "Falta el texto del CTA.",
+      action: "Agrega el texto del botón de la promo.",
+    });
+  }
+
+  if (config.ctaMode === "redirect" && !config.ctaUrl) {
+    issues.push({
+      code: "missing_redirect_url",
+      message: "El CTA de redirección no tiene una URL válida.",
+      action: "Agrega una URL HTTPS para publicar este CTA.",
+    });
+  }
+
+  if (config.ctaMode === "copy_coupon" && !config.coupon) {
+    issues.push({
+      code: "missing_coupon",
+      message: "El CTA de copiar cupón no tiene código.",
+      action: "Agrega un cupón o cambia el CTA a redirección con URL HTTPS.",
+    });
+  }
+
+  const startsAt = config.startsAt ? new Date(config.startsAt) : null;
+  const endsAt = config.endsAt ? new Date(config.endsAt) : null;
+
+  if (startsAt && endsAt && startsAt.getTime() > endsAt.getTime()) {
+    issues.push({
+      code: "invalid_date_range",
+      message: "La fecha de inicio es posterior a la fecha de fin.",
+      action:
+        "Corrige las fechas de vigencia para que el inicio sea anterior al fin.",
+    });
+  } else if (config.active) {
+    const timestamp = now.getTime();
+
+    if (startsAt && timestamp < startsAt.getTime()) {
+      issues.push({
+        code: "not_started",
+        message: "La campaña aún no comenzó.",
+        action: "Ajusta la fecha de inicio si quieres publicarla ahora.",
+      });
+    }
+
+    if (endsAt && timestamp > endsAt.getTime()) {
+      issues.push({
+        code: "expired",
+        message: "La campaña ya finalizó.",
+        action: "Extiende la fecha de fin o desactiva esta campaña.",
+      });
+    }
+  }
+
+  return {
+    publishable: config.active && issues.length === 0,
+    issues,
   };
 }
