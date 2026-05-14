@@ -7,6 +7,7 @@ import {
   getVariantStock,
   incrementItemViewCount,
   updateItem,
+  __productsApiTestUtils,
 } from "@/lib/supabase/products-api";
 
 const { getSupabaseEcommerceMock, getStoreIdMock } = vi.hoisted(() => ({
@@ -208,6 +209,25 @@ describe("products-api contract", () => {
       {
         item_id: "item-1",
         image_url: "https://example.com/extra.webp",
+        image_alt: "Café Especial - Imagen 2",
+        display_order: 2,
+        image_type: "product",
+      },
+    ]);
+  });
+
+  it("normalizes empty product image values before syncing item_images", () => {
+    expect(
+      __productsApiTestUtils.buildProductImageRows(
+        "item-1",
+        "Café Especial",
+        { primary_image_url: "", primary_image_alt: "Alt vacío" },
+        ["", "  ", "https://example.com/valid.webp"],
+      ),
+    ).toEqual([
+      {
+        item_id: "item-1",
+        image_url: "https://example.com/valid.webp",
         image_alt: "Café Especial - Imagen 2",
         display_order: 2,
         image_type: "product",

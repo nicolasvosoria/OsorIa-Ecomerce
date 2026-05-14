@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAdminPermissions } from "@/contexts/admin-permissions-context"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -28,34 +28,40 @@ import type { ItemCategory } from "@/lib/types/products"
 import { MultiImageUpload } from "@/components/admin/multi-image-upload"
 import { toast } from "sonner"
 
+const initialProductFormData = {
+  item_name: "",
+  item_code: "",
+  item_description: "",
+  ai_details: "",
+  category_id: "",
+  base_price: "",
+  compare_at_price: "",
+  currency_code: "COP",
+  is_active: true,
+  is_featured: false,
+  is_available_for_sale: true,
+  track_inventory: false,
+  inventory_quantity: "0",
+  low_stock_threshold: "10",
+  seo_title: "",
+  seo_description: "",
+  tags: "",
+  display_order: "0",
+}
+
+type CreateSubmitIntent = "list" | "another"
+
 export default function CreateProductPage() {
   const { isAdmin, loading } = useAdminPermissions()
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const submitLockRef = useRef(false)
   const [categories, setCategories] = useState<ItemCategory[]>([])
   const [loadingCategories, setLoadingCategories] = useState(true)
   
   // Form state
-  const [formData, setFormData] = useState({
-    item_name: "",
-    item_code: "",
-    item_description: "",
-    ai_details: "",
-    category_id: "",
-    base_price: "",
-    compare_at_price: "",
-    currency_code: "COP",
-    is_active: true,
-    is_featured: false,
-    is_available_for_sale: true,
-    track_inventory: false,
-    inventory_quantity: "0",
-    low_stock_threshold: "10",
-    seo_title: "",
-    seo_description: "",
-    tags: "",
-    display_order: "0",
-  })
+  const [formData, setFormData] = useState(initialProductFormData)
+  const [imageResetToken, setImageResetToken] = useState(0)
   
   const [images, setImages] = useState<string[]>([])
 
@@ -86,8 +92,18 @@ export default function CreateProductPage() {
     }
   }, [isAdmin])
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const resetFormForNextProduct = () => {
+    setFormData({ ...initialProductFormData })
+    setImages([])
+    setImageResetToken((token) => token + 1)
+  }
+
+  const handleSubmit = async (e: React.FormEvent, intent: CreateSubmitIntent = "list") => {
     e.preventDefault()
+
+    if (submitLockRef.current) {
+      return
+    }
     
     if (!formData.item_name.trim()) {
       toast.error("El nombre del producto es requerido")
@@ -112,6 +128,7 @@ export default function CreateProductPage() {
       return
     }
 
+    submitLockRef.current = true
     setIsSubmitting(true)
 
     try {
@@ -152,8 +169,13 @@ export default function CreateProductPage() {
       )
 
       if (result.success && result.item) {
-        toast.success("Producto creado exitosamente")
-        router.push(`/admin/products`)
+        if (intent === "another") {
+          resetFormForNextProduct()
+          toast.success("Producto creado exitosamente. Puedes crear otro producto.")
+        } else {
+          toast.success("Producto creado exitosamente")
+          router.push(`/admin/products`)
+        }
       } else {
         toast.error(result.error || "Error al crear el producto")
       }
@@ -161,6 +183,7 @@ export default function CreateProductPage() {
       console.error("[Create Product] Error:", error)
       toast.error(error.message || "Error inesperado al crear el producto")
     } finally {
+      submitLockRef.current = false
       setIsSubmitting(false)
     }
   }
@@ -250,7 +273,7 @@ export default function CreateProductPage() {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8 max-w-full overflow-x-hidden">
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={(event) => handleSubmit(event, "list")}>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Columna Principal */}
             <div className="lg:col-span-2 space-y-6">
@@ -513,6 +536,7 @@ export default function CreateProductPage() {
                     maxSizeMB={1}
                     context="product-images"
                     label="Imágenes del Producto"
+                    resetToken={imageResetToken}
                   />
                 </CardContent>
               </Card>
@@ -576,7 +600,7 @@ export default function CreateProductPage() {
               </Card>
 
               {/* Botones de Acción */}
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <Button
                   type="submit"
                   className="flex-1"
@@ -591,6 +615,25 @@ export default function CreateProductPage() {
                     <>
                       <Save className="h-4 w-4 mr-2" />
                       Crear Producto
+                    </>
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1"
+                  disabled={isSubmitting}
+                  onClick={(event) => handleSubmit(event, "another")}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Creando...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      Guardar y crear otro
                     </>
                   )}
                 </Button>

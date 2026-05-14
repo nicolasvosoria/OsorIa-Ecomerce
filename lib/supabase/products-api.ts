@@ -764,10 +764,12 @@ function buildProductImageRows(
 ) {
   const rows: Array<Record<string, any>> = []
 
-  if (input.primary_image_url) {
+  const primaryImageUrl = input.primary_image_url?.trim()
+
+  if (primaryImageUrl) {
     rows.push({
       item_id: itemId,
-      image_url: input.primary_image_url,
+      image_url: primaryImageUrl,
       image_alt: input.primary_image_alt || itemName,
       display_order: 1,
       image_type: 'product',
@@ -775,13 +777,16 @@ function buildProductImageRows(
   }
 
   rows.push(
-    ...additionalImages.map((url, index) => ({
-      item_id: itemId,
-      image_url: url,
-      image_alt: `${itemName} - Imagen ${index + 2}`,
-      display_order: index + 2,
-      image_type: 'product',
-    }))
+    ...additionalImages
+      .map((url) => url.trim())
+      .filter(Boolean)
+      .map((url, index) => ({
+        item_id: itemId,
+        image_url: url,
+        image_alt: `${itemName} - Imagen ${index + 2}`,
+        display_order: index + 2,
+        image_type: 'product',
+      }))
   )
 
   return rows
@@ -866,7 +871,7 @@ export async function createItem(
     }
 
     // Validar que solo haya máximo 3 imágenes en total (primary + additional)
-    const totalImagesCount = (data.primary_image_url ? 1 : 0) + additionalImages.length
+    const totalImagesCount = buildProductImageRows("count-only", data.item_name, data, additionalImages).length
     if (totalImagesCount > 3) {
       return {
         success: false,
@@ -1076,7 +1081,7 @@ export async function updateItem(
     }
 
     // Validar que solo haya máximo 3 imágenes en total (primary + additional)
-    const totalImagesCount = (data.primary_image_url ? 1 : 0) + additionalImages.length
+    const totalImagesCount = buildProductImageRows("count-only", data.item_name || "Producto", data, additionalImages).length
     if (totalImagesCount > 3) {
       return {
         success: false,
