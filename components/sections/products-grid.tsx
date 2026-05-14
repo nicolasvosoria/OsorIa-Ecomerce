@@ -60,6 +60,8 @@ interface ProductsGridProps {
     name: string
     category: string
     price: string
+    compareAtPrice?: string
+    savingsLabel?: string
     image: string
     slug?: string
   }>
@@ -177,9 +179,21 @@ export function ProductsGrid({ initialProducts }: ProductsGridProps = {}) {
                     {product.name}
                   </h3>
                   <p className="text-xs sm:text-sm md:text-[13.9775px] font-inter font-normal mb-2" style={{ color: "var(--muted-foreground)" }}>{product.category}</p>
-                  <p className="text-base sm:text-lg md:text-[20.5864px] font-inter font-normal" style={{ color: "var(--card-foreground)" }}>
-                    {product.price}
-                  </p>
+                  <div className="space-y-1">
+                    <p className="text-base sm:text-lg md:text-[20.5864px] font-inter font-normal" style={{ color: "var(--card-foreground)" }}>
+                      {product.price}
+                    </p>
+                    {product.compareAtPrice ? (
+                      <p className="text-xs sm:text-sm line-through" style={{ color: "var(--muted-foreground)" }}>
+                        {product.compareAtPrice}
+                      </p>
+                    ) : null}
+                    {product.savingsLabel ? (
+                      <p className="text-xs sm:text-sm font-medium" style={{ color: "var(--primary)" }}>
+                        {product.savingsLabel}
+                      </p>
+                    ) : null}
+                  </div>
                 </div>
 
                 <div 
