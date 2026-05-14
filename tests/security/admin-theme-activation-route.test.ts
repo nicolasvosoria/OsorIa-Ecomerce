@@ -196,9 +196,26 @@ describe("theme activation admin route", () => {
     const themeQuery = {
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
-      single: vi
-        .fn()
-        .mockResolvedValue({ data: { id: "theme-1" }, error: null }),
+      single: vi.fn().mockResolvedValue({
+        data: {
+          id: "theme-1",
+          theme_name: "Claro Original",
+          updated_at: "2026-05-14T10:00:00Z",
+          colors: {
+            primary: "#111111",
+            secondary: "#222222",
+            accent: "#333333",
+            background: "#ffffff",
+            foreground: "#000000",
+            card: "#f5f5f5",
+            cardForeground: "#101010",
+            border: "#dedede",
+            muted: "#eeeeee",
+            mutedForeground: "#444444",
+          },
+        },
+        error: null,
+      }),
     };
     const existingQuery = {
       eq: vi.fn().mockReturnThis(),
@@ -246,7 +263,15 @@ describe("theme activation admin route", () => {
     );
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ success: true });
+    await expect(response.json()).resolves.toEqual({
+      success: true,
+      activeTheme: expect.objectContaining({
+        theme_name: "Claro Original",
+        theme_fingerprint: expect.stringMatching(
+          /^v1:store-1:version-1:theme-1:/,
+        ),
+      }),
+    });
     expect(createClient).toHaveBeenCalledWith(
       "https://test.supabase.co",
       "test-service-role-key",

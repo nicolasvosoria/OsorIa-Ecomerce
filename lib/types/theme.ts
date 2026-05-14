@@ -18,4 +18,8 @@ export interface AppTheme {
   is_active: boolean
   created_at: string
   updated_at: string
+  theme_fingerprint?: string
+  theme_version_id?: string | null
+  theme_published_at?: string | null
+  store_id?: string | null
 }

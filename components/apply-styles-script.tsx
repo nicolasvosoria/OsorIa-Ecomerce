@@ -41,8 +41,10 @@ export function ApplyStylesScript() {
       const colors = payload.colors || payload.theme_config;
       if (!colors || typeof colors !== 'object') return null;
       if (!payload.theme_name || typeof payload.theme_name !== 'string') return null;
+      if (!payload.theme_fingerprint || typeof payload.theme_fingerprint !== 'string') return null;
       return {
         theme_name: payload.theme_name,
+        theme_fingerprint: payload.theme_fingerprint,
         colors,
       };
     }
@@ -100,7 +102,7 @@ export function ApplyStylesScript() {
       body.style.backgroundColor = colors.background;
       
       // Marcar qué tema fue aplicado
-      window.__osoria_applied_theme = themeToApply.theme_name;
+      window.__osoria_applied_theme = { theme_name: themeToApply.theme_name, theme_fingerprint: themeToApply.theme_fingerprint || null };
     }
     
     // Aplicar fuente desde localStorage

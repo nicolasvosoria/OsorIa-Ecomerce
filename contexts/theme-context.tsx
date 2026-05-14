@@ -26,7 +26,7 @@ interface ThemeContextType {
   error: string | null;
   changeTheme: (
     themeName: string,
-  ) => Promise<{ success: boolean; error?: string }>;
+  ) => Promise<{ success: boolean; error?: string; activeTheme?: AppTheme }>;
   refreshThemes: () => Promise<void>;
 }
 
@@ -140,12 +140,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
       const result = await setActiveTheme(themeName);
       if (result.success) {
-        // Aplicar tema inmediatamente desde la lista actual (forzar aplicación)
-        const selectedTheme = themes.find((t) => t.theme_name === themeName);
+        const confirmedTheme = result.activeTheme;
+        const selectedTheme =
+          confirmedTheme ?? themes.find((t) => t.theme_name === themeName);
         if (selectedTheme) {
-          applyTheme(selectedTheme, true); // Forzar aplicación
+          applyTheme(selectedTheme, true);
+          setActiveThemeState(selectedTheme);
         }
-        // Refrescar temas para actualizar el estado
         await refreshThemes();
       }
       return result;
@@ -159,31 +160,37 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const applyTheme = (theme: AppTheme, force: boolean = false) => {
     if (typeof document === "undefined") return;
 
-    // Evitar aplicar el mismo tema múltiples veces (a menos que sea forzado)
-    if (!force && appliedThemeRef.current === theme.theme_name) {
-      return;
-    }
-
-    // Si el script ya aplicó este tema desde localStorage, no volver a aplicarlo
-    // a menos que sea un cambio explícito (force = true)
-    if (
-      !force &&
-      typeof window !== "undefined" &&
-      (window as any).__osoria_applied_theme === theme.theme_name
-    ) {
-      appliedThemeRef.current = theme.theme_name;
-      return;
-    }
-
     const normalizedTheme = normalizeThemeRecord(theme);
     if (!normalizedTheme) {
+      return;
+    }
+
+    const themeIdentity = normalizedTheme.theme_fingerprint;
+
+    // Evitar aplicar el mismo tema múltiples veces (a menos que sea forzado)
+    if (!force && appliedThemeRef.current === themeIdentity) {
+      return;
+    }
+
+    // Si el script ya aplicó este fingerprint desde localStorage, no volver a aplicarlo
+    // a menos que sea un cambio explícito (force = true)
+    const scriptAppliedTheme =
+      typeof window !== "undefined"
+        ? (window as any).__osoria_applied_theme
+        : null;
+    const scriptAppliedFingerprint =
+      typeof scriptAppliedTheme === "object" && scriptAppliedTheme !== null
+        ? scriptAppliedTheme.theme_fingerprint
+        : null;
+    if (!force && scriptAppliedFingerprint === themeIdentity) {
+      appliedThemeRef.current = themeIdentity;
       return;
     }
 
     applyRuntimeTheme(normalizedTheme);
 
     // Marcar que este tema ya fue aplicado
-    appliedThemeRef.current = theme.theme_name;
+    appliedThemeRef.current = themeIdentity;
 
     // Guardar en localStorage para aplicar inmediatamente en la próxima carga
     try {
@@ -237,14 +244,21 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
     // Solo aplicar si tenemos un tema activo y no se ha aplicado ya
     if (activeTheme) {
-      // Si el script ya aplicó este tema, solo marcar como aplicado sin volver a aplicar
-      if (scriptAppliedTheme === activeTheme.theme_name) {
-        appliedThemeRef.current = activeTheme.theme_name;
+      const normalizedActiveTheme = normalizeThemeRecord(activeTheme);
+      const activeIdentity = normalizedActiveTheme?.theme_fingerprint ?? null;
+      const scriptAppliedFingerprint =
+        typeof scriptAppliedTheme === "object" && scriptAppliedTheme !== null
+          ? scriptAppliedTheme.theme_fingerprint
+          : null;
+
+      // Si el script ya aplicó este fingerprint, solo marcar como aplicado sin volver a aplicar
+      if (activeIdentity && scriptAppliedFingerprint === activeIdentity) {
+        appliedThemeRef.current = activeIdentity;
         return;
       }
 
       // Solo aplicar si no se ha aplicado ya
-      if (appliedThemeRef.current !== activeTheme.theme_name) {
+      if (activeIdentity && appliedThemeRef.current !== activeIdentity) {
         applyTheme(activeTheme);
       }
     } else if (!activeTheme && themes.length > 0) {
@@ -254,15 +268,23 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         (t) => t.theme_name === "Claro Original",
       );
       if (defaultTheme) {
-        // Si el script ya aplicó este tema, solo marcar como aplicado
-        if (scriptAppliedTheme === defaultTheme.theme_name) {
-          appliedThemeRef.current = defaultTheme.theme_name;
+        const normalizedDefaultTheme = normalizeThemeRecord(defaultTheme);
+        const defaultIdentity =
+          normalizedDefaultTheme?.theme_fingerprint ?? null;
+        const scriptAppliedFingerprint =
+          typeof scriptAppliedTheme === "object" && scriptAppliedTheme !== null
+            ? scriptAppliedTheme.theme_fingerprint
+            : null;
+
+        // Si el script ya aplicó este fingerprint, solo marcar como aplicado
+        if (defaultIdentity && scriptAppliedFingerprint === defaultIdentity) {
+          appliedThemeRef.current = defaultIdentity;
           deferStateUpdate(() => setActiveThemeState(defaultTheme));
           return;
         }
 
         // Solo aplicar si no se ha aplicado ya
-        if (appliedThemeRef.current !== defaultTheme.theme_name) {
+        if (defaultIdentity && appliedThemeRef.current !== defaultIdentity) {
           applyTheme(defaultTheme);
           setActiveThemeState(defaultTheme);
         }

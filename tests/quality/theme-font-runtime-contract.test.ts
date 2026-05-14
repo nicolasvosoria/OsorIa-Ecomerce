@@ -4,6 +4,7 @@ import {
   DEFAULT_RUNTIME_THEME,
   normalizeFontRecord,
   normalizeThemeRecord,
+  stableThemeColorsHash,
 } from "@/lib/theme-font/runtime-contract";
 import {
   normalizeRuntimeStoreId,
@@ -30,7 +31,33 @@ describe("normalizeThemeRecord", () => {
       },
     });
 
-    expect(theme).toEqual({
+    expect(theme).toEqual(
+      expect.objectContaining({
+        theme_name: "Ocean",
+        colors: {
+          primary: "#001122",
+          secondary: "#112233",
+          accent: "#334455",
+          background: "#ffffff",
+          foreground: "#111111",
+          card: "#f6f6f6",
+          cardForeground: "#111111",
+          border: "#dddddd",
+          muted: "#efefef",
+          mutedForeground: "#555555",
+        },
+        theme_fingerprint: expect.stringMatching(/^legacy:1:/),
+      }),
+    );
+  });
+
+  it("derives a deterministic fingerprint from version metadata and colors", () => {
+    const base = {
+      id: "theme-1",
+      store_id: "store-1",
+      theme_version_id: "version-1",
+      updated_at: "2026-05-14T10:00:00Z",
+      theme_published_at: "2026-05-14T10:05:00Z",
       theme_name: "Ocean",
       colors: {
         primary: "#001122",
@@ -44,7 +71,50 @@ describe("normalizeThemeRecord", () => {
         muted: "#efefef",
         mutedForeground: "#555555",
       },
+    };
+
+    const first = normalizeThemeRecord(base);
+    const changedSameName = normalizeThemeRecord({
+      ...base,
+      colors: { ...base.colors, primary: "#991122" },
     });
+
+    expect(first?.theme_fingerprint).toBe(
+      `v1:store-1:version-1:theme-1:2026-05-14T10:00:00Z:${stableThemeColorsHash(base.colors)}`,
+    );
+    expect(changedSameName?.theme_name).toBe("Ocean");
+    expect(changedSameName?.theme_fingerprint).not.toBe(
+      first?.theme_fingerprint,
+    );
+  });
+
+  it("normalizes legacy theme_config into a fingerprinted runtime shape", () => {
+    const legacy = normalizeThemeRecord({
+      id: "theme-legacy",
+      updated_at: "2026-05-14T11:00:00Z",
+      theme_name: "Legacy",
+      theme_config: {
+        primary: "#123456",
+        secondary: "#223456",
+        accent: "#323456",
+        background: "#fefefe",
+        foreground: "#1c1c1c",
+        card: "#ffffff",
+        cardForeground: "#121212",
+        border: "#ededed",
+        muted: "#fafafa",
+        mutedForeground: "#4c4c4c",
+      },
+    });
+
+    expect(legacy).toEqual(
+      expect.objectContaining({
+        theme_name: "Legacy",
+        theme_fingerprint: expect.stringMatching(
+          /^legacy:theme-legacy:2026-05-14T11:00:00Z:/,
+        ),
+      }),
+    );
   });
 
   it("maps legacy theme_config to canonical colors", () => {
@@ -118,6 +188,7 @@ describe("resolveThemeBootstrapPayload", () => {
   it("applies valid cached theme", () => {
     const cachedTheme = JSON.stringify({
       theme_name: "Cached",
+      theme_fingerprint: "legacy:cached:stamp:hash",
       colors: {
         primary: "#0a0a0a",
         secondary: "#0b0b0b",

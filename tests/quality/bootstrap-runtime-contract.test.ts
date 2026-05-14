@@ -4,9 +4,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   applyRuntimeFont,
+  resolveThemeBootstrapPayload,
   ensureStylesheetLink,
   shouldLoadFontStylesheet,
 } from "@/lib/theme-font/bootstrap";
+import { DEFAULT_RUNTIME_THEME } from "@/lib/theme-font/runtime-contract";
 
 describe("font stylesheet bootstrap", () => {
   it("loads stylesheet only once for active custom fonts", () => {
@@ -57,5 +59,53 @@ describe("font stylesheet bootstrap", () => {
         'link[href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap"]',
       ),
     ).toHaveLength(1);
+  });
+});
+
+describe("theme cache bootstrap fingerprint contract", () => {
+  const fingerprintedTheme = {
+    theme_name: "Cached",
+    theme_fingerprint: "v1:store-1:version-1:theme-1:stamp:abc",
+    colors: DEFAULT_RUNTIME_THEME.colors,
+  };
+
+  it("accepts fingerprint-aware cache when the expected fingerprint matches", () => {
+    const result = resolveThemeBootstrapPayload(
+      JSON.stringify(fingerprintedTheme),
+      {
+        expectedThemeFingerprint: fingerprintedTheme.theme_fingerprint,
+      },
+    );
+
+    expect(result.status).toBe("valid");
+    expect(result.theme.theme_fingerprint).toBe(
+      fingerprintedTheme.theme_fingerprint,
+    );
+  });
+
+  it("rejects legacy cache without a fingerprint before first paint", () => {
+    const result = resolveThemeBootstrapPayload(
+      JSON.stringify({
+        theme_name: "Cached",
+        colors: DEFAULT_RUNTIME_THEME.colors,
+      }),
+    );
+
+    expect(result.status).toBe("stale");
+    expect(result.theme).toEqual(DEFAULT_RUNTIME_THEME);
+  });
+
+  it("rejects fingerprint-aware cache when the expected fingerprint differs", () => {
+    const result = resolveThemeBootstrapPayload(
+      JSON.stringify(fingerprintedTheme),
+      {
+        expectedThemeFingerprint: "v1:store-1:version-2:theme-1:stamp:def",
+      },
+    );
+
+    expect(result.status).toBe("stale");
+    expect(result.theme.theme_fingerprint).toBe(
+      DEFAULT_RUNTIME_THEME.theme_fingerprint,
+    );
   });
 });
