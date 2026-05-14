@@ -64,9 +64,8 @@ export default async function RootLayout({
   children: React.ReactNode
 }>) {
   // Intentar obtener colecciones de Shopify, pero no fallar si no está configurado
-  let collections = [];
   try {
-    collections = await getCollections();
+    await getCollections();
   } catch (error) {
     console.warn('[Layout] ⚠️ No se pudieron obtener colecciones de Shopify:', error);
     // Continuar sin colecciones si Shopify no está configurado
@@ -84,6 +83,7 @@ export default async function RootLayout({
           href="https://fonts.gstatic.com"
           crossOrigin="anonymous"
         />
+        {/* eslint-disable-next-line @next/next/no-page-custom-font -- Google-hosted runtime font link is intentionally in the app shell for this App Router project. */}
         <link
           href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Geist+Mono:wght@100..900&display=swap"
           rel="stylesheet"

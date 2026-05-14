@@ -16,6 +16,7 @@ import {
   getRuntimeStoreIdSync,
   resolveScopedStorageKey,
 } from "@/lib/utils/store";
+import { deferStateUpdate } from "@/lib/react/defer-state-update";
 
 interface StylesContextType {
   styles: Map<string, Record<string, any>>;
@@ -165,7 +166,7 @@ export function StylesProvider({ children }: { children: ReactNode }) {
               console.warn(
                 "[v0] No se pudo obtener storeId después de varios intentos",
               );
-              setLoading(false);
+              deferStateUpdate(() => setLoading(false));
             }
           }
         }, 200); // Reintentar cada 200ms
@@ -174,8 +175,10 @@ export function StylesProvider({ children }: { children: ReactNode }) {
       }
     } else {
       // Durante SSR, usar valores por defecto
-      setLoading(false);
+      deferStateUpdate(() => setLoading(false));
     }
+    // refreshStyles intentionally reads the current runtime store id inside the effect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Dependencias vacías porque getCurrentStoreId se llama dentro
 
   // También escuchar cambios en el storeId (por si cambia el subdominio)
@@ -214,6 +217,8 @@ export function StylesProvider({ children }: { children: ReactNode }) {
         clearInterval(checkInterval);
       };
     }
+    // refreshStyles intentionally reads the latest store id when storage changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -247,9 +252,10 @@ export function useComponentStyle(
   const { styles, loading } = useStyles();
 
   // Memoizar defaultStyles para evitar re-renders infinitos
+  const defaultStylesKey = JSON.stringify(defaultStyles);
   const memoizedDefaults = useMemo(
-    () => defaultStyles,
-    [JSON.stringify(defaultStyles)],
+    () => JSON.parse(defaultStylesKey) as Record<string, any>,
+    [defaultStylesKey],
   );
 
   // Inicializar con datos guardados si existen, o con defaults
@@ -270,17 +276,21 @@ export function useComponentStyle(
       // Si hay estilos guardados, combinarlos con defaults (los guardados tienen prioridad)
       const mergedStyles = { ...memoizedDefaults, ...currentStyles };
       // Solo actualizar si realmente cambió
-      setComponentStyles((prev) => {
-        const currentStr = JSON.stringify(mergedStyles);
-        const prevStr = JSON.stringify(prev);
-        return currentStr !== prevStr ? mergedStyles : prev;
+      deferStateUpdate(() => {
+        setComponentStyles((prev) => {
+          const currentStr = JSON.stringify(mergedStyles);
+          const prevStr = JSON.stringify(prev);
+          return currentStr !== prevStr ? mergedStyles : prev;
+        });
       });
     } else {
       // Solo actualizar si realmente cambió
-      setComponentStyles((prev) => {
-        const defaultStr = JSON.stringify(memoizedDefaults);
-        const prevStr = JSON.stringify(prev);
-        return defaultStr !== prevStr ? memoizedDefaults : prev;
+      deferStateUpdate(() => {
+        setComponentStyles((prev) => {
+          const defaultStr = JSON.stringify(memoizedDefaults);
+          const prevStr = JSON.stringify(prev);
+          return defaultStr !== prevStr ? memoizedDefaults : prev;
+        });
       });
     }
 
@@ -309,7 +319,7 @@ export function useComponentStyle(
           console.warn("[v0] Error saving component style to localStorage:", e);
         }
       });
-    } catch (error) {
+    } catch {
       // Error silencioso para evitar spam en consola
     }
 

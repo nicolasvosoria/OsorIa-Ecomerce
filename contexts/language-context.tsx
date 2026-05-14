@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
 import { translations, type Language, type Translations } from "@/lib/i18n/translations"
+import { deferStateUpdate } from "@/lib/react/defer-state-update"
 
 interface LanguageContextType {
   language: Language
@@ -26,17 +27,19 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
 
   // Cargar idioma desde localStorage al montar
   useEffect(() => {
-    setMounted(true)
-    const savedLanguage = localStorage.getItem('osoria_language') as Language | null
-    if (savedLanguage && (savedLanguage === 'es' || savedLanguage === 'en' || savedLanguage === 'pt')) {
-      setLanguageState(savedLanguage)
-    } else {
-      // Detectar idioma del navegador
-      const browserLang = navigator.language.split('-')[0]
-      if (browserLang === 'en' || browserLang === 'pt') {
-        setLanguageState(browserLang as Language)
+    deferStateUpdate(() => {
+      setMounted(true)
+      const savedLanguage = localStorage.getItem('osoria_language') as Language | null
+      if (savedLanguage && (savedLanguage === 'es' || savedLanguage === 'en' || savedLanguage === 'pt')) {
+        setLanguageState(savedLanguage)
+      } else {
+        // Detectar idioma del navegador
+        const browserLang = navigator.language.split('-')[0]
+        if (browserLang === 'en' || browserLang === 'pt') {
+          setLanguageState(browserLang as Language)
+        }
       }
-    }
+    })
   }, [])
 
   // Guardar idioma en localStorage cuando cambia
@@ -77,5 +80,4 @@ export function useLanguage() {
   }
   return context
 }
-
 

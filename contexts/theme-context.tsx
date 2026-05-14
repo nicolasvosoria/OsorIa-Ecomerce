@@ -17,6 +17,7 @@ import { useAuth } from "@/contexts/auth-context";
 import type { AppTheme } from "@/lib/types/theme";
 import { applyRuntimeTheme } from "@/lib/theme-font/bootstrap";
 import { normalizeThemeRecord } from "@/lib/theme-font/runtime-contract";
+import { deferStateUpdate } from "@/lib/react/defer-state-update";
 
 interface ThemeContextType {
   themes: AppTheme[];
@@ -199,10 +200,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     // Solo cargar en el cliente, no durante SSR/prerendering
     if (typeof window !== "undefined") {
       console.log("[Theme] Provider montado, iniciando carga de temas...");
-      refreshThemes();
+      deferStateUpdate(() => {
+        void refreshThemes();
+      });
     } else {
       // Durante SSR, usar valores por defecto
-      setLoading(false);
+      deferStateUpdate(() => setLoading(false));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -254,7 +257,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         // Si el script ya aplicó este tema, solo marcar como aplicado
         if (scriptAppliedTheme === defaultTheme.theme_name) {
           appliedThemeRef.current = defaultTheme.theme_name;
-          setActiveThemeState(defaultTheme);
+          deferStateUpdate(() => setActiveThemeState(defaultTheme));
           return;
         }
 

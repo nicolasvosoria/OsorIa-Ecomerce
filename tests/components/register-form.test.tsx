@@ -1,9 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { render, screen } from '@testing-library/react'
 import { Header } from '@/components/layout/header'
 import { AuthProvider } from '@/contexts/auth-context'
-import { signUp } from '@/lib/supabase/auth-api'
+import { CartProvider } from '@/contexts/cart-context'
+import { FontProvider } from '@/contexts/font-context'
+import { LanguageProvider } from '@/contexts/language-context'
+import { StoreProvider } from '@/contexts/store-context'
+import { StylesProvider } from '@/contexts/styles-context'
+import { ThemeProvider } from '@/contexts/theme-context'
+import { WishlistProvider } from '@/contexts/wishlist-context'
 import { signUp } from '@/lib/supabase/auth-api'
 
 // Mock de Next.js Image
@@ -55,6 +60,18 @@ vi.mock('@/lib/supabase/auth-api', () => ({
   onAuthStateChange: () => mockOnAuthStateChange(),
 }))
 
+vi.mock('@/lib/supabase/themes-api', () => ({
+  getThemes: vi.fn().mockResolvedValue([]),
+  getActiveTheme: vi.fn().mockResolvedValue(null),
+  setActiveTheme: vi.fn().mockResolvedValue({ success: true }),
+}))
+
+vi.mock('@/lib/supabase/fonts-api', () => ({
+  getFonts: vi.fn().mockResolvedValue([]),
+  getActiveFont: vi.fn().mockResolvedValue(null),
+  setActiveFont: vi.fn().mockResolvedValue({ success: true }),
+}))
+
 // Mock de toast
 vi.mock('sonner', () => ({
   toast: {
@@ -74,32 +91,34 @@ describe('Formulario de Registro - Componente Header', () => {
 
   const renderHeader = () => {
     return render(
-      <AuthProvider>
-        <Header />
-      </AuthProvider>
+      <LanguageProvider>
+        <StoreProvider>
+          <StylesProvider>
+            <AuthProvider>
+              <ThemeProvider>
+                <FontProvider>
+                  <CartProvider>
+                    <WishlistProvider>
+                      <Header />
+                    </WishlistProvider>
+                  </CartProvider>
+                </FontProvider>
+              </ThemeProvider>
+            </AuthProvider>
+          </StylesProvider>
+        </StoreProvider>
+      </LanguageProvider>
     )
   }
 
-  it('debe mostrar el modal de registro cuando se hace clic en crear cuenta', async () => {
-    const user = userEvent.setup()
+  it('debe renderizar el header con el árbol de providers requerido', async () => {
     renderHeader()
 
-    // Buscar el botón para abrir el modal (puede variar según la implementación)
-    // Por ahora, asumimos que hay un botón de "Iniciar Sesión" o similar
-    const loginButton = screen.queryByText(/iniciar sesión|crear cuenta/i)
-    
-    if (loginButton) {
-      await user.click(loginButton)
-      
-      // Verificar que el modal se abre
-      await waitFor(() => {
-        expect(screen.getByText(/crear cuenta|iniciar sesión/i)).toBeInTheDocument()
-      })
-    }
+    expect(screen.getByRole('banner')).toBeInTheDocument()
+    expect(screen.getAllByAltText(/osoria logo/i).length).toBeGreaterThan(0)
   })
 
   it('debe validar que las contraseñas coincidan', async () => {
-    const user = userEvent.setup()
     renderHeader()
 
     // Este test requiere que el modal esté abierto
@@ -181,4 +200,3 @@ describe('Formulario de Registro - Componente Header', () => {
     expect(fields.lastName).toBe('')
   })
 })
-

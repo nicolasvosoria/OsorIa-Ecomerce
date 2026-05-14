@@ -24,7 +24,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { updateItem, getCategories, getItemById } from "@/lib/supabase/products-api"
-import type { ItemCategory, StoreItemWithDetails } from "@/lib/types/products"
+import type { ItemCategory } from "@/lib/types/products"
 import { MultiImageUpload } from "@/components/admin/multi-image-upload"
 import { toast } from "sonner"
 

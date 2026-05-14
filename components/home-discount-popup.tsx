@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { X } from "lucide-react";
 import { toast } from "sonner";
@@ -12,6 +12,7 @@ import {
   isHomeDiscountPopupEligible,
   type PublicHomeDiscountPopupConfig,
 } from "@/lib/home-discount-popup";
+import { deferStateUpdate } from "@/lib/react/defer-state-update";
 
 function getStorageSnapshot(storageKey: string): Record<string, string | null> {
   if (typeof window === "undefined") {
@@ -171,16 +172,13 @@ export function HomeDiscountPopup() {
   const [isVisible, setIsVisible] = useState(false);
 
   const config = store?.homeDiscountPopup ?? null;
-  const storageKey = useMemo(() => {
-    if (!store?.id || !config?.fingerprint) {
-      return null;
-    }
-
-    return getHomeDiscountPopupStorageKey(store.id, config.fingerprint);
-  }, [config?.fingerprint, store?.id]);
+  const storageKey =
+    store?.id && config?.fingerprint
+      ? getHomeDiscountPopupStorageKey(store.id, config.fingerprint)
+      : null;
 
   useEffect(() => {
-    setIsVisible(false);
+    deferStateUpdate(() => setIsVisible(false));
 
     if (!config || !storageKey) {
       return;

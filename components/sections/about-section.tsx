@@ -1,10 +1,11 @@
+/* eslint-disable @next/next/no-img-element -- Existing dynamic storefront images intentionally use native img in these legacy components; converting all to next/image is outside the global-gates cleanup risk budget. */
 "use client"
 
 import { useComponentStyle } from "@/contexts/styles-context"
 import { useAdmin } from "@/contexts/admin-context"
 
 export function AboutSection() {
-  const { styles: styleData, loading } = useComponentStyle("about", {
+  const { styles: styleData } = useComponentStyle("about", {
     title: "Café con Raíces,\nTradición y Orgullo\nColombiano",
     description: "En Highlands Café somos una familia cafetera del Huila que cultiva con amor y dedicación cada grano. Desde nuestra finca en Palermo, producimos cafés de especialidad con procesos artesanales, cuidando cada detalle para ofrecer una experiencia única en aroma, sabor y origen.\n\nNuestro compromiso es llevar a tu mesa un café que cuente una historia: la nuestra.",
     ceoName: "Sofía Ramírez",

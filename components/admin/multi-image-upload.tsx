@@ -28,8 +28,6 @@ export function MultiImageUpload({
   accept = "image/jpeg,image/jpg,image/png,image/webp,image/gif",
 }: MultiImageUploadProps) {
   const [uploading, setUploading] = useState<number | null>(null)
-  const fileInputRef = useState<HTMLInputElement | null>(null)[0]
-
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>, index?: number) => {
     const file = event.target.files?.[0]
     if (!file) return
@@ -227,4 +225,3 @@ export function MultiImageUpload({
     </div>
   )
 }
-

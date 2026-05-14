@@ -1,175 +1,132 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createServerClient } from "@supabase/ssr"
+import { createClient } from "@supabase/supabase-js"
 import { cookies } from "next/headers"
-import { ECOMMERCE_SCHEMA, ECOMMERCE_TABLES } from "@/lib/supabase/contract"
 
-async function getSupabaseServerClient() {
+import {
+  buildChatbotStoreLookups,
+  loadChatbotConfigForStore,
+  saveChatbotConfigForStore,
+  type ChatbotPersistenceClient,
+} from "@/lib/supabase/chatbot-api"
+import { requireAdminUser } from "@/lib/supabase/admin-route-auth"
+import { ECOMMERCE_SCHEMA } from "@/lib/supabase/contract"
+
+function getChatbotServiceClient(): ChatbotPersistenceClient | null {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-  if (!supabaseUrl || !supabaseKey) {
+  if (!supabaseUrl || !serviceRoleKey) {
     return null
   }
 
+  return createClient(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  }).schema(ECOMMERCE_SCHEMA) as unknown as ChatbotPersistenceClient
+}
+
+async function getRequestStoreLookups(request: NextRequest) {
+  if (process.env.DISABLE_SUBDOMAIN_MULTI_TENANT === "true") {
+    return buildChatbotStoreLookups({
+      storeId: process.env.DEFAULT_STORE_ID || "default",
+      host: request.headers.get("host"),
+    })
+  }
+
   const cookieStore = await cookies()
-  
-  return createServerClient(supabaseUrl, supabaseKey, {
-    cookies: {
-      get(name: string) {
-        return cookieStore.get(name)?.value
-      },
-      set(name: string, value: string, options: any) {
-        try {
-          cookieStore.set({ name, value, ...options })
-        } catch {
-          // Las cookies pueden fallar durante el renderizado estático
-        }
-      },
-      remove(name: string, options: any) {
-        try {
-          cookieStore.set({ name, value: '', ...options })
-        } catch {
-          // Las cookies pueden fallar durante el renderizado estático
-        }
-      },
-    },
-  }).schema(ECOMMERCE_SCHEMA)
+
+  return buildChatbotStoreLookups({
+    forwardedStoreId: request.headers.get("x-store-id"),
+    storeId: cookieStore.get("store_id")?.value ?? null,
+    host: request.headers.get("host"),
+  })
 }
 
-async function getStoreIdFromServer(): Promise<string | null> {
-  const disableMultiTenant = process.env.DISABLE_SUBDOMAIN_MULTI_TENANT === 'true'
-  if (disableMultiTenant) {
-    return process.env.DEFAULT_STORE_ID || 'default'
+async function getAuthorizedClient(
+  request: NextRequest,
+): Promise<
+  | { ecommerceClient: ChatbotPersistenceClient }
+  | { error: string; status: 401 | 403 | 500 }
+> {
+  const ecommerceClient = getChatbotServiceClient()
+  if (!ecommerceClient) {
+    return { error: "Supabase no configurado", status: 500 }
   }
 
-  try {
-    const cookieStore = await cookies()
-    const storeIdCookie = cookieStore.get('store_id')
-    if (storeIdCookie) return storeIdCookie.value
-  } catch {
-    return 'default'
+  const adminCheck = await requireAdminUser(request, ecommerceClient)
+  if ("error" in adminCheck) {
+    return {
+      error: adminCheck.error,
+      status: adminCheck.status,
+    }
   }
-  
-  return 'default'
+
+  return { ecommerceClient }
 }
 
-// GET - Obtener configuración del chatbot
-export async function GET() {
+function asNotFoundResponse(error: unknown) {
+  if (error instanceof Error && error.message === "Tienda no encontrada") {
+    return NextResponse.json({ error: error.message }, { status: 404 })
+  }
+
+  return null
+}
+
+// GET - Obtener configuración del chatbot para la tienda actual
+export async function GET(request: NextRequest) {
   try {
-    const supabase = await getSupabaseServerClient()
-    if (!supabase) {
+    const authorized = await getAuthorizedClient(request)
+    if (!("ecommerceClient" in authorized)) {
       return NextResponse.json(
-        { error: "Supabase no configurado" },
-        { status: 500 }
+        { error: authorized.error },
+        { status: authorized.status },
       )
     }
 
-    const storeId = await getStoreIdFromServer()
+    const { storeId, config } = await loadChatbotConfigForStore(
+      authorized.ecommerceClient,
+      await getRequestStoreLookups(request),
+    )
 
-    let query = supabase
-      .from(ECOMMERCE_TABLES.stores)
-      .select('metadata')
-      .eq('is_active', true)
-      .is('deleted_at', null)
-
-    if (storeId === 'default') {
-      query = query.eq('subdomain', 'default')
-    } else {
-      query = query.eq('id', storeId)
-    }
-
-    const { data, error } = await query.single()
-
-    if (error || !data) {
-      return NextResponse.json(
-        { error: "Tienda no encontrada" },
-        { status: 404 }
-      )
-    }
-
-    const metadata = (data.metadata as Record<string, any>) || {}
-    const chatbotConfig = metadata.chatbot || null
-
-    return NextResponse.json({ config: chatbotConfig })
+    return NextResponse.json({ config, storeId })
   } catch (error) {
-    console.error("[Chatbot Config API] Error:", error)
+    const notFoundResponse = asNotFoundResponse(error)
+    if (notFoundResponse) return notFoundResponse
+
+    console.error("[Chatbot Config API] Error al obtener configuración:", error)
     return NextResponse.json(
       { error: "Error interno del servidor" },
-      { status: 500 }
+      { status: 500 },
     )
   }
 }
 
-// POST - Guardar configuración del chatbot
+// POST - Guardar configuración del chatbot para la tienda actual
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await getSupabaseServerClient()
-    if (!supabase) {
+    const authorized = await getAuthorizedClient(request)
+    if (!("ecommerceClient" in authorized)) {
       return NextResponse.json(
-        { error: "Supabase no configurado" },
-        { status: 500 }
+        { error: authorized.error },
+        { status: authorized.status },
       )
     }
 
     const body = await request.json()
-    const { config } = body
+    const { storeId, config } = await saveChatbotConfigForStore(
+      authorized.ecommerceClient,
+      await getRequestStoreLookups(request),
+      body?.config,
+    )
 
-    if (!config) {
-      return NextResponse.json(
-        { error: "Configuración requerida" },
-        { status: 400 }
-      )
-    }
-
-    const storeId = await getStoreIdFromServer()
-
-    let query = supabase
-      .from(ECOMMERCE_TABLES.stores)
-      .select('id, metadata')
-      .eq('is_active', true)
-      .is('deleted_at', null)
-
-    if (storeId === 'default') {
-      query = query.eq('subdomain', 'default')
-    } else {
-      query = query.eq('id', storeId)
-    }
-
-    const { data: storeData, error: fetchError } = await query.single()
-
-    if (fetchError || !storeData) {
-      return NextResponse.json(
-        { error: "Tienda no encontrada" },
-        { status: 404 }
-      )
-    }
-
-    // Actualizar el metadata
-    const metadata = (storeData.metadata as Record<string, any>) || {}
-    metadata.chatbot = config
-
-    const { error: updateError } = await supabase
-      .from(ECOMMERCE_TABLES.stores)
-      .update({ 
-        metadata,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', storeData.id)
-
-    if (updateError) {
-      console.error("[Chatbot Config API] Error al actualizar:", updateError)
-      return NextResponse.json(
-        { error: "Error al guardar configuración" },
-        { status: 500 }
-      )
-    }
-
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, config, storeId })
   } catch (error) {
-    console.error("[Chatbot Config API] Error:", error)
+    const notFoundResponse = asNotFoundResponse(error)
+    if (notFoundResponse) return notFoundResponse
+
+    console.error("[Chatbot Config API] Error al guardar configuración:", error)
     return NextResponse.json(
       { error: "Error interno del servidor" },
-      { status: 500 }
+      { status: 500 },
     )
   }
 }

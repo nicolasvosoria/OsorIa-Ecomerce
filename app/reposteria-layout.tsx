@@ -9,16 +9,19 @@ import { useEffect } from "react"
  */
 export function ReposteriaLayout({ children }: { children: React.ReactNode }) {
   const { store } = useStore()
+  const storeSubdomain = store?.subdomain ?? null
+  const configuredPrimaryColor = store?.primary_color ?? null
+  const configuredSecondaryColor = store?.secondary_color ?? null
 
   useEffect(() => {
     // Solo aplicar si estamos en la tienda de repostería
-    if (store?.subdomain === 'reposteria') {
+    if (storeSubdomain === 'reposteria') {
       const root = document.documentElement
       
       // Aplicar tema personalizado de repostería (inspirado en nicolukas.com)
       // Usar colores de la tienda si están disponibles, sino usar valores por defecto
-      const primaryColor = store.primary_color || '#FF6B9D'
-      const secondaryColor = store.secondary_color || '#FFE5F1'
+      const primaryColor = configuredPrimaryColor || '#FF6B9D'
+      const secondaryColor = configuredSecondaryColor || '#FFE5F1'
       
       root.style.setProperty('--primary', primaryColor)
       root.style.setProperty('--secondary', secondaryColor)
@@ -55,16 +58,11 @@ export function ReposteriaLayout({ children }: { children: React.ReactNode }) {
 
     return () => {
       // Limpiar al desmontar solo si no es repostería
-      if (store?.subdomain !== 'reposteria') {
+      if (storeSubdomain !== 'reposteria') {
         document.body.classList.remove('reposteria-store')
       }
     }
-  }, [
-    store?.subdomain ?? null,
-    store?.primary_color ?? null,
-    store?.secondary_color ?? null
-  ])
+  }, [configuredPrimaryColor, configuredSecondaryColor, storeSubdomain])
 
   return <>{children}</>
 }
-

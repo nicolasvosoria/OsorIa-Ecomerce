@@ -8,8 +8,6 @@ import Image from "next/image"
 import { formatPrice } from "@/lib/shopify/utils"
 import { toast } from "sonner"
 import { useCart } from "@/contexts/cart-context"
-import { AddToCartButton } from "@/components/cart/add-to-cart"
-import { Product } from "@/lib/shopify/types"
 import { useLanguage } from "@/contexts/language-context"
 
 export default function WishlistPage() {
@@ -18,41 +16,6 @@ export default function WishlistPage() {
   const { t } = useLanguage()
 
   const handleAddToCart = (item: typeof items[0]) => {
-    // Crear un producto adaptado para AddToCartButton
-    const product: Product = {
-      id: item.id,
-      title: item.title,
-      handle: item.handle,
-      description: "",
-      descriptionHtml: "",
-      categoryId: "",
-      featuredImage: item.image ? { url: item.image, altText: item.title, width: 400, height: 400 } : { url: "/placeholder.svg", altText: item.title, width: 400, height: 400 },
-      currencyCode: item.currencyCode || "COP",
-      priceRange: {
-        minVariantPrice: {
-          amount: item.price || "0",
-          currencyCode: item.currencyCode || "COP",
-        },
-        maxVariantPrice: {
-          amount: item.price || "0",
-          currencyCode: item.currencyCode || "COP",
-        },
-      },
-      compareAtPrice: item.compareAtPrice ? {
-        amount: item.compareAtPrice,
-        currencyCode: item.currencyCode || "COP",
-      } : undefined,
-      options: [],
-      tags: [],
-      variants: [],
-      images: [],
-      availableForSale: true,
-      seo: {
-        title: item.title,
-        description: "",
-      },
-    }
-
     // Agregar al carrito local
     addToCart({
       id: item.id,
@@ -206,4 +169,3 @@ export default function WishlistPage() {
     </div>
   )
 }
-

@@ -5,6 +5,7 @@ import { useTheme } from "@/contexts/theme-context"
 import { useFont } from "@/contexts/font-context"
 import { useStyles } from "@/contexts/styles-context"
 import { LoadingScreen } from "./loading-screen"
+import { deferStateUpdate } from "@/lib/react/defer-state-update"
 
 interface StylesLoaderProps {
   children: React.ReactNode
@@ -31,7 +32,7 @@ export function StylesLoader({ children }: StylesLoaderProps) {
       const stylesApplied = (window as any).__osoria_styles_applied === true
       
       if (scriptExecuted || stylesApplied) {
-        setScriptExecuted(true)
+        deferStateUpdate(() => setScriptExecuted(true))
       } else {
         // Si no se ha ejecutado aún, esperar un poco (máximo 500ms)
         let attempts = 0
@@ -99,4 +100,3 @@ export function StylesLoader({ children }: StylesLoaderProps) {
     </>
   )
 }
-

@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/error-boundaries -- Server components render fallback UI after async data-loading failures. */
 import { Suspense } from "react"
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
@@ -6,11 +7,8 @@ import { FooterNew } from "@/components/sections/footer-new"
 import { getCategories, getItems } from "@/lib/supabase/products-api"
 import { CatalogProductsList } from "@/components/catalog/catalog-products-list"
 import { getStoreId } from "@/lib/utils/store"
-import { headers, cookies } from "next/headers"
-import { createServerClient } from "@supabase/ssr"
 import { notFound } from "next/navigation"
 import { getStoreIdServer } from "@/lib/utils/store-server"
-import { ECOMMERCE_SCHEMA, ECOMMERCE_VIEWS } from "@/lib/supabase/contract"
 
 // Helper para formatear precio
 function formatPrice(price: number | string, currencyCode: string = "COP"): string {
@@ -31,91 +29,6 @@ function generateCategorySlug(name: string): string {
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "")
-}
-
-// Helper para obtener cliente de Supabase en el servidor
-async function getSupabaseServerClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  if (!supabaseUrl || !supabaseKey) {
-    return null
-  }
-
-  const cookieStore = await cookies()
-  
-  return createServerClient(supabaseUrl, supabaseKey, {
-    cookies: {
-      get(name: string) {
-        return cookieStore.get(name)?.value
-      },
-      set() {
-        // No hacer nada en lectura
-      },
-      remove() {
-        // No hacer nada en lectura
-      },
-    },
-  }).schema(ECOMMERCE_SCHEMA)
-}
-
-// Helper para obtener store_id desde headers o subdominio
-async function getStoreIdFromRequest(): Promise<string | null> {
-  try {
-    // Intentar obtener de headers (establecido por middleware)
-    const headersList = await headers()
-    const storeIdFromHeader = headersList.get('x-store-id')
-    if (storeIdFromHeader) {
-      return storeIdFromHeader
-    }
-    
-    // Si no hay header, intentar obtener del subdominio
-    const hostname = headersList.get('host') || ''
-    const subdomain = getSubdomainFromHostname(hostname)
-    
-    if (subdomain) {
-      const supabase = await getSupabaseServerClient()
-      if (supabase) {
-        const { data: store, error } = await supabase
-          .from(ECOMMERCE_VIEWS.storesLegacy)
-          .select('id')
-          .eq('subdomain', subdomain)
-          .eq('is_active', true)
-          .single()
-        
-        if (!error && store?.id) {
-          return store.id
-        }
-      }
-    }
-    
-    return null
-  } catch (error) {
-    console.warn('[Category] Error obteniendo store_id:', error)
-    return null
-  }
-}
-
-// Helper para extraer subdominio del hostname
-function getSubdomainFromHostname(hostname: string): string | null {
-  if (hostname.includes('localhost') || hostname.includes('127.0.0.1')) {
-    const parts = hostname.split('.')
-    if (parts.length > 1 && parts[0] !== 'localhost' && parts[0] !== '127') {
-      return parts[0]
-    }
-    return 'default'
-  }
-  
-  const parts = hostname.split('.')
-  if (parts.length >= 2) {
-    const subdomain = parts[0]
-    if (subdomain === 'www') {
-      return parts.length > 2 ? parts[1] : null
-    }
-    return subdomain
-  }
-  
-  return null
 }
 
 // Contenido de la categoría

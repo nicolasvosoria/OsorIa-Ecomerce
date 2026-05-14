@@ -12,7 +12,7 @@ export function FooterNew() {
   const { store } = useStore()
   const { activeTheme } = useTheme()
   const { t } = useLanguage()
-  const { styles: styleData } = useComponentStyle("footer", {
+  useComponentStyle("footer", {
     brandName: "OSORIA"
   })
   
