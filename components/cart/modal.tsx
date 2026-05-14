@@ -8,8 +8,9 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Button } from '../ui/button';
 import { Loader } from '../ui/loader';
 import { CartItemCard } from './cart-item';
-import { formatPrice } from '@/lib/shopify/utils';
+import { buildShopifyCartSummary } from '@/lib/cart/cart-summary';
 import { useBodyScrollLock } from '@/lib/hooks/use-body-scroll-lock';
+import { useLanguage } from '@/contexts/language-context';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { Cart } from '../../lib/shopify/types';
@@ -21,16 +22,19 @@ const CartContainer = ({ children, className }: { children: React.ReactNode; cla
 
 const CartItems = ({ closeCart }: { closeCart: () => void }) => {
   const { cart } = useCart();
+  const { language, t } = useLanguage();
   const [showCheckoutDialog, setShowCheckoutDialog] = useState(false);
 
   if (!cart) return <></>;
+
+  const summary = buildShopifyCartSummary(cart, language);
 
   return (
     <>
       <div className="flex flex-col justify-between h-full overflow-hidden">
         <CartContainer className="flex justify-between text-sm text-muted-foreground">
-          <span>Products</span>
-          <span>{cart.lines.length} items</span>
+          <span>{t.cart.products}</span>
+          <span>{t.cart.itemsCount.replace('{count}', String(cart.totalQuantity || cart.lines.length))}</span>
         </CartContainer>
         <div className="relative flex-1 min-h-0 py-4 overflow-x-hidden">
           <CartContainer className="overflow-y-auto flex flex-col gap-y-3 h-full scrollbar-hide">
@@ -51,18 +55,20 @@ const CartItems = ({ closeCart }: { closeCart: () => void }) => {
         <CartContainer>
           <div className="py-4 text-sm text-foreground/50 shrink-0">
             <div className="flex justify-between items-center pb-1 mb-3 border-b border-muted-foreground/20">
-              <p>Taxes</p>
-              <p className="text-right">Calculated at checkout</p>
+              <p>{t.cart.subtotal}</p>
+              <p className="text-right text-foreground">{summary.formattedSubtotal}</p>
+            </div>
+            <div className="flex justify-between items-center pb-1 mb-3 border-b border-muted-foreground/20">
+              <p>{t.cart.tax}</p>
+              <p className="text-right">{t.cart.calculatedAtCheckout}</p>
             </div>
             <div className="flex justify-between items-center pt-1 pb-1 mb-3 border-b border-muted-foreground/20">
-              <p>Shipping</p>
-              <p className="text-right">Calculated at checkout</p>
+              <p>{t.cart.shipping}</p>
+              <p className="text-right">{t.cart.calculatedAtCheckout}</p>
             </div>
             <div className="flex justify-between items-center pt-1 pb-1 mb-1.5 text-lg font-semibold">
-              <p>Total</p>
-              <p className="text-base text-right text-foreground">
-                {formatPrice(cart.cost.totalAmount.amount, cart.cost.totalAmount.currencyCode)}
-              </p>
+              <p>{t.cart.total}</p>
+              <p className="text-base text-right text-foreground">{summary.formattedTotal}</p>
             </div>
           </div>
           <CheckoutButton onCheckoutClick={() => setShowCheckoutDialog(true)} />
@@ -88,6 +94,7 @@ const serializeCart = (cart: Cart) => {
 
 export default function CartModal() {
   const { isPending, cart } = useCart();
+  const { t } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const serializedCart = useRef(cart ? serializeCart(cart) : undefined);
 
@@ -131,7 +138,18 @@ export default function CartModal() {
   const closeCart = () => setIsOpen(false);
 
   const renderCartContent = () => {
-    if (!cart || cart.lines.length === 0) {
+    if (!cart) {
+      return (
+        <CartContainer className="flex flex-1 items-center justify-center text-center text-muted-foreground">
+          <div className="flex flex-col items-center gap-3">
+            <Loader size="default" />
+            <p>{t.cart.loading}</p>
+          </div>
+        </CartContainer>
+      );
+    }
+
+    if (cart.lines.length === 0) {
       return (
         <CartContainer className="flex w-full">
           <Link
@@ -144,8 +162,8 @@ export default function CartModal() {
                 <PlusCircleIcon className="size-6 text-muted-foreground" />
               </div>
               <div className="flex flex-col flex-1 gap-2 justify-center 2xl:gap-3">
-                <span className="text-lg font-semibold 2xl:text-xl">Cart is empty</span>
-                <p className="text-sm text-muted-foreground hover:underline">Start shopping to get started</p>
+                <span className="text-lg font-semibold 2xl:text-xl">{t.cart.empty}</span>
+                <p className="text-sm text-muted-foreground hover:underline">{t.cart.emptyDescription}</p>
               </div>
             </div>
           </Link>
@@ -158,8 +176,8 @@ export default function CartModal() {
 
   return (
     <>
-      <Button aria-label="Open cart" onClick={openCart} className="uppercase" size={'sm'}>
-        <span className="max-md:hidden">cart</span> ({cart?.totalQuantity || 0})
+      <Button aria-label={t.nav.cart} onClick={openCart} className="uppercase" size={'sm'}>
+        <span className="max-md:hidden">{t.nav.cart}</span> ({cart?.totalQuantity || 0})
       </Button>
       <AnimatePresence>
         {isOpen && (
@@ -185,9 +203,9 @@ export default function CartModal() {
             >
               <div className="flex flex-col py-3 w-full rounded bg-muted md:py-4">
                 <CartContainer className="flex justify-between items-baseline mb-10">
-                  <p className="text-2xl font-semibold">Cart</p>
-                  <Button size="sm" variant="ghost" aria-label="Close cart" onClick={closeCart}>
-                    Close
+                  <p className="text-2xl font-semibold">{t.cart.title}</p>
+                  <Button size="sm" variant="ghost" aria-label={t.common.close} onClick={closeCart}>
+                    {t.common.close}
                   </Button>
                 </CartContainer>
 
@@ -204,6 +222,7 @@ export default function CartModal() {
 function CheckoutButton({ onCheckoutClick }: { onCheckoutClick: () => void }) {
   const { pending } = useFormStatus();
   const { cart, isPending } = useCart();
+  const { t } = useLanguage();
 
   const isLoading = pending;
   const isDisabled = !cart || cart.lines.length === 0 || isPending;
@@ -211,6 +230,7 @@ function CheckoutButton({ onCheckoutClick }: { onCheckoutClick: () => void }) {
   return (
     <Button
       type="button"
+      aria-label={t.cart.checkout}
       disabled={isDisabled}
       size="lg"
       className="flex relative gap-3 justify-between items-center w-full"
@@ -229,7 +249,7 @@ function CheckoutButton({ onCheckoutClick }: { onCheckoutClick: () => void }) {
             <Loader size="default" />
           ) : (
             <div className="flex justify-between items-center w-full">
-              <span>Finalizar Compra</span>
+              <span>{t.cart.checkout}</span>
               <ArrowRight className="size-6" />
             </div>
           )}
