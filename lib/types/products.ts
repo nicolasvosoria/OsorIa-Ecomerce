@@ -95,6 +95,34 @@ export interface StoreItemWithDetails extends StoreItem {
   combo?: ComboCatalogDetails
 }
 
+export interface CommerceProductPrice {
+  amount: number
+  currencyCode: string
+  label: string
+  compareAtAmount?: number
+  compareAtLabel?: string
+  hasDiscount: boolean
+}
+
+export interface CommerceProductBadge {
+  label: string
+  tone?: 'default' | 'sale' | 'combo'
+}
+
+export interface CommerceProductCard {
+  id: string
+  title: string
+  description?: string
+  href: string
+  imageUrl?: string
+  imageAlt: string
+  category?: string
+  price: CommerceProductPrice
+  badges: CommerceProductBadge[]
+  ctaLabel?: string
+  availableForSale?: boolean
+}
+
 export interface GetItemsParams {
   store_id?: string // ID de la tienda para filtrar productos
   item_kind?: 'all' | 'products' | 'combos'
@@ -115,7 +143,6 @@ export interface GetItemsResult {
   total: number
   has_more: boolean
 }
-
 
 
 
