@@ -97,6 +97,9 @@ async function CategoryContent({ categorySlug }: { categorySlug: string }) {
       name: item.item_name,
       category: category.category_name,
       price: formatPrice(item.base_price, item.currency_code),
+      compareAtPrice: item.compare_at_price && Number(item.compare_at_price) > Number(item.base_price)
+        ? formatPrice(item.compare_at_price, item.currency_code)
+        : undefined,
       image: item.primary_image_url || "/placeholder.svg",
       slug: item.item_slug || item.id,
     }))
