@@ -12,7 +12,6 @@ import { WishlistProvider } from "@/contexts/wishlist-context"
 import { DebugGrid } from "@/components/debug-grid"
 import { isDevelopment } from "@/lib/constants"
 import { getCollections } from "@/lib/shopify"
-import { Header } from "../components/layout/header"
 import dynamic from "next/dynamic"
 import { V0Provider } from "../lib/context"
 import { cn } from "../lib/utils"
@@ -22,12 +21,7 @@ import { FontProvider } from "@/contexts/font-context"
 import { AuthProvider } from "@/contexts/auth-context"
 import { AdminPermissionsProvider } from "@/contexts/admin-permissions-context"
 import { AdminProvider } from "@/contexts/admin-context"
-import { EditorPanel } from "@/components/admin/editor-panel"
-import { EditModeToggle } from "@/components/admin/edit-mode-toggle"
-import { MainContentWrapper } from "@/components/admin/main-content-wrapper"
-import { EditableWrapper } from "@/components/admin/editable-wrapper"
 import { viewport } from "./viewport"
-import { FloatingContactButton } from "@/components/ui/floating-contact-button"
 import { ApplyStylesScript } from "@/components/apply-styles-script"
 import { StylesLoader } from "@/components/styles-loader"
 import { SiteBackground } from "@/components/site-background"
@@ -38,6 +32,7 @@ import { DynamicTitle } from "@/components/dynamic-title"
 import { DynamicFavicon } from "@/components/dynamic-favicon"
 import { DynamicLang } from "@/components/dynamic-lang"
 import { LanguageProvider } from "@/contexts/language-context"
+import { RouteAwareChrome } from "@/components/layout/route-aware-chrome"
 
 const V0Setup = dynamic(() => import("@/components/v0-setup"))
 
@@ -117,19 +112,9 @@ export default async function RootLayout({
                                 <Suspense fallback={null}>
                                   <AdminRedirect />
                                 </Suspense>
-                                <MainContentWrapper>
-                              <main data-vaul-drawer-wrapper="true">
-                                <EditableWrapper componentName="header" label="Header">
-                                  <Header />
-                                </EditableWrapper>
-                                {children}
-                              </main>
-                                </MainContentWrapper>
+                                <RouteAwareChrome>{children}</RouteAwareChrome>
                                 {isDevelopment && <DebugGrid />}
                                 <Toaster closeButton position="top-left" />
-                                <FloatingContactButton />
-                                <EditModeToggle />
-                                <EditorPanel />
                               </StylesLoader>
                             </Suspense>
                             </NuqsAdapter>
