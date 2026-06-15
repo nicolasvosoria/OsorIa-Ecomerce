@@ -1,6 +1,6 @@
 "use client"
 
-import type { ReactNode } from "react"
+import { useSyncExternalStore, type ReactNode } from "react"
 import { usePathname } from "next/navigation"
 
 import { EditModeToggle } from "@/components/admin/edit-mode-toggle"
@@ -14,6 +14,10 @@ interface RouteAwareChromeProps {
   children: ReactNode
 }
 
+const subscribeToHydrationStore = () => () => undefined
+const clientHydrationSnapshot = () => true
+const serverHydrationSnapshot = () => false
+
 export function isAdminChromeRoute(pathname: string | null): boolean {
   return pathname === "/admin"
     || pathname?.startsWith("/admin/") === true
@@ -23,13 +27,18 @@ export function isAdminChromeRoute(pathname: string | null): boolean {
 
 export function RouteAwareChrome({ children }: RouteAwareChromeProps) {
   const pathname = usePathname()
-  const hideStorefrontChrome = isAdminChromeRoute(pathname)
+  const hasHydrated = useSyncExternalStore(
+    subscribeToHydrationStore,
+    clientHydrationSnapshot,
+    serverHydrationSnapshot,
+  )
+  const showStorefrontChrome = hasHydrated && !isAdminChromeRoute(pathname)
 
   return (
     <>
       <MainContentWrapper>
         <main data-vaul-drawer-wrapper="true">
-          {!hideStorefrontChrome && (
+          {showStorefrontChrome && (
             <EditableWrapper componentName="header" label="Header">
               <Header />
             </EditableWrapper>
@@ -37,7 +46,7 @@ export function RouteAwareChrome({ children }: RouteAwareChromeProps) {
           {children}
         </main>
       </MainContentWrapper>
-      {!hideStorefrontChrome && (
+      {showStorefrontChrome && (
         <>
           <FloatingContactButton />
           <EditModeToggle />

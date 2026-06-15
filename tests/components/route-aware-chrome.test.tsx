@@ -1,5 +1,6 @@
 import type { ReactNode } from "react"
 import { render, screen } from "@testing-library/react"
+import { renderToString } from "react-dom/server"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 let mockedPathname = "/"
@@ -83,6 +84,22 @@ describe("isAdminChromeRoute", () => {
 describe("RouteAwareChrome", () => {
   beforeEach(() => {
     mockedPathname = "/"
+  })
+
+  it("renders a stable server shell before the client pathname is resolved", () => {
+    mockedPathname = "/admin"
+
+    const markup = renderToString(
+      <RouteAwareChrome>
+        <div data-testid="route-children">Route children</div>
+      </RouteAwareChrome>,
+    )
+
+    expect(markup).toContain("Route children")
+    expect(markup).not.toContain("Storefront header")
+    expect(markup).not.toContain("Contact")
+    expect(markup).not.toContain("Edit mode")
+    expect(markup).not.toContain("Editor panel")
   })
 
   it("renders the root editable storefront chrome exactly once on public storefront routes", () => {
