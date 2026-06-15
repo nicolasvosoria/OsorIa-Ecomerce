@@ -14,6 +14,7 @@ import {
   type ChatbotStoreLookup,
 } from "@/lib/supabase/chatbot-api"
 import { ECOMMERCE_SCHEMA, ECOMMERCE_TABLES } from "@/lib/supabase/contract"
+import { buildProductsContextFromList } from "@/lib/products/chat-product-context"
 
 // En Vercel: dar más tiempo a la función (DeepSeek + Supabase pueden tardar). Plan Hobby máx 10s; Pro hasta 300s.
 export const maxDuration = 30
@@ -135,52 +136,6 @@ function normalizeForSearch(text: string): string {
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
     .toLowerCase()
-}
-
-// Construir el texto de contexto a partir de una lista de productos
-type StoreProductContextRow = {
-  item_name: string | null
-  item_description: string | null
-  base_price: number | string | null
-  currency_code: string | null
-  metadata: unknown
-}
-
-function buildProductsContextFromList(
-  products: StoreProductContextRow[],
-  strictCatalog: boolean,
-): string {
-  if (!products || products.length === 0) return ""
-
-  const productsInfo = products.map((product) => {
-    const metadata =
-      product.metadata && typeof product.metadata === "object" && !Array.isArray(product.metadata)
-        ? (product.metadata as Record<string, unknown>)
-        : {}
-    const aiDetails = typeof metadata.ai_details === "string" ? metadata.ai_details : ""
-
-    let productInfo = `- ${product.item_name ?? "Producto sin nombre"}`
-    if (product.base_price) {
-      productInfo += ` (Precio: ${product.base_price} ${product.currency_code || "COP"})`
-    }
-    if (product.item_description) {
-      productInfo += `\n  Descripción: ${product.item_description.substring(0, 200)}${product.item_description.length > 200 ? "..." : ""}`
-    }
-    if (aiDetails) {
-      productInfo += `\n  Detalles y características: ${aiDetails}`
-    }
-    return productInfo
-  }).join("\n\n")
-
-  const strictInstruction = strictCatalog
-    ? "\n\nREGLA OBLIGATORIA para preguntas sobre productos: Responde SOLO con la información de la lista anterior (nombre, precio, descripción, Detalles y características). No inventes características, no uses textos de otra marca ni descripciones genéricas. Si un producto tiene 'Detalles y características', copia o parafrasea exactamente esa información al hablar de ese producto."
-    : ""
-
-  return `\n\nInformación de productos de la tienda (usa SOLO esta información):\n${productsInfo}\n\nInstrucciones: Responde usando únicamente los productos listados. Para características, especificaciones, materiales o detalles, usa la sección "Detalles y características" cuando exista; si no, usa la descripción y el nombre.${strictInstruction}`
-}
-
-export const __chatRouteTestUtils = {
-  buildProductsContextFromList,
 }
 
 // Cliente para leer productos: preferir service_role (evita RLS), si no hay, usar anon.

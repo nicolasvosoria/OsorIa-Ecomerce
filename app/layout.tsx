@@ -33,18 +33,17 @@ import { DynamicFavicon } from "@/components/dynamic-favicon"
 import { DynamicLang } from "@/components/dynamic-lang"
 import { LanguageProvider } from "@/contexts/language-context"
 import { RouteAwareChrome } from "@/components/layout/route-aware-chrome"
+import { metadataBaseFromEnvironment } from "@/lib/metadata/metadata-base"
 
 const V0Setup = dynamic(() => import("@/components/v0-setup"))
 
 const isV0 = process.env["VERCEL_URL"]?.includes("vusercontent.net") ?? false
-const metadataBaseUrl = process.env.NEXT_PUBLIC_SITE_URL
-  ?? (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000")
 
 // Variables CSS para fuentes (definidas en globals.css)
 // Ya no usamos next/font/google para evitar problemas con Turbopack
 
 export const metadata: Metadata = {
-  metadataBase: new URL(metadataBaseUrl),
+  metadataBase: metadataBaseFromEnvironment(),
   title: "Ecommerce",
   description:
     "Ecommerce parametrizable.",

@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import { __chatRouteTestUtils } from '@/app/api/chat/route'
+import { buildProductsContextFromList } from '@/lib/products/chat-product-context'
 
 describe('chat product context', () => {
   it('keeps ai_details available for assistant product answers', () => {
-    const context = __chatRouteTestUtils.buildProductsContextFromList([
+    const context = buildProductsContextFromList([
       {
         item_name: 'Audífonos privados',
         item_description: 'Descripción pública corta',
