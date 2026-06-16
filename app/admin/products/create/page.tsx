@@ -49,7 +49,16 @@ const initialProductFormData = {
   display_order: "0",
 }
 
-type CreateSubmitIntent = "list" | "another"
+const createSubmitIntent = {
+  list: "list",
+  another: "another",
+} as const
+
+type CreateSubmitIntent = (typeof createSubmitIntent)[keyof typeof createSubmitIntent]
+
+type SubmitEventWithSubmitter = Event & {
+  submitter?: HTMLElement | null
+}
 
 export default function CreateProductPage() {
   const { isAdmin, loading } = useAdminPermissions()
@@ -98,8 +107,16 @@ export default function CreateProductPage() {
     setImageResetToken((token) => token + 1)
   }
 
-  const handleSubmit = async (e: React.FormEvent, intent: CreateSubmitIntent = "list") => {
-    e.preventDefault()
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    const form = event.currentTarget
+    const intent = submitIntentFromEvent(event)
+
+    event.preventDefault()
+
+    if (!form.checkValidity()) {
+      form.reportValidity()
+      return
+    }
 
     if (submitLockRef.current) {
       return
@@ -169,7 +186,7 @@ export default function CreateProductPage() {
       )
 
       if (result.success && result.item) {
-        if (intent === "another") {
+        if (intent === createSubmitIntent.another) {
           resetFormForNextProduct()
           toast.success("Producto creado exitosamente. Puedes crear otro producto.")
         } else {
@@ -273,7 +290,7 @@ export default function CreateProductPage() {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8 max-w-full overflow-x-hidden">
-        <form onSubmit={(event) => handleSubmit(event, "list")}>
+        <form onSubmit={handleSubmit}>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Columna Principal */}
             <div className="lg:col-span-2 space-y-6">
@@ -603,6 +620,8 @@ export default function CreateProductPage() {
               <div className="flex flex-col sm:flex-row gap-2">
                 <Button
                   type="submit"
+                  name="createSubmitIntent"
+                  value={createSubmitIntent.list}
                   className="flex-1"
                   disabled={isSubmitting}
                 >
@@ -619,11 +638,12 @@ export default function CreateProductPage() {
                   )}
                 </Button>
                 <Button
-                  type="button"
+                  type="submit"
+                  name="createSubmitIntent"
+                  value={createSubmitIntent.another}
                   variant="outline"
                   className="flex-1"
                   disabled={isSubmitting}
-                  onClick={(event) => handleSubmit(event, "another")}
                 >
                   {isSubmitting ? (
                     <>
@@ -653,4 +673,12 @@ export default function CreateProductPage() {
   )
 }
 
+function submitIntentFromEvent(event: React.FormEvent<HTMLFormElement>): CreateSubmitIntent {
+  const submitter = (event.nativeEvent as SubmitEventWithSubmitter).submitter
 
+  if (submitter instanceof HTMLButtonElement && submitter.value === createSubmitIntent.another) {
+    return createSubmitIntent.another
+  }
+
+  return createSubmitIntent.list
+}

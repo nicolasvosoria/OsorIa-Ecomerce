@@ -7,8 +7,8 @@ import {
   getVariantStock,
   incrementItemViewCount,
   updateItem,
-  __productsApiTestUtils,
 } from "@/lib/supabase/products-api";
+import { buildProductImageRows } from "@/lib/supabase/product-image-rows";
 
 const { getSupabaseEcommerceMock, getStoreIdMock } = vi.hoisted(() => ({
   getSupabaseEcommerceMock: vi.fn(),
@@ -218,7 +218,7 @@ describe("products-api contract", () => {
 
   it("normalizes empty product image values before syncing item_images", () => {
     expect(
-      __productsApiTestUtils.buildProductImageRows(
+      buildProductImageRows(
         "item-1",
         "Café Especial",
         { primary_image_url: "", primary_image_alt: "Alt vacío" },

@@ -16,6 +16,7 @@ import {
   getComboStock as getDerivedComboStock,
   listCombos,
 } from './combos-api'
+import { buildProductImageRows } from './product-image-rows'
 
 // Importación dinámica de getStoreId para evitar problemas con análisis estático de Next.js
 async function getStoreId(): Promise<string | null> {
@@ -751,47 +752,6 @@ export interface CreateItemResult {
   item?: StoreItemWithDetails
 }
 
-type ProductImageInput = {
-  primary_image_url?: string | null
-  primary_image_alt?: string | null
-}
-
-function buildProductImageRows(
-  itemId: string,
-  itemName: string,
-  input: ProductImageInput,
-  additionalImages: string[] = []
-) {
-  const rows: Array<Record<string, any>> = []
-
-  const primaryImageUrl = input.primary_image_url?.trim()
-
-  if (primaryImageUrl) {
-    rows.push({
-      item_id: itemId,
-      image_url: primaryImageUrl,
-      image_alt: input.primary_image_alt || itemName,
-      display_order: 1,
-      image_type: 'product',
-    })
-  }
-
-  rows.push(
-    ...additionalImages
-      .map((url) => url.trim())
-      .filter(Boolean)
-      .map((url, index) => ({
-        item_id: itemId,
-        image_url: url,
-        image_alt: `${itemName} - Imagen ${index + 2}`,
-        display_order: index + 2,
-        image_type: 'product',
-      }))
-  )
-
-  return rows
-}
-
 async function syncProductNormalizedDetails(
   supabase: ReturnType<typeof getSupabaseEcommerce>,
   item: { id: string; item_name: string },
@@ -851,10 +811,6 @@ async function syncProductNormalizedDetails(
       console.warn('[Products] No se pudo sincronizar item_images:', error)
     }
   }
-}
-
-export const __productsApiTestUtils = {
-  buildProductImageRows,
 }
 
 export async function createItem(

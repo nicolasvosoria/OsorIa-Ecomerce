@@ -186,6 +186,28 @@ describe("admin product create form reset", () => {
     );
   });
 
+  it("requires valid native form fields before Guardar y crear otro creates a product", async () => {
+    render(createElement(CreateProductPage));
+
+    fireEvent.change(screen.getByLabelText(/nombre del producto/i), {
+      target: { value: "Café Especial" },
+    });
+    fireEvent.change(screen.getByLabelText(/precio base/i), {
+      target: { value: "12000" },
+    });
+    fireEvent.change(screen.getByLabelText(/cantidad en stock/i), {
+      target: { value: "" },
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /guardar y crear otro/i }));
+    });
+
+    expect(mockCreateItem).not.toHaveBeenCalled();
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(mockToastSuccess).not.toHaveBeenCalled();
+  });
+
   it("navigates after Guardar and a later create page mount starts with defaults", async () => {
     const { unmount } = render(createElement(CreateProductPage));
 
