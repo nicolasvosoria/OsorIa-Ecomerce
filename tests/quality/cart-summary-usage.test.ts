@@ -13,4 +13,15 @@ describe('cart summary helper usage contract', () => {
 
     expect(source).toContain(helperImport);
   });
+
+  it('preserves the current cart when a server quantity update returns null', () => {
+    const source = readFileSync('components/cart/cart-context.tsx', 'utf8');
+    const updateSource = source.slice(
+      source.indexOf('const update ='),
+      source.indexOf('const add ='),
+    );
+
+    expect(updateSource).toContain('if (fresh) setCart(fresh);');
+    expect(updateSource).not.toContain('setCart(fresh ?? createEmptyCart())');
+  });
 });

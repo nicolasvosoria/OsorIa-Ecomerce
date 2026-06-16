@@ -205,7 +205,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         updateOptimisticCart({ type: 'UPDATE_ITEM', payload: { merchandiseId, nextQuantity } });
       });
       const fresh = await CartActions.updateItem({ lineId, quantity: nextQuantity });
-      setCart(fresh ?? createEmptyCart());
+      if (fresh) setCart(fresh);
     },
     [updateOptimisticCart]
   );
