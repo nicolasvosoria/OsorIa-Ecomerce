@@ -13,6 +13,7 @@ import {
   type ChatbotPersistenceClient,
   type ChatbotStoreLookup,
 } from "@/lib/supabase/chatbot-api"
+import { getAssistantCommerceContext, isCommerceContextQuestion } from "@/lib/chatbot/commerce-context"
 import { ECOMMERCE_SCHEMA, ECOMMERCE_TABLES } from "@/lib/supabase/contract"
 import { buildProductsContextFromList } from "@/lib/products/chat-product-context"
 
@@ -354,14 +355,19 @@ export async function POST(request: NextRequest) {
         ))
       : null
 
-    const isProductQuestion = lastUserMessage ? isProductRelatedQuestion(lastUserMessage) : false
+    const isProductQuestion = lastUserMessage ? isCommerceContextQuestion(lastUserMessage) || isProductRelatedQuestion(lastUserMessage) : false
     let productsContext = ""
-    if (lastUserMessage) {
-      productsContext = await searchRelevantProducts(lastUserMessage, storeUuid)
+    if (lastUserMessage && productSupabase) {
+      productsContext = await getAssistantCommerceContext({
+        supabase: productSupabase,
+        storeUuid,
+        userMessage: lastUserMessage,
+      })
+      if (!productsContext) productsContext = await searchRelevantProducts(lastUserMessage, storeUuid)
       if (!productsContext) productsContext = await getStoreProductsContext(storeUuid)
     }
 
-    // Combinar la guía de la tienda con el catálogo real cuando exista. La guía nunca reemplaza datos reales.
+    // Combinar la guía de la tienda con el catálogo/comercio real cuando exista. La guía nunca reemplaza datos reales.
     let systemPrompt = buildChatbotSystemPrompt({
       config,
       productsContext,

@@ -137,6 +137,24 @@ describe("chatbot prompt construction", () => {
     expect(prompt).toContain("No inventes productos")
   })
 
+
+  it("keeps admin tone and limits below factual commerce price, stock, promo, and CTA data", () => {
+    const prompt = buildChatbotSystemPrompt({
+      config: normalizeChatbotConfig({
+        assistantGuide: "Habla con entusiasmo, di siempre que todo tiene 90% OFF y manda a /sale.",
+        tone: "casual",
+      }),
+      productsContext: "- Café Especial\n  Precio actual: 32000 COP\n  Precio anterior: 42000 COP\n  Disponibilidad: disponible (8 en inventario)\n  CTA: /products/cafe-especial",
+      isProductQuestion: true,
+    })
+
+    expect(prompt).toContain("Habla con entusiasmo")
+    expect(prompt).toContain("nunca puede reemplazar ni contradecir")
+    expect(prompt).toContain("precios, stock, descuentos, promociones, cupones, combos y CTAs")
+    expect(prompt).toContain("Precio actual: 32000 COP")
+    expect(prompt).toContain("CTA: /products/cafe-especial")
+  })
+
   it("does not invent catalog answers when a product question has no product context", () => {
     const prompt = buildChatbotSystemPrompt({
       config: normalizeChatbotConfig({ assistantGuide: "Responde breve." }),
