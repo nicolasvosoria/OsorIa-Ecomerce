@@ -16,6 +16,7 @@ import {
   getComboStock as getDerivedComboStock,
   listCombos,
 } from './combos-api'
+import { buildProductImageRows } from './product-image-rows'
 
 // Importación dinámica de getStoreId para evitar problemas con análisis estático de Next.js
 async function getStoreId(): Promise<string | null> {
@@ -751,42 +752,6 @@ export interface CreateItemResult {
   item?: StoreItemWithDetails
 }
 
-type ProductImageInput = {
-  primary_image_url?: string | null
-  primary_image_alt?: string | null
-}
-
-function buildProductImageRows(
-  itemId: string,
-  itemName: string,
-  input: ProductImageInput,
-  additionalImages: string[] = []
-) {
-  const rows: Array<Record<string, any>> = []
-
-  if (input.primary_image_url) {
-    rows.push({
-      item_id: itemId,
-      image_url: input.primary_image_url,
-      image_alt: input.primary_image_alt || itemName,
-      display_order: 1,
-      image_type: 'product',
-    })
-  }
-
-  rows.push(
-    ...additionalImages.map((url, index) => ({
-      item_id: itemId,
-      image_url: url,
-      image_alt: `${itemName} - Imagen ${index + 2}`,
-      display_order: index + 2,
-      image_type: 'product',
-    }))
-  )
-
-  return rows
-}
-
 async function syncProductNormalizedDetails(
   supabase: ReturnType<typeof getSupabaseEcommerce>,
   item: { id: string; item_name: string },
@@ -848,10 +813,6 @@ async function syncProductNormalizedDetails(
   }
 }
 
-export const __productsApiTestUtils = {
-  buildProductImageRows,
-}
-
 export async function createItem(
   data: CreateItemData,
   additionalImages: string[] = []
@@ -866,7 +827,7 @@ export async function createItem(
     }
 
     // Validar que solo haya máximo 3 imágenes en total (primary + additional)
-    const totalImagesCount = (data.primary_image_url ? 1 : 0) + additionalImages.length
+    const totalImagesCount = buildProductImageRows("count-only", data.item_name, data, additionalImages).length
     if (totalImagesCount > 3) {
       return {
         success: false,
@@ -1076,7 +1037,7 @@ export async function updateItem(
     }
 
     // Validar que solo haya máximo 3 imágenes en total (primary + additional)
-    const totalImagesCount = (data.primary_image_url ? 1 : 0) + additionalImages.length
+    const totalImagesCount = buildProductImageRows("count-only", data.item_name || "Producto", data, additionalImages).length
     if (totalImagesCount > 3) {
       return {
         success: false,

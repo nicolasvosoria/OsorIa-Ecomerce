@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Upload, X, Loader2 } from "lucide-react"
@@ -16,6 +16,7 @@ interface MultiImageUploadProps {
   context?: string
   maxSizeMB?: number
   accept?: string
+  resetToken?: number
 }
 
 export function MultiImageUpload({
@@ -26,10 +27,18 @@ export function MultiImageUpload({
   context,
   maxSizeMB = 1, // Por defecto 1 MB para imágenes de productos
   accept = "image/jpeg,image/jpg,image/png,image/webp,image/gif",
+  resetToken = 0,
 }: MultiImageUploadProps) {
   const [uploading, setUploading] = useState<number | null>(null)
+  const resetTokenRef = useRef(resetToken)
+
+  useEffect(() => {
+    resetTokenRef.current = resetToken
+  }, [resetToken])
+
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>, index?: number) => {
     const file = event.target.files?.[0]
+    const uploadResetToken = resetTokenRef.current
     if (!file) return
 
     // Validar tipo
@@ -61,6 +70,10 @@ export function MultiImageUpload({
     setUploading(uploadIndex)
     try {
       const result = await uploadImage(file, context || "product-images")
+
+      if (uploadResetToken !== resetTokenRef.current) {
+        return
+      }
 
       if (result.success && result.url) {
         const newImages = [...images]
