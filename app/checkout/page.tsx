@@ -8,7 +8,8 @@ import { GuestCheckoutForm, GuestCustomerData } from "@/components/checkout/gues
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, ShoppingBag } from "lucide-react"
-import { formatPrice } from "@/lib/shopify/utils"
+import { buildLocalCartSummary, buildShopifyCartSummary } from "@/lib/cart/cart-summary"
+import { useLanguage } from "@/contexts/language-context"
 import { toast } from "sonner"
 import Link from "next/link"
 import { useAuth } from "@/contexts/auth-context"
@@ -19,6 +20,7 @@ export default function CheckoutPage() {
   const shopifyCart = useShopifyCart()
   const localCart = useLocalCart()
   const { user, isAuthenticated, isLoading: authLoading } = useAuth()
+  const { language, t } = useLanguage()
   const [customerData, setCustomerData] = useState<GuestCustomerData | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
 
@@ -37,6 +39,14 @@ export default function CheckoutPage() {
   const hasShopifyItems = cart && cart.lines.length > 0
   const hasLocalItems = localCart.items.length > 0
   const hasAnyItems = hasShopifyItems || hasLocalItems
+  const shopifySummary = hasShopifyItems && cart ? buildShopifyCartSummary(cart, language) : null
+  const localSummary = buildLocalCartSummary({
+    items: localCart.items,
+    getItemSubtotal: localCart.getItemSubtotal,
+    total: localCart.getTotal(),
+    language,
+  })
+  const checkoutSummary = shopifySummary || localSummary
 
   useEffect(() => {
     // Redirigir si ambos carritos están vacíos (solo después de que se haya cargado)
@@ -442,12 +452,12 @@ export default function CheckoutPage() {
         <div className="lg:col-span-1">
           <Card className="lg:sticky lg:top-4">
             <CardHeader>
-              <CardTitle>Resumen del Pedido</CardTitle>
+              <CardTitle>{t.checkout.orderSummary}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-3">
-                {hasShopifyItems && cart ? (
-                  cart.lines.map((item) => (
+                {hasShopifyItems && cart && shopifySummary ? (
+                  cart.lines.map((item, index) => (
                     <div
                       key={item.merchandise.id}
                       className="flex justify-between items-start pb-3 border-b"
@@ -457,19 +467,16 @@ export default function CheckoutPage() {
                           {item.merchandise.product.title}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          Cantidad: {item.quantity}
+                          {t.cart.quantityLabel}: {item.quantity}
                         </p>
                       </div>
                       <p className="text-sm font-semibold ml-4">
-                        {formatPrice(
-                          item.cost.totalAmount.amount,
-                          item.cost.totalAmount.currencyCode
-                        )}
+                        {shopifySummary.lines[index]?.formattedLineTotal}
                       </p>
                     </div>
                   ))
                 ) : (
-                  localCart.items.map((item) => (
+                  localCart.items.map((item, index) => (
                     <div
                       key={item.id}
                       className="flex justify-between items-start pb-3 border-b"
@@ -477,7 +484,7 @@ export default function CheckoutPage() {
                       <div className="flex-1">
                         <p className="font-medium text-sm">{item.name}</p>
                         <p className="text-xs text-muted-foreground">
-                          Cantidad: {item.quantity}
+                          {t.cart.quantityLabel}: {item.quantity}
                         </p>
                         {item.itemKind === "combo" && item.comboDetails && (
                           <ul className="mt-1 text-[11px] text-muted-foreground">
@@ -490,10 +497,7 @@ export default function CheckoutPage() {
                         )}
                       </div>
                       <p className="text-sm font-semibold ml-4">
-                        {formatPrice(
-                          localCart.getItemSubtotal(item).toString(),
-                          "COP"
-                        )}
+                        {localSummary.lines[index]?.formattedLineTotal}
                       </p>
                     </div>
                   ))
@@ -502,38 +506,24 @@ export default function CheckoutPage() {
 
               <div className="space-y-2 pt-4 border-t">
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Subtotal</span>
-                  <span>
-                    {hasShopifyItems && cart
-                      ? formatPrice(
-                          cart.cost.subtotalAmount.amount,
-                          cart.cost.subtotalAmount.currencyCode
-                        )
-                      : formatPrice(localCart.getTotal().toString(), "COP")}
+                  <span className="text-muted-foreground">{t.cart.subtotal}</span>
+                  <span>{checkoutSummary.formattedSubtotal}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">{t.cart.shipping}</span>
+                  <span className="text-muted-foreground">
+                    {t.cart.calculatedAtCheckout}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Envío</span>
+                  <span className="text-muted-foreground">{t.cart.tax}</span>
                   <span className="text-muted-foreground">
-                    Calculado al finalizar
-                  </span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Impuestos</span>
-                  <span className="text-muted-foreground">
-                    Calculado al finalizar
+                    {t.cart.calculatedAtCheckout}
                   </span>
                 </div>
                 <div className="flex justify-between text-lg font-bold pt-2 border-t">
-                  <span>Total</span>
-                  <span>
-                    {hasShopifyItems && cart
-                      ? formatPrice(
-                          cart.cost.totalAmount.amount,
-                          cart.cost.totalAmount.currencyCode
-                        )
-                      : formatPrice(localCart.getTotal().toString(), "COP")}
-                  </span>
+                  <span>{t.cart.total}</span>
+                  <span>{checkoutSummary.formattedTotal}</span>
                 </div>
               </div>
 

@@ -100,6 +100,12 @@ export interface Translations {
     discount: string
     total: string
     checkout: string
+    loading: string
+    products: string
+    itemsCount: string
+    quantityLabel: string
+    calculatedAtCheckout: string
+    combo: string
     continueShopping: string
     remove: string
     update: string
@@ -377,6 +383,12 @@ export const translations: Record<Language, Translations> = {
       discount: 'Descuento',
       total: 'Total',
       checkout: 'Finalizar compra',
+      loading: 'Cargando carrito...',
+      products: 'Productos',
+      itemsCount: '{count} artículos',
+      quantityLabel: 'Cantidad',
+      calculatedAtCheckout: 'Calculado al finalizar',
+      combo: 'combo',
       continueShopping: 'Continuar comprando',
       remove: 'Eliminar',
       update: 'Actualizar',
@@ -645,6 +657,12 @@ export const translations: Record<Language, Translations> = {
       discount: 'Discount',
       total: 'Total',
       checkout: 'Checkout',
+      loading: 'Loading cart...',
+      products: 'Products',
+      itemsCount: '{count} items',
+      quantityLabel: 'Quantity',
+      calculatedAtCheckout: 'Calculated at checkout',
+      combo: 'combo',
       continueShopping: 'Continue shopping',
       remove: 'Remove',
       update: 'Update',
@@ -913,6 +931,12 @@ export const translations: Record<Language, Translations> = {
       discount: 'Desconto',
       total: 'Total',
       checkout: 'Finalizar compra',
+      loading: 'Carregando carrinho...',
+      products: 'Produtos',
+      itemsCount: '{count} itens',
+      quantityLabel: 'Quantidade',
+      calculatedAtCheckout: 'Calculado ao finalizar',
+      combo: 'combo',
       continueShopping: 'Continuar comprando',
       remove: 'Remover',
       update: 'Atualizar',

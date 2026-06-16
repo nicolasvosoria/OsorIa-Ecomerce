@@ -7,7 +7,8 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { DeleteItemButton } from './delete-item-button';
 import { EditItemQuantityButton } from './edit-item-quantity-button';
-import { formatPrice } from '@/lib/shopify/utils';
+import { formatCartMoney } from '@/lib/cart/cart-summary';
+import { useLanguage } from '@/contexts/language-context';
 import { ColorSwatch } from '@/components/ui/color-picker';
 import { useProductImages } from '../products/variant-selector';
 
@@ -21,6 +22,7 @@ interface CartItemProps {
 }
 
 export function CartItemCard({ item, onCloseCart }: CartItemProps) {
+  const { language, t } = useLanguage();
   const merchandiseSearchParams = {} as MerchandiseSearchParams;
 
   item.merchandise.selectedOptions.forEach(({ name, value }) => {
@@ -80,12 +82,15 @@ export function CartItemCard({ item, onCloseCart }: CartItemProps) {
             <span className="2xl:text-lg font-semibold">{item.merchandise.product.title}</span>
           </Link>
           <p className="2xl:text-lg font-semibold">
-            {formatPrice(item.cost.totalAmount.amount, item.cost.totalAmount.currencyCode)}
+            {formatCartMoney(item.cost.totalAmount.amount, item.cost.totalAmount.currencyCode, language)}
           </p>
           <div className="flex justify-between items-end mt-auto">
             <div className="flex h-8 flex-row items-center rounded-md border border-neutral-200">
               <EditItemQuantityButton item={item} type="minus" />
-              <span className="w-8 text-center text-sm">{item.quantity}</span>
+              <span className="w-8 text-center text-sm" aria-label={`${t.cart.quantityLabel}: ${item.quantity}`}>
+                <span className="sr-only">{t.cart.quantityLabel}: </span>
+                {item.quantity}
+              </span>
               <EditItemQuantityButton item={item} type="plus" />
             </div>
             <DeleteItemButton item={item} />

@@ -55,6 +55,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { CheckoutOptionsDialog } from "@/components/cart/checkout-options-dialog"
 import { useLanguage } from "@/contexts/language-context"
+import { buildLocalCartSummary, formatCartMoney } from "@/lib/cart/cart-summary"
 
 // Helper para generar slug desde el nombre de categoría
 function generateCategorySlug(name: string): string {
@@ -101,7 +102,14 @@ export function Header() {
   const { getTotalItems: getWishlistTotalItems } = useWishlist()
   const { user, isAuthenticated, login, register, logout, refreshUser } = useAuth()
   const { store } = useStore()
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
+  const localCartSummary = buildLocalCartSummary({
+    items,
+    getItemSubtotal,
+    total: getTotal(),
+    language,
+  })
+
   const { styles: styleData } = useComponentStyle("header", {
     brandName: "Osoria",
     logoImage: "/logo-negro.svg",
@@ -1199,10 +1207,10 @@ export function Header() {
                     <div key={item.id} className="flex items-center justify-between text-sm">
                       <span style={{ color: "var(--muted-foreground)" }}>
                         {item.name} x{item.quantity}
-                        {item.itemKind === "combo" ? " (combo)" : ""}
+                        {item.itemKind === "combo" ? ` (${t.cart.combo})` : ""}
                       </span>
                       <span style={{ color: "var(--foreground)", fontWeight: 500 }}>
-                        ${getItemSubtotal(item).toFixed(2)}
+                        {localCartSummary.lines.find(line => line.id === String(item.id))?.formattedLineTotal}
                       </span>
                     </div>
                   ))}
@@ -1217,7 +1225,7 @@ export function Header() {
                     {t.cart.total}:
                   </span>
                   <span className="text-2xl font-inter font-bold" style={{ color: "var(--primary)" }}>
-                    ${getTotal().toFixed(2)}
+                    {localCartSummary.formattedTotal}
                   </span>
                 </div>
                 <Button
@@ -1901,20 +1909,20 @@ export function Header() {
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm" style={{ color: "var(--muted-foreground)" }}>{t.cart.subtotal}:</span>
               <span className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>
-                ${getTotal().toFixed(2)}
+                {localCartSummary.formattedTotal}
               </span>
             </div>
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm" style={{ color: "var(--muted-foreground)" }}>{t.cart.shipping}:</span>
               <span className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>
-                $0.00
+                {formatCartMoney(0, localCartSummary.currencyCode, language)}
               </span>
             </div>
             <div className="border-t pt-2 mt-2" style={{ borderColor: "var(--border)" }}>
               <div className="flex items-center justify-between">
-                <span className="text-base font-semibold" style={{ color: "var(--foreground)" }}>Total:</span>
+                <span className="text-base font-semibold" style={{ color: "var(--foreground)" }}>{t.cart.total}:</span>
                 <span className="text-xl font-bold" style={{ color: "var(--primary)" }}>
-                  ${getTotal().toFixed(2)}
+                  {localCartSummary.formattedTotal}
                 </span>
               </div>
             </div>

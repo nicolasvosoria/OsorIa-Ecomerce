@@ -182,7 +182,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const loadCart = async () => {
       const cart = await CartActions.getCart();
-      if (cart) setCart(cart);
+      setCart(cart ?? createEmptyCart());
     };
     
     loadCart();
@@ -222,7 +222,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       }
       // Llamar a la acción del servidor con la cantidad total
       const fresh = await CartActions.addItem(variant.id, quantity);
-      if (fresh) setCart(fresh);
+      setCart(fresh ?? createEmptyCart());
     },
     [updateOptimisticCart, optimisticCart]
   );
