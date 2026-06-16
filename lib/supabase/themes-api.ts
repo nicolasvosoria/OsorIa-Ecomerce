@@ -22,8 +22,11 @@ function withTimeout<T>(
   ]);
 }
 
-function normalizeThemeRow(theme: any): AppTheme | null {
-  const normalized = normalizeThemeRecord(theme);
+function normalizeThemeRow(
+  theme: any,
+  publication: Record<string, unknown> = {},
+): AppTheme | null {
+  const normalized = normalizeThemeRecord({ ...theme, ...publication });
   if (!normalized) {
     return null;
   }
@@ -32,6 +35,10 @@ function normalizeThemeRow(theme: any): AppTheme | null {
     ...theme,
     theme_name: normalized.theme_name,
     colors: normalized.colors,
+    theme_fingerprint: normalized.theme_fingerprint,
+    theme_version_id: normalized.theme_version_id,
+    theme_published_at: normalized.theme_published_at,
+    store_id: normalized.store_id,
   } as AppTheme;
 }
 
@@ -138,7 +145,7 @@ export async function getActiveTheme(): Promise<AppTheme | null> {
   if (storeId) {
     const { data: version } = await supabase
       .from(ECOMMERCE_TABLES.appThemeVersions)
-      .select("theme_id")
+      .select("id, store_id, theme_id, created_at")
       .eq("store_id", storeId)
       .eq("is_current", true)
       .maybeSingle();
@@ -149,7 +156,11 @@ export async function getActiveTheme(): Promise<AppTheme | null> {
         .eq("id", version.theme_id)
         .maybeSingle();
       if (!themeError && theme) {
-        const normalizedTheme = normalizeThemeRow(theme);
+        const normalizedTheme = normalizeThemeRow(theme, {
+          store_id: version.store_id ?? storeId,
+          theme_version_id: version.id,
+          theme_published_at: version.created_at,
+        });
         if (normalizedTheme) {
           return normalizedTheme;
         }
@@ -239,7 +250,7 @@ export async function getActiveTheme(): Promise<AppTheme | null> {
 
 export async function setActiveTheme(
   themeName: string,
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; activeTheme?: AppTheme }> {
   try {
     await requireAdmin();
   } catch (error) {
@@ -274,7 +285,12 @@ export async function setActiveTheme(
       return { success: false, error: message };
     }
 
-    return { success: true };
+    const activeTheme =
+      payload && typeof payload === "object" && "activeTheme" in payload
+        ? (payload.activeTheme as AppTheme)
+        : undefined;
+
+    return activeTheme ? { success: true, activeTheme } : { success: true };
   } catch (err) {
     const errorMessage =
       err instanceof Error ? err.message : "Error desconocido";

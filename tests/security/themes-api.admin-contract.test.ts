@@ -230,6 +230,91 @@ describe("theme activation admin client contract", () => {
     expect(order).toHaveBeenCalledWith("theme_name");
   });
 
+  it("prefers current app_theme_versions and returns publication fingerprint metadata", async () => {
+    mockedGetStoreId.mockResolvedValue("store-123");
+
+    const currentVersion = {
+      id: "version-1",
+      store_id: "store-123",
+      theme_id: "theme-1",
+      created_at: "2026-05-14T10:05:00Z",
+    };
+    const themeRow = {
+      id: "theme-1",
+      theme_name: "Claro Original",
+      updated_at: "2026-05-14T10:00:00Z",
+      colors: {
+        primary: "#111111",
+        secondary: "#222222",
+        accent: "#333333",
+        background: "#ffffff",
+        foreground: "#000000",
+        card: "#f5f5f5",
+        cardForeground: "#101010",
+        border: "#dedede",
+        muted: "#eeeeee",
+        mutedForeground: "#444444",
+      },
+    };
+
+    const versionMaybeSingle = vi
+      .fn()
+      .mockResolvedValue({ data: currentVersion, error: null });
+    const versionEq2 = vi
+      .fn()
+      .mockReturnValue({ maybeSingle: versionMaybeSingle });
+    const versionEq1 = vi.fn().mockReturnValue({ eq: versionEq2 });
+    const versionSelect = vi.fn().mockReturnValue({ eq: versionEq1 });
+
+    const themeMaybeSingle = vi
+      .fn()
+      .mockResolvedValue({ data: themeRow, error: null });
+    const themeEq = vi.fn().mockReturnValue({ maybeSingle: themeMaybeSingle });
+    const themeSelect = vi.fn().mockReturnValue({ eq: themeEq });
+
+    const from = vi.fn((table: string) => {
+      if (table === "app_theme_versions") return { select: versionSelect };
+      if (table === "app_themes") return { select: themeSelect };
+      throw new Error(`unexpected table ${table}`);
+    });
+
+    mockedGetSupabaseEcommerce.mockReturnValue({ from } as any);
+
+    await expect(getActiveTheme()).resolves.toEqual(
+      expect.objectContaining({
+        theme_name: "Claro Original",
+        store_id: "store-123",
+        theme_version_id: "version-1",
+        theme_published_at: "2026-05-14T10:05:00Z",
+        theme_fingerprint: expect.stringMatching(
+          /^v1:store-123:version-1:theme-1:2026-05-14T10:00:00Z:/,
+        ),
+      }),
+    );
+    expect(versionSelect).toHaveBeenCalledWith(
+      "id, store_id, theme_id, created_at",
+    );
+  });
+
+  it("returns the confirmed active theme from successful activation", async () => {
+    const activeTheme = {
+      theme_name: "Claro Original",
+      theme_fingerprint: "v1:store-1:version-1:theme-1:stamp:hash",
+      colors: { primary: "#111111" },
+    };
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({ success: true, activeTheme }),
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(setActiveTheme("Claro Original")).resolves.toEqual({
+      success: true,
+      activeTheme,
+    });
+  });
+
   it("falls back to active theme without store_id filters when version lookup misses", async () => {
     mockedGetStoreId.mockResolvedValue("store-123");
 

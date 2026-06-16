@@ -11,6 +11,7 @@ type ThemeBootstrapStatus = "valid" | "missing" | "corrupt" | "stale";
 interface ResolveThemeBootstrapOptions {
   fallbackTheme?: RuntimeTheme;
   expectedThemeName?: string | null;
+  expectedThemeFingerprint?: string | null;
 }
 
 export function resolveThemeBootstrapPayload(
@@ -25,6 +26,14 @@ export function resolveThemeBootstrapPayload(
 
   try {
     const parsed = JSON.parse(cachedThemeRaw);
+    if (
+      !parsed ||
+      typeof parsed !== "object" ||
+      typeof parsed.theme_fingerprint !== "string"
+    ) {
+      return { status: "stale", theme: fallbackTheme };
+    }
+
     const normalizedTheme = normalizeThemeRecord(parsed);
 
     if (!normalizedTheme) {
@@ -35,6 +44,14 @@ export function resolveThemeBootstrapPayload(
       options.expectedThemeName &&
       options.expectedThemeName.trim().length > 0 &&
       options.expectedThemeName !== normalizedTheme.theme_name
+    ) {
+      return { status: "stale", theme: fallbackTheme };
+    }
+
+    if (
+      options.expectedThemeFingerprint &&
+      options.expectedThemeFingerprint.trim().length > 0 &&
+      options.expectedThemeFingerprint !== normalizedTheme.theme_fingerprint
     ) {
       return { status: "stale", theme: fallbackTheme };
     }

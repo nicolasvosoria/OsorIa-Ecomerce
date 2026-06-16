@@ -3,6 +3,10 @@ import type { ThemeColors } from "@/lib/types/theme";
 export interface RuntimeTheme {
   theme_name: string;
   colors: ThemeColors;
+  theme_fingerprint: string;
+  theme_version_id?: string | null;
+  theme_published_at?: string | null;
+  store_id?: string | null;
 }
 
 export interface RuntimeFont {
@@ -25,7 +29,32 @@ export const DEFAULT_RUNTIME_THEME: RuntimeTheme = {
     muted: "#f5f5f5",
     mutedForeground: "#737373",
   },
+  theme_fingerprint: "default:claro-original",
 };
+
+const THEME_COLOR_KEYS: (keyof ThemeColors)[] = [
+  "primary",
+  "secondary",
+  "accent",
+  "background",
+  "foreground",
+  "card",
+  "cardForeground",
+  "border",
+  "muted",
+  "mutedForeground",
+];
+
+export function stableThemeColorsHash(colors: ThemeColors): string {
+  const serialized = THEME_COLOR_KEYS.map(
+    (key) => `${key}:${colors[key].trim().toLowerCase()}`,
+  ).join("|");
+  let hash = 5381;
+  for (let index = 0; index < serialized.length; index += 1) {
+    hash = (hash * 33) ^ serialized.charCodeAt(index);
+  }
+  return (hash >>> 0).toString(36);
+}
 
 function parseJsonIfNeeded(value: unknown): unknown {
   if (typeof value !== "string") {
@@ -51,6 +80,16 @@ function readString(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function readIdentifier(value: unknown): string | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+  if (typeof value === "bigint") {
+    return String(value);
+  }
+  return readString(value);
 }
 
 function normalizeThemeColors(value: unknown): ThemeColors | null {
@@ -108,9 +147,26 @@ export function normalizeThemeRecord(input: unknown): RuntimeTheme | null {
     return null;
   }
 
+  const explicitFingerprint = readString(raw.theme_fingerprint);
+  const themeId = readIdentifier(raw.id ?? raw.theme_id);
+  const storeId = readIdentifier(raw.store_id);
+  const versionId = readIdentifier(raw.theme_version_id ?? raw.version_id);
+  const updatedAt = readString(raw.updated_at) ?? "unknown";
+  const publishedAt = readString(raw.theme_published_at ?? raw.created_at);
+  const colorHash = stableThemeColorsHash(colors);
+  const themeFingerprint =
+    explicitFingerprint ??
+    (versionId && storeId && themeId
+      ? `v1:${storeId}:${versionId}:${themeId}:${updatedAt}:${colorHash}`
+      : `legacy:${themeId ?? themeName}:${updatedAt}:${colorHash}`);
+
   return {
     theme_name: themeName,
     colors,
+    theme_fingerprint: themeFingerprint,
+    theme_version_id: versionId,
+    theme_published_at: publishedAt,
+    store_id: storeId,
   };
 }
 

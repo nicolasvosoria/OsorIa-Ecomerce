@@ -7,6 +7,7 @@ import {
   ECOMMERCE_VIEWS,
 } from "@/lib/supabase/contract";
 import { requireAdminUser } from "@/lib/supabase/admin-route-auth";
+import { normalizeThemeRecord } from "@/lib/theme-font/runtime-contract";
 
 function getSupabaseServiceClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -53,6 +54,32 @@ async function resolveTargetStoreId(supabase: any) {
   return resolveDefaultStoreId(supabase);
 }
 
+async function readConfirmedActiveTheme(supabase: any, storeId: string) {
+  const { data: version, error: versionError } = await supabase
+    .from(ECOMMERCE_TABLES.appThemeVersions)
+    .select("id, store_id, theme_id, created_at")
+    .eq("store_id", storeId)
+    .eq("is_current", true)
+    .maybeSingle();
+
+  if (versionError || !version?.theme_id) return null;
+
+  const { data: activeTheme, error: activeThemeError } = await supabase
+    .from(ECOMMERCE_TABLES.appThemes)
+    .select("*")
+    .eq("id", version.theme_id)
+    .maybeSingle();
+
+  if (activeThemeError || !activeTheme) return null;
+
+  return normalizeThemeRecord({
+    ...activeTheme,
+    store_id: version.store_id ?? storeId,
+    theme_version_id: version.id,
+    theme_published_at: version.created_at,
+  });
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -84,7 +111,7 @@ export async function POST(request: NextRequest) {
 
     const { data: theme, error: themeError } = await supabase
       .from(ECOMMERCE_TABLES.appThemes)
-      .select("id")
+      .select("*")
       .eq("theme_name", themeName)
       .single();
     if (themeError || !theme?.id) {
@@ -112,6 +139,8 @@ export async function POST(request: NextRequest) {
       throw existingError;
     }
 
+    let activatedVersionId = existing?.id as string | undefined;
+
     if (existing?.id) {
       const { error: activateError } = await supabase
         .from(ECOMMERCE_TABLES.appThemeVersions)
@@ -125,7 +154,7 @@ export async function POST(request: NextRequest) {
       const { error: insertError } = await supabase
         .from(ECOMMERCE_TABLES.appThemeVersions)
         .insert({
-          id: crypto.randomUUID(),
+          id: (activatedVersionId = crypto.randomUUID()),
           store_id: storeId,
           theme_id: theme.id,
           is_current: true,
@@ -136,7 +165,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ success: true });
+    const activeTheme =
+      (await readConfirmedActiveTheme(supabase, storeId)) ??
+      normalizeThemeRecord({
+        ...theme,
+        store_id: storeId,
+        theme_version_id: activatedVersionId,
+      });
+
+    return NextResponse.json(
+      activeTheme ? { success: true, activeTheme } : { success: true },
+    );
   } catch (error) {
     console.error("[Theme Activation API] Error:", error);
     return NextResponse.json(

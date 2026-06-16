@@ -23,6 +23,8 @@ export function ThemeSelectorModal({ open, onOpenChange }: ThemeSelectorModalPro
   const { themes, activeTheme, loading, changeTheme } = useTheme()
   const { store } = useStore()
   const [changing, setChanging] = useState<string | null>(null)
+  const [publicationMessage, setPublicationMessage] = useState<string | null>(null)
+  const [publicationError, setPublicationError] = useState<string | null>(null)
 
   // Verificar si el cambio de tema está deshabilitado para este subdominio
   const isThemeChangeDisabled = store?.subdomain === 'reposteria'
@@ -31,13 +33,19 @@ export function ThemeSelectorModal({ open, onOpenChange }: ThemeSelectorModalPro
     if (changing) return
     if (isThemeChangeDisabled) return // No permitir cambios si está deshabilitado
 
+    setPublicationMessage(null)
+    setPublicationError(null)
     setChanging(themeName)
     const result = await changeTheme(themeName)
     setChanging(null)
 
     if (result.success) {
-      onOpenChange(false)
+      const publishedName = result.activeTheme?.theme_name || themeName
+      setPublicationMessage(`Tema publicado: ${publishedName}`)
+      return
     }
+
+    setPublicationError(result.error || "No se pudo confirmar la publicación")
   }
 
   return (
@@ -51,6 +59,18 @@ export function ThemeSelectorModal({ open, onOpenChange }: ThemeSelectorModalPro
               : "Elige un tema para personalizar los colores de la página"}
           </DialogDescription>
         </DialogHeader>
+
+        {publicationMessage && (
+          <Alert className="mb-4">
+            <AlertDescription className="text-sm">{publicationMessage}</AlertDescription>
+          </Alert>
+        )}
+
+        {publicationError && (
+          <Alert className="mb-4" variant="destructive">
+            <AlertDescription className="text-sm">{publicationError}</AlertDescription>
+          </Alert>
+        )}
 
         {isThemeChangeDisabled && (
           <Alert className="mb-4">
