@@ -12,6 +12,7 @@ import {
   parseDateTimeLocalValue,
   projectPublicHomeDiscountPopupConfig,
   toDateTimeLocalValue,
+  validateHomeDiscountPopupAdminStatus,
 } from "@/lib/home-discount-popup";
 import {
   HOME_DISCOUNT_POPUP_UPLOAD_BUCKET,
@@ -130,6 +131,40 @@ describe("isHomeDiscountPopupEligible", () => {
     });
     expect(wrongRoute).toMatchObject({ eligible: false, reason: "route" });
     expect(expired).toMatchObject({ eligible: false, reason: "schedule" });
+  });
+
+  it("blocks inactive, invalid CTA, and future campaign schedules with actionable reasons", () => {
+    const storageKey = getHomeDiscountPopupStorageKey("store-123", "campaign");
+
+    expect(
+      isHomeDiscountPopupEligible({
+        config: { ...config, active: false },
+        pathname: "/",
+        now: new Date("2026-04-23T12:00:00.000Z"),
+        storageKey,
+        storageSnapshot: {},
+      }),
+    ).toEqual({ eligible: false, reason: "inactive" });
+
+    expect(
+      isHomeDiscountPopupEligible({
+        config: { ...config, ctaMode: "redirect", ctaUrl: null },
+        pathname: "/",
+        now: new Date("2026-04-23T12:00:00.000Z"),
+        storageKey,
+        storageSnapshot: {},
+      }),
+    ).toEqual({ eligible: false, reason: "invalid_cta" });
+
+    expect(
+      isHomeDiscountPopupEligible({
+        config: { ...config, startsAt: "2026-04-24T10:00:00.000Z" },
+        pathname: "/",
+        now: new Date("2026-04-23T12:00:00.000Z"),
+        storageKey,
+        storageSnapshot: {},
+      }),
+    ).toEqual({ eligible: false, reason: "schedule" });
   });
 });
 
@@ -350,5 +385,83 @@ describe("getHomeDiscountPopupStorageKey", () => {
     expect(getHomeDiscountPopupStorageKey("store-123", "fingerprint-abc")).toBe(
       "osoria.homeDiscountPopup.store-123.fingerprint-abc",
     );
+  });
+});
+
+describe("validateHomeDiscountPopupAdminStatus", () => {
+  it("returns actionable admin issues when an active popup cannot publish", () => {
+    const status = validateHomeDiscountPopupAdminStatus(
+      normalizeHomeDiscountPopupConfig({
+        active: true,
+        title: "Promo home",
+        text: "Texto",
+        ctaText: "Ir ahora",
+        ctaMode: "redirect",
+        ctaUrl: "",
+        startsAt: "2026-05-10T10:00:00.000Z",
+        endsAt: "2026-05-09T10:00:00.000Z",
+      }),
+      new Date("2026-05-08T10:00:00.000Z"),
+    );
+
+    expect(status.publishable).toBe(false);
+    expect(status.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "missing_redirect_url",
+          action: expect.stringContaining("URL"),
+        }),
+        expect.objectContaining({
+          code: "invalid_date_range",
+          action: expect.stringContaining("fechas"),
+        }),
+      ]),
+    );
+  });
+
+  it.each(["foo", "javascript:alert(1)"])(
+    "does not mark redirect campaigns publishable when the CTA URL is %s",
+    (ctaUrl) => {
+      const status = validateHomeDiscountPopupAdminStatus(
+        {
+          ...normalizeHomeDiscountPopupConfig({
+            active: true,
+            title: "Promo home",
+            text: "Texto",
+            ctaText: "Ir ahora",
+            ctaMode: "redirect",
+            ctaUrl: "https://example.com/promo",
+          }),
+          ctaUrl,
+        },
+        new Date("2026-05-08T10:00:00.000Z"),
+      );
+
+      expect(status.publishable).toBe(false);
+      expect(status.issues).toEqual([
+        expect.objectContaining({
+          code: "missing_redirect_url",
+          action: expect.stringContaining("URL"),
+        }),
+      ]);
+    },
+  );
+
+  it("marks a complete active coupon campaign as publishable", () => {
+    expect(
+      validateHomeDiscountPopupAdminStatus(
+        normalizeHomeDiscountPopupConfig({
+          active: true,
+          title: "Promo home",
+          text: "Texto",
+          ctaText: "Copiar cupon",
+          coupon: "HOME10",
+          ctaMode: "copy_coupon",
+          startsAt: "2026-05-01T10:00:00.000Z",
+          endsAt: "2026-05-20T10:00:00.000Z",
+        }),
+        new Date("2026-05-08T10:00:00.000Z"),
+      ),
+    ).toEqual({ publishable: true, issues: [] });
   });
 });

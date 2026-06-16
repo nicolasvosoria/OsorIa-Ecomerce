@@ -46,11 +46,36 @@ const baseConfig: PublicHomeDiscountPopupConfig = {
   fingerprint: "fingerprint-abc",
 };
 
+function createMemoryStorage(): Storage {
+  const entries = new Map<string, string>();
+
+  return {
+    get length() {
+      return entries.size;
+    },
+    clear: () => {
+      entries.clear();
+    },
+    getItem: (key: string) => entries.get(key) ?? null,
+    key: (index: number) => Array.from(entries.keys())[index] ?? null,
+    removeItem: (key: string) => {
+      entries.delete(key);
+    },
+    setItem: (key: string, value: string) => {
+      entries.set(key, value);
+    },
+  };
+}
+
 describe("HomeDiscountPopup", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-04-23T12:00:00.000Z"));
-    localStorage.clear();
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      value: createMemoryStorage(),
+    });
+    window.localStorage.clear();
     mockUseStore.mockReturnValue({
       store: {
         id: "store-123",
@@ -69,7 +94,9 @@ describe("HomeDiscountPopup", () => {
   });
 
   afterEach(() => {
-    vi.runOnlyPendingTimers();
+    act(() => {
+      vi.runOnlyPendingTimers();
+    });
     vi.useRealTimers();
   });
 
@@ -115,6 +142,57 @@ describe("HomeDiscountPopup", () => {
 
   it("does not render on non-home routes even when the popup is active", () => {
     mockUsePathname.mockReturnValue("/products/cafetera");
+
+    render(<HomeDiscountPopup />);
+
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+
+    expect(screen.queryByText(baseConfig.title)).not.toBeInTheDocument();
+  });
+
+  it("shows a changed campaign fingerprint even when the previous campaign is in cooldown", () => {
+    const oldStorageKey =
+      "osoria.homeDiscountPopup.store-123.previous-fingerprint";
+    window.localStorage.setItem(
+      oldStorageKey,
+      JSON.stringify({ dismissedAt: "2026-04-23T11:59:00.000Z" }),
+    );
+
+    mockUseStore.mockReturnValue({
+      store: {
+        id: "store-123",
+        store_name: "Osoria",
+        homeDiscountPopup: {
+          ...baseConfig,
+          title: "Nueva campaña",
+          fingerprint: "new-fingerprint",
+        },
+      },
+    });
+
+    render(<HomeDiscountPopup />);
+
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+
+    expect(screen.getByText("Nueva campaña")).toBeInTheDocument();
+  });
+
+  it("does not render active popup data when its CTA is invalid", () => {
+    mockUseStore.mockReturnValue({
+      store: {
+        id: "store-123",
+        store_name: "Osoria",
+        homeDiscountPopup: {
+          ...baseConfig,
+          ctaMode: "redirect",
+          ctaUrl: null,
+        },
+      },
+    });
 
     render(<HomeDiscountPopup />);
 

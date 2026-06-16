@@ -265,6 +265,31 @@ describe("home discount popup admin page", () => {
     expect(mockToastSuccess).toHaveBeenCalledWith("Popup promocional guardado");
   });
 
+  it("shows an actionable admin alert when the active popup config cannot publish", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({
+        config: {
+          active: true,
+          title: "Promo home",
+          text: "Texto",
+          ctaText: "Ir ahora",
+          ctaMode: "redirect",
+          ctaUrl: "",
+        },
+      }),
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(createElement(HomeDiscountPopupConfigPage));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "La promo activa no se publicará",
+    );
+    expect(screen.getByRole("alert")).toHaveTextContent("Agrega una URL HTTPS");
+  });
+
   it("opens a local preview with unsaved content and the staged image without uploading", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,

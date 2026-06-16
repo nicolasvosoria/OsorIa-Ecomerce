@@ -32,6 +32,7 @@ import { deferStateUpdate } from "@/lib/react/defer-state-update";
 import {
   normalizeHomeDiscountPopupConfig,
   parseDateTimeLocalValue,
+  validateHomeDiscountPopupAdminStatus,
   type HomeDiscountPopupConfig,
   type HomeDiscountPopupCtaMode,
   toDateTimeLocalValue,
@@ -237,6 +238,7 @@ export default function HomeDiscountPopupConfigPage() {
     imageUrl: previewImageUrl ?? config.imageUrl,
     fingerprint: "admin-preview",
   };
+  const adminStatus = validateHomeDiscountPopupAdminStatus(config);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-muted">
@@ -265,6 +267,26 @@ export default function HomeDiscountPopupConfigPage() {
           </div>
         ) : (
           <>
+            {config.active && !adminStatus.publishable ? (
+              <div
+                role="alert"
+                className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950"
+              >
+                <p className="font-semibold">
+                  La promo activa no se publicará hasta corregir la
+                  configuración.
+                </p>
+                <ul className="mt-2 list-disc space-y-1 pl-5">
+                  {adminStatus.issues.map((issue) => (
+                    <li key={issue.code}>
+                      <span>{issue.message}</span>
+                      <span> {issue.action}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
