@@ -59,3 +59,47 @@ describe("font stylesheet bootstrap", () => {
     ).toHaveLength(1);
   });
 });
+
+import { ApplyStylesScript } from "@/components/apply-styles-script";
+import { DEFAULT_RUNTIME_THEME } from "@/lib/theme-font/runtime-contract";
+import { applyRuntimeTheme } from "@/lib/theme-font/bootstrap";
+import { CRITICAL_THEME_CSS_VARIABLES } from "@/lib/theme-font/contrast";
+
+describe("theme contrast bootstrap parity", () => {
+  function readCriticalVariables() {
+    return Object.fromEntries(
+      CRITICAL_THEME_CSS_VARIABLES.map((name) => [
+        name,
+        document.documentElement.style.getPropertyValue(name),
+      ]),
+    );
+  }
+
+  it("beforeInteractive script and runtime provider emit the same critical variables", () => {
+    const unsafeTheme = {
+      theme_name: "Unsafe cached theme",
+      colors: {
+        ...DEFAULT_RUNTIME_THEME.colors,
+        primary: "#001a66",
+        foreground: "#000000",
+        background: "#000000",
+      },
+    };
+
+    localStorage.setItem("osoria_active_theme", JSON.stringify(unsafeTheme));
+    const element = ApplyStylesScript() as { props: { dangerouslySetInnerHTML: { __html: string } } };
+    const script = element.props.dangerouslySetInnerHTML.__html;
+    expect(script).toContain("resolveThemeCssVariables");
+    new Function(script ?? "")();
+    const scriptVariables = readCriticalVariables();
+    const scriptBodyBackground = document.body.style.backgroundColor;
+
+    document.documentElement.removeAttribute("style");
+    document.body.removeAttribute("style");
+    applyRuntimeTheme(unsafeTheme);
+    const runtimeVariables = readCriticalVariables();
+
+    expect(scriptVariables).toEqual(runtimeVariables);
+    expect(scriptBodyBackground).toBe(document.body.style.backgroundColor);
+  });
+});

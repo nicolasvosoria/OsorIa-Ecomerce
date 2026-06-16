@@ -164,3 +164,105 @@ describe("resolveThemeBootstrapPayload", () => {
     expect(result.theme).toEqual(DEFAULT_RUNTIME_THEME);
   });
 });
+
+describe("theme contrast resolver", () => {
+  it("documents the no-migration runtime-only contrast rule", () => {
+    const auditedPairs = [
+      "background/foreground",
+      "card/card-foreground",
+      "muted/muted-foreground",
+      "popover/popover-foreground",
+      "primary/primary-foreground",
+      "secondary/secondary-foreground",
+      "accent/accent-foreground",
+      "destructive/destructive-foreground",
+    ];
+
+    expect(auditedPairs).toEqual([
+      "background/foreground",
+      "card/card-foreground",
+      "muted/muted-foreground",
+      "popover/popover-foreground",
+      "primary/primary-foreground",
+      "secondary/secondary-foreground",
+      "accent/accent-foreground",
+      "destructive/destructive-foreground",
+    ]);
+  });
+
+  it("keeps valid configured foregrounds unchanged", async () => {
+    const { getContrastRatio, resolveThemeCssVariables } = await import(
+      "@/lib/theme-font/contrast"
+    );
+    const resolved = resolveThemeCssVariables({
+      theme_name: "High contrast",
+      colors: {
+        primary: "#0f766e",
+        secondary: "#f8fafc",
+        accent: "#7c2d12",
+        background: "#ffffff",
+        foreground: "#111111",
+        card: "#f8fafc",
+        cardForeground: "#1f2937",
+        border: "#cbd5e1",
+        muted: "#e2e8f0",
+        mutedForeground: "#334155",
+      },
+    });
+
+    expect(resolved["--background"]).toBe("#ffffff");
+    expect(resolved["--foreground"]).toBe("#111111");
+    expect(resolved["--card-foreground"]).toBe("#1f2937");
+    expect(resolved["--primary-foreground"]).toBe("#ffffff");
+    expect(getContrastRatio(resolved["--primary"], resolved["--primary-foreground"])).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it.each([
+    ["default primary", "#005aa1", "#1a1a1a"],
+    ["dark blue on black", "#001a66", "#000000"],
+  ])("prevents unreadable %s CTA foreground below 4.5", async (_, primary, foreground) => {
+    const { getContrastRatio, resolveThemeCssVariables } = await import(
+      "@/lib/theme-font/contrast"
+    );
+    const resolved = resolveThemeCssVariables({
+      theme_name: "Unsafe CTA",
+      colors: {
+        ...DEFAULT_RUNTIME_THEME.colors,
+        primary,
+        foreground,
+        background: foreground,
+      },
+    });
+
+    expect(resolved["--primary"]).toBe(primary);
+    expect(resolved["--primary-foreground"]).not.toBe(foreground);
+    expect(getContrastRatio(resolved["--primary"], resolved["--primary-foreground"])).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("audits every critical pair against the 4.5 normal text threshold", async () => {
+    const { CRITICAL_THEME_CONTRAST_PAIRS, getContrastRatio, resolveThemeCssVariables } = await import(
+      "@/lib/theme-font/contrast"
+    );
+    const resolved = resolveThemeCssVariables({
+      theme_name: "Unsafe matrix",
+      colors: {
+        primary: "#001a66",
+        secondary: "#101010",
+        accent: "#202020",
+        background: "#000000",
+        foreground: "#001a66",
+        card: "#050505",
+        cardForeground: "#111111",
+        border: "#1f1f1f",
+        muted: "#070707",
+        mutedForeground: "#222222",
+      },
+    });
+
+    expect(CRITICAL_THEME_CONTRAST_PAIRS).toHaveLength(8);
+    for (const pair of CRITICAL_THEME_CONTRAST_PAIRS) {
+      const ratio = getContrastRatio(resolved[pair.background], resolved[pair.foreground]);
+      expect(ratio, `${pair.name} must meet WCAG-ish 4.5 contrast`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+});

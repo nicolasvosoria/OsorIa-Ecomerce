@@ -1,4 +1,7 @@
 import {
+  resolveThemeCssVariables,
+} from "@/lib/theme-font/contrast";
+import {
   DEFAULT_RUNTIME_THEME,
   normalizeFontRecord,
   normalizeThemeRecord,
@@ -50,24 +53,14 @@ export function applyRuntimeTheme(theme: RuntimeTheme): void {
 
   const root = document.documentElement;
   const body = document.body;
-  const colors = theme.colors;
+  const resolvedVariables = resolveThemeCssVariables(theme);
 
-  root.style.setProperty("--primary", colors.primary);
-  root.style.setProperty("--secondary", colors.secondary);
-  root.style.setProperty("--accent", colors.accent);
-  root.style.setProperty("--background", colors.background);
-  root.style.setProperty("--foreground", colors.foreground);
-  root.style.setProperty("--card", colors.card);
-  root.style.setProperty("--card-foreground", colors.cardForeground);
-  root.style.setProperty("--border", colors.border);
-  root.style.setProperty("--muted", colors.muted);
-  root.style.setProperty("--muted-foreground", colors.mutedForeground);
-  root.style.setProperty("--primary-foreground", colors.foreground);
-  root.style.setProperty("--secondary-foreground", colors.foreground);
-  root.style.setProperty("--accent-foreground", colors.foreground);
+  Object.entries(resolvedVariables).forEach(([name, value]) => {
+    root.style.setProperty(name, value);
+  });
 
   if (body) {
-    body.style.backgroundColor = colors.background;
+    body.style.backgroundColor = resolvedVariables["--background"];
   }
 }
 
