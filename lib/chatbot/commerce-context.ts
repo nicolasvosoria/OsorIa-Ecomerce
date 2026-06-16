@@ -1,3 +1,4 @@
+import type { SupabaseClient } from "@supabase/supabase-js"
 import {
   isHomeDiscountPopupWithinSchedule,
   projectPublicHomeDiscountPopupConfig,
@@ -38,10 +39,20 @@ type BuildInput = {
   now: Date
 }
 
+type AssistantCommerceClient = Pick<SupabaseClient, "from">
+type StoreIntegrationMetadataRow = { metadata?: unknown }
+
+const MAX_CONTEXT_PRODUCTS = 6
+const MAX_FETCHED_PRODUCTS = 20
+
 const KEYWORDS = [
   "producto", "productos", "catálogo", "catalogo", "precio", "precios", "comprar", "compra",
   "descuento", "descuentos", "promo", "promoción", "promocion", "promociones", "oferta", "ofertas",
   "cupón", "cupon", "cupones", "combo", "combos", "qué tienen", "que tienen", "qué venden", "que venden",
+]
+const PROMOTION_KEYWORDS = [
+  "descuento", "descuentos", "promo", "promoción", "promocion", "promociones", "oferta", "ofertas",
+  "cupón", "cupon", "cupones", "combo", "combos",
 ]
 
 const numberOrNull = (value: unknown) => {
@@ -91,6 +102,12 @@ function productLine(product: AssistantCommerceProduct) {
   return lines.join("\n")
 }
 
+function hasProductDiscount(product: AssistantCommerceProduct) {
+  const current = numberOrNull(product.base_price)
+  const previous = numberOrNull(product.compare_at_price)
+  return current !== null && previous !== null && previous > current
+}
+
 function comboLine(combo: AssistantCommerceCombo) {
   if (combo.isActive === false || !combo.availability.isAvailable) return null
   const current = numberOrNull(combo.pricing.finalUnitPrice)
@@ -120,9 +137,21 @@ export function isCommerceContextQuestion(message: string): boolean {
   return words.length >= 2 && message.length < 120
 }
 
+function isPromotionQuestion(message: string): boolean {
+  const normalized = message.toLowerCase().trim()
+  return PROMOTION_KEYWORDS.some((keyword) => normalized.includes(keyword))
+}
+
+function productsForContext(products: AssistantCommerceProduct[], wantsPromotion: boolean) {
+  if (!wantsPromotion) return products.slice(0, MAX_CONTEXT_PRODUCTS)
+  const discounted = products.filter(hasProductDiscount)
+  const regular = products.filter((product) => !hasProductDiscount(product))
+  return [...discounted, ...regular].slice(0, MAX_CONTEXT_PRODUCTS)
+}
+
 export function buildAssistantCommerceContext({ products, combos, popup, now }: BuildInput): string {
   const sections: string[] = []
-  const productLines = products.slice(0, 6).map(productLine).filter(Boolean)
+  const productLines = products.slice(0, MAX_CONTEXT_PRODUCTS).map(productLine).filter(Boolean)
   const comboLines = combos.slice(0, 3).map(comboLine).filter(Boolean)
   const popupBlock = popupLines(popup, now)
   if (productLines.length) sections.push(`Productos verificados:\n${productLines.join("\n")}`)
@@ -138,30 +167,38 @@ function terms(message: string) {
     .map((word) => word.replace(/[^a-z0-9]/g, "")).filter((word) => word.length > 2)))
 }
 
-async function fetchProducts(supabase: any, storeUuid: string, userMessage: string) {
+async function fetchProducts(supabase: AssistantCommerceClient, storeUuid: string, userMessage: string) {
+  const search = terms(userMessage)
+  const wantsPromotion = isPromotionQuestion(userMessage)
   let query = supabase.from(ECOMMERCE_TABLES.storeItems)
     .select("id, item_name, item_description, base_price, compare_at_price, currency_code, metadata, item_slug, is_active, is_available_for_sale, track_inventory, inventory_quantity")
-    .eq("store_id", storeUuid).eq("is_active", true).order("display_order", { ascending: true }).limit(6)
-  const search = terms(userMessage)
-  if (search.length && typeof query.or === "function") {
+    .eq("store_id", storeUuid).eq("is_active", true).order("display_order", { ascending: true }).limit(MAX_FETCHED_PRODUCTS)
+  if (search.length && !wantsPromotion && typeof query.or === "function") {
     query = query.or(search.flatMap((term) => [`item_name.ilike.%${term}%`, `item_description.ilike.%${term}%`]).join(","))
   }
   const { data, error } = await query as { data: AssistantCommerceProduct[] | null; error: unknown }
-  return error || !data ? [] : data
+  return error || !data ? [] : productsForContext(data, wantsPromotion)
 }
 
-async function fetchPopup(supabase: any, storeUuid: string) {
-  const { data } = await supabase.from(ECOMMERCE_TABLES.storeIntegrations).select("metadata").eq("store_id", storeUuid).maybeSingle()
-  return projectPublicHomeDiscountPopupConfig(data?.metadata?.homeDiscountPopup)
+function homeDiscountPopupFromMetadata(metadata: unknown) {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return null
+  return (metadata as Record<string, unknown>).homeDiscountPopup
+}
+
+async function fetchPopup(supabase: AssistantCommerceClient, storeUuid: string) {
+  const { data } = await supabase.from(ECOMMERCE_TABLES.storeIntegrations).select("metadata").eq("store_id", storeUuid).maybeSingle() as {
+    data: StoreIntegrationMetadataRow | null
+  }
+  return projectPublicHomeDiscountPopupConfig(homeDiscountPopupFromMetadata(data?.metadata))
 }
 
 export async function getAssistantCommerceContext({ supabase, storeUuid, userMessage, now = new Date() }: {
-  supabase: any
+  supabase: AssistantCommerceClient
   storeUuid: string | null
   userMessage: string
   now?: Date
 }): Promise<string> {
-  if (!supabase || !storeUuid || !isCommerceContextQuestion(userMessage)) return ""
+  if (!storeUuid || !isCommerceContextQuestion(userMessage)) return ""
   try {
     const [products, combos, popup] = await Promise.all([
       fetchProducts(supabase, storeUuid, userMessage),

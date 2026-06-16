@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import {
   buildAssistantCommerceContext,
+  getAssistantCommerceContext,
   isCommerceContextQuestion,
   type AssistantCommerceCombo,
   type AssistantCommerceProduct,
@@ -16,6 +17,43 @@ const product = (overrides: Partial<AssistantCommerceProduct> = {}): AssistantCo
 })
 const context = (input: Partial<Parameters<typeof buildAssistantCommerceContext>[0]>) =>
   buildAssistantCommerceContext({ products: [], combos: [], popup: null, now, ...input })
+
+type AssistantCommerceClient = Parameters<typeof getAssistantCommerceContext>[0]["supabase"]
+type ProductQueryResult = { data: AssistantCommerceProduct[] | null; error: unknown }
+
+class FakeProductQuery implements PromiseLike<ProductQueryResult> {
+  readonly searchFilters: string[] = []
+
+  constructor(private readonly products: AssistantCommerceProduct[]) {}
+
+  select() { return this }
+  eq() { return this }
+  order() { return this }
+  limit() { return this }
+  or(filters: string) { this.searchFilters.push(filters); return this }
+  then<TResult1 = ProductQueryResult, TResult2 = never>(
+    onfulfilled?: ((value: ProductQueryResult) => TResult1 | PromiseLike<TResult1>) | null,
+    onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
+  ) {
+    const result = { data: this.searchFilters.length ? [] : this.products, error: null }
+    return Promise.resolve(result).then(onfulfilled, onrejected)
+  }
+}
+
+class EmptyMetadataQuery {
+  select() { return this }
+  eq() { return this }
+  async maybeSingle() { return { data: null, error: null } }
+}
+
+function fakeCommerceClient(products: AssistantCommerceProduct[]) {
+  const productQuery = new FakeProductQuery(products)
+  const client = {
+    from: (table: string) => table === "store_items" ? productQuery : new EmptyMetadataQuery(),
+  } as unknown as AssistantCommerceClient
+
+  return { client, productQuery }
+}
 
 describe("assistant commerce context", () => {
   it("formats discounted products with real current/previous prices, stock, and CTA", () => {
@@ -34,6 +72,24 @@ describe("assistant commerce context", () => {
     expect(output).not.toContain("Precio anterior")
     expect(output).not.toContain("CTA: /products/cafe-regular")
     expect(output).toContain("Disponibilidad: no disponible")
+  })
+
+  it("does not text-filter away real discounts for generic promotion questions", async () => {
+    const { client, productQuery } = fakeCommerceClient([
+      product({ item_name: "Café Regular", base_price: 28000, compare_at_price: 28000 }),
+      product({ item_name: "Café Especial", base_price: 32000, compare_at_price: 42000 }),
+    ])
+
+    const output = await getAssistantCommerceContext({
+      supabase: client,
+      storeUuid: "store-1",
+      userMessage: "¿Qué descuentos o cupones tienen hoy?",
+      now,
+    })
+
+    expect(productQuery.searchFilters).toEqual([])
+    expect(output).toContain("Precio anterior: 42000 COP")
+    expect(output.indexOf("Café Especial")).toBeLessThan(output.indexOf("Café Regular"))
   })
 
   it("includes only available combos", () => {
