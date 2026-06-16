@@ -1,6 +1,6 @@
-/* eslint-disable @next/next/no-img-element -- Storefront product media can be tenant-provided remote URLs; Next image migration is outside this UI-slice scope. */
 import Link from "next/link"
 import type { ReactNode } from "react"
+import { VisualProductCardImage } from "@/components/products/visual-product-card-image"
 import type { CommerceProductBadge, CommerceProductCard } from "@/lib/types/products"
 
 interface VisualProductCardProps {
@@ -28,21 +28,6 @@ export function VisualProductCard({
 }: VisualProductCardProps) {
   const isOverlay = variant === "overlay"
   const imageAlt = product.imageAlt || product.title
-  const imageContent = product.imageUrl ? (
-    <img
-      src={product.imageUrl}
-      alt={imageAlt}
-      className={`h-full w-full ${isOverlay ? "object-cover transition-transform duration-300 group-hover:scale-105" : "object-contain"}`}
-    />
-  ) : (
-    <div
-      role="img"
-      aria-label={`Sin imagen para ${product.title}`}
-      className="flex h-full w-full items-center justify-center rounded-xl border border-dashed border-border/70 bg-muted/40 px-4 text-center text-sm text-muted-foreground"
-    >
-      Sin imagen
-    </div>
-  )
 
   return (
     <article
@@ -71,7 +56,12 @@ export function VisualProductCard({
         <div
           className={`${isOverlay ? "aspect-[4/3]" : "aspect-square"} flex items-center justify-center bg-background p-4`}
         >
-          {imageContent}
+          <VisualProductCardImage
+            src={product.imageUrl}
+            alt={imageAlt}
+            title={product.title}
+            isOverlay={isOverlay}
+          />
         </div>
       </Link>
 

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { VisualProductCard } from '@/components/products/visual-product-card'
 import type { CommerceProductCard } from '@/lib/types/products'
@@ -69,6 +69,14 @@ describe('VisualProductCard', () => {
     expect(screen.queryByText(/159\.000/)).not.toBeInTheDocument()
     expect(screen.queryByText('Oferta')).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /ver detalles/i })).not.toBeInTheDocument()
+  })
+
+  it('falls back when a tenant-provided image URL fails to load', () => {
+    render(<VisualProductCard product={product} />)
+
+    fireEvent.error(screen.getByRole('img', { name: 'Auriculares negros' }))
+
+    expect(screen.getByRole('img', { name: /sin imagen para auriculares premium/i })).toBeInTheDocument()
   })
 
   it('places favorite and custom action slots without nesting them in the product link', () => {
