@@ -118,4 +118,52 @@ describe("AdminPermissionsProvider deny-until-verified fallback", () => {
     expect(screen.getByTestId("is-admin")).toHaveTextContent("false");
     expect(screen.getByTestId("role")).toHaveTextContent("user");
   });
+
+  it("ignores a stale admin verification that resolves after the authenticated user changes", async () => {
+    let resolveFirstAdmin!: (value: boolean) => void;
+    let resolveFirstRole!: (value: string) => void;
+    mockIsCurrentUserAdmin
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveFirstAdmin = resolve;
+        }),
+      )
+      .mockResolvedValueOnce(false);
+    mockGetCurrentUserRole
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveFirstRole = resolve;
+        }),
+      )
+      .mockResolvedValueOnce("user");
+
+    const { rerender } = renderHarness();
+
+    expect(screen.getByTestId("loading")).toHaveTextContent("true");
+    await waitFor(() => {
+      expect(mockIsCurrentUserAdmin).toHaveBeenCalledTimes(1);
+    });
+
+    authState.user = { id: "customer-1", email: "customer@example.com" };
+
+    rerender(
+      <AdminPermissionsProvider>
+        <Harness />
+      </AdminPermissionsProvider>,
+    );
+
+    await waitFor(() => {
+      expect(mockIsCurrentUserAdmin).toHaveBeenCalledTimes(2);
+    });
+
+    resolveFirstAdmin(true);
+    resolveFirstRole("admin");
+
+    await waitFor(() => {
+      expect(screen.getByTestId("loading")).toHaveTextContent("false");
+    });
+    expect(screen.getByTestId("has-checked")).toHaveTextContent("true");
+    expect(screen.getByTestId("is-admin")).toHaveTextContent("false");
+    expect(screen.getByTestId("role")).toHaveTextContent("user");
+  });
 });

@@ -33,13 +33,14 @@ function mockStoreFetch() {
 
 describe("proxy admin route guard", () => {
   let fetchMock: ReturnType<typeof mockStoreFetch>;
-  let errorSpy: ReturnType<typeof vi.spyOn>;
+  let restoreConsoleError: () => void;
 
   beforeEach(() => {
     vi.resetModules();
     fetchMock = mockStoreFetch();
     vi.stubGlobal("fetch", fetchMock);
-    errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    restoreConsoleError = () => errorSpy.mockRestore();
     process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "test-anon-key";
     process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role";
@@ -51,7 +52,7 @@ describe("proxy admin route guard", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
-    errorSpy.mockRestore();
+    restoreConsoleError();
   });
 
   it("redirects a guest /admin/orders request before render with login intent", async () => {
