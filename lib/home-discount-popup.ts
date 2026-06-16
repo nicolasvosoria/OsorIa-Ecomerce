@@ -145,9 +145,13 @@ function normalizeCtaMode(value: unknown): HomeDiscountPopupCtaMode {
   return value === "redirect" ? "redirect" : "copy_coupon";
 }
 
+function hasValidRedirectCtaUrl(config: HomeDiscountPopupConfig): boolean {
+  return Boolean(sanitizePublicUrl(config.ctaUrl));
+}
+
 function hasValidCta(config: HomeDiscountPopupConfig): boolean {
   if (config.ctaMode === "redirect") {
-    return Boolean(config.ctaUrl);
+    return hasValidRedirectCtaUrl(config);
   }
 
   return Boolean(config.coupon);
@@ -395,7 +399,7 @@ export function validateHomeDiscountPopupAdminStatus(
     });
   }
 
-  if (config.ctaMode === "redirect" && !config.ctaUrl) {
+  if (config.ctaMode === "redirect" && !hasValidRedirectCtaUrl(config)) {
     issues.push({
       code: "missing_redirect_url",
       message: "El CTA de redirección no tiene una URL válida.",

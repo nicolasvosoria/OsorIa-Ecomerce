@@ -419,6 +419,34 @@ describe("validateHomeDiscountPopupAdminStatus", () => {
     );
   });
 
+  it.each(["foo", "javascript:alert(1)"])(
+    "does not mark redirect campaigns publishable when the CTA URL is %s",
+    (ctaUrl) => {
+      const status = validateHomeDiscountPopupAdminStatus(
+        {
+          ...normalizeHomeDiscountPopupConfig({
+            active: true,
+            title: "Promo home",
+            text: "Texto",
+            ctaText: "Ir ahora",
+            ctaMode: "redirect",
+            ctaUrl: "https://example.com/promo",
+          }),
+          ctaUrl,
+        },
+        new Date("2026-05-08T10:00:00.000Z"),
+      );
+
+      expect(status.publishable).toBe(false);
+      expect(status.issues).toEqual([
+        expect.objectContaining({
+          code: "missing_redirect_url",
+          action: expect.stringContaining("URL"),
+        }),
+      ]);
+    },
+  );
+
   it("marks a complete active coupon campaign as publishable", () => {
     expect(
       validateHomeDiscountPopupAdminStatus(
