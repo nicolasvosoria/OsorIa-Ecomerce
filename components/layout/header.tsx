@@ -1,8 +1,8 @@
 /* eslint-disable @next/next/no-img-element -- Existing dynamic storefront images intentionally use native img in these legacy components; converting all to next/image is outside the global-gates cleanup risk budget. */
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
-import { useRouter, usePathname } from "next/navigation"
+import { useState, useMemo, useEffect, useRef } from "react"
+import { useRouter, usePathname, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Search, Heart, ShoppingCart, Palette, AlignLeft, Menu, LogIn, LogOut, User, Eye, EyeOff, CreditCard, Building2, Wallet, LayoutDashboard, Edit } from "lucide-react"
 import { VisaIcon, MasterCardIcon, AmexIcon } from "@/components/icons/cc-icons"
@@ -21,6 +21,7 @@ import { Trash2, Plus, Minus } from "lucide-react"
 import { toast } from "sonner"
 import { resetPassword } from "@/lib/supabase/auth-api"
 import { deferStateUpdate } from "@/lib/react/defer-state-update"
+import { ADMIN_ACCESS_DENIED_PATH, getAuthReturnPath, resolvePostAuthDestination } from "@/lib/auth-return-intent"
 import {
   Sheet,
   SheetContent,
@@ -67,6 +68,7 @@ function generateCategorySlug(name: string): string {
 
 export function Header() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [themeModalOpen, setThemeModalOpen] = useState(false)
   const [fontModalOpen, setFontModalOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -87,6 +89,8 @@ export function Header() {
   const [forgotPasswordModalOpen, setForgotPasswordModalOpen] = useState(false)
   const [resetEmail, setResetEmail] = useState("")
   const [resetEmailSent, setResetEmailSent] = useState(false)
+  const [pendingLoginReturnPath, setPendingLoginReturnPath] = useState<string | null>(null)
+  const openedLoginReturnIntentRef = useRef<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [searchSuggestions, setSearchSuggestions] = useState<Array<{ id: string; title: string; slug: string; image?: string }>>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
@@ -146,6 +150,26 @@ export function Header() {
     ? (styleData.logoImageDark || "/logo-osoria-blanco.svg")
     : (styleData.logoImage || "/logo-negro.svg")
   const pathname = usePathname()
+
+  useEffect(() => {
+    if (searchParams.get("auth") !== "login") {
+      return
+    }
+
+    const safeReturnPath = getAuthReturnPath(searchParams)
+    if (!safeReturnPath) {
+      return
+    }
+
+    if (openedLoginReturnIntentRef.current === safeReturnPath) {
+      return
+    }
+
+    openedLoginReturnIntentRef.current = safeReturnPath
+    setPendingLoginReturnPath(safeReturnPath)
+    setIsRegisterMode(false)
+    setLoginModalOpen(true)
+  }, [searchParams])
 
   // Sincronizar el query de búsqueda con la URL cuando esté en /shop
   useEffect(() => {
@@ -1323,7 +1347,8 @@ export function Header() {
                   // Refrescar el usuario para obtener el rol actualizado
                   await refreshUser()
                   
-                  // Todos los usuarios (admin y user) van a la página principal
+                  // Todos los usuarios (admin y user) inician sesión; solo admins consumen
+                  // un destino admin seguro solicitado desde ?auth=login&next=...
                   toast.success(t.header.sessionStarted, {
                     description: result.user?.role === 'admin' 
                       ? t.header.welcomeAdminLogin 
@@ -1331,6 +1356,8 @@ export function Header() {
                     duration: 3000,
                   })
                   
+                  const loginReturnPath = pendingLoginReturnPath
+                  setPendingLoginReturnPath(null)
                   setLoginModalOpen(false)
                   setEmail("")
                   setPassword("")
@@ -1340,6 +1367,15 @@ export function Header() {
                   setShowPassword(false)
                   setShowConfirmPassword(false)
                   setIsRegisterMode(false)
+
+                  if (loginReturnPath) {
+                    const nextDestination = resolvePostAuthDestination({
+                      returnPath: loginReturnPath,
+                      user: result.user,
+                      fallback: ADMIN_ACCESS_DENIED_PATH,
+                    })
+                    router.push(nextDestination)
+                  }
                 } else {
                   toast.error(t.header.errorLoggingIn, {
                     description: result.error || "Verifica tus credenciales e intenta nuevamente",

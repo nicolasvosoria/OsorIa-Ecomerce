@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { resolveStoreSubdomain } from '@/lib/utils/store-host'
+import { normalizeSafeAdminPath, resolveAdminAccess } from '@/lib/supabase/admin-access'
 
 // Variable de entorno para deshabilitar multi-tenant temporalmente
 const DISABLE_SUBDOMAIN_MULTI_TENANT = process.env.DISABLE_SUBDOMAIN_MULTI_TENANT === 'true'
@@ -20,6 +21,40 @@ interface Store {
 // Caché simple en memoria para las tiendas (evita consultas repetidas)
 const storeCache = new Map<string, { store: Store | null; timestamp: number }>()
 const CACHE_TTL = 5 * 60 * 1000 // 5 minutos
+
+function isAdminRoute(pathname: string) {
+  return pathname === '/admin' || pathname.startsWith('/admin/')
+}
+
+async function applyAdminRouteGate(request: NextRequest, response: NextResponse) {
+  const { pathname, search } = request.nextUrl
+
+  if (!isAdminRoute(pathname)) {
+    return response
+  }
+
+  const access = await resolveAdminAccess(request)
+  if (access.status === 'admin') {
+    return response
+  }
+
+  const redirectUrl = request.nextUrl.clone()
+  redirectUrl.pathname = '/'
+  redirectUrl.search = ''
+
+  if (access.status === 'guest') {
+    const next = normalizeSafeAdminPath(`${pathname}${search}`) || '/admin'
+    redirectUrl.searchParams.set('auth', 'login')
+    redirectUrl.searchParams.set('next', next)
+    return NextResponse.redirect(redirectUrl)
+  }
+
+  redirectUrl.searchParams.set(
+    'admin_access',
+    access.status === 'error' ? 'error' : 'denied',
+  )
+  return NextResponse.redirect(redirectUrl)
+}
 
 /**
  * Obtiene la tienda desde Supabase por subdominio (schema ecommerce, vista stores_legacy)
@@ -109,7 +144,7 @@ export async function proxy(request: NextRequest) {
       sameSite: 'lax',
     })
 
-    return response
+    return applyAdminRouteGate(request, response)
   }
 
   // Extraer subdominio
@@ -133,7 +168,7 @@ export async function proxy(request: NextRequest) {
         sameSite: 'lax',
       })
       
-      return response
+      return applyAdminRouteGate(request, response)
     }
     
     // Si no existe tienda por defecto, permitir continuar con valores por defecto
@@ -149,7 +184,7 @@ export async function proxy(request: NextRequest) {
       sameSite: 'lax',
     })
     
-    return response
+    return applyAdminRouteGate(request, response)
   }
 
   // Obtener información de la tienda
@@ -182,7 +217,7 @@ export async function proxy(request: NextRequest) {
     sameSite: 'lax',
   })
 
-  return response
+  return applyAdminRouteGate(request, response)
 }
 
 // Configurar qué rutas deben ejecutar el proxy
