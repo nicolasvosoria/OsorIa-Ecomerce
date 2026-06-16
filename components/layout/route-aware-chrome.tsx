@@ -9,6 +9,7 @@ import { EditorPanel } from "@/components/admin/editor-panel"
 import { MainContentWrapper } from "@/components/admin/main-content-wrapper"
 import { FloatingContactButton } from "@/components/ui/floating-contact-button"
 import { Header } from "@/components/layout/header"
+import { AdminSessionActions } from "@/components/admin/admin-session-actions"
 
 interface RouteAwareChromeProps {
   children: ReactNode
@@ -33,6 +34,7 @@ export function RouteAwareChrome({ children }: RouteAwareChromeProps) {
     serverHydrationSnapshot,
   )
   const showStorefrontChrome = hasHydrated && !isAdminChromeRoute(pathname)
+  const showAdminSessionActions = hasHydrated && isAdminChromeRoute(pathname)
 
   return (
     <>
@@ -46,6 +48,7 @@ export function RouteAwareChrome({ children }: RouteAwareChromeProps) {
           {children}
         </main>
       </MainContentWrapper>
+      {showAdminSessionActions && <AdminSessionActions />}
       {showStorefrontChrome && (
         <>
           <FloatingContactButton />
