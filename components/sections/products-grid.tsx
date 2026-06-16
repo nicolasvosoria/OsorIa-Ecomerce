@@ -1,11 +1,11 @@
-/* eslint-disable @next/next/no-img-element -- Existing dynamic storefront images intentionally use native img in these legacy components; converting all to next/image is outside the global-gates cleanup risk budget. */
 "use client"
 
-import Link from "next/link"
 import { useComponentStyle } from "@/contexts/styles-context"
 import { useAdmin } from "@/contexts/admin-context"
 import { useStore } from "@/contexts/store-context"
-import { useState } from "react"
+import { VisualProductCard } from "@/components/products/visual-product-card"
+import { normalizeCommercePrice } from "@/lib/products/adapter"
+import type { CommerceProductBadge, CommerceProductCard, CommerceProductPrice } from "@/lib/types/products"
 
 // Helper para generar slug desde el nombre
 function generateSlug(name: string): string {
@@ -17,52 +17,58 @@ function generateSlug(name: string): string {
     .replace(/(^-|-$)/g, "")
 }
 
-// Componente Image con fallback automático a placeholder
-function ProductImageWithFallback({ src, alt }: { src: string; alt: string }) {
-  const [imgSrc, setImgSrc] = useState(src)
-  const [hasError, setHasError] = useState(false)
-
-  const handleError = () => {
-    if (!hasError && imgSrc !== "/placeholder.svg") {
-      setHasError(true)
-      setImgSrc("/placeholder.svg")
-    }
-  }
-
-  // Si ya hubo error, mostrar placeholder directamente
-  if (hasError || imgSrc === "/placeholder.svg") {
-    return (
-      <img
-        src="/placeholder.svg"
-        alt={alt}
-        className="w-full h-full object-contain"
-        onError={(e) => {
-          // Prevenir loops infinitos
-          e.currentTarget.src = "/placeholder.svg"
-        }}
-      />
-    )
-  }
-
-  return (
-    <img
-      src={imgSrc}
-      alt={alt}
-      className="w-full h-full object-contain"
-      onError={handleError}
-    />
-  )
+type EditableProduct = Partial<CommerceProductCard> & {
+  name?: string
+  title?: string
+  slug?: string
+  image?: string
+  imageUrl?: string
+  price?: string | number | CommerceProductPrice
+  originalPrice?: number
+  compareAtPrice?: number
+  badge?: string
+  badges?: CommerceProductBadge[]
 }
 
 interface ProductsGridProps {
-  initialProducts?: Array<{
-    id: string
-    name: string
-    category: string
-    price: string
-    image: string
-    slug?: string
-  }>
+  initialProducts?: CommerceProductCard[]
+}
+
+function isCommercePrice(price: EditableProduct["price"]): price is CommerceProductPrice {
+  return Boolean(price && typeof price === "object" && "label" in price)
+}
+
+function toCard(product: EditableProduct, index: number): CommerceProductCard {
+  const title = product.title || product.name || `Producto ${index + 1}`
+  const slug = product.slug || generateSlug(title)
+  const price = isCommercePrice(product.price)
+    ? product.price
+    : typeof product.price === "number"
+      ? normalizeCommercePrice(product.price, "COP", product.originalPrice ?? product.compareAtPrice)
+      : {
+          amount: 0,
+          currencyCode: "COP",
+          label: product.price || "",
+          hasDiscount: false,
+        }
+  const saleBadge = price.hasDiscount ? [{ label: "Oferta", tone: "sale" as const }] : []
+
+  return {
+    id: product.id || `product-${index}`,
+    title,
+    description: product.description,
+    href: product.href || `/products/${slug}`,
+    imageUrl: product.imageUrl || product.image || undefined,
+    imageAlt: product.imageAlt || title,
+    category: product.category,
+    price,
+    badges: product.badges || [
+      ...(product.badge ? [{ label: product.badge, tone: "default" as const }] : []),
+      ...saleBadge,
+    ],
+    ctaLabel: product.ctaLabel || "Ver detalles",
+    availableForSale: product.availableForSale,
+  }
 }
 
 export function ProductsGrid({ initialProducts }: ProductsGridProps = {}) {
@@ -71,7 +77,7 @@ export function ProductsGrid({ initialProducts }: ProductsGridProps = {}) {
     title: "Productos populares",
   })
   const { componentEdits } = useAdmin()
-  
+
   // Combinar estilos de BD con ediciones locales para mostrar cambios en tiempo real
   const edits = componentEdits.get("products") || {}
   const title = edits.title ?? styleData.title ?? "Productos populares"
@@ -85,18 +91,21 @@ export function ProductsGrid({ initialProducts }: ProductsGridProps = {}) {
   // Si es repostería, usar imágenes de repostería, si no, usar imágenes de tecnología
   const defaultProducts = isReposteria ? [
     {
+      id: "cupcakes-decorados",
       name: "Cupcakes Decorados",
       category: "Cupcakes",
       price: "$25.00",
       image: "/reposteria/cupcakes-decorados.jpg",
     },
     {
+      id: "tarta-berries",
       name: "Tarta de Berries",
       category: "Tartas",
       price: "$45.00",
       image: "/reposteria/tarta-berries.jpg",
     },
     {
+      id: "macarons-artesanales",
       name: "Macarons Artesanales",
       category: "Macarons",
       price: "$18.00",
@@ -104,25 +113,28 @@ export function ProductsGrid({ initialProducts }: ProductsGridProps = {}) {
     },
   ] : [
     {
+      id: "beshow-volcano",
       name: "BeShow Volcano",
       category: "Proyectores",
       price: "$1,420.00",
       image: "/white-projector.jpg",
     },
     {
+      id: "soporte-laptop-desk-muo-g",
       name: "Soporte para Laptop Desk MUO-g",
       category: "Soportes",
       price: "$82.00",
       image: "/laptop-stand.png",
     },
     {
+      id: "beshow-volcano-alt",
       name: "BeShow Volcano",
       category: "Proyectores",
       price: "$1,420.00",
       image: "/white-projector.jpg",
     },
   ]
-  
+
   // Imágenes de repostería para reemplazar cuando hay productos de BD
   const reposteriaImages = [
     "/reposteria/cupcakes-decorados.jpg",
@@ -138,15 +150,16 @@ export function ProductsGrid({ initialProducts }: ProductsGridProps = {}) {
   const products = initialProducts && initialProducts.length > 0
     ? initialProducts.map((p, index) => ({
         ...p,
-        image: isReposteria 
-          ? (reposteriaImages[index % reposteriaImages.length] || p.image)
-          : p.image,
+        imageUrl: isReposteria
+          ? (reposteriaImages[index % reposteriaImages.length] || p.imageUrl)
+          : p.imageUrl,
       }))
     : (edits.products ?? styleData.products ?? defaultProducts)
+  const productCards = products.map((product: EditableProduct, index: number) => toCard(product, index))
 
   return (
-    <section 
-      data-component="products" 
+    <section
+      data-component="products"
       className="py-6 sm:py-8 md:py-12 px-4 sm:px-6"
       style={{
         ...(bgColor && { backgroundColor: bgColor }),
@@ -154,46 +167,17 @@ export function ProductsGrid({ initialProducts }: ProductsGridProps = {}) {
       }}
     >
       <div className="container mx-auto">
-        <h2 
-          className="text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-[51px] font-inter font-normal mb-4 sm:mb-6 md:mb-8" 
+        <h2
+          className="text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-[51px] font-inter font-normal mb-4 sm:mb-6 md:mb-8"
           style={{ color: textColor || "var(--foreground)" }}
         >
           {title}
         </h2>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-5 md:gap-6">
-          {products.map((product: any, index: number) => {
-            const productSlug = product.slug || generateSlug(product.name)
-            const productId = initialProducts?.[index]?.id || `product-${index}`
-            return (
-              <Link 
-                key={productId} 
-                href={`/products/${productSlug}`}
-                className="rounded-2xl overflow-hidden hover:shadow-lg transition-shadow cursor-pointer block"
-                style={{ backgroundColor: "var(--card)" }}
-              >
-                <div className="p-3 sm:p-4">
-                  <h3 className="font-inter font-normal text-sm sm:text-base md:text-[17.4854px] mb-1 hover:text-primary transition-colors" style={{ color: "var(--card-foreground)" }}>
-                    {product.name}
-                  </h3>
-                  <p className="text-xs sm:text-sm md:text-[13.9775px] font-inter font-normal mb-2" style={{ color: "var(--muted-foreground)" }}>{product.category}</p>
-                  <p className="text-base sm:text-lg md:text-[20.5864px] font-inter font-normal" style={{ color: "var(--card-foreground)" }}>
-                    {product.price}
-                  </p>
-                </div>
-
-                <div 
-                  className="aspect-square flex items-center justify-center p-3 sm:p-4"
-                  style={{ backgroundColor: "var(--background)" }}
-                >
-                  <ProductImageWithFallback
-                    src={product.image || "/placeholder.svg"}
-                    alt={product.name}
-                  />
-                </div>
-              </Link>
-            )
-          })}
+          {productCards.map((product) => (
+            <VisualProductCard key={product.id} product={product} />
+          ))}
         </div>
       </div>
     </section>
