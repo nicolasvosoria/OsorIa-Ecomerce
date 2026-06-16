@@ -82,6 +82,16 @@ function readString(value: unknown): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+function readIdentifier(value: unknown): string | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+  if (typeof value === "bigint") {
+    return String(value);
+  }
+  return readString(value);
+}
+
 function normalizeThemeColors(value: unknown): ThemeColors | null {
   const raw = toRecord(parseJsonIfNeeded(value));
   if (!raw) return null;
@@ -138,9 +148,9 @@ export function normalizeThemeRecord(input: unknown): RuntimeTheme | null {
   }
 
   const explicitFingerprint = readString(raw.theme_fingerprint);
-  const themeId = readString(raw.id ?? raw.theme_id);
-  const storeId = readString(raw.store_id);
-  const versionId = readString(raw.theme_version_id ?? raw.version_id);
+  const themeId = readIdentifier(raw.id ?? raw.theme_id);
+  const storeId = readIdentifier(raw.store_id);
+  const versionId = readIdentifier(raw.theme_version_id ?? raw.version_id);
   const updatedAt = readString(raw.updated_at) ?? "unknown";
   const publishedAt = readString(raw.theme_published_at ?? raw.created_at);
   const colorHash = stableThemeColorsHash(colors);

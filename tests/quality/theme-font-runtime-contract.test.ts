@@ -88,6 +88,35 @@ describe("normalizeThemeRecord", () => {
     );
   });
 
+  it("derives v1 fingerprints from numeric database ids", () => {
+    const colors = {
+      primary: "#001122",
+      secondary: "#112233",
+      accent: "#334455",
+      background: "#ffffff",
+      foreground: "#111111",
+      card: "#f6f6f6",
+      cardForeground: "#111111",
+      border: "#dddddd",
+      muted: "#efefef",
+      mutedForeground: "#555555",
+    };
+
+    const theme = normalizeThemeRecord({
+      theme_id: 42,
+      store_id: "store-1",
+      version_id: 7,
+      updated_at: "2026-05-14T10:00:00Z",
+      theme_name: "Ocean",
+      colors,
+    });
+
+    expect(theme?.theme_fingerprint).toBe(
+      `v1:store-1:7:42:2026-05-14T10:00:00Z:${stableThemeColorsHash(colors)}`,
+    );
+    expect(theme?.theme_version_id).toBe("7");
+  });
+
   it("normalizes legacy theme_config into a fingerprinted runtime shape", () => {
     const legacy = normalizeThemeRecord({
       id: "theme-legacy",
