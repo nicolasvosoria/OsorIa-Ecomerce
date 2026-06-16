@@ -139,9 +139,9 @@ export default function CreateProductPage() {
       return
     }
 
-    // Validar imágenes: máximo 3
-    if (images.length > 3) {
-      toast.error("Solo se permiten máximo 3 imágenes")
+    // Validar imágenes: máximo 5
+    if (images.length > 5) {
+      toast.error("Solo se permiten máximo 5 imágenes")
       return
     }
 
@@ -541,7 +541,7 @@ export default function CreateProductPage() {
                 <CardHeader>
                   <CardTitle>Imágenes del Producto</CardTitle>
                   <CardDescription>
-                    Máximo 3 imágenes. Cada imagen debe pesar 1 MB o menos.
+                    Máximo 5 imágenes. Cada imagen debe pesar 1 MB o menos.
                     La primera imagen será la imagen principal.
                   </CardDescription>
                 </CardHeader>
@@ -549,7 +549,7 @@ export default function CreateProductPage() {
                   <MultiImageUpload
                     images={images}
                     onChange={setImages}
-                    maxImages={3}
+                    maxImages={5}
                     maxSizeMB={1}
                     context="product-images"
                     label="Imágenes del Producto"

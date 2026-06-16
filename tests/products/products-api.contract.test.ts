@@ -235,6 +235,72 @@ describe("products-api contract", () => {
     ]);
   });
 
+  it("allows exactly five product images and persists their display order", async () => {
+    const state = new MockSupabaseState({
+      "store_items:select": [{ data: null, error: null }],
+      "store_items:insert": [
+        {
+          data: {
+            id: "item-5",
+            item_name: "Galería Cinco",
+            item_categories: null,
+          },
+          error: null,
+        },
+      ],
+      "item_images:insert": [{ error: null }],
+    });
+    getSupabaseEcommerceMock.mockReturnValue({ from: state.from });
+
+    const result = await createItem(
+      {
+        item_name: "Galería Cinco",
+        base_price: 12000,
+        primary_image_url: "https://example.com/1.webp",
+        primary_image_alt: "Galería Cinco",
+      },
+      [
+        "https://example.com/2.webp",
+        "https://example.com/3.webp",
+        "https://example.com/4.webp",
+        "https://example.com/5.webp",
+      ],
+    );
+
+    expect(result.success).toBe(true);
+    expect(state.inserts.item_images[0]).toEqual([
+      expect.objectContaining({ image_url: "https://example.com/1.webp", display_order: 1 }),
+      expect.objectContaining({ image_url: "https://example.com/2.webp", display_order: 2 }),
+      expect.objectContaining({ image_url: "https://example.com/3.webp", display_order: 3 }),
+      expect.objectContaining({ image_url: "https://example.com/4.webp", display_order: 4 }),
+      expect.objectContaining({ image_url: "https://example.com/5.webp", display_order: 5 }),
+    ]);
+  });
+
+  it("rejects more than five product images with a clear limit error", async () => {
+    const state = new MockSupabaseState({});
+    getSupabaseEcommerceMock.mockReturnValue({ from: state.from });
+
+    const result = await createItem(
+      {
+        item_name: "Demasiadas imágenes",
+        base_price: 12000,
+        primary_image_url: "https://example.com/1.webp",
+      },
+      [
+        "https://example.com/2.webp",
+        "https://example.com/3.webp",
+        "https://example.com/4.webp",
+        "https://example.com/5.webp",
+        "https://example.com/6.webp",
+      ],
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("máximo 5 imágenes");
+    expect(state.inserts.store_items).toBeUndefined();
+  });
+
   it("updates product slugs within the same store and refreshes normalized details", async () => {
     const state = new MockSupabaseState({
       "store_items_legacy:select": [
@@ -286,6 +352,45 @@ describe("products-api contract", () => {
       image_url: "https://example.com/new.webp",
       display_order: 1,
     });
+  });
+
+
+
+  it("removes every normalized product image when edit submits an empty gallery", async () => {
+    const state = new MockSupabaseState({
+      "store_items_legacy:select": [
+        {
+          data: {
+            id: "item-empty",
+            item_name: "Sin imágenes",
+            store_id: "store-1",
+            primary_image_url: "https://example.com/old.webp",
+          },
+          error: null,
+        },
+      ],
+      "store_items:update": [
+        {
+          data: { id: "item-empty", item_name: "Sin imágenes", item_categories: null },
+          error: null,
+        },
+      ],
+      "item_images:delete": [{ error: null }],
+    });
+    getSupabaseEcommerceMock.mockReturnValue({ from: state.from });
+
+    const result = await updateItem("item-empty", {
+      primary_image_url: null,
+      primary_image_alt: null,
+    });
+
+    expect(result.success).toBe(true);
+    expect(state.updates.store_items[0]).toMatchObject({
+      primary_image_url: null,
+      primary_image_alt: null,
+    });
+    expect(state.deletes.item_images).toEqual([true]);
+    expect(state.inserts.item_images).toBeUndefined();
   });
 
   it("resolves the symbolic default store before filtering UUID store columns", async () => {

@@ -18,6 +18,11 @@ import {
 } from './combos-api'
 import { buildProductImageRows } from './product-image-rows'
 
+const MAX_PRODUCT_IMAGES = 5
+const MAX_ADDITIONAL_PRODUCT_IMAGES = MAX_PRODUCT_IMAGES - 1
+const MAX_PRODUCT_IMAGES_ERROR =
+  `Solo se permiten máximo ${MAX_PRODUCT_IMAGES} imágenes por producto (1 principal + ${MAX_ADDITIONAL_PRODUCT_IMAGES} adicionales)`
+
 // Importación dinámica de getStoreId para evitar problemas con análisis estático de Next.js
 async function getStoreId(): Promise<string | null> {
   const { getStoreId: getStoreIdFn } = await import('@/lib/utils/store')
@@ -740,8 +745,8 @@ export interface CreateItemData {
   seo_description?: string
   metadata?: Record<string, any>
   tags?: string[]
-  primary_image_url?: string
-  primary_image_alt?: string
+  primary_image_url?: string | null
+  primary_image_alt?: string | null
   display_order?: number
   store_id?: string
 }
@@ -826,12 +831,11 @@ export async function createItem(
       }
     }
 
-    // Validar que solo haya máximo 3 imágenes en total (primary + additional)
-    const totalImagesCount = buildProductImageRows("count-only", data.item_name, data, additionalImages).length
-    if (totalImagesCount > 3) {
+    const totalImagesCount = buildProductImageRows('count-only', data.item_name, data, additionalImages).length
+    if (totalImagesCount > MAX_PRODUCT_IMAGES) {
       return {
         success: false,
-        error: 'Solo se permiten máximo 3 imágenes por producto (1 principal + 2 adicionales)',
+        error: MAX_PRODUCT_IMAGES_ERROR,
       }
     }
 
@@ -1011,8 +1015,8 @@ export interface UpdateItemData {
   seo_description?: string
   metadata?: Record<string, any>
   tags?: string[]
-  primary_image_url?: string
-  primary_image_alt?: string
+  primary_image_url?: string | null
+  primary_image_alt?: string | null
   display_order?: number
 }
 
@@ -1036,12 +1040,11 @@ export async function updateItem(
       }
     }
 
-    // Validar que solo haya máximo 3 imágenes en total (primary + additional)
-    const totalImagesCount = buildProductImageRows("count-only", data.item_name || "Producto", data, additionalImages).length
-    if (totalImagesCount > 3) {
+    const totalImagesCount = buildProductImageRows('count-only', data.item_name || 'Producto', data, additionalImages).length
+    if (totalImagesCount > MAX_PRODUCT_IMAGES) {
       return {
         success: false,
-        error: 'Solo se permiten máximo 3 imágenes por producto (1 principal + 2 adicionales)',
+        error: MAX_PRODUCT_IMAGES_ERROR,
       }
     }
 
