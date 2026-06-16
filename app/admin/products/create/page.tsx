@@ -27,6 +27,7 @@ import { createItem, getCategories } from "@/lib/supabase/products-api"
 import type { ItemCategory } from "@/lib/types/products"
 import { MultiImageUpload } from "@/components/admin/multi-image-upload"
 import { toast } from "sonner"
+import { getAdminCompareAtPriceNotice, getValidCompareAtPrice } from "@/lib/shopify/utils"
 
 export default function CreateProductPage() {
   const { isAdmin, loading } = useAdminPermissions()
@@ -86,6 +87,8 @@ export default function CreateProductPage() {
     }
   }, [isAdmin])
 
+  const compareAtPriceNotice = getAdminCompareAtPriceNotice(formData.base_price, formData.compare_at_price)
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -95,8 +98,12 @@ export default function CreateProductPage() {
     }
 
     if (!formData.base_price || parseFloat(formData.base_price) <= 0) {
-      toast.error("El precio base debe ser mayor a 0")
+      toast.error("El precio de venta actual debe ser mayor a 0")
       return
+    }
+
+    if (compareAtPriceNotice) {
+      toast.warning(compareAtPriceNotice)
     }
 
     // Validar cantidad de stock
@@ -132,7 +139,7 @@ export default function CreateProductPage() {
           item_description: formData.item_description.trim() || undefined,
           category_id: formData.category_id || undefined,
           base_price: parseFloat(formData.base_price),
-          compare_at_price: formData.compare_at_price ? parseFloat(formData.compare_at_price) : undefined,
+          compare_at_price: getValidCompareAtPrice(formData.base_price, formData.compare_at_price),
           currency_code: formData.currency_code,
           is_active: formData.is_active,
           is_featured: formData.is_featured,
@@ -354,7 +361,7 @@ export default function CreateProductPage() {
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-3 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="base_price">Precio Base *</Label>
+                      <Label htmlFor="base_price">Precio de venta actual *</Label>
                       <Input
                         id="base_price"
                         type="number"
@@ -362,13 +369,16 @@ export default function CreateProductPage() {
                         min="0"
                         value={formData.base_price}
                         onChange={(e) => setFormData({ ...formData, base_price: e.target.value })}
-                        placeholder="0.00"
+                        placeholder="Ej: 72000"
                         required
                       />
+                      <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>
+                        Este es el precio que pagará el cliente. Se muestra como precio actual en tienda, cards y detalle.
+                      </p>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="compare_at_price">Precio Comparación</Label>
+                      <Label htmlFor="compare_at_price">Precio anterior / precio de comparación</Label>
                       <Input
                         id="compare_at_price"
                         type="number"
@@ -376,8 +386,17 @@ export default function CreateProductPage() {
                         min="0"
                         value={formData.compare_at_price}
                         onChange={(e) => setFormData({ ...formData, compare_at_price: e.target.value })}
-                        placeholder="0.00"
+                        placeholder="Ej: 90000"
+                        aria-describedby={compareAtPriceNotice ? "compare-at-price-warning" : undefined}
                       />
+                      <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>
+                        Opcional: úsalo solo cuando sea mayor al precio actual; se verá tachado como referencia.
+                      </p>
+                      {compareAtPriceNotice ? (
+                        <p id="compare-at-price-warning" role="alert" className="text-xs font-medium text-amber-600">
+                          {compareAtPriceNotice}
+                        </p>
+                      ) : null}
                     </div>
 
                     <div className="space-y-2">
