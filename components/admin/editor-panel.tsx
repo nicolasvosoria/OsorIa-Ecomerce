@@ -79,6 +79,18 @@ const WHYUS_ICON_OPTIONS: Array<{ value: WhyUsIconKey; label: string }> = [
   { value: "shipping", label: "Envío" },
   { value: "payment", label: "Pago" },
   { value: "discount", label: "Descuento" },
+  { value: "warranty", label: "Garantía" },
+  { value: "returns", label: "Devoluciones" },
+  { value: "security", label: "Seguridad" },
+  { value: "chat", label: "Chat" },
+  { value: "fast", label: "Rápido" },
+  { value: "quality", label: "Calidad" },
+  { value: "gift", label: "Regalo" },
+  { value: "stock", label: "Stock" },
+  { value: "delivery", label: "Entrega" },
+  { value: "phone", label: "Teléfono" },
+  { value: "favorite", label: "Favorito" },
+  { value: "star", label: "Estrella" },
 ];
 
 const COMPONENT_FIELDS: Record<
@@ -379,14 +391,14 @@ const COMPONENT_FIELDS: Record<
       },
     ],
     styles: [
-      { key: "bgColor", label: "Color de Fondo", type: "color" },
-      { key: "textColor", label: "Color de Texto", type: "color" },
+      { key: "sectionBgColor", label: "Fondo de la sección", type: "color" },
+      { key: "cardBgColor", label: "Fondo de la tarjeta", type: "color" },
+      { key: "iconBgColor", label: "Fondo del ícono", type: "color" },
+      { key: "iconColor", label: "Color del ícono", type: "color" },
+      { key: "titleColor", label: "Color del título", type: "color" },
+      { key: "subtitleColor", label: "Color del subtítulo", type: "color" },
     ],
-    defaults: {
-      ...WHYUS_DEFAULTS,
-      bgColor: "#f5f5f5",
-      textColor: "#1e354e",
-    },
+    defaults: WHYUS_DEFAULTS,
   },
   footer: {
     content: [
