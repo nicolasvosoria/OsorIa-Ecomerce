@@ -31,7 +31,7 @@ import { useState } from "react";
 import { updateComponentStyle } from "@/lib/supabase/styles-api";
 import { toast } from "sonner";
 import { ImageUpload } from "./image-upload";
-import { getStoreId } from "@/lib/utils/store";
+import { resolveScopedStorageKey } from "@/lib/utils/store";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   HERO_HOTSPOT_ANCHOR_OPTIONS,
@@ -65,6 +65,20 @@ import {
   updateHeroSlide,
 } from "./hero-editor/hero-editor-state";
 import { HeroEditorPanel } from "./hero-editor/hero-editor-panel";
+import { SPECIAL_OFFER_DEFAULTS } from "@/components/sections/special-offer";
+import { NEWSLETTER_DEFAULTS } from "@/components/sections/newsletter-section";
+import { HEADER_DEFAULTS } from "@/components/layout/header";
+import { FEATURED_DEFAULTS } from "@/components/sections/featured-product";
+import { POPULAR_DEFAULTS } from "@/components/sections/popular-items";
+import { PRODUCTS_DEFAULTS } from "@/components/sections/products-grid";
+import { WHYUS_DEFAULTS, type WhyUsIconKey } from "@/components/sections/why-us";
+
+const WHYUS_ICON_OPTIONS: Array<{ value: WhyUsIconKey; label: string }> = [
+  { value: "support", label: "Soporte" },
+  { value: "shipping", label: "Envío" },
+  { value: "payment", label: "Pago" },
+  { value: "discount", label: "Descuento" },
+];
 
 const COMPONENT_FIELDS: Record<
   string,
@@ -188,110 +202,77 @@ const COMPONENT_FIELDS: Record<
   popular: {
     content: [
       { key: "title", label: "Título de la Sección", type: "text" },
-      {
-        key: "items",
-        label: "Productos",
-        type: "array",
-        isArray: true,
-        arrayFields: [
-          { key: "title", label: "Título del Producto", type: "text" },
-          { key: "price", label: "Precio", type: "text" },
-          { key: "image", label: "URL de la Imagen", type: "image" },
-        ],
-      },
+      { key: "priceLabel", label: "Etiqueta de Precio (encabezado)", type: "text" },
     ],
     styles: [
       { key: "bgColor", label: "Color de Fondo", type: "color" },
       { key: "textColor", label: "Color de Texto", type: "color" },
     ],
-    defaults: {
-      title: "Lo más vendido",
-      items: [
-        {
-          title: "Bocinas Bluetooth",
-          price: "Desde $356",
-          image: "/bluetooth-speaker-modern.jpg",
-        },
-        {
-          title: "Auriculares y Audífonos",
-          price: "Desde $29",
-          image: "/premium-headphones.png",
-        },
-        {
-          title: "Soportes para Laptop",
-          price: "Desde $82",
-          image: "/laptop-stand.png",
-        },
-        {
-          title: "Proyectores",
-          price: "Desde $199",
-          image: "/mini-projector.jpg",
-        },
-        {
-          title: "Bocinas Inteligentes",
-          price: "Desde $89",
-          image: "/black-smart-speaker.jpg",
-        },
-        {
-          title: "Audífonos Inalámbricos",
-          price: "Desde $45",
-          image: "/green-earphones-product.jpg",
-        },
-        {
-          title: "Fundas para Teléfono",
-          price: "Desde $25",
-          image: "/modern-phone-case-product.jpg",
-        },
-      ],
-      bgColor: "#ffffff",
-      textColor: "#1e354e",
-    },
+    defaults: POPULAR_DEFAULTS,
   },
   products: {
     content: [
       { key: "title", label: "Título de la Sección", type: "text" },
+      { key: "eyebrow", label: "Texto Superior (categoría destacada)", type: "text" },
+      { key: "description", label: "Descripción", type: "textarea" },
       {
-        key: "products",
-        label: "Productos",
-        type: "array",
-        isArray: true,
-        arrayFields: [
-          { key: "name", label: "Nombre del Producto", type: "text" },
-          { key: "category", label: "Categoría", type: "text" },
-          { key: "price", label: "Precio", type: "text" },
-          { key: "image", label: "URL de la Imagen", type: "image" },
+        key: "selectionMode",
+        label: "Modo de Selección",
+        type: "select",
+        options: [
+          { value: "display_order", label: "Orden de exhibición" },
+          { value: "best_selling", label: "Más vendidos" },
+          { value: "most_viewed", label: "Más vistos" },
+          { value: "featured", label: "Destacados" },
         ],
       },
     ],
     styles: [
       { key: "bgColor", label: "Color de Fondo", type: "color" },
       { key: "textColor", label: "Color de Texto", type: "color" },
+      { key: "cardBgColor", label: "Color de Fondo de la Tarjeta", type: "color" },
+      { key: "priceColor", label: "Color del Precio", type: "color" },
+      {
+        key: "columns",
+        label: "Columnas",
+        type: "select",
+        options: [
+          { value: "2", label: "2" },
+          { value: "3", label: "3" },
+          { value: "4", label: "4" },
+        ],
+      },
+      {
+        key: "cornerRadius",
+        label: "Radio de Esquina",
+        type: "select",
+        options: [
+          { value: "none", label: "Ninguno" },
+          { value: "md", label: "Mediano" },
+          { value: "lg", label: "Grande" },
+          { value: "xl", label: "Extra" },
+        ],
+      },
+      {
+        key: "showCategory",
+        label: "Mostrar Categoría",
+        type: "select",
+        options: [
+          { value: "si", label: "Sí" },
+          { value: "no", label: "No" },
+        ],
+      },
+      {
+        key: "showPrice",
+        label: "Mostrar Precio",
+        type: "select",
+        options: [
+          { value: "si", label: "Sí" },
+          { value: "no", label: "No" },
+        ],
+      },
     ],
-    defaults: {
-      title: "Productos populares",
-      products: [
-        {
-          name: "BeShow Volcano",
-          category: "Proyectores",
-          price: "$1,420.00",
-          image: "/white-projector.jpg",
-        },
-        {
-          name: "Soporte para Laptop Desk MUO-g",
-          category: "Soportes",
-          price: "$82.00",
-          image: "/laptop-stand.png",
-        },
-        {
-          name: "BeShow Volcano",
-          category: "Proyectores",
-          price: "$1,420.00",
-          image: "/white-projector.jpg",
-        },
-      ],
-      bgColor: "#ffffff",
-      textColor: "#1e354e",
-    },
+    defaults: PRODUCTS_DEFAULTS,
   },
   featured: {
     content: [
@@ -328,27 +309,71 @@ const COMPONENT_FIELDS: Record<
       { key: "bgColor", label: "Color de Fondo", type: "color" },
       { key: "textColor", label: "Color de Texto", type: "color" },
     ],
-    defaults: {
-      title: "¡Por favor, no detengas la música!",
-      subtitle: "La elección de los usuarios en este mundo",
-      linkText: "Ver todos los productos",
-      mainImage: "/woman-wearing-headphones-smiling.jpg",
-      productName: "Auriculares BelPhones XTRM",
-      originalPrice: "$99.99",
-      salePrice: "$79.00",
-      productImage: "/green-earphones-product.jpg",
-      bgColor: "#5c9fa3",
-      textColor: "#ffffff",
-    },
+    defaults: FEATURED_DEFAULTS,
+  },
+  specialOffer: {
+    content: [
+      { key: "eyebrow", label: "Texto Superior (categoría)", type: "text" },
+      { key: "title", label: "Título Principal", type: "text" },
+      { key: "productName", label: "Nombre del Producto", type: "text" },
+      { key: "description", label: "Descripción", type: "textarea" },
+      { key: "originalPrice", label: "Precio Original", type: "text" },
+      { key: "salePrice", label: "Precio de Oferta", type: "text" },
+      { key: "claimedLabel", label: "Etiqueta de Reclamados", type: "text" },
+      { key: "claimedPercent", label: "Porcentaje Reclamado", type: "number" },
+      { key: "countdownLabel", label: "Etiqueta de Cuenta Regresiva", type: "text" },
+      { key: "linkText", label: "Texto del Botón", type: "text" },
+      { key: "href", label: "Enlace del Botón", type: "text" },
+      { key: "image", label: "URL Imagen del Producto", type: "image" },
+    ],
+    styles: [
+      { key: "bgColor", label: "Color de Fondo de la Tarjeta", type: "color" },
+      {
+        key: "sectionBgColor",
+        label: "Color de Fondo de la Sección",
+        type: "color",
+      },
+      { key: "textColor", label: "Color de Texto", type: "color" },
+    ],
+    defaults: SPECIAL_OFFER_DEFAULTS,
+  },
+  newsletter: {
+    content: [
+      { key: "title", label: "Título", type: "text" },
+      { key: "description", label: "Descripción", type: "textarea" },
+      { key: "discountText", label: "Texto de Descuento", type: "text" },
+      { key: "emailPlaceholder", label: "Placeholder del Email", type: "text" },
+      { key: "buttonText", label: "Texto del Botón", type: "text" },
+    ],
+    styles: [],
+    defaults: NEWSLETTER_DEFAULTS,
   },
   whyus: {
-    content: [{ key: "title", label: "Título de la Sección", type: "text" }],
+    content: [
+      { key: "title", label: "Título de la Sección", type: "text" },
+      {
+        key: "items",
+        label: "Tarjetas de Beneficios",
+        type: "array",
+        isArray: true,
+        arrayFields: [
+          { key: "title", label: "Título", type: "text" },
+          { key: "description", label: "Descripción", type: "text" },
+          {
+            key: "icon",
+            label: "Ícono",
+            type: "select",
+            options: WHYUS_ICON_OPTIONS,
+          },
+        ],
+      },
+    ],
     styles: [
       { key: "bgColor", label: "Color de Fondo", type: "color" },
       { key: "textColor", label: "Color de Texto", type: "color" },
     ],
     defaults: {
-      title: "Why us?",
+      ...WHYUS_DEFAULTS,
       bgColor: "#f5f5f5",
       textColor: "#1e354e",
     },
@@ -378,6 +403,11 @@ const COMPONENT_FIELDS: Record<
         key: "logoImageDark",
         label: "Logo para Tema Oscuro (opcional)",
         type: "image",
+      },
+      {
+        key: "tagline",
+        label: "Texto de la Barra de Promoción (vacío = oculta la barra)",
+        type: "text",
       },
     ],
     styles: [
@@ -448,27 +478,7 @@ const COMPONENT_FIELDS: Record<
         type: "color",
       },
     ],
-    defaults: {
-      brandName: "Osoria",
-      logoImage: "/logo-negro.svg",
-      logoImageDark: "/logo-osoria-blanco.svg",
-      searchPlaceholder: "Buscar...",
-      tagline: "Big Sale! Hurry up! Sale ends in 2025",
-      bgColor: "#ffffff",
-      bannerBgColor: "#c4faff",
-      bannerTextColor: "#005aa1",
-      menuButtonColor: "#1a1a1a",
-      menuButtonHoverBg: "#f5f5f5",
-      loginButtonColor: "#1a1a1a",
-      loginButtonHoverBg: "#f5f5f5",
-      iconColor: "#1a1a1a",
-      iconHoverBg: "#f5f5f5",
-      searchIconColor: "#737373",
-      searchBgColor: "#f5f5f5",
-      searchTextColor: "#1a1a1a",
-      searchBorderColor: "#e5e5e5",
-      linkColor: "#005aa1",
-    },
+    defaults: HEADER_DEFAULTS,
   },
   about: {
     content: [
@@ -1003,6 +1013,8 @@ export function EditorPanel() {
             }
             label="Imagen de fondo"
             context="hero-background-image"
+            recommendedWidth={1920}
+            recommendedHeight={1080}
           />
           <div className="space-y-2">
             <Label htmlFor="hero-background-mode">Cobertura del fondo</Label>
@@ -1750,44 +1762,23 @@ export function EditorPanel() {
       // Refrescar estilos desde Supabase para asegurar sincronización
       await refreshStyles();
 
-      // Actualizar localStorage inmediatamente (con store_id)
+      // Actualizar localStorage inmediatamente con el store_id confirmado por la API.
       try {
-        // Para Hero, siempre usar el store_id del store por defecto
-        let storeId: string | null = null;
-        if (selectedComponent === "hero") {
-          // Obtener el store_id del store por defecto desde Supabase
-          const supabase = (
-            await import("@/lib/supabase/client")
-          ).getSupabaseEcommerce();
-          if (supabase) {
-            const { ECOMMERCE_VIEWS } = await import(
-              "@/lib/supabase/contract"
-            );
-            const { data: defaultStore } = await supabase
-              .from(ECOMMERCE_VIEWS.storesLegacy)
-              .select("id")
-              .eq("subdomain", "default")
-              .single();
+        const storeId =
+          result && typeof result.store_id === "string"
+            ? result.store_id
+            : null;
+        const storageKey = resolveScopedStorageKey(
+          "osoria_component_styles",
+          storeId,
+        );
 
-            if (defaultStore?.id) {
-              storeId = defaultStore.id;
-            }
-          }
-        } else {
-          // Para otros componentes, usar el store_id actual
-          storeId = await getStoreId();
-        }
-
-        if (storeId) {
-          const storageKey = `osoria_component_styles_${storeId}`;
+        if (storageKey && storeId) {
           const savedStyles = localStorage.getItem(storageKey);
           const styles = savedStyles ? JSON.parse(savedStyles) : {};
           styles[selectedComponent] = mergedStyles;
           localStorage.setItem(storageKey, JSON.stringify(styles));
-          // Solo actualizar osoria_current_store_id si no es Hero
-          if (selectedComponent !== "hero") {
-            localStorage.setItem("osoria_current_store_id", storeId);
-          }
+          localStorage.setItem("osoria_current_store_id", storeId);
         }
 
         // Aplicar estilos inmediatamente al DOM
@@ -2042,6 +2033,45 @@ export function EditorPanel() {
                                             label={subField.label}
                                             context={`${selectedComponent}-${field.key}-${subField.key}-${index + 1}`}
                                           />
+                                        ) : subField.type === "select" &&
+                                          subField.options ? (
+                                          <>
+                                            <Label className="text-xs">
+                                              {subField.label}
+                                            </Label>
+                                            <Select
+                                              value={item[subField.key] || ""}
+                                              onValueChange={(value) =>
+                                                handleArrayItemChange(
+                                                  field.key,
+                                                  index,
+                                                  subField.key,
+                                                  value,
+                                                )
+                                              }
+                                            >
+                                              <SelectTrigger className="w-full">
+                                                <SelectValue
+                                                  placeholder={`Selecciona ${subField.label.toLowerCase()}`}
+                                                />
+                                              </SelectTrigger>
+                                              <SelectContent>
+                                                {subField.options.map(
+                                                  (option: {
+                                                    value: string;
+                                                    label: string;
+                                                  }) => (
+                                                    <SelectItem
+                                                      key={option.value}
+                                                      value={option.value}
+                                                    >
+                                                      {option.label}
+                                                    </SelectItem>
+                                                  ),
+                                                )}
+                                              </SelectContent>
+                                            </Select>
+                                          </>
                                         ) : subField.type === "textarea" ? (
                                           <>
                                             <Label className="text-xs">

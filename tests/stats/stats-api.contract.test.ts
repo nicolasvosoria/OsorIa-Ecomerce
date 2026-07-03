@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { getDashboardStats, getDetailedStats } from "@/lib/supabase/stats-api";
+import { getDashboardStats, getDetailedStats, getTopSellingProductIds } from "@/lib/supabase/stats-api";
 
 const { getSupabaseEcommerceMock } = vi.hoisted(() => ({
   getSupabaseEcommerceMock: vi.fn(),
@@ -209,5 +209,59 @@ describe("stats-api contract", () => {
     expect(result.totalOrders).toBe(3);
     expect(result.averageOrderValue).toBe(100);
     expect(result.conversionRate).toBeCloseTo(66.666, 2);
+  });
+
+  it("ranks top-selling product ids by summed quantity, filtering by paid/confirmed orders and store", async () => {
+    const state = new MockSupabaseState({
+      order_items: [
+        {
+          data: [
+            { product_id: "item-1", quantity: "2" },
+            { product_id: "item-2", quantity: 5 },
+            { product_id: "item-1", quantity: 1 },
+            { product_id: null, quantity: 9 },
+          ],
+          error: null,
+        },
+      ],
+    });
+    getSupabaseEcommerceMock.mockReturnValue({ from: state.from });
+
+    const topIds = await getTopSellingProductIds("store-1", 2);
+
+    expect(topIds).toEqual(["item-2", "item-1"]);
+    expect(state.fromCalls).toEqual(["order_items"]);
+    expect(state.filters.order_items).toEqual(
+      expect.arrayContaining([
+        { op: "in", column: "orders.status", value: ["confirmed", "processing", "shipped", "delivered"] },
+        { op: "in", column: "orders.payment_status", value: ["paid"] },
+        { op: "eq", column: "orders.store_id", value: "store-1" },
+      ]),
+    );
+  });
+
+  it("skips the store filter when no store id is provided", async () => {
+    const state = new MockSupabaseState({
+      order_items: [{ data: [{ product_id: "item-1", quantity: 3 }], error: null }],
+    });
+    getSupabaseEcommerceMock.mockReturnValue({ from: state.from });
+
+    const topIds = await getTopSellingProductIds(null, 5);
+
+    expect(topIds).toEqual(["item-1"]);
+    expect(state.filters.order_items).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ column: "orders.store_id" })]),
+    );
+  });
+
+  it("returns an empty list when the query fails", async () => {
+    const state = new MockSupabaseState({
+      order_items: [{ data: null, error: { message: "boom" } }],
+    });
+    getSupabaseEcommerceMock.mockReturnValue({ from: state.from });
+
+    const topIds = await getTopSellingProductIds("store-1", 5);
+
+    expect(topIds).toEqual([]);
   });
 });

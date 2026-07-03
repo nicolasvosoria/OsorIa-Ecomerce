@@ -6,6 +6,8 @@ import { ReposteriaAbout } from "@/components/sections/reposteria-about";
 import { PopularItemsWrapper } from "@/components/sections/popular-items-wrapper";
 import { ProductsGridWrapper } from "@/components/sections/products-grid-wrapper";
 import { FeaturedProduct } from "@/components/sections/featured-product";
+import { NewsletterSection } from "@/components/sections/newsletter-section";
+import { SpecialOffer } from "@/components/sections/special-offer";
 import { WhyUs } from "@/components/sections/why-us";
 import { FooterNew } from "@/components/sections/footer-new";
 import { EditableWrapper } from "@/components/admin/editable-wrapper";
@@ -86,7 +88,7 @@ export async function ConditionalHomeContent() {
             <PopularItemsWrapper />
           </Suspense>
         </EditableWrapper>
-        <EditableWrapper componentName="products" label="Productos">
+        <EditableWrapper componentName="products" label="Productos Populares (cards)">
           <Suspense
             fallback={
               <div className="py-12 text-center text-muted-foreground">
@@ -100,8 +102,14 @@ export async function ConditionalHomeContent() {
         <EditableWrapper componentName="featured" label="Producto Destacado">
           <FeaturedProduct />
         </EditableWrapper>
+        <EditableWrapper componentName="specialOffer" label="Oferta Especial">
+          <SpecialOffer />
+        </EditableWrapper>
         <EditableWrapper componentName="whyus" label="Por Qué Nosotros">
           <WhyUs />
+        </EditableWrapper>
+        <EditableWrapper componentName="newsletter" label="Newsletter">
+          <NewsletterSection />
         </EditableWrapper>
         <EditableWrapper componentName="footer" label="Pie de Página">
           <FooterNew />

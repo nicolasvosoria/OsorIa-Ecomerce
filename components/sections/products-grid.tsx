@@ -1,199 +1,158 @@
-/* eslint-disable @next/next/no-img-element -- Existing dynamic storefront images intentionally use native img in these legacy components; converting all to next/image is outside the global-gates cleanup risk budget. */
 "use client"
 
-import Link from "next/link"
+import { useEffect, useState } from "react"
 import { useComponentStyle } from "@/contexts/styles-context"
 import { useAdmin } from "@/contexts/admin-context"
-import { useStore } from "@/contexts/store-context"
-import { useState } from "react"
-
-// Helper para generar slug desde el nombre
-function generateSlug(name: string): string {
-  return name
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "")
-}
-
-// Componente Image con fallback automático a placeholder
-function ProductImageWithFallback({ src, alt }: { src: string; alt: string }) {
-  const [imgSrc, setImgSrc] = useState(src)
-  const [hasError, setHasError] = useState(false)
-
-  const handleError = () => {
-    if (!hasError && imgSrc !== "/placeholder.svg") {
-      setHasError(true)
-      setImgSrc("/placeholder.svg")
-    }
-  }
-
-  // Si ya hubo error, mostrar placeholder directamente
-  if (hasError || imgSrc === "/placeholder.svg") {
-    return (
-      <img
-        src="/placeholder.svg"
-        alt={alt}
-        className="w-full h-full object-contain"
-        onError={(e) => {
-          // Prevenir loops infinitos
-          e.currentTarget.src = "/placeholder.svg"
-        }}
-      />
-    )
-  }
-
-  return (
-    <img
-      src={imgSrc}
-      alt={alt}
-      className="w-full h-full object-contain"
-      onError={handleError}
-    />
-  )
-}
+import { VisualProductCard } from "@/components/products/visual-product-card"
+import { getAdminRequestHeaders } from "@/lib/supabase/admin-request-headers"
+import type { CommerceProductCard } from "@/lib/types/products"
 
 interface ProductsGridProps {
-  initialProducts?: Array<{
-    id: string
-    name: string
-    category: string
-    price: string
-    image: string
-    slug?: string
-  }>
+  initialProducts?: CommerceProductCard[]
+}
+
+export const PRODUCTS_DEFAULTS = {
+  title: "Productos populares",
+  eyebrow: "Electrónica",
+  description: "Descubrí los productos más buscados, seleccionados de nuestro catálogo destacado.",
+  bgColor: "#ffffff",
+  textColor: "#1e354e",
+  cardBgColor: "#f2f2f2",
+  priceColor: "#1e354e",
+  columns: "4",
+  cornerRadius: "xl",
+  showCategory: "si",
+  showPrice: "si",
+  selectionMode: "display_order",
+}
+
+const COLUMNS_CLASS: Record<string, string> = {
+  "2": "sm:grid-cols-2",
+  "3": "sm:grid-cols-2 lg:grid-cols-3",
+  "4": "sm:grid-cols-2 lg:grid-cols-4",
+}
+
+const RADIUS_CLASS: Record<string, string> = {
+  none: "rounded-none",
+  md: "rounded-xl",
+  lg: "rounded-2xl",
+  xl: "rounded-3xl",
 }
 
 export function ProductsGrid({ initialProducts }: ProductsGridProps = {}) {
-  const { store } = useStore()
-  const { styles: styleData } = useComponentStyle("products", {
-    title: "Productos populares",
-  })
+  const { styles: styleData } = useComponentStyle("products", PRODUCTS_DEFAULTS)
   const { componentEdits } = useAdmin()
-  
-  // Combinar estilos de BD con ediciones locales para mostrar cambios en tiempo real
+
   const edits = componentEdits.get("products") || {}
-  const title = edits.title ?? styleData.title ?? "Productos populares"
-  const bgColor = edits.bgColor ?? styleData.bgColor
-  const textColor = edits.textColor ?? styleData.textColor
+  const {
+    title,
+    eyebrow,
+    description,
+    bgColor,
+    textColor,
+    cardBgColor,
+    priceColor,
+    columns,
+    cornerRadius,
+    showCategory,
+    showPrice,
+    selectionMode,
+  } = {
+    ...PRODUCTS_DEFAULTS,
+    ...styleData,
+    ...edits,
+  }
 
-  // Detectar si es tienda de repostería
-  const isReposteria = store?.subdomain === 'reposteria'
+  const columnsClass = COLUMNS_CLASS[columns] || COLUMNS_CLASS["4"]
+  const radiusClass = RADIUS_CLASS[cornerRadius] || RADIUS_CLASS.xl
 
-  // Obtener productos editables desde estilos o ediciones locales
-  // Si es repostería, usar imágenes de repostería, si no, usar imágenes de tecnología
-  const defaultProducts = isReposteria ? [
-    {
-      name: "Cupcakes Decorados",
-      category: "Cupcakes",
-      price: "$25.00",
-      image: "/reposteria/cupcakes-decorados.jpg",
-    },
-    {
-      name: "Tarta de Berries",
-      category: "Tartas",
-      price: "$45.00",
-      image: "/reposteria/tarta-berries.jpg",
-    },
-    {
-      name: "Macarons Artesanales",
-      category: "Macarons",
-      price: "$18.00",
-      image: "/reposteria/macarons-colores.jpg",
-    },
-  ] : [
-    {
-      name: "BeShow Volcano",
-      category: "Proyectores",
-      price: "$1,420.00",
-      image: "/white-projector.jpg",
-    },
-    {
-      name: "Soporte para Laptop Desk MUO-g",
-      category: "Soportes",
-      price: "$82.00",
-      image: "/laptop-stand.png",
-    },
-    {
-      name: "BeShow Volcano",
-      category: "Proyectores",
-      price: "$1,420.00",
-      image: "/white-projector.jpg",
-    },
-  ]
-  
-  // Imágenes de repostería para reemplazar cuando hay productos de BD
-  const reposteriaImages = [
-    "/reposteria/cupcakes-decorados.jpg",
-    "/reposteria/tarta-berries.jpg",
-    "/reposteria/macarons-colores.jpg",
-    "/reposteria/mini-cakes-cheesecakes.jpg",
-    "/reposteria/galletas-chocolate.jpg",
-    "/reposteria/pastel-cumpleanos.jpg",
-  ]
+  // El live homepage pasa initialProducts (vía ProductsGridWrapper), usando
+  // getPopularProductCards() directamente en el servidor. El editor no pasa
+  // props, así que el preview pide los MISMOS productos a la ruta admin
+  // (que llama a la misma función bajo una sesión autenticada) — esto es lo
+  // que mantiene editor y live sincronizados.
+  const [fetchedProducts, setFetchedProducts] = useState<CommerceProductCard[]>([])
 
-  // Priorizar: productos de BD > ediciones > estilos > default
-  // Si es repostería y hay productos de BD, reemplazar sus imágenes con imágenes de repostería
-  const products = initialProducts && initialProducts.length > 0
-    ? initialProducts.map((p, index) => ({
-        ...p,
-        image: isReposteria 
-          ? (reposteriaImages[index % reposteriaImages.length] || p.image)
-          : p.image,
-      }))
-    : (edits.products ?? styleData.products ?? defaultProducts)
+  useEffect(() => {
+    if (initialProducts) return
+
+    let active = true
+
+    async function loadPreviewProducts() {
+      try {
+        const headers = await getAdminRequestHeaders()
+        const response = await fetch(
+          `/api/admin/popular-products?mode=${selectionMode}&limit=4`,
+          { headers },
+        )
+
+        if (!response.ok) {
+          throw new Error("No se pudieron cargar los productos populares")
+        }
+
+        const payload = (await response.json()) as { products?: CommerceProductCard[] }
+        if (active) setFetchedProducts(payload.products ?? [])
+      } catch (error) {
+        console.error("Error fetching popular products:", error)
+      }
+    }
+
+    loadPreviewProducts()
+
+    return () => {
+      active = false
+    }
+  }, [initialProducts, selectionMode])
+
+  const products = initialProducts ?? fetchedProducts
+
+  if (products.length === 0) return null
 
   return (
-    <section 
-      data-component="products" 
-      className="py-6 sm:py-8 md:py-12 px-4 sm:px-6"
+    <section
+      data-component="products"
+      className="px-4 py-10 sm:px-6 md:py-16"
       style={{
         ...(bgColor && { backgroundColor: bgColor }),
         ...(textColor && { color: textColor }),
       }}
     >
       <div className="container mx-auto">
-        <h2 
-          className="text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-[51px] font-inter font-normal mb-4 sm:mb-6 md:mb-8" 
-          style={{ color: textColor || "var(--foreground)" }}
-        >
-          {title}
-        </h2>
+        <div className="mb-8 flex flex-col gap-2 md:mb-10 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="mb-2 text-sm font-semibold uppercase tracking-[0.2em] text-primary">
+              {eyebrow}
+            </p>
+            <h2
+              className="text-3xl font-semibold tracking-tight md:text-5xl"
+              style={{ color: textColor || "var(--foreground)" }}
+            >
+              {title}
+            </h2>
+          </div>
+          {description ? (
+            <p className="max-w-xl text-sm leading-relaxed text-muted-foreground md:text-base">
+              {description}
+            </p>
+          ) : null}
+        </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-5 md:gap-6">
-          {products.map((product: any, index: number) => {
-            const productSlug = product.slug || generateSlug(product.name)
-            const productId = initialProducts?.[index]?.id || `product-${index}`
-            return (
-              <Link 
-                key={productId} 
-                href={`/products/${productSlug}`}
-                className="rounded-2xl overflow-hidden hover:shadow-lg transition-shadow cursor-pointer block"
-                style={{ backgroundColor: "var(--card)" }}
-              >
-                <div className="p-3 sm:p-4">
-                  <h3 className="font-inter font-normal text-sm sm:text-base md:text-[17.4854px] mb-1 hover:text-primary transition-colors" style={{ color: "var(--card-foreground)" }}>
-                    {product.name}
-                  </h3>
-                  <p className="text-xs sm:text-sm md:text-[13.9775px] font-inter font-normal mb-2" style={{ color: "var(--muted-foreground)" }}>{product.category}</p>
-                  <p className="text-base sm:text-lg md:text-[20.5864px] font-inter font-normal" style={{ color: "var(--card-foreground)" }}>
-                    {product.price}
-                  </p>
-                </div>
-
-                <div 
-                  className="aspect-square flex items-center justify-center p-3 sm:p-4"
-                  style={{ backgroundColor: "var(--background)" }}
-                >
-                  <ProductImageWithFallback
-                    src={product.image || "/placeholder.svg"}
-                    alt={product.name}
-                  />
-                </div>
-              </Link>
-            )
-          })}
+        <div className={`grid grid-cols-1 gap-4 ${columnsClass}`}>
+          {products.map((product) => (
+            <VisualProductCard
+              key={product.id}
+              product={product}
+              showDescription={false}
+              showCta={false}
+              mediaPosition="bottom"
+              cardBackground={cardBgColor}
+              priceColor={priceColor}
+              radiusClass={radiusClass}
+              imageBlendsWithCard
+              showCategory={showCategory === "si"}
+              showPrice={showPrice === "si"}
+            />
+          ))}
         </div>
       </div>
     </section>

@@ -50,6 +50,9 @@ export interface DetailedStats {
   conversionRate: number
 }
 
+const SOLD_ORDER_STATUSES = ['confirmed', 'processing', 'shipped', 'delivered']
+const SOLD_PAYMENT_STATUSES = ['paid']
+
 /**
  * Obtener estadísticas del dashboard
  */
@@ -293,6 +296,61 @@ export async function getDetailedStats(days: number = 30): Promise<DetailedStats
       averageOrderValue: 0,
       conversionRate: 0,
     }
+  }
+}
+
+/**
+ * Obtener los IDs de los productos más vendidos (por unidades), en orden de ranking.
+ * Solo tiene en cuenta pedidos confirmados/procesados/enviados/entregados y pagados.
+ */
+export async function getTopSellingProductIds(
+  storeId: string | null,
+  limit: number
+): Promise<string[]> {
+  try {
+    const supabase = getSupabaseEcommerce()
+    if (!supabase) {
+      return []
+    }
+
+    let query = supabase
+      .from(ECOMMERCE_TABLES.orderItems)
+      .select(`
+        product_id,
+        quantity,
+        orders!inner(store_id, status, payment_status)
+      `)
+      .in('orders.status', SOLD_ORDER_STATUSES)
+      .in('orders.payment_status', SOLD_PAYMENT_STATUSES)
+
+    if (storeId) {
+      query = query.eq('orders.store_id', storeId)
+    }
+
+    const result = await withTimeout(
+      query,
+      15000,
+      'getTopSellingProductIds'
+    ) as { data: Array<{ product_id: string | null; quantity: unknown }> | null; error: any }
+
+    if (result.error || !result.data) {
+      return []
+    }
+
+    const unitsByProductId = new Map<string, number>()
+    result.data.forEach((row) => {
+      if (!row.product_id) return
+      const quantity = Number(row.quantity) || 0
+      unitsByProductId.set(row.product_id, (unitsByProductId.get(row.product_id) || 0) + quantity)
+    })
+
+    return Array.from(unitsByProductId.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, limit)
+      .map(([productId]) => productId)
+  } catch (error: any) {
+    console.error('[Stats] Error al obtener productos más vendidos:', error)
+    return []
   }
 }
 
