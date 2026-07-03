@@ -1,135 +1,192 @@
 "use client"
 
-import Image from "next/image"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { useComponentStyle } from "@/contexts/styles-context"
 import { useAdmin } from "@/contexts/admin-context"
+import { VisualProductCardImage } from "@/components/products/visual-product-card-image"
+import { getItemById } from "@/lib/supabase/products-api"
+import { toCommerceProductCard } from "@/lib/products/adapter"
+import type { CommerceProductCard } from "@/lib/types/products"
 
-// Helper para generar slug desde el nombre del producto
-function generateSlug(name: string): string {
-  return name
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "")
+export const FEATURED_DEFAULTS = {
+  title: "¡Por favor, no detengas la música!",
+  subtitle: "La elección de los usuarios esta semana",
+  productId: "",
+  linkText: "Ver todos los productos",
+  linkHref: "/shop",
+  mainImage: "/woman-wearing-headphones-smiling.jpg",
+  bgColor: "#b8fff5",
+  textColor: "var(--secondary-foreground)",
+  cardBgColor: "var(--card)",
+  productBgColor: "var(--background)",
 }
 
 export function FeaturedProduct() {
-  const { styles: styleData } = useComponentStyle("featured", {
-    title: "¡Por favor, no detengas la música!",
-    subtitle: "La elección de los usuarios en este mundo",
-    productName: "Auriculares BelPhones XTRM",
-    originalPrice: "$99.99",
-    salePrice: "$79.00",
-    linkText: "Ver todos los productos",
-    mainImage: "/woman-wearing-headphones-smiling.jpg",
-    productImage: "/green-earphones-product.jpg",
-    bgColor: "#5daba8",
-  })
-  const { componentEdits } = useAdmin()
-  
-  // Combinar estilos de BD con ediciones locales para mostrar cambios en tiempo real
+  const { styles: styleData } = useComponentStyle("featured", FEATURED_DEFAULTS)
+  const { componentEdits, isEditMode } = useAdmin()
+
   const edits = componentEdits.get("featured") || {}
-  const title = edits.title ?? styleData.title ?? "¡Por favor, no detengas la música!"
-  const subtitle = edits.subtitle ?? styleData.subtitle ?? "La elección de los usuarios en este mundo"
-  const productName = edits.productName ?? styleData.productName ?? "Auriculares BelPhones XTRM"
-  const originalPrice = edits.originalPrice ?? styleData.originalPrice ?? "$99.99"
-  const salePrice = edits.salePrice ?? styleData.salePrice ?? "$79.00"
-  const linkText = edits.linkText ?? styleData.linkText ?? "Ver todos los productos"
-  const mainImage = edits.mainImage ?? styleData.mainImage ?? "/woman-wearing-headphones-smiling.jpg"
-  const productImage = edits.productImage ?? styleData.productImage ?? "/green-earphones-product.jpg"
-  const bgColor = edits.bgColor ?? styleData.bgColor
-  const textColor = edits.textColor ?? styleData.textColor
+  const featured = { ...FEATURED_DEFAULTS, ...styleData, ...edits }
+
+  // El live homepage y el preview del editor comparten esta misma fuente de
+  // datos (getItemById), igual que hace popular-items — así ambos quedan
+  // sincronizados con el producto elegido en el catálogo.
+  const [fetched, setFetched] = useState<{ id: string; card: CommerceProductCard | null } | null>(
+    null,
+  )
+
+  useEffect(() => {
+    const productId = featured.productId
+    if (!productId) return
+
+    let active = true
+    getItemById(productId)
+      .then((item) => {
+        if (active) setFetched({ id: productId, card: item ? toCommerceProductCard(item) : null })
+      })
+      .catch((error) => {
+        console.error("Error fetching featured product:", error)
+        if (active) setFetched({ id: productId, card: null })
+      })
+
+    return () => {
+      active = false
+    }
+  }, [featured.productId])
+
+  const card = fetched && fetched.id === featured.productId ? fetched.card : null
+  const originalPrice =
+    card && card.price.hasDiscount ? (card.price.compareAtLabel ?? null) : null
 
   return (
-    <section 
+    // La imagen lifestyle es el fondo de la sección (anclada abajo-izquierda),
+    // igual que en la referencia; el contenido vive en una columna a la derecha
+    // que flota encima del fondo.
+    <section
       data-component="featured"
-      className="py-8 md:py-16 px-4 rounded-2xl md:rounded-3xl mx-2 md:mx-4 my-4 md:my-8" 
-      style={{ 
-        backgroundColor: bgColor || "var(--secondary)",
-        ...(textColor && { color: textColor }),
+      className="relative overflow-hidden rounded-2xl md:rounded-3xl mx-2 md:mx-4 my-4 md:my-8 flex items-center min-h-[480px] md:min-h-[560px] lg:min-h-[600px]"
+      style={{
+        backgroundColor: featured.bgColor,
+        backgroundImage: `url(${featured.mainImage || "/placeholder.svg"})`,
+        backgroundRepeat: "no-repeat",
+        backgroundPosition: "15% bottom",
+        backgroundSize: "contain",
+        color: featured.textColor,
       }}
     >
-      <div className="container mx-auto">
-        <div className="grid lg:grid-cols-2 gap-6 md:gap-12 items-center">
-          {/* Left - Image */}
-          <div className="relative">
-            <Image
-              src={mainImage || "/placeholder.svg"}
-              alt={title || "Featured product"}
-              width={800}
-              height={600}
-              className="w-full h-auto rounded-2xl"
-              sizes="(max-width: 1024px) 100vw, 50vw"
-            />
+      <div className="container mx-auto px-4 py-10 md:py-14">
+        <div className="ml-auto flex w-full flex-col gap-8 text-center md:w-[56%] md:text-left lg:w-[50%]">
+          <div>
+            <h2 className="mb-3 font-heading text-4xl font-normal leading-tight md:text-5xl lg:text-[52px]">
+              {featured.title}
+            </h2>
+            <p
+              className="text-lg font-normal md:text-xl lg:text-[22px]"
+              style={{ opacity: 0.9 }}
+            >
+              {featured.subtitle}
+            </p>
           </div>
 
-          {/* Right - Content */}
-          <div 
-            className="space-y-6 md:space-y-8 text-center md:text-left" 
-            style={{ color: textColor || "var(--secondary-foreground)" }}
-          >
-            <div>
-              <h2 className="text-2xl md:text-4xl lg:text-[46.5225px] font-inter font-normal mb-2">
-                {title}
-              </h2>
-              <p className="text-base md:text-lg lg:text-[19.1856px] font-inter font-normal" style={{ opacity: 0.9 }}>
-                {subtitle}
-              </p>
-            </div>
-
-            {/* Product Card */}
-            <Link href={`/products/${generateSlug(productName)}`}>
-              <div 
-                className="rounded-xl md:rounded-2xl p-4 md:p-8 cursor-pointer hover:shadow-lg transition-shadow" 
-                style={{ 
-                  backgroundColor: "var(--card)", 
+          {/* Card de producto compacta (texto arriba, imagen abajo); sale
+              únicamente del producto elegido. Sin producto: en el editor se
+              muestra un placeholder que guía al admin, y en vivo no se
+              renderiza ninguna card (nunca datos falsos al cliente). */}
+          {card ? (
+            <Link href={card.href} className="mx-auto block w-full max-w-lg md:mx-0">
+              <div
+                className="cursor-pointer rounded-2xl p-6 text-left shadow-lg transition-shadow hover:shadow-xl md:p-8"
+                style={{
+                  backgroundColor: featured.cardBgColor,
                   color: "var(--card-foreground)",
-                  border: "1px solid var(--border)"
+                  border: "1px solid var(--border)",
                 }}
               >
-                <h3 className="mb-3 md:mb-4 font-semibold text-sm md:text-base hover:text-primary transition-colors" style={{ color: "var(--card-foreground)" }}>
-                  {productName}
+                <h3
+                  className="text-lg font-semibold transition-colors hover:text-primary md:text-xl"
+                  style={{ color: "var(--card-foreground)" }}
+                >
+                  {card.title}
                 </h3>
-                <div className="flex items-baseline gap-2 mb-4 md:mb-6">
-                  <span className="line-through text-sm md:text-base" style={{ color: "var(--muted-foreground)" }}>
-                    {originalPrice}
-                  </span>
-                  <span className="font-normal text-base md:text-lg" style={{ color: "var(--card-foreground)" }}>
-                    {salePrice}
+                <p
+                  className="mt-1 text-sm uppercase tracking-wide md:text-base"
+                  style={{ color: "var(--muted-foreground)" }}
+                >
+                  {card.category ?? ""}
+                </p>
+                <div className="mb-5 mt-4 flex items-baseline gap-2">
+                  {originalPrice ? (
+                    <span
+                      className="text-base line-through md:text-lg"
+                      style={{ color: "var(--muted-foreground)" }}
+                    >
+                      {originalPrice}
+                    </span>
+                  ) : null}
+                  <span
+                    className="text-lg font-normal md:text-xl"
+                    style={{ color: "var(--card-foreground)" }}
+                  >
+                    {card.price.label}
                   </span>
                 </div>
-                <div 
-                  className="aspect-square flex items-center justify-center rounded-lg"
-                  style={{ backgroundColor: "var(--background)" }}
+                <div
+                  className="flex aspect-square items-center justify-center rounded-lg"
+                  style={{ backgroundColor: featured.productBgColor }}
                 >
-                  <Image
-                    src={productImage || "/placeholder.svg"}
-                    alt={productName}
-                    width={400}
-                    height={400}
-                    className="w-full h-full object-contain"
-                    sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 400px"
+                  <VisualProductCardImage
+                    src={card.imageUrl}
+                    alt={card.title}
+                    title={card.title}
+                    isOverlay={false}
                   />
                 </div>
               </div>
             </Link>
+          ) : isEditMode ? (
+            <div className="mx-auto block w-full max-w-lg md:mx-0">
+              <div
+                className="rounded-2xl p-6 text-left shadow-lg md:p-8"
+                style={{
+                  backgroundColor: featured.cardBgColor,
+                  color: "var(--card-foreground)",
+                  border: "1px solid var(--border)",
+                }}
+              >
+                <p
+                  className="text-sm md:text-base"
+                  style={{ color: "var(--muted-foreground)" }}
+                >
+                  Elegí un producto del catálogo para mostrarlo acá
+                </p>
+                <div
+                  className="mt-4 flex aspect-square items-center justify-center rounded-lg"
+                  style={{ backgroundColor: featured.productBgColor }}
+                >
+                  <VisualProductCardImage
+                    alt="Producto destacado sin elegir"
+                    title="Producto destacado sin elegir"
+                    isOverlay={false}
+                  />
+                </div>
+              </div>
+            </div>
+          ) : null}
 
-            <Button 
-              variant="link" 
-              className="min-h-[44px] min-w-[44px] touch-manipulation"
-              style={{ color: textColor || "var(--secondary-foreground)" }}
-              onMouseEnter={(e) => e.currentTarget.style.opacity = "0.8"}
-              onMouseLeave={(e) => e.currentTarget.style.opacity = "1"}
-              asChild
-            >
-              <Link href={`/products/${generateSlug(productName)}`}>
-                {linkText} →
-              </Link>
-            </Button>
-          </div>
+          <Button
+            variant="link"
+            className="mx-auto flex min-h-[44px] w-fit items-center gap-2 p-0 touch-manipulation md:mx-0"
+            style={{ color: featured.textColor }}
+            onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.8")}
+            onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
+            asChild
+          >
+            <Link href={featured.linkHref || "/shop"}>
+              {featured.linkText} <span aria-hidden>→</span>
+            </Link>
+          </Button>
         </div>
       </div>
     </section>

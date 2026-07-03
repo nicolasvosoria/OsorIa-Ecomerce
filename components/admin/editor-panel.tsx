@@ -31,6 +31,7 @@ import { useState } from "react";
 import { updateComponentStyle } from "@/lib/supabase/styles-api";
 import { toast } from "sonner";
 import { ImageUpload } from "./image-upload";
+import { ProductPicker } from "./product-picker";
 import { resolveScopedStorageKey } from "@/lib/utils/store";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -285,29 +286,20 @@ const COMPONENT_FIELDS: Record<
         type: "image",
       },
       {
-        key: "productName",
-        label: "Nombre del Producto (Cuadro pequeño)",
-        type: "text",
-      },
-      {
-        key: "originalPrice",
-        label: "Precio Original (Cuadro pequeño)",
-        type: "text",
-      },
-      {
-        key: "salePrice",
-        label: "Precio de Oferta (Cuadro pequeño)",
-        type: "text",
-      },
-      {
-        key: "productImage",
-        label: "URL Imagen del Producto (Cuadro pequeño)",
-        type: "image",
+        key: "productId",
+        label: "Producto (elegir del catálogo)",
+        type: "product",
       },
     ],
     styles: [
       { key: "bgColor", label: "Color de Fondo", type: "color" },
       { key: "textColor", label: "Color de Texto", type: "color" },
+      { key: "cardBgColor", label: "Color de Fondo de la Tarjeta", type: "color" },
+      {
+        key: "productBgColor",
+        label: "Color de Fondo del Producto (Cuadro pequeño)",
+        type: "color",
+      },
     ],
     defaults: FEATURED_DEFAULTS,
   },
@@ -2155,6 +2147,16 @@ export function EditorPanel() {
                               ))}
                             </SelectContent>
                           </Select>
+                        </>
+                      ) : field.type === "product" ? (
+                        <>
+                          <Label htmlFor={field.key}>{field.label}</Label>
+                          <ProductPicker
+                            value={effectiveLocalValues[field.key] || ""}
+                            onChange={(productId) =>
+                              handleInputChange(field.key, productId)
+                            }
+                          />
                         </>
                       ) : field.type === "image" ||
                         field.key.toLowerCase().includes("image") ? (
