@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
-import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 
-import { ECOMMERCE_SCHEMA } from "@/lib/supabase/contract";
 import { createOrder, type CreateOrderData } from "@/lib/supabase/orders-api";
+import { getServiceEcommerceClient } from "@/lib/supabase/service-client";
 
 async function resolveAuthenticatedUserId(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -29,17 +28,6 @@ async function resolveAuthenticatedUserId(request: NextRequest) {
   if (error || !data.user?.id) return null;
 
   return data.user.id;
-}
-
-function getServiceEcommerceClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceRoleKey) return null;
-
-  return createClient(supabaseUrl, serviceRoleKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  }).schema(ECOMMERCE_SCHEMA);
 }
 
 export async function POST(request: NextRequest) {

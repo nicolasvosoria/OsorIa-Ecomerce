@@ -366,8 +366,20 @@ const COMPONENT_FIELDS: Record<
       { key: "discountText", label: "Texto de Descuento", type: "text" },
       { key: "emailPlaceholder", label: "Placeholder del Email", type: "text" },
       { key: "buttonText", label: "Texto del Botón", type: "text" },
+      { key: "backgroundImage", label: "Imagen de Fondo", type: "image" },
+      { key: "logoImage", label: "Logo (opcional)", type: "image" },
     ],
-    styles: [],
+    styles: [
+      { key: "overlayColor", label: "Color del Overlay", type: "color" },
+      {
+        key: "overlayOpacity",
+        label: "Opacidad del Overlay (0-1)",
+        type: "number",
+      },
+      { key: "titleColor", label: "Color del Título", type: "color" },
+      { key: "textColor", label: "Color del Texto", type: "color" },
+      { key: "buttonColor", label: "Color del Botón", type: "color" },
+    ],
     defaults: NEWSLETTER_DEFAULTS,
   },
   whyus: {
