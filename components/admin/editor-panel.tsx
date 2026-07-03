@@ -27,7 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { updateComponentStyle } from "@/lib/supabase/styles-api";
 import { toast } from "sonner";
 import { ImageUpload } from "./image-upload";
@@ -305,18 +305,26 @@ const COMPONENT_FIELDS: Record<
   },
   specialOffer: {
     content: [
-      { key: "eyebrow", label: "Texto Superior (categoría)", type: "text" },
+      {
+        key: "productId",
+        label: "Producto (elegir del catálogo)",
+        type: "product",
+      },
+      {
+        key: "endDate",
+        label: "Fecha límite de la oferta",
+        type: "datetime",
+      },
+      {
+        key: "showcaseImage",
+        label: "Imagen de la oferta (opcional, reemplaza la del producto)",
+        type: "image",
+      },
       { key: "title", label: "Título Principal", type: "text" },
-      { key: "productName", label: "Nombre del Producto", type: "text" },
       { key: "description", label: "Descripción", type: "textarea" },
-      { key: "originalPrice", label: "Precio Original", type: "text" },
-      { key: "salePrice", label: "Precio de Oferta", type: "text" },
-      { key: "claimedLabel", label: "Etiqueta de Reclamados", type: "text" },
       { key: "claimedPercent", label: "Porcentaje Reclamado", type: "number" },
       { key: "countdownLabel", label: "Etiqueta de Cuenta Regresiva", type: "text" },
       { key: "linkText", label: "Texto del Botón", type: "text" },
-      { key: "href", label: "Enlace del Botón", type: "text" },
-      { key: "image", label: "URL Imagen del Producto", type: "image" },
     ],
     styles: [
       { key: "bgColor", label: "Color de Fondo de la Tarjeta", type: "color" },
@@ -326,6 +334,16 @@ const COMPONENT_FIELDS: Record<
         type: "color",
       },
       { key: "textColor", label: "Color de Texto", type: "color" },
+      {
+        key: "productBgColor",
+        label: "Color de Fondo del Producto",
+        type: "color",
+      },
+      {
+        key: "accentColor",
+        label: "Color de Acento (precio, barra, botón)",
+        type: "color",
+      },
     ],
     defaults: SPECIAL_OFFER_DEFAULTS,
   },
@@ -719,6 +737,45 @@ const COMPONENT_FIELDS: Record<
     },
   },
 };
+
+// Input datetime-local que impide elegir una fecha/hora anterior a la actual.
+// El `min` arranca vacío para que el primer render coincida server/cliente
+// (evita mismatch de hidratación) y se completa con la hora local al montar.
+function DatetimeLocalInput({
+  id,
+  value,
+  onChange,
+}: {
+  id: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const [min, setMin] = useState("");
+
+  useEffect(() => {
+    // Diferido a un tick para no llamar setState en el cuerpo del effect
+    // (react-hooks/set-state-in-effect), igual que el reloj del countdown.
+    const timeoutId = setTimeout(() => {
+      const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, "0");
+      setMin(
+        `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`,
+      );
+    }, 0);
+    return () => clearTimeout(timeoutId);
+  }, []);
+
+  return (
+    <input
+      id={id}
+      type="datetime-local"
+      value={value}
+      min={min || undefined}
+      onChange={(e) => onChange(e.target.value)}
+      className="file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input h-9 w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+    />
+  );
+}
 
 export function EditorPanel() {
   const {
@@ -2155,6 +2212,17 @@ export function EditorPanel() {
                             value={effectiveLocalValues[field.key] || ""}
                             onChange={(productId) =>
                               handleInputChange(field.key, productId)
+                            }
+                          />
+                        </>
+                      ) : field.type === "datetime" ? (
+                        <>
+                          <Label htmlFor={field.key}>{field.label}</Label>
+                          <DatetimeLocalInput
+                            id={field.key}
+                            value={effectiveLocalValues[field.key] || ""}
+                            onChange={(value) =>
+                              handleInputChange(field.key, value)
                             }
                           />
                         </>

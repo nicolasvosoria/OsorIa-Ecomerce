@@ -1,14 +1,11 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { useComponentStyle } from "@/contexts/styles-context"
 import { useAdmin } from "@/contexts/admin-context"
 import { VisualProductCardImage } from "@/components/products/visual-product-card-image"
-import { getItemById } from "@/lib/supabase/products-api"
-import { toCommerceProductCard } from "@/lib/products/adapter"
-import type { CommerceProductCard } from "@/lib/types/products"
+import { useHydratedProductCard } from "@/lib/products/use-hydrated-product-card"
 
 export const FEATURED_DEFAULTS = {
   title: "¡Por favor, no detengas la música!",
@@ -30,33 +27,7 @@ export function FeaturedProduct() {
   const edits = componentEdits.get("featured") || {}
   const featured = { ...FEATURED_DEFAULTS, ...styleData, ...edits }
 
-  // El live homepage y el preview del editor comparten esta misma fuente de
-  // datos (getItemById), igual que hace popular-items — así ambos quedan
-  // sincronizados con el producto elegido en el catálogo.
-  const [fetched, setFetched] = useState<{ id: string; card: CommerceProductCard | null } | null>(
-    null,
-  )
-
-  useEffect(() => {
-    const productId = featured.productId
-    if (!productId) return
-
-    let active = true
-    getItemById(productId)
-      .then((item) => {
-        if (active) setFetched({ id: productId, card: item ? toCommerceProductCard(item) : null })
-      })
-      .catch((error) => {
-        console.error("Error fetching featured product:", error)
-        if (active) setFetched({ id: productId, card: null })
-      })
-
-    return () => {
-      active = false
-    }
-  }, [featured.productId])
-
-  const card = fetched && fetched.id === featured.productId ? fetched.card : null
+  const { card } = useHydratedProductCard(featured.productId)
   const originalPrice =
     card && card.price.hasDiscount ? (card.price.compareAtLabel ?? null) : null
 
