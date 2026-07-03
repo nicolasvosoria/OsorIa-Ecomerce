@@ -9,10 +9,70 @@ export type Json =
 export type Database = {
   ecommerce: {
     Tables: {
+      app_font_pairings: {
+        Row: {
+          body_font_name: string
+          created_at: string
+          heading_font_name: string
+          id: number
+          is_active: boolean
+          pairing_name: string
+          updated_at: string
+        }
+        Insert: {
+          body_font_name: string
+          created_at?: string
+          heading_font_name: string
+          id?: number
+          is_active?: boolean
+          pairing_name: string
+          updated_at?: string
+        }
+        Update: {
+          body_font_name?: string
+          created_at?: string
+          heading_font_name?: string
+          id?: number
+          is_active?: boolean
+          pairing_name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "app_font_pairings_body_font_name_fkey"
+            columns: ["body_font_name"]
+            isOneToOne: false
+            referencedRelation: "app_fonts"
+            referencedColumns: ["font_name"]
+          },
+          {
+            foreignKeyName: "app_font_pairings_body_font_name_fkey"
+            columns: ["body_font_name"]
+            isOneToOne: false
+            referencedRelation: "app_fonts_legacy"
+            referencedColumns: ["font_name"]
+          },
+          {
+            foreignKeyName: "app_font_pairings_heading_font_name_fkey"
+            columns: ["heading_font_name"]
+            isOneToOne: false
+            referencedRelation: "app_fonts"
+            referencedColumns: ["font_name"]
+          },
+          {
+            foreignKeyName: "app_font_pairings_heading_font_name_fkey"
+            columns: ["heading_font_name"]
+            isOneToOne: false
+            referencedRelation: "app_fonts_legacy"
+            referencedColumns: ["font_name"]
+          },
+        ]
+      }
       app_fonts: {
         Row: {
           created_at: string
           css_font_family: string
+          font_axis: string | null
           font_display_name: string | null
           font_family: string
           font_name: string
@@ -24,6 +84,7 @@ export type Database = {
         Insert: {
           created_at?: string
           css_font_family: string
+          font_axis?: string | null
           font_display_name?: string | null
           font_family: string
           font_name: string
@@ -35,6 +96,7 @@ export type Database = {
         Update: {
           created_at?: string
           css_font_family?: string
+          font_axis?: string | null
           font_display_name?: string | null
           font_family?: string
           font_name?: string
@@ -650,121 +712,6 @@ export type Database = {
           },
         ]
       }
-      product_combos: {
-        Row: {
-          created_at: string | null
-          description: string | null
-          discount_type: "percentage" | "fixed_cop"
-          discount_value: number
-          id: string
-          image_url: string | null
-          is_active: boolean
-          metadata: Json
-          name: string
-          slug: string
-          store_id: string
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          description?: string | null
-          discount_type: "percentage" | "fixed_cop"
-          discount_value?: number
-          id?: string
-          image_url?: string | null
-          is_active?: boolean
-          metadata?: Json
-          name: string
-          slug: string
-          store_id: string
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          description?: string | null
-          discount_type?: "percentage" | "fixed_cop"
-          discount_value?: number
-          id?: string
-          image_url?: string | null
-          is_active?: boolean
-          metadata?: Json
-          name?: string
-          slug?: string
-          store_id?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "product_combos_store_id_fkey"
-            columns: ["store_id"]
-            isOneToOne: false
-            referencedRelation: "stores"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "product_combos_store_id_fkey"
-            columns: ["store_id"]
-            isOneToOne: false
-            referencedRelation: "stores_legacy"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      product_combo_components: {
-        Row: {
-          combo_id: string
-          created_at: string | null
-          display_order: number
-          id: string
-          product_id: string
-          quantity: number
-          updated_at: string | null
-          variant_id: string | null
-        }
-        Insert: {
-          combo_id: string
-          created_at?: string | null
-          display_order?: number
-          id?: string
-          product_id: string
-          quantity: number
-          updated_at?: string | null
-          variant_id?: string | null
-        }
-        Update: {
-          combo_id?: string
-          created_at?: string | null
-          display_order?: number
-          id?: string
-          product_id?: string
-          quantity?: number
-          updated_at?: string | null
-          variant_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "product_combo_components_combo_id_fkey"
-            columns: ["combo_id"]
-            isOneToOne: false
-            referencedRelation: "product_combos"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "product_combo_components_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "store_items"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "product_combo_components_variant_id_fkey"
-            columns: ["variant_id"]
-            isOneToOne: false
-            referencedRelation: "item_variants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       item_variants: {
         Row: {
           compare_at_price: number | null
@@ -890,7 +837,7 @@ export type Database = {
           created_at: string | null
           currency_code: string
           discount_amount: number
-          discount_type: "percentage" | "fixed_cop"
+          discount_type: string
           discount_value: number
           id: string
           order_id: string
@@ -908,7 +855,7 @@ export type Database = {
           created_at?: string | null
           currency_code?: string
           discount_amount?: number
-          discount_type: "percentage" | "fixed_cop"
+          discount_type: string
           discount_value?: number
           id?: string
           order_id: string
@@ -926,7 +873,7 @@ export type Database = {
           created_at?: string | null
           currency_code?: string
           discount_amount?: number
-          discount_type?: "percentage" | "fixed_cop"
+          discount_type?: string
           discount_value?: number
           id?: string
           order_id?: string
@@ -936,6 +883,20 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "order_combo_snapshots_combo_id_fkey"
+            columns: ["combo_id"]
+            isOneToOne: false
+            referencedRelation: "product_combos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_combo_snapshots_item_belongs_to_order_fk"
+            columns: ["order_item_id", "order_id"]
+            isOneToOne: false
+            referencedRelation: "order_items"
+            referencedColumns: ["id", "order_id"]
+          },
+          {
             foreignKeyName: "order_combo_snapshots_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
@@ -943,17 +904,17 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "order_combo_snapshots_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders_legacy"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "order_combo_snapshots_order_item_id_fkey"
             columns: ["order_item_id"]
             isOneToOne: true
             referencedRelation: "order_items"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "order_combo_snapshots_combo_id_fkey"
-            columns: ["combo_id"]
-            isOneToOne: false
-            referencedRelation: "product_combos"
             referencedColumns: ["id"]
           },
         ]
@@ -1108,7 +1069,7 @@ export type Database = {
           metadata?: Json | null
           notes?: string | null
           order_date?: string | null
-          order_number?: string
+          order_number: string
           payment_method?: string | null
           payment_reference?: string | null
           payment_status?:
@@ -1263,6 +1224,135 @@ export type Database = {
           perm_key?: string
         }
         Relationships: []
+      }
+      product_combo_components: {
+        Row: {
+          combo_id: string
+          created_at: string | null
+          display_order: number
+          id: string
+          product_id: string
+          quantity: number
+          updated_at: string | null
+          variant_id: string | null
+        }
+        Insert: {
+          combo_id: string
+          created_at?: string | null
+          display_order?: number
+          id?: string
+          product_id: string
+          quantity: number
+          updated_at?: string | null
+          variant_id?: string | null
+        }
+        Update: {
+          combo_id?: string
+          created_at?: string | null
+          display_order?: number
+          id?: string
+          product_id?: string
+          quantity?: number
+          updated_at?: string | null
+          variant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_combo_components_combo_id_fkey"
+            columns: ["combo_id"]
+            isOneToOne: false
+            referencedRelation: "product_combos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_combo_components_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "store_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_combo_components_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "store_items_legacy"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_combo_components_variant_belongs_to_product_fk"
+            columns: ["variant_id", "product_id"]
+            isOneToOne: false
+            referencedRelation: "item_variants"
+            referencedColumns: ["id", "item_id"]
+          },
+          {
+            foreignKeyName: "product_combo_components_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "item_variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_combos: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          discount_type: string
+          discount_value: number
+          id: string
+          image_url: string | null
+          is_active: boolean
+          metadata: Json
+          name: string
+          slug: string
+          store_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          discount_type: string
+          discount_value?: number
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          metadata?: Json
+          name: string
+          slug: string
+          store_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          discount_type?: string
+          discount_value?: number
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          metadata?: Json
+          name?: string
+          slug?: string
+          store_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_combos_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_combos_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores_legacy"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       role_permissions: {
         Row: {
@@ -1865,9 +1955,57 @@ export type Database = {
       }
     }
     Views: {
+      app_font_pairings_legacy: {
+        Row: {
+          body_font_axis: string | null
+          body_font_family: string | null
+          body_font_name: string | null
+          body_google_font_url: string | null
+          created_at: string | null
+          heading_font_axis: string | null
+          heading_font_family: string | null
+          heading_font_name: string | null
+          heading_google_font_url: string | null
+          id: number | null
+          is_active: boolean | null
+          pairing_name: string | null
+          updated_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "app_font_pairings_body_font_name_fkey"
+            columns: ["body_font_name"]
+            isOneToOne: false
+            referencedRelation: "app_fonts"
+            referencedColumns: ["font_name"]
+          },
+          {
+            foreignKeyName: "app_font_pairings_body_font_name_fkey"
+            columns: ["body_font_name"]
+            isOneToOne: false
+            referencedRelation: "app_fonts_legacy"
+            referencedColumns: ["font_name"]
+          },
+          {
+            foreignKeyName: "app_font_pairings_heading_font_name_fkey"
+            columns: ["heading_font_name"]
+            isOneToOne: false
+            referencedRelation: "app_fonts"
+            referencedColumns: ["font_name"]
+          },
+          {
+            foreignKeyName: "app_font_pairings_heading_font_name_fkey"
+            columns: ["heading_font_name"]
+            isOneToOne: false
+            referencedRelation: "app_fonts_legacy"
+            referencedColumns: ["font_name"]
+          },
+        ]
+      }
       app_fonts_legacy: {
         Row: {
           created_at: string | null
+          font_axis: string | null
           font_family: string | null
           font_name: string | null
           font_url: string | null
@@ -1879,6 +2017,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          font_axis?: string | null
           font_family?: string | null
           font_name?: string | null
           font_url?: string | null
@@ -1890,6 +2029,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          font_axis?: string | null
           font_family?: string | null
           font_name?: string | null
           font_url?: string | null
@@ -2140,6 +2280,10 @@ export type Database = {
     }
     Functions: {
       can_manage_store: { Args: { p_store_id: string }; Returns: boolean }
+      generate_order_number: {
+        Args: { p_order_date?: string; p_store_id: string }
+        Returns: string
+      }
       increment_item_views: { Args: { p_item_id: string }; Returns: number }
       is_component_styles_admin: { Args: never; Returns: boolean }
       is_global_admin: { Args: never; Returns: boolean }

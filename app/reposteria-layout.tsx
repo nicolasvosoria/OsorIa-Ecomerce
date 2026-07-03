@@ -51,6 +51,7 @@ export function ReposteriaLayout({ children }: { children: React.ReactNode }) {
       // Aplicar fuente
       root.style.setProperty('--font-family-sans', '"Inter", sans-serif')
       root.style.setProperty('--font-family-serif', '"Playfair Display", serif')
+      root.style.setProperty('--font-family-heading', '"Playfair Display", serif')
     } else {
       // Si no es repostería, remover la clase
       document.body.classList.remove('reposteria-store')

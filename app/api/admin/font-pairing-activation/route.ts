@@ -17,10 +17,10 @@ function getSupabaseServiceClient() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const fontName =
-      typeof body?.fontName === "string" ? body.fontName.trim() : "";
+    const pairingName =
+      typeof body?.pairingName === "string" ? body.pairingName.trim() : "";
 
-    if (!fontName) {
+    if (!pairingName) {
       return NextResponse.json({ error: "Payload inválido" }, { status: 400 });
     }
 
@@ -41,25 +41,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(responseBody, { status: adminCheck.status });
     }
 
-    const { data: targetFont, error: targetFontError } = await supabase
-      .from(ECOMMERCE_TABLES.appFonts)
+    const { data: targetPairing, error: targetPairingError } = await supabase
+      .from(ECOMMERCE_TABLES.appFontPairings)
       .select("id")
-      .eq("font_name", fontName)
+      .eq("pairing_name", pairingName)
       .maybeSingle();
 
-    if (targetFontError) {
-      throw targetFontError;
+    if (targetPairingError) {
+      throw targetPairingError;
     }
 
-    if (!targetFont?.id) {
+    if (!targetPairing?.id) {
       return NextResponse.json(
-        { error: "Fuente no encontrada" },
+        { error: "Combinación de fuentes no encontrada" },
         { status: 404 },
       );
     }
 
     const { error: deactivateError } = await supabase
-      .from(ECOMMERCE_TABLES.appFonts)
+      .from(ECOMMERCE_TABLES.appFontPairings)
       .update({ is_active: false })
       .neq("is_active", false);
 
@@ -68,9 +68,9 @@ export async function POST(request: NextRequest) {
     }
 
     const { error: activateError } = await supabase
-      .from(ECOMMERCE_TABLES.appFonts)
+      .from(ECOMMERCE_TABLES.appFontPairings)
       .update({ is_active: true, updated_at: new Date().toISOString() })
-      .eq("font_name", fontName);
+      .eq("pairing_name", pairingName);
 
     if (activateError) {
       throw activateError;
@@ -78,9 +78,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("[Font Activation API] Error:", error);
+    console.error("[Font Pairing Activation API] Error:", error);
     return NextResponse.json(
-      { error: "Error al activar fuente" },
+      { error: "Error al activar combinación de fuentes" },
       { status: 500 },
     );
   }

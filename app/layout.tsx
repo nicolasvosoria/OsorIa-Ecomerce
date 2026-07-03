@@ -1,8 +1,11 @@
 import type React from "react"
-import { Suspense } from "react"
+import { Fragment, Suspense } from "react"
 import type { Metadata } from "next"
-// Importación alternativa de fuentes para evitar problemas con Turbopack
-// Usando CSS directo en lugar de next/font/google para evitar errores con Turbopack
+import { cacheLife, cacheTag } from "next/cache"
+// Geist se auto-hospeda vía next/font/local (paquete `geist`) para evitar la
+// petición bloqueante a fonts.googleapis.com y ser compatible con Turbopack.
+import { GeistSans } from "geist/font/sans"
+import { GeistMono } from "geist/font/mono"
 import "./globals.css"
 import { Toaster } from "sonner"
 import { NuqsAdapter } from "nuqs/adapters/next/app"
@@ -34,13 +37,16 @@ import { DynamicLang } from "@/components/dynamic-lang"
 import { LanguageProvider } from "@/contexts/language-context"
 import { RouteAwareChrome } from "@/components/layout/route-aware-chrome"
 import { metadataBaseFromEnvironment } from "@/lib/metadata/metadata-base"
+import { getActivePairing } from "@/lib/supabase/fonts-api"
+import {
+  buildPairingStylesheetUrl,
+  shouldLoadFontStylesheet,
+} from "@/lib/theme-font/bootstrap"
+import { normalizePairingRecord } from "@/lib/theme-font/runtime-contract"
 
 const V0Setup = dynamic(() => import("@/components/v0-setup"))
 
 const isV0 = process.env["VERCEL_URL"]?.includes("vusercontent.net") ?? false
-
-// Variables CSS para fuentes (definidas en globals.css)
-// Ya no usamos next/font/google para evitar problemas con Turbopack
 
 export const metadata: Metadata = {
   metadataBase: metadataBaseFromEnvironment(),
@@ -48,12 +54,63 @@ export const metadata: Metadata = {
   description:
     "Ecommerce parametrizable.",
   generator: "v0.app",
-  other: {
-    // Fuentes Geist cargadas directamente para evitar problemas con Turbopack
-  },
 }
 
 export { viewport }
+
+interface FontPairingHeadLink {
+  preloadHref: string
+  stylesheetHref: string
+}
+
+/**
+ * Resuelve la hoja de estilos de Google Fonts de la combinación de fuentes
+ * activa para renderizarla en el `<head>` del servidor y evitar el FOUC del
+ * `<link>` inyectado por el cliente. Cacheada para no golpear Supabase en
+ * cada request; nunca debe hacer fallar el layout (build sin credenciales,
+ * Supabase caído, etc.).
+ */
+async function resolveFontPairingHeadLinks(): Promise<FontPairingHeadLink[]> {
+  'use cache'
+  cacheTag('font-pairing')
+  cacheLife('minutes')
+
+  try {
+    const pairing = await getActivePairing()
+    if (!pairing) return []
+
+    const normalized = normalizePairingRecord(pairing)
+    if (!normalized) return []
+
+    const combinedUrl = buildPairingStylesheetUrl(
+      normalized.heading,
+      normalized.body,
+      normalized.headingFontAxis,
+      normalized.bodyFontAxis,
+    )
+
+    if (combinedUrl) {
+      return [{ preloadHref: combinedUrl, stylesheetHref: combinedUrl }]
+    }
+
+    const links: FontPairingHeadLink[] = []
+    if (shouldLoadFontStylesheet(normalized.heading)) {
+      const href = normalized.heading.google_font_url as string
+      links.push({ preloadHref: href, stylesheetHref: href })
+    }
+    if (shouldLoadFontStylesheet(normalized.body)) {
+      const href = normalized.body.google_font_url as string
+      links.push({ preloadHref: href, stylesheetHref: href })
+    }
+    return links
+  } catch (error) {
+    console.warn(
+      '[Layout] ⚠️ No se pudo obtener la combinación de fuentes activa:',
+      error,
+    )
+    return []
+  }
+}
 
 export default async function RootLayout({
   children,
@@ -68,8 +125,24 @@ export default async function RootLayout({
     // Continuar sin colecciones si Shopify no está configurado
   }
 
+  // Resolver la hoja de estilos de la combinación de fuentes activa en el
+  // servidor; nunca debe hacer fallar el layout si Supabase no está disponible.
+  let fontPairingLinks: FontPairingHeadLink[] = []
+  try {
+    fontPairingLinks = await resolveFontPairingHeadLinks()
+  } catch (error) {
+    console.warn(
+      '[Layout] ⚠️ No se pudo resolver la combinación de fuentes activa:',
+      error,
+    )
+  }
+
   return (
-    <html lang="es" suppressHydrationWarning>
+    <html
+      lang="es"
+      suppressHydrationWarning
+      className={cn(GeistSans.variable, GeistMono.variable)}
+    >
       <head>
         <link
           rel="preconnect"
@@ -80,11 +153,12 @@ export default async function RootLayout({
           href="https://fonts.gstatic.com"
           crossOrigin="anonymous"
         />
-        {/* eslint-disable-next-line @next/next/no-page-custom-font -- Google-hosted runtime font link is intentionally in the app shell for this App Router project. */}
-        <link
-          href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Geist+Mono:wght@100..900&display=swap"
-          rel="stylesheet"
-        />
+        {fontPairingLinks.map((link) => (
+          <Fragment key={link.stylesheetHref}>
+            <link rel="preload" as="style" href={link.preloadHref} />
+            <link rel="stylesheet" href={link.stylesheetHref} />
+          </Fragment>
+        ))}
       </head>
       <body
         className={cn("antialiased min-h-screen", { "is-v0": isV0 })}

@@ -4,6 +4,7 @@
  */
 import Script from "next/script";
 import { DEFAULT_RUNTIME_THEME } from "@/lib/theme-font/runtime-contract";
+import { THEME_CONTRAST_HELPER_SOURCE } from "@/lib/theme-font/contrast";
 
 export function ApplyStylesScript() {
   const runtimeDefaultTheme = JSON.stringify(DEFAULT_RUNTIME_THEME);
@@ -59,9 +60,38 @@ export function ApplyStylesScript() {
         google_font_url: typeof googleFontUrl === 'string' && googleFontUrl.trim().length > 0 ? googleFontUrl : null,
       };
     }
+
+    function normalizePairingPayload(payload) {
+      if (!payload || typeof payload !== 'object') return null;
+      if (!payload.pairing_name || typeof payload.pairing_name !== 'string') return null;
+      const heading = normalizeFontPayload(payload.heading);
+      const body = normalizeFontPayload(payload.body);
+      if (!heading || !body) return null;
+      const headingFontAxis = typeof payload.headingFontAxis === 'string' && payload.headingFontAxis.trim().length > 0 ? payload.headingFontAxis.trim() : null;
+      const bodyFontAxis = typeof payload.bodyFontAxis === 'string' && payload.bodyFontAxis.trim().length > 0 ? payload.bodyFontAxis.trim() : null;
+      return {
+        pairing_name: payload.pairing_name,
+        heading: heading,
+        body: body,
+        headingFontAxis: headingFontAxis,
+        bodyFontAxis: bodyFontAxis,
+      };
+    }
+
+    function ensureStylesheetLinkOnce(url) {
+      if (!url) return;
+      const existingLink = document.querySelector('link[href="' + url + '"]');
+      if (!existingLink) {
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = url;
+        document.head.appendChild(link);
+      }
+    }
     
     // Tema por defecto "Claro Original" - se usa solo si no hay tema guardado
     const defaultTheme = ${runtimeDefaultTheme};
+${THEME_CONTRAST_HELPER_SOURCE}
     
     // Aplicar tema desde localStorage (que será actualizado por el ThemeProvider con el tema activo de BD)
     // Si no hay tema guardado, usar el por defecto
@@ -80,52 +110,67 @@ export function ApplyStylesScript() {
     
     // Aplicar el tema (guardado o por defecto)
     if (themeToApply.colors) {
-      const colors = themeToApply.colors;
       const body = document.body;
-      
-      root.style.setProperty('--primary', colors.primary);
-      root.style.setProperty('--secondary', colors.secondary);
-      root.style.setProperty('--accent', colors.accent);
-      root.style.setProperty('--background', colors.background);
-      root.style.setProperty('--foreground', colors.foreground);
-      root.style.setProperty('--card', colors.card);
-      root.style.setProperty('--card-foreground', colors.cardForeground);
-      root.style.setProperty('--border', colors.border);
-      root.style.setProperty('--muted', colors.muted);
-      root.style.setProperty('--muted-foreground', colors.mutedForeground);
-      root.style.setProperty('--primary-foreground', colors.foreground);
-      root.style.setProperty('--secondary-foreground', colors.foreground);
-      root.style.setProperty('--accent-foreground', colors.foreground);
+      const resolvedCssVariables = resolveThemeCssVariables(themeToApply);
+      CRITICAL_THEME_CSS_VARIABLES.forEach(function(variableName) {
+        root.style.setProperty(variableName, resolvedCssVariables[variableName]);
+      });
       
       // Aplicar color de fondo al body para temas oscuros
       // Esto evita el "flash" de fondo blanco antes de que React se monte
-      body.style.backgroundColor = colors.background;
+      body.style.backgroundColor = resolvedCssVariables['--background'];
       
       // Marcar qué tema fue aplicado
       window.__osoria_applied_theme = { theme_name: themeToApply.theme_name, theme_fingerprint: themeToApply.theme_fingerprint || null };
     }
     
-    // Aplicar fuente desde localStorage
-    const savedFont = localStorage.getItem('osoria_active_font');
-    if (savedFont) {
-      const parsedFont = parseJson(savedFont);
-      const font = normalizeFontPayload(parsedFont);
-      if (font) {
-        root.style.setProperty('--font-family-sans', font.font_family);
+    // Aplicar combinación de fuentes (heading + body) desde localStorage
+    var pairingApplied = false;
+    const savedPairing = localStorage.getItem('osoria_active_pairing');
+    if (savedPairing) {
+      const parsedPairing = parseJson(savedPairing);
+      const pairing = normalizePairingPayload(parsedPairing);
+      if (pairing) {
+        root.style.setProperty('--font-family-heading', pairing.heading.font_family);
+        root.style.setProperty('--font-family-sans', pairing.body.font_family);
 
-        // Cargar stylesheet solo para fuentes externas reales
-        if (font.google_font_url && font.font_name.toLowerCase() !== 'system') {
-          const existingLink = document.querySelector('link[href="' + font.google_font_url + '"]');
-          if (!existingLink) {
-            const link = document.createElement('link');
-            link.rel = 'stylesheet';
-            link.href = font.google_font_url;
-            document.head.appendChild(link);
+        // Un solo stylesheet combinado si tenemos ambos axis; si no, cada google_font_url por separado
+        if (pairing.headingFontAxis && pairing.bodyFontAxis) {
+          const combinedUrl = 'https://fonts.googleapis.com/css2?family=' + pairing.headingFontAxis + '&family=' + pairing.bodyFontAxis + '&display=swap';
+          ensureStylesheetLinkOnce(combinedUrl);
+        } else {
+          if (pairing.heading.google_font_url && pairing.heading.font_name.toLowerCase() !== 'system') {
+            ensureStylesheetLinkOnce(pairing.heading.google_font_url);
+          }
+          if (pairing.body.google_font_url && pairing.body.font_name.toLowerCase() !== 'system') {
+            ensureStylesheetLinkOnce(pairing.body.google_font_url);
           }
         }
 
-        // Marcar qué fuente fue aplicada
-        window.__osoria_applied_font = font.font_name;
+        // Marcar qué combinación fue aplicada
+        window.__osoria_applied_pairing = pairing.pairing_name;
+        pairingApplied = true;
+      }
+    }
+
+    // Aplicar fuente suelta (legacy) desde localStorage — solo como fallback de migración
+    // cuando todavía no hay una combinación (pairing) activa cacheada.
+    if (!pairingApplied) {
+      const savedFont = localStorage.getItem('osoria_active_font');
+      if (savedFont) {
+        const parsedFont = parseJson(savedFont);
+        const font = normalizeFontPayload(parsedFont);
+        if (font) {
+          root.style.setProperty('--font-family-sans', font.font_family);
+
+          // Cargar stylesheet solo para fuentes externas reales
+          if (font.google_font_url && font.font_name.toLowerCase() !== 'system') {
+            ensureStylesheetLinkOnce(font.google_font_url);
+          }
+
+          // Marcar qué fuente fue aplicada
+          window.__osoria_applied_font = font.font_name;
+        }
       }
     }
     

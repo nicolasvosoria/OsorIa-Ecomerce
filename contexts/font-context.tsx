@@ -11,19 +11,26 @@ import {
 import {
   getFonts,
   getActiveFont,
-  setActiveFont,
+  getPairings,
+  getActivePairing,
+  setActivePairing,
 } from "@/lib/supabase/fonts-api";
-import type { AppFont } from "@/lib/types/font";
-import { applyRuntimeFont } from "@/lib/theme-font/bootstrap";
+import type { AppFont, AppFontPairing } from "@/lib/types/font";
+import {
+  applyRuntimeFont,
+  applyRuntimePairing,
+} from "@/lib/theme-font/bootstrap";
 import { deferStateUpdate } from "@/lib/react/defer-state-update";
 
 interface FontContextType {
   fonts: AppFont[];
   activeFont: AppFont | null;
+  pairings: AppFontPairing[];
+  activePairing: AppFontPairing | null;
   loading: boolean;
   error: string | null;
-  changeFont: (
-    fontName: string,
+  changePairing: (
+    pairingName: string,
   ) => Promise<{ success: boolean; error?: string }>;
   refreshFonts: () => Promise<void>;
 }
@@ -33,19 +40,26 @@ const FontContext = createContext<FontContextType | undefined>(undefined);
 export function FontProvider({ children }: { children: ReactNode }) {
   const [fonts, setFonts] = useState<AppFont[]>([]);
   const [activeFont, setActiveFontState] = useState<AppFont | null>(null);
+  const [pairings, setPairings] = useState<AppFontPairing[]>([]);
+  const [activePairing, setActivePairingState] =
+    useState<AppFontPairing | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const appliedFontRef = useRef<string | null>(null); // Para evitar aplicar la misma fuente múltiples veces
+  const appliedPairingRef = useRef<string | null>(null); // Para evitar aplicar la misma combinación múltiples veces
 
   const refreshFonts = async () => {
     try {
       console.log("[Font] Iniciando carga de fuentes...");
       setLoading(true);
       setError(null);
-      const [fontsData, activeFontData] = await Promise.all([
-        getFonts(),
-        getActiveFont(),
-      ]);
+      const [fontsData, activeFontData, pairingsData, activePairingData] =
+        await Promise.all([
+          getFonts(),
+          getActiveFont(),
+          getPairings(),
+          getActivePairing(),
+        ]);
       console.log(
         "[Font] Fuentes recibidas:",
         fontsData.length,
@@ -54,6 +68,8 @@ export function FontProvider({ children }: { children: ReactNode }) {
       );
       setFonts(fontsData);
       setActiveFontState(activeFontData);
+      setPairings(pairingsData);
+      setActivePairingState(activePairingData);
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "Error al cargar fuentes";
@@ -64,25 +80,78 @@ export function FontProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const changeFont = async (
-    fontName: string,
+  const changePairing = async (
+    pairingName: string,
   ): Promise<{ success: boolean; error?: string }> => {
     try {
-      const result = await setActiveFont(fontName);
+      const result = await setActivePairing(pairingName);
       if (result.success) {
-        // Aplicar fuente inmediatamente desde la lista actual (forzar aplicación)
-        const selectedFont = fonts.find((f) => f.font_name === fontName);
-        if (selectedFont) {
-          applyFont(selectedFont, true); // Forzar aplicación
+        const selectedPairing = pairings.find(
+          (p) => p.pairing_name === pairingName,
+        );
+        if (selectedPairing) {
+          applyPairing(selectedPairing, true);
         }
-        // Refrescar fuentes para actualizar el estado
         await refreshFonts();
       }
       return result;
     } catch (err) {
       const errorMessage =
-        err instanceof Error ? err.message : "Error al cambiar fuente";
+        err instanceof Error
+          ? err.message
+          : "Error al cambiar combinación de fuentes";
       return { success: false, error: errorMessage };
+    }
+  };
+
+  const applyPairing = (pairing: AppFontPairing, force: boolean = false) => {
+    if (typeof document === "undefined") return;
+
+    if (!force && appliedPairingRef.current === pairing.pairing_name) {
+      return;
+    }
+
+    // Si el script ya aplicó esta combinación desde localStorage, no volver a aplicarla
+    // a menos que sea un cambio explícito (force = true)
+    if (
+      !force &&
+      typeof window !== "undefined" &&
+      (window as any).__osoria_applied_pairing === pairing.pairing_name
+    ) {
+      appliedPairingRef.current = pairing.pairing_name;
+      return;
+    }
+
+    const normalizedPairing = applyRuntimePairing(pairing);
+    if (!normalizedPairing) {
+      return;
+    }
+
+    appliedPairingRef.current = normalizedPairing.pairing_name;
+
+    // Guardar en localStorage para aplicar inmediatamente en la próxima carga.
+    // El font_axis se anida dentro de heading/body (formato que normalizePairingRecord
+    // puede volver a leer) y también se expone en headingFontAxis/bodyFontAxis
+    // (leído por el script beforeInteractive de apply-styles-script.tsx).
+    try {
+      localStorage.setItem(
+        "osoria_active_pairing",
+        JSON.stringify({
+          pairing_name: normalizedPairing.pairing_name,
+          heading: {
+            ...normalizedPairing.heading,
+            font_axis: normalizedPairing.headingFontAxis,
+          },
+          body: {
+            ...normalizedPairing.body,
+            font_axis: normalizedPairing.bodyFontAxis,
+          },
+          headingFontAxis: normalizedPairing.headingFontAxis,
+          bodyFontAxis: normalizedPairing.bodyFontAxis,
+        }),
+      );
+    } catch (e) {
+      console.warn("[Font] Error saving pairing to localStorage:", e);
     }
   };
 
@@ -142,6 +211,11 @@ export function FontProvider({ children }: { children: ReactNode }) {
     // Esperar a que termine la carga antes de aplicar
     if (loading) return;
 
+    // Si hay una combinación de fuentes activa, esta se aplica en su propio
+    // efecto y ya establece --font-family-sans (body); no reaplicar la fuente
+    // suelta (legacy) para no pisar innecesariamente ese estado.
+    if (activePairing) return;
+
     // Verificar si el script ya aplicó una fuente desde localStorage
     const scriptAppliedFont =
       typeof window !== "undefined"
@@ -161,14 +235,41 @@ export function FontProvider({ children }: { children: ReactNode }) {
         applyFont(activeFont);
       }
     }
-  }, [activeFont, loading]); // Agregar loading para evitar aplicar antes de que termine la carga
+  }, [activeFont, activePairing, loading]); // Agregar loading para evitar aplicar antes de que termine la carga
+
+  useEffect(() => {
+    // Esperar a que termine la carga antes de aplicar
+    if (loading) return;
+
+    // Verificar si el script ya aplicó una combinación desde localStorage
+    const scriptAppliedPairing =
+      typeof window !== "undefined"
+        ? (window as any).__osoria_applied_pairing
+        : null;
+
+    // Solo aplicar si tenemos una combinación activa y no se ha aplicado ya
+    if (activePairing) {
+      // Si el script ya aplicó esta combinación, solo marcar como aplicada sin volver a aplicar
+      if (scriptAppliedPairing === activePairing.pairing_name) {
+        appliedPairingRef.current = activePairing.pairing_name;
+        return;
+      }
+
+      // Solo aplicar si no se ha aplicado ya
+      if (appliedPairingRef.current !== activePairing.pairing_name) {
+        applyPairing(activePairing);
+      }
+    }
+  }, [activePairing, loading]); // Agregar loading para evitar aplicar antes de que termine la carga
 
   const value: FontContextType = {
     fonts,
     activeFont,
+    pairings,
+    activePairing,
     loading,
     error,
-    changeFont,
+    changePairing,
     refreshFonts,
   };
 

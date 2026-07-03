@@ -15,6 +15,14 @@ export interface RuntimeFont {
   google_font_url: string | null;
 }
 
+export interface RuntimePairing {
+  pairing_name: string;
+  heading: RuntimeFont;
+  headingFontAxis: string | null;
+  body: RuntimeFont;
+  bodyFontAxis: string | null;
+}
+
 export const DEFAULT_RUNTIME_THEME: RuntimeTheme = {
   theme_name: "Claro Original",
   colors: {
@@ -187,5 +195,48 @@ export function normalizeFontRecord(input: unknown): RuntimeFont | null {
     font_name: fontName,
     font_family: fontFamily,
     google_font_url: normalizedUrl ?? null,
+  };
+}
+
+export function normalizePairingRecord(input: unknown): RuntimePairing | null {
+  const raw = toRecord(input);
+  if (!raw) return null;
+
+  const pairingName = readString(raw.pairing_name);
+  if (!pairingName) return null;
+
+  const headingRaw = toRecord(raw.heading);
+  const bodyRaw = toRecord(raw.body);
+
+  const heading = normalizeFontRecord(
+    headingRaw ?? {
+      font_name: raw.heading_font_name,
+      font_family: raw.heading_font_family,
+      google_font_url: raw.heading_google_font_url,
+    },
+  );
+  const body = normalizeFontRecord(
+    bodyRaw ?? {
+      font_name: raw.body_font_name,
+      font_family: raw.body_font_family,
+      google_font_url: raw.body_google_font_url,
+    },
+  );
+
+  if (!heading || !body) return null;
+
+  const headingFontAxis = readString(
+    headingRaw ? headingRaw.font_axis : raw.heading_font_axis,
+  );
+  const bodyFontAxis = readString(
+    bodyRaw ? bodyRaw.font_axis : raw.body_font_axis,
+  );
+
+  return {
+    pairing_name: pairingName,
+    heading,
+    headingFontAxis,
+    body,
+    bodyFontAxis,
   };
 }

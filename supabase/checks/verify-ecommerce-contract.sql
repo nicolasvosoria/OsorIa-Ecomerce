@@ -32,7 +32,13 @@ begin
     ('orders','shipping_address'),('order_addresses','address_type'),('order_addresses','address_line_1'),
     ('payment_transactions','transaction_type'),('payment_transactions','provider_payment_method'),
     ('payment_transactions','provider_transaction_id'),('payment_transactions','provider_txn_id'),('payment_transactions','metadata'),
-    ('payment_transactions','raw_response')
+    ('payment_transactions','raw_response'),('app_fonts','font_axis'),
+    ('app_font_pairings_legacy','id'),('app_font_pairings_legacy','pairing_name'),
+    ('app_font_pairings_legacy','heading_font_name'),('app_font_pairings_legacy','heading_font_family'),
+    ('app_font_pairings_legacy','heading_google_font_url'),('app_font_pairings_legacy','heading_font_axis'),
+    ('app_font_pairings_legacy','body_font_name'),('app_font_pairings_legacy','body_font_family'),
+    ('app_font_pairings_legacy','body_google_font_url'),('app_font_pairings_legacy','body_font_axis'),
+    ('app_font_pairings_legacy','is_active'),('app_font_pairings_legacy','created_at'),('app_font_pairings_legacy','updated_at')
   ) req(required_table, required_column)
   where not exists (
     select 1 from information_schema.columns c
@@ -52,6 +58,7 @@ declare
 begin
   select array_agg(required_table order by required_table) into v_missing
   from (values
+    ('app_font_pairings'),
     ('app_fonts'),('app_theme_versions'),('app_themes'),('cart_items'),('carts'),('component_styles'),
     ('inventory_movements'),('item_categories'),('item_images'),('item_metrics'),('item_option_values'),
     ('item_options'),('item_seo'),('item_tags'),('item_variants'),('order_addresses'),('order_items'),
@@ -72,7 +79,7 @@ declare
   v_missing text[];
 begin
   select array_agg(required_view order by required_view) into v_missing
-  from (values ('app_fonts_legacy'),('app_themes_legacy'),('component_styles_legacy'),('item_options_legacy'),('orders_legacy'),('store_items_legacy'),('stores_legacy')) req(required_view)
+  from (values ('app_font_pairings_legacy'),('app_fonts_legacy'),('app_themes_legacy'),('component_styles_legacy'),('item_options_legacy'),('orders_legacy'),('store_items_legacy'),('stores_legacy')) req(required_view)
   where to_regclass(format('ecommerce.%I', req.required_view)) is null;
 
   if v_missing is not null then
@@ -169,6 +176,26 @@ begin
 
   if v_missing is not null then
     raise exception 'Missing combo indexes: %', array_to_string(v_missing, ', ');
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'ecommerce' and c.relname = 'app_font_pairings_single_active' and c.relkind = 'i'
+  ) then
+    raise exception 'Missing single-active-pairing partial unique index: app_font_pairings_single_active';
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'ecommerce' and tablename = 'app_fonts' and policyname = 'app_fonts_active_pairing_read'
+  ) then
+    raise exception 'Missing RLS policy app_fonts_active_pairing_read on ecommerce.app_fonts';
   end if;
 end $$;
 

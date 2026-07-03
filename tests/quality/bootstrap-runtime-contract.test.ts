@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   applyRuntimeFont,
+  applyRuntimePairing,
+  buildPairingStylesheetUrl,
   resolveThemeBootstrapPayload,
   ensureStylesheetLink,
   shouldLoadFontStylesheet,
@@ -59,6 +61,90 @@ describe("font stylesheet bootstrap", () => {
         'link[href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap"]',
       ),
     ).toHaveLength(1);
+  });
+});
+
+describe("buildPairingStylesheetUrl", () => {
+  const heading = {
+    font_name: "Playfair Display",
+    font_family: '"Playfair Display", serif',
+    google_font_url:
+      "https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&display=swap",
+  };
+  const body = {
+    font_name: "Inter",
+    font_family: '"Inter", sans-serif',
+    google_font_url:
+      "https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap",
+  };
+
+  it("composes one combined css2 request when both axes are present", () => {
+    const url = buildPairingStylesheetUrl(
+      heading,
+      body,
+      "Playfair+Display:wght@600;700",
+      "Inter:wght@400;500",
+    );
+
+    expect(url).toBe(
+      "https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500&display=swap",
+    );
+  });
+
+  it("returns null when either axis is missing", () => {
+    expect(
+      buildPairingStylesheetUrl(heading, body, null, "Inter:wght@400;500"),
+    ).toBeNull();
+    expect(
+      buildPairingStylesheetUrl(
+        heading,
+        body,
+        "Playfair+Display:wght@600;700",
+        null,
+      ),
+    ).toBeNull();
+    expect(buildPairingStylesheetUrl(heading, body, null, null)).toBeNull();
+  });
+});
+
+describe("applyRuntimePairing", () => {
+  it("sets both heading and body CSS vars and injects one combined stylesheet link", () => {
+    const combinedUrl =
+      "https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500&display=swap";
+
+    const pairing = applyRuntimePairing({
+      pairing_name: "Editorial",
+      heading: {
+        font_name: "Playfair Display",
+        font_family: '"Playfair Display", serif',
+        google_font_url:
+          "https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&display=swap",
+        font_axis: "Playfair+Display:wght@600;700",
+      },
+      body: {
+        font_name: "Inter",
+        font_family: '"Inter", sans-serif',
+        google_font_url:
+          "https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap",
+        font_axis: "Inter:wght@400;500",
+      },
+    });
+
+    expect(pairing?.pairing_name).toBe("Editorial");
+    expect(
+      document.documentElement.style.getPropertyValue("--font-family-heading"),
+    ).toBe('"Playfair Display", serif');
+    expect(
+      document.documentElement.style.getPropertyValue("--font-family-sans"),
+    ).toBe('"Inter", sans-serif');
+    expect(
+      document.head.querySelectorAll(`link[href="${combinedUrl}"]`),
+    ).toHaveLength(1);
+  });
+
+  it("returns null for invalid input", () => {
+    expect(applyRuntimePairing(null)).toBeNull();
+    expect(applyRuntimePairing({ pairing_name: "Broken" })).toBeNull();
   });
 });
 

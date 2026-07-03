@@ -1,9 +1,12 @@
 import { getSupabaseEcommerce } from "./client";
 import { ECOMMERCE_VIEWS } from "./contract";
-import type { AppFont } from "@/lib/types/font";
+import type { AppFont, AppFontPairing } from "@/lib/types/font";
 import { requireAdmin } from "./permissions-api";
 import { getAdminRequestHeaders } from "./admin-request-headers";
-import { normalizeFontRecord } from "@/lib/theme-font/runtime-contract";
+import {
+  normalizeFontRecord,
+  normalizePairingRecord,
+} from "@/lib/theme-font/runtime-contract";
 
 // Helper para agregar timeout a las promesas
 function withTimeout<T>(
@@ -33,6 +36,26 @@ function normalizeFontRow(font: any): AppFont | null {
     font_family: normalized.font_family,
     google_font_url: normalized.google_font_url,
   } as AppFont;
+}
+
+function normalizePairingRow(pairing: any): AppFontPairing | null {
+  const normalized = normalizePairingRecord(pairing);
+  if (!normalized) {
+    return null;
+  }
+
+  return {
+    ...pairing,
+    pairing_name: normalized.pairing_name,
+    heading_font_name: normalized.heading.font_name,
+    heading_font_family: normalized.heading.font_family,
+    heading_google_font_url: normalized.heading.google_font_url,
+    heading_font_axis: normalized.headingFontAxis,
+    body_font_name: normalized.body.font_name,
+    body_font_family: normalized.body.font_family,
+    body_google_font_url: normalized.body.google_font_url,
+    body_font_axis: normalized.bodyFontAxis,
+  } as AppFontPairing;
 }
 
 export async function getFonts(): Promise<AppFont[]> {
@@ -171,10 +194,70 @@ export async function getActiveFont(): Promise<AppFont | null> {
   return normalizeFontRow(data);
 }
 
-export async function setActiveFont(
-  fontName: string,
+export async function getPairings(): Promise<AppFontPairing[]> {
+  const supabase = getSupabaseEcommerce();
+  if (!supabase) {
+    console.error("[FontPairing] Supabase no configurado");
+    return [];
+  }
+
+  try {
+    const queryPromise = supabase
+      .from(ECOMMERCE_VIEWS.appFontPairingsLegacy)
+      .select("*")
+      .order("pairing_name");
+
+    const { data, error } = (await withTimeout(queryPromise, 20000)) as {
+      data: any;
+      error: any;
+    };
+
+    if (error) {
+      console.error("[FontPairing] Error fetching pairings:", error);
+      return [];
+    }
+
+    if (!data || data.length === 0) {
+      return [];
+    }
+
+    return data
+      .map((pairing: any) => normalizePairingRow(pairing))
+      .filter(
+        (pairing: AppFontPairing | null): pairing is AppFontPairing =>
+          pairing !== null,
+      );
+  } catch (err) {
+    console.error("[FontPairing] Excepción al obtener pairings:", err);
+    return [];
+  }
+}
+
+export async function getActivePairing(): Promise<AppFontPairing | null> {
+  const supabase = getSupabaseEcommerce();
+  if (!supabase) {
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from(ECOMMERCE_VIEWS.appFontPairingsLegacy)
+    .select("*")
+    .eq("is_active", true)
+    .single();
+
+  if (error) {
+    console.error("[FontPairing] Error fetching active pairing:", error);
+    return null;
+  }
+
+  if (!data) return null;
+
+  return normalizePairingRow(data);
+}
+
+export async function setActivePairing(
+  pairingName: string,
 ): Promise<{ success: boolean; error?: string }> {
-  // Verificar que el usuario es administrador
   try {
     await requireAdmin();
   } catch (error) {
@@ -188,11 +271,11 @@ export async function setActiveFont(
   }
 
   try {
-    const response = await fetch("/api/admin/font-activation", {
+    const response = await fetch("/api/admin/font-pairing-activation", {
       method: "POST",
       headers: await getAdminRequestHeaders(),
       body: JSON.stringify({
-        fontName,
+        pairingName,
       }),
     });
 
@@ -204,7 +287,7 @@ export async function setActiveFont(
         "error" in payload &&
         typeof payload.error === "string"
           ? payload.error
-          : "Error al activar fuente";
+          : "Error al activar combinación de fuentes";
 
       return { success: false, error: message };
     }

@@ -9,6 +9,7 @@ export type EcommerceViewName = keyof EcommerceSchema["Views"] & string;
 export type EcommerceFunctionName = keyof EcommerceSchema["Functions"] & string;
 
 export const ECOMMERCE_TABLES = {
+  appFontPairings: "app_font_pairings",
   appFonts: "app_fonts",
   appThemeVersions: "app_theme_versions",
   appThemes: "app_themes",
@@ -34,6 +35,7 @@ export const ECOMMERCE_TABLES = {
 } as const satisfies Record<string, EcommerceTableName>;
 
 export const ECOMMERCE_VIEWS = {
+  appFontPairingsLegacy: "app_font_pairings_legacy",
   appFontsLegacy: "app_fonts_legacy",
   appThemesLegacy: "app_themes_legacy",
   componentStylesLegacy: "component_styles_legacy",
