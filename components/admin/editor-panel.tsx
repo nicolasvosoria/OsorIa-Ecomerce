@@ -32,6 +32,7 @@ import { updateComponentStyle } from "@/lib/supabase/styles-api";
 import { toast } from "sonner";
 import { ImageUpload } from "./image-upload";
 import { ProductPicker } from "./product-picker";
+import { HeaderMegaMenuFeaturedEditor } from "./header-mega-menu-featured-editor";
 import { resolveScopedStorageKey } from "@/lib/utils/store";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -69,6 +70,8 @@ import { HeroEditorPanel } from "./hero-editor/hero-editor-panel";
 import { SPECIAL_OFFER_DEFAULTS } from "@/components/sections/special-offer";
 import { NEWSLETTER_DEFAULTS } from "@/components/sections/newsletter-section";
 import { HEADER_DEFAULTS } from "@/components/layout/header";
+import { HEADER_LAYOUT_VARIANT_OPTIONS } from "@/lib/header/header-layout-variant"
+import { HEADER_STICKY_MODE_OPTIONS } from "@/lib/header/header-sticky-mode";
 import { FEATURED_DEFAULTS } from "@/components/sections/featured-product";
 import { POPULAR_DEFAULTS } from "@/components/sections/popular-items";
 import { PRODUCTS_DEFAULTS } from "@/components/sections/products-grid";
@@ -439,8 +442,30 @@ const COMPONENT_FIELDS: Record<
         type: "image",
       },
       {
+        key: "layoutVariant",
+        label: "Variante de Diseño del Encabezado",
+        type: "select",
+        options: [...HEADER_LAYOUT_VARIANT_OPTIONS],
+      },
+      {
+        key: "stickyMode",
+        label: "Comportamiento al Desplazarse",
+        type: "select",
+        options: [...HEADER_STICKY_MODE_OPTIONS],
+      },
+      {
         key: "tagline",
         label: "Texto de la Barra de Promoción (vacío = oculta la barra)",
+        type: "text",
+      },
+      {
+        key: "megaMenuDescription",
+        label: "Descripción del Menú de Categorías",
+        type: "textarea",
+      },
+      {
+        key: "viewAllText",
+        label: "Texto de 'Ver Todo' (Menú de Categorías)",
         type: "text",
       },
     ],
@@ -509,6 +534,21 @@ const COMPONENT_FIELDS: Record<
       {
         key: "linkColor",
         label: "Color de Enlaces de Navegación",
+        type: "color",
+      },
+      {
+        key: "megaMenuBgColor",
+        label: "Color de Fondo del Menú de Categorías",
+        type: "color",
+      },
+      {
+        key: "megaMenuTextColor",
+        label: "Color de Texto del Menú de Categorías",
+        type: "color",
+      },
+      {
+        key: "megaMenuFeaturedBgColor",
+        label: "Color de Fondo del Producto Destacado (Menú)",
         type: "color",
       },
     ],
@@ -2307,6 +2347,14 @@ export function EditorPanel() {
                     </div>
                   );
                 })}
+                {selectedComponent === "header" && (
+                  <HeaderMegaMenuFeaturedEditor
+                    value={effectiveLocalValues.featuredByCategory || {}}
+                    onChange={(featuredByCategory) =>
+                      handleInputChange("featuredByCategory", featuredByCategory)
+                    }
+                  />
+                )}
               </CardContent>
             </Card>
           </TabsContent>

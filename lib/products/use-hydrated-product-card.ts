@@ -7,7 +7,7 @@ import type { CommerceProductCard } from "@/lib/types/products";
 
 export function useHydratedProductCard(
   productId: string,
-): { card: CommerceProductCard | null } {
+): { card: CommerceProductCard | null; isLoading: boolean } {
   const [fetched, setFetched] = useState<{
     id: string;
     card: CommerceProductCard | null;
@@ -32,6 +32,8 @@ export function useHydratedProductCard(
     };
   }, [productId]);
 
-  const card = fetched && fetched.id === productId ? fetched.card : null;
-  return { card };
+  const isHydrated = fetched !== null && fetched.id === productId;
+  const card = isHydrated ? fetched.card : null;
+  const isLoading = Boolean(productId) && !isHydrated;
+  return { card, isLoading };
 }

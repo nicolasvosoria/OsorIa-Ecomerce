@@ -4,11 +4,20 @@
 import { useState, useMemo, useEffect, useRef } from "react"
 import { useRouter, usePathname, useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { Search, Heart, ShoppingCart, Palette, AlignLeft, Menu, LogIn, LogOut, User, Eye, EyeOff, CreditCard, Building2, Wallet, LayoutDashboard, Edit } from "lucide-react"
+import { Search, Heart, ShoppingCart, Palette, AlignLeft, Menu, LogIn, LogOut, User, Eye, EyeOff, CreditCard, Building2, Wallet, LayoutDashboard, Edit, X } from "lucide-react"
 import { VisaIcon, MasterCardIcon, AmexIcon } from "@/components/icons/cc-icons"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { useComponentStyle } from "@/contexts/styles-context"
+import { useAdmin } from "@/contexts/admin-context"
+import { generateCategorySlug } from "@/lib/utils/category-slug"
+import { resolveFeaturedProductId } from "@/lib/products/featured-product"
+import { HeaderMegaMenu } from "@/components/layout/header-mega-menu"
+import { HeaderSearchSuggestions } from "@/components/layout/header-search-suggestions"
+import { resolveHeaderLayoutVariant } from "@/lib/header/header-layout-variant"
+import { resolveHeaderStickyMode } from "@/lib/header/header-sticky-mode"
+import { useHeaderScrollHidden } from "@/lib/hooks/use-header-scroll-hidden"
+import { cn } from "@/lib/utils"
 import { useTheme } from "@/contexts/theme-context"
 import { useStore } from "@/contexts/store-context"
 import { ThemeSelectorModal } from "@/components/theme/theme-selector-modal"
@@ -57,15 +66,44 @@ import { CheckoutOptionsDialog } from "@/components/cart/checkout-options-dialog
 import { useLanguage } from "@/contexts/language-context"
 import { buildLocalCartSummary, formatCartMoney } from "@/lib/cart/cart-summary"
 
-// Helper para generar slug desde el nombre de categoría
-function generateCategorySlug(name: string): string {
-  return name
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "")
+/**
+ * Single source of truth for the header's editable defaults. Imported by
+ * `editor-panel.tsx` for `COMPONENT_FIELDS.header.defaults` so the live
+ * header and the admin editor never drift apart.
+ */
+export const HEADER_DEFAULTS = {
+  brandName: "Osoria",
+  logoImage: "/logo-negro.svg",
+  logoImageDark: "/logo-osoria-blanco.svg",
+  searchPlaceholder: "Buscar...",
+  tagline: "¡Gran venta! Apurate, la oferta termina pronto",
+  layoutVariant: "classic",
+  stickyMode: "",
+  // Usar variables CSS del tema para que se adapte a temas oscuros
+  bgColor: "var(--background)",
+  bannerBgColor: "var(--secondary)",
+  bannerTextColor: "var(--primary)",
+  menuButtonColor: "var(--foreground)",
+  menuButtonHoverBg: "var(--muted)",
+  loginButtonColor: "var(--foreground)",
+  loginButtonHoverBg: "var(--muted)",
+  iconColor: "var(--foreground)",
+  iconHoverBg: "var(--muted)",
+  searchIconColor: "var(--muted-foreground)",
+  searchBgColor: "var(--muted)",
+  searchTextColor: "var(--foreground)",
+  searchBorderColor: "var(--border)",
+  linkColor: "var(--foreground)",
+  megaMenuDescription:
+    "Encontrá los mejores productos de tecnología, seleccionados por su calidad y el mejor precio.",
+  viewAllText: "Ver todos los productos",
+  megaMenuBgColor: "var(--background)",
+  megaMenuTextColor: "var(--foreground)",
+  megaMenuFeaturedBgColor: "var(--muted)",
+  featuredByCategory: {} as Record<string, string>,
 }
+
+const PROMO_BAR_DISMISSED_STORAGE_KEY = "osoria_header_promo_dismissed"
 
 export function Header() {
   const router = useRouter()
@@ -97,6 +135,8 @@ export function Header() {
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [isSearching, setIsSearching] = useState(false)
   const [categories, setCategories] = useState<Array<{ id: string; category_name: string; display_order: number }>>([])
+  const [openMegaMenuCategoryId, setOpenMegaMenuCategoryId] = useState<string | null>(null)
+  const [categoryFeaturedProductId, setCategoryFeaturedProductId] = useState<Record<string, string | null>>({})
   const { activeTheme } = useTheme()
   const { items, removeFromCart, updateQuantity, getTotal, getItemSubtotal, getTotalItems } = useCart()
   const { getTotalItems: getWishlistTotalItems } = useWishlist()
@@ -110,28 +150,14 @@ export function Header() {
     language,
   })
 
-  const { styles: styleData } = useComponentStyle("header", {
-    brandName: "Osoria",
-    logoImage: "/logo-negro.svg",
-    logoImageDark: "/logo-osoria-blanco.svg",
-    searchPlaceholder: "Buscar...",
-    tagline: "Big Sale! Hurry up! Sale ends in 2025",
-    // Usar variables CSS del tema para que se adapte a temas oscuros
-    bgColor: "var(--background)",
-    bannerBgColor: "var(--secondary)",
-    bannerTextColor: "var(--primary)",
-    menuButtonColor: "var(--foreground)",
-    menuButtonHoverBg: "var(--muted)",
-    loginButtonColor: "var(--foreground)",
-    loginButtonHoverBg: "var(--muted)",
-    iconColor: "var(--foreground)",
-    iconHoverBg: "var(--muted)",
-    searchIconColor: "var(--muted-foreground)",
-    searchBgColor: "var(--muted)",
-    searchTextColor: "var(--foreground)",
-    searchBorderColor: "var(--border)",
-    linkColor: "var(--primary)",
-  })
+  const { styles: styleData } = useComponentStyle("header", HEADER_DEFAULTS)
+  const { componentEdits } = useAdmin()
+  const edits = componentEdits.get("header") || {}
+  const header = { ...HEADER_DEFAULTS, ...styleData, ...edits }
+  const layoutVariant = resolveHeaderLayoutVariant(header.layoutVariant)
+  const stickyMode = resolveHeaderStickyMode(header.stickyMode, layoutVariant)
+  const isHeaderScrollHidden = useHeaderScrollHidden(stickyMode === "smart")
+  const [promoDismissed, setPromoDismissed] = useState(true)
 
   // Determinar si el tema es oscuro
   const isDarkTheme = useMemo(() => {
@@ -155,8 +181,8 @@ export function Header() {
 
   // Usar logo desde configuración o valores por defecto
   const logoSrc = isDarkTheme 
-    ? (styleData.logoImageDark || "/logo-osoria-blanco.svg")
-    : (styleData.logoImage || "/logo-negro.svg")
+    ? (header.logoImageDark || "/logo-osoria-blanco.svg")
+    : (header.logoImage || "/logo-negro.svg")
   const pathname = usePathname()
 
   useEffect(() => {
@@ -271,7 +297,46 @@ export function Header() {
     loadCategories()
   }, [store?.id]) // Recargar cuando cambie la tienda
 
+  // Resolver el producto destacado de cada categoría para el mega-menu (una consulta liviana por categoría).
+  // Sólo la variante classic renderiza el mega-menu, así que el resto de variantes no pagan este costo.
+  useEffect(() => {
+    if (layoutVariant !== "classic" || categories.length === 0) return
+
+    let active = true
+
+    Promise.all(
+      categories.map(async (category) => {
+        const productId = await resolveFeaturedProductId(category.id, header.featuredByCategory?.[category.id])
+        return [category.id, productId] as const
+      })
+    )
+      .then((entries) => {
+        if (active) setCategoryFeaturedProductId(Object.fromEntries(entries))
+      })
+      .catch((error) => {
+        console.error('Error resolving header mega-menu featured products:', error)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [layoutVariant, categories, header.featuredByCategory])
+
+  // Leer el estado de descarte de la barra de promoción guardado en el navegador
+  useEffect(() => {
+    const dismissed = window.localStorage.getItem(PROMO_BAR_DISMISSED_STORAGE_KEY) === "true"
+    deferStateUpdate(() => setPromoDismissed(dismissed))
+  }, [])
+
   // Removido console.log para evitar spam en consola y rate limiting
+
+  // Handler para cerrar la barra de promoción (persiste la elección)
+  const handleDismissPromoBar = () => {
+    window.localStorage.setItem(PROMO_BAR_DISMISSED_STORAGE_KEY, "true")
+    setPromoDismissed(true)
+  }
+
+  const showPromoBar = !promoDismissed && Boolean(header.tagline?.trim())
 
   // Handler para búsqueda
   const handleSearch = (e?: React.FormEvent) => {
@@ -300,313 +365,463 @@ export function Header() {
     router.push(`/products/${slug}`)
   }
 
+  // Handlers del mega-menu de categorías (solo desktop)
+  const openMegaMenu = (categoryId: string) => setOpenMegaMenuCategoryId(categoryId)
+  const closeMegaMenu = () => setOpenMegaMenuCategoryId(null)
+  const handleMegaMenuAreaBlur = (e: React.FocusEvent<HTMLDivElement>) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+      closeMegaMenu()
+    }
+  }
+  const handleMegaMenuAreaKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Escape') {
+      closeMegaMenu()
+    }
+  }
+
+  // Promo pill compacta usada en las variantes classic y centered (fila de utilidad)
+  const renderPromoPill = () => {
+    if (!showPromoBar) return null
+    return (
+      <div
+        className="flex items-center gap-2 flex-shrink-0 rounded-full px-4 py-2 text-xs lg:text-sm font-medium max-w-[160px] lg:max-w-xs"
+        style={{
+          backgroundColor: header.bannerBgColor || "var(--secondary)",
+          color: header.bannerTextColor || "var(--primary)",
+        }}
+      >
+        <span className="truncate">{header.tagline}</span>
+        <button
+          type="button"
+          onClick={handleDismissPromoBar}
+          aria-label="Cerrar promoción"
+          className="flex-shrink-0 rounded-full p-0.5 hover:opacity-70 transition-opacity"
+          style={{ color: header.bannerTextColor || "var(--primary)" }}
+        >
+          <X className="h-3 w-3" />
+        </button>
+      </div>
+    )
+  }
+
+  // Formulario de búsqueda de escritorio (input + sugerencias), compartido por las 3 variantes
+  const renderDesktopSearchForm = (formClassName: string) => (
+    <form className={formClassName} onSubmit={handleSearch}>
+      <div className="relative">
+        <Search className="absolute left-3 lg:left-4 top-1/2 -translate-y-1/2 h-3.5 w-3.5 lg:h-4 lg:w-4 z-10 pointer-events-none" style={{ color: header.searchIconColor || "var(--muted-foreground)" }} />
+        <Input
+          type="search"
+          placeholder={t.header.searchPlaceholder}
+          value={searchQuery}
+          onChange={(e) => {
+            setSearchQuery(e.target.value)
+            if (e.target.value.trim().length >= 2) {
+              setShowSuggestions(true)
+            }
+          }}
+          onKeyDown={handleSearchKeyDown}
+          onFocus={() => {
+            if (searchQuery.trim().length >= 2 && searchSuggestions.length > 0) {
+              setShowSuggestions(true)
+            }
+          }}
+          className="pl-10 lg:pl-14 pr-4 h-9 lg:h-10 rounded-full w-full font-inter font-medium text-sm lg:text-base border"
+          style={{
+            backgroundColor: header.searchBgColor || "var(--muted)",
+            borderColor: header.searchBorderColor || "var(--border)",
+            color: header.searchTextColor || "var(--foreground)",
+            paddingLeft: "2.5rem",
+          }}
+        />
+        <Button
+          type="submit"
+          variant="ghost"
+          size="icon"
+          className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 lg:h-8 lg:w-8 rounded-full hover:bg-transparent"
+          style={{ backgroundColor: "transparent" }}
+          onClick={handleSearch}
+          title={t.header.search}
+        >
+          <Search className="h-3.5 w-3.5 lg:h-4 lg:w-4" style={{ color: header.searchIconColor || "var(--muted-foreground)" }} />
+        </Button>
+
+        {/* Dropdown de sugerencias */}
+        {showSuggestions && searchQuery.trim().length >= 2 && (
+          <HeaderSearchSuggestions
+            isSearching={isSearching}
+            suggestions={searchSuggestions}
+            searchQuery={searchQuery}
+            onSelectSuggestion={handleSelectSuggestion}
+            onViewAllResults={handleSearch}
+            t={t}
+          />
+        )}
+      </div>
+    </form>
+  )
+
+  // Botón de icono con badge de conteo (wishlist/carrito): misma forma en escritorio y móvil,
+  // sólo cambian tamaños de clase y el conteo/acción según el llamador.
+  const renderBadgeIconButton = ({
+    icon,
+    count,
+    onClick,
+    title,
+    buttonClassName,
+    badgeClassName,
+  }: {
+    icon: React.ReactNode
+    count: number
+    onClick: () => void
+    title: string
+    buttonClassName: string
+    badgeClassName: string
+  }) => (
+    <Button
+      variant="ghost"
+      size="icon"
+      className={buttonClassName}
+      style={{ backgroundColor: "transparent" }}
+      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = header.iconHoverBg || "var(--muted)"}
+      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+      onClick={onClick}
+      title={title}
+    >
+      {icon}
+      {count > 0 && (
+        <span className={badgeClassName} style={{ backgroundColor: "var(--primary)" }}>
+          {count > 99 ? '99+' : count}
+        </span>
+      )}
+    </Button>
+  )
+
+  // Iconos de acción (cuenta, wishlist, carrito), compartidos por las 3 variantes
+  const renderActionIcons = () => (
+    <>
+      {isAuthenticated ? (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              className="h-9 lg:h-10 px-2.5 lg:px-4 rounded-full gap-1.5 lg:gap-2"
+              style={{ backgroundColor: "transparent" }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = header.loginButtonHoverBg || "var(--muted)"}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+            >
+              <User className="h-4 w-4 lg:h-5 lg:w-5" style={{ color: header.loginButtonColor || "var(--foreground)" }} />
+              <span className="text-xs lg:text-sm xl:text-base font-medium hidden xl:inline truncate max-w-[150px]" style={{ color: header.loginButtonColor || "var(--foreground)" }}>
+                {user?.role === 'admin'
+                  ? t.nav.admin
+                  : user?.first_name && user?.last_name
+                    ? `${user.first_name} ${user.last_name}`
+                    : user?.email?.split('@')[0] || t.nav.account}
+              </span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" style={{ backgroundColor: "var(--background)", borderColor: "var(--border)" }}>
+            <DropdownMenuLabel style={{ color: "var(--foreground)" }}>
+              {user?.role === 'admin'
+                ? "Administrador"
+                : user?.first_name && user?.last_name
+                  ? `${user.first_name} ${user.last_name}`
+                  : user?.email || "Usuario"}
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator style={{ backgroundColor: "var(--border)" }} />
+            {user?.role === 'admin' && (
+              <>
+                <DropdownMenuItem asChild style={{ color: "var(--foreground)" }}>
+                  <Link href="/dashboard">
+                    <LayoutDashboard className="mr-2 h-4 w-4" />
+                    {t.nav.dashboard}
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild style={{ color: "var(--foreground)" }}>
+                  <Link href="/admin">
+                    <Edit className="mr-2 h-4 w-4" />
+                    {t.admin.pageEditor}
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator style={{ backgroundColor: "var(--border)" }} />
+              </>
+            )}
+            <DropdownMenuItem
+              onClick={async () => {
+                // Guardar si el usuario es administrador antes de cerrar sesión
+                const wasAdmin = user?.role === 'admin'
+                const wasOnAdminPage = pathname === '/admin' || pathname === '/dashboard'
+
+                await logout()
+
+                // Si era administrador, redirigir a la página principal
+                if (wasAdmin && wasOnAdminPage) {
+                  router.push('/')
+                }
+
+                toast.success(t.header.sessionClosed, {
+                  description: t.header.sessionClosedDescription,
+                  duration: 3000,
+                })
+              }}
+              style={{ color: "var(--foreground)" }}
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              {t.auth.logout}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : (
+        <Button
+          variant="ghost"
+          className="h-9 lg:h-10 px-2.5 lg:px-4 rounded-full gap-1.5 lg:gap-2"
+          style={{ backgroundColor: "transparent" }}
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = header.loginButtonHoverBg || "var(--muted)"}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+          onClick={() => setLoginModalOpen(true)}
+          title={t.auth.login}
+        >
+          <LogIn className="h-4 w-4 lg:h-5 lg:w-5" style={{ color: header.loginButtonColor || "var(--foreground)" }} />
+          <span className="text-xs lg:text-sm xl:text-base font-medium hidden xl:inline" style={{ color: header.loginButtonColor || "var(--foreground)" }}>{t.auth.login}</span>
+        </Button>
+      )}
+      {renderBadgeIconButton({
+        icon: <Heart className="h-4 w-4 lg:h-5 lg:w-5" style={{ color: header.iconColor || "var(--foreground)" }} />,
+        count: getWishlistTotalItems(),
+        onClick: () => router.push('/wishlist'),
+        title: t.nav.wishlist,
+        buttonClassName: "h-9 w-9 lg:h-10 lg:w-10 rounded-full touch-manipulation relative flex-shrink-0",
+        badgeClassName: "absolute -top-1 -right-1 h-4 w-4 lg:h-5 lg:w-5 rounded-full flex items-center justify-center text-[10px] lg:text-xs font-bold text-white",
+      })}
+      {renderBadgeIconButton({
+        icon: <ShoppingCart className="h-4 w-4 lg:h-5 lg:w-5" style={{ color: header.iconColor || "var(--foreground)" }} />,
+        count: getTotalItems(),
+        onClick: () => setCartOpen(true),
+        title: t.nav.cart,
+        buttonClassName: "h-9 w-9 lg:h-10 lg:w-10 rounded-full touch-manipulation relative flex-shrink-0",
+        badgeClassName: "absolute -top-1 -right-1 h-4 w-4 lg:h-5 lg:w-5 rounded-full flex items-center justify-center text-[10px] lg:text-xs font-bold text-white",
+      })}
+      {user?.role === 'admin' && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-9 w-9 lg:h-10 lg:w-10 rounded-full touch-manipulation flex-shrink-0"
+          style={{ backgroundColor: "transparent" }}
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = header.menuButtonHoverBg || "var(--muted)"}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+          onClick={() => setMenuOpen(true)}
+          title={t.header.menu}
+          aria-label={t.header.menu}
+        >
+          <Menu className="h-4 w-4 lg:h-5 lg:w-5" style={{ color: header.menuButtonColor || "var(--foreground)" }} />
+        </Button>
+      )}
+    </>
+  )
+
+  // Logo de escritorio: banda de altura fija compartida por las 3 variantes para que
+  // logos horizontales, verticales o cuadrados quepan sin alterar la altura del header.
+  // La altura de la banda y la imagen siempre coinciden para que cada variante pueda
+  // elegir su propio tamaño (classic es más grande que compact/centered) sin max-h-full.
+  const renderDesktopLogo = (heightClass: string, maxWidthClass: string = "max-w-[160px]") => (
+    <Link href="/" className={cn("flex flex-shrink-0 items-center", heightClass)}>
+      <Image
+        src={logoSrc}
+        alt="Osoria Logo"
+        width={160}
+        height={48}
+        className={cn("object-contain w-auto", heightClass, maxWidthClass)}
+        priority
+      />
+    </Link>
+  )
+
+  // Enlaces de categorías, compartidos por las 3 variantes. El mega-menu (hover/foco) sólo
+  // se activa cuando `withMegaMenu` es true (variante classic); compact y centered son enlaces planos.
+  // `linkTextClass` permite que classic/centered usen un texto más grande sin agrandar compact,
+  // que necesita mantenerse denso al ser una sola fila.
+  const renderCategoryLinks = (navClassName: string, withMegaMenu: boolean, linkTextClass: string = "text-sm") => (
+    <nav className={navClassName}>
+      {categories.map((category) => {
+        const categorySlug = generateCategorySlug(category.category_name)
+        return (
+          <Link
+            key={category.id}
+            href={`/catalog/${categorySlug}`}
+            className={cn(linkTextClass, "font-inter font-medium tracking-wide transition-opacity hover:opacity-70")}
+            style={{ color: header.linkColor || "var(--foreground)" }}
+            {...(withMegaMenu
+              ? {
+                  onMouseEnter: () => openMegaMenu(category.id),
+                  onFocus: () => openMegaMenu(category.id),
+                }
+              : {})}
+          >
+            {category.category_name}
+          </Link>
+        )
+      })}
+    </nav>
+  )
+
+  // Área de categorías con mega-menu: envuelve el contenido de la fila en el manejo de hover/foco/Escape
+  // y superpone el panel del mega-menu de la categoría abierta. Sólo usada por la variante classic.
+  // Todas las categorías se montan de una vez (ocultas salvo la abierta) para precargar el producto
+  // destacado de cada una y que el flyout aparezca instantáneo al pasar el mouse.
+  const renderCategoryNavArea = (
+    rowContent: React.ReactNode,
+    wrapperClassName: string,
+  ) => (
+    <div
+      className={wrapperClassName}
+      onMouseLeave={closeMegaMenu}
+      onBlur={handleMegaMenuAreaBlur}
+      onKeyDown={handleMegaMenuAreaKeyDown}
+      data-testid="header-nav-row"
+    >
+      {rowContent}
+
+      {categories.map((category) => (
+        <div
+          key={category.id}
+          className={cn(
+            "absolute left-1/2 top-full z-40 w-screen -translate-x-1/2 pt-2",
+            category.id === openMegaMenuCategoryId ? "block" : "hidden",
+          )}
+        >
+          <div className="container mx-auto px-4">
+            <HeaderMegaMenu
+              categoryName={category.category_name}
+              categoryHref={`/catalog/${generateCategorySlug(category.category_name)}`}
+              description={header.megaMenuDescription}
+              viewAllText={header.viewAllText}
+              featuredProductId={categoryFeaturedProductId[category.id] ?? null}
+              bgColor={header.megaMenuBgColor}
+              textColor={header.megaMenuTextColor}
+              featuredBgColor={header.megaMenuFeaturedBgColor}
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+
   return (
-    <header 
-      className="sticky top-0 z-50 w-full border-b" 
-      style={{ 
-        backgroundColor: styleData.bgColor || "var(--background)", 
+    <header
+      className={cn(
+        "w-full z-50 border-b",
+        stickyMode !== "none" && "sticky top-0",
+        stickyMode === "smart" && "transition-transform duration-300 will-change-transform",
+        stickyMode === "smart" && (isHeaderScrollHidden ? "-translate-y-full" : "translate-y-0"),
+      )}
+      style={{
+        backgroundColor: header.bgColor || "var(--background)", 
         borderColor: "var(--border)",
         // Asegurar que el header use el color de fondo del tema
       }}
     >
-      <div className="container mx-auto px-4 py-3 md:py-6">
-        {/* Desktop y Tablet: Layout completo */}
-        <div className="hidden md:flex items-center justify-between gap-3 lg:gap-6 mb-4 relative">
-          {/* Logo - Izquierda */}
-          <Link href="/" className="flex items-center flex-shrink-0 z-10">
-            <Image 
-              src={logoSrc}
-              alt="Osoria Logo"
-              width={120}
-              height={40}
-              className="object-contain w-auto h-8 lg:h-10"
-              priority
-            />
-          </Link>
-
-          {/* Botón de menú - Izquierda después del logo */}
-          <Button
-            variant="ghost"
-            className="h-9 lg:h-10 pl-2 pr-3 lg:pr-4 rounded-full gap-1.5 flex-shrink-0 z-10"
-            style={{ backgroundColor: "transparent" }}
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = styleData.menuButtonHoverBg || "var(--muted)"}
-            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
-            onClick={() => setMenuOpen(true)}
-            title={t.header.menu}
+      {showPromoBar && (
+        <div
+          className={cn(
+            "relative flex items-center justify-center px-4 py-2 text-center text-xs sm:text-sm font-medium",
+            layoutVariant === "compact" ? "flex" : "md:hidden",
+          )}
+          style={{
+            backgroundColor: header.bannerBgColor || "var(--secondary)",
+            color: header.bannerTextColor || "var(--primary)",
+          }}
+        >
+          <span className="pr-6">{header.tagline}</span>
+          <button
+            type="button"
+            onClick={handleDismissPromoBar}
+            aria-label="Cerrar promoción"
+            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 hover:opacity-70 transition-opacity"
+            style={{ color: header.bannerTextColor || "var(--primary)" }}
           >
-            <Menu className="h-4 w-4 lg:h-5 lg:w-5" style={{ color: styleData.menuButtonColor || "var(--foreground)" }} />
-            <span className="text-sm lg:text-[15px] font-medium hidden lg:inline" style={{ color: styleData.menuButtonColor || "var(--foreground)" }}>{t.header.menu}</span>
-          </Button>
-
-          {/* Barra de búsqueda - Centro (responsive) */}
-          <form 
-            className="flex-1 max-w-md lg:max-w-xl mx-2 lg:mx-4 relative search-container"
-            onSubmit={handleSearch}
-          >
-            <div className="relative">
-              <Search className="absolute left-3 lg:left-4 top-1/2 -translate-y-1/2 h-3.5 w-3.5 lg:h-4 lg:w-4 z-10 pointer-events-none" style={{ color: styleData.searchIconColor || "var(--muted-foreground)" }} />
-              <Input
-                type="search"
-                placeholder={t.header.searchPlaceholder}
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value)
-                  if (e.target.value.trim().length >= 2) {
-                    setShowSuggestions(true)
-                  }
-                }}
-                onKeyDown={handleSearchKeyDown}
-                onFocus={() => {
-                  if (searchQuery.trim().length >= 2 && searchSuggestions.length > 0) {
-                    setShowSuggestions(true)
-                  }
-                }}
-                className="pl-10 lg:pl-14 pr-4 h-9 lg:h-10 rounded-full w-full font-inter font-medium text-sm lg:text-base border"
-                style={{
-                  backgroundColor: styleData.searchBgColor || "var(--muted)",
-                  borderColor: styleData.searchBorderColor || "var(--border)",
-                  color: styleData.searchTextColor || "var(--foreground)",
-                  paddingLeft: "2.5rem",
-                }}
-              />
-              <Button
-                type="submit"
-                variant="ghost"
-                size="icon"
-                className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 lg:h-8 lg:w-8 rounded-full hover:bg-transparent"
-                style={{ backgroundColor: "transparent" }}
-                onClick={handleSearch}
-                title={t.header.search}
-              >
-                <Search className="h-3.5 w-3.5 lg:h-4 lg:w-4" style={{ color: styleData.searchIconColor || "var(--muted-foreground)" }} />
-              </Button>
-
-              {/* Dropdown de sugerencias */}
-              {showSuggestions && searchQuery.trim().length >= 2 && (
-                <div 
-                  className="absolute top-full left-0 right-0 mt-2 bg-background border rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto"
-                  style={{
-                    borderColor: "var(--border)",
-                    backgroundColor: "var(--background)",
-                  }}
-                >
-                  {isSearching ? (
-                    <div className="p-4 text-center text-sm" style={{ color: "var(--muted-foreground)" }}>
-                      Buscando...
-                    </div>
-                  ) : searchSuggestions.length > 0 ? (
-                    <>
-                      <div className="p-2 border-b" style={{ borderColor: "var(--border)" }}>
-                        <p className="text-xs font-medium px-2" style={{ color: "var(--muted-foreground)" }}>
-                          Productos sugeridos
-                        </p>
-                      </div>
-                      {searchSuggestions.map((suggestion) => (
-                        <button
-                          key={suggestion.id}
-                          type="button"
-                          onClick={() => handleSelectSuggestion(suggestion.slug)}
-                          className="w-full flex items-center gap-3 p-3 hover:bg-muted transition-colors text-left"
-                          style={{ 
-                            backgroundColor: "transparent",
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = "var(--muted)"
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = "transparent"
-                          }}
-                        >
-                          {suggestion.image ? (
-                            <img 
-                              src={suggestion.image} 
-                              alt={suggestion.title}
-                              className="w-12 h-12 object-cover rounded"
-                              onError={(e) => {
-                                e.currentTarget.src = "/placeholder.svg"
-                              }}
-                            />
-                          ) : (
-                            <div 
-                              className="w-12 h-12 rounded flex items-center justify-center"
-                              style={{ backgroundColor: "var(--muted)" }}
-                            >
-                              <Search className="h-5 w-5" style={{ color: "var(--muted-foreground)" }} />
-                            </div>
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate" style={{ color: "var(--foreground)" }}>
-                              {suggestion.title}
-                            </p>
-                          </div>
-                        </button>
-                      ))}
-                      <div className="p-2 border-t" style={{ borderColor: "var(--border)" }}>
-                        <button
-                          type="button"
-                          onClick={handleSearch}
-                          className="w-full text-sm font-medium text-center py-2 hover:underline"
-                          style={{ color: "var(--primary)" }}
-                        >
-                          {t.header.viewAllResults.replace('{query}', searchQuery)}
-                        </button>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="p-4 text-center text-sm" style={{ color: "var(--muted-foreground)" }}>
-                      {t.header.noProductsFound}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </form>
-
-          {/* Iconos de acción - Derecha */}
-          <div className="flex items-center gap-1.5 lg:gap-2 flex-shrink-0 z-10">
-            {isAuthenticated ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    className="h-9 lg:h-10 px-2.5 lg:px-4 rounded-full gap-1.5 lg:gap-2"
-                    style={{ backgroundColor: "transparent" }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = styleData.loginButtonHoverBg || "var(--muted)"}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
-                  >
-                    <User className="h-4 w-4 lg:h-5 lg:w-5" style={{ color: styleData.loginButtonColor || "var(--foreground)" }} />
-                    <span className="text-xs lg:text-sm xl:text-base font-medium hidden xl:inline truncate max-w-[150px]" style={{ color: styleData.loginButtonColor || "var(--foreground)" }}>
-                      {user?.role === 'admin' 
-                        ? t.nav.admin
-                        : user?.first_name && user?.last_name 
-                          ? `${user.first_name} ${user.last_name}`
-                          : user?.email?.split('@')[0] || t.nav.account}
-                    </span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" style={{ backgroundColor: "var(--background)", borderColor: "var(--border)" }}>
-                  <DropdownMenuLabel style={{ color: "var(--foreground)" }}>
-                    {user?.role === 'admin' 
-                      ? "Administrador"
-                      : user?.first_name && user?.last_name 
-                        ? `${user.first_name} ${user.last_name}`
-                        : user?.email || "Usuario"}
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator style={{ backgroundColor: "var(--border)" }} />
-                  {user?.role === 'admin' && (
-                    <>
-                      <DropdownMenuItem asChild style={{ color: "var(--foreground)" }}>
-                        <Link href="/dashboard">
-                          <LayoutDashboard className="mr-2 h-4 w-4" />
-                          {t.nav.dashboard}
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem asChild style={{ color: "var(--foreground)" }}>
-                        <Link href="/admin">
-                          <Edit className="mr-2 h-4 w-4" />
-                          {t.admin.pageEditor}
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator style={{ backgroundColor: "var(--border)" }} />
-                    </>
-                  )}
-                  <DropdownMenuItem
-                    onClick={async () => {
-                      // Guardar si el usuario es administrador antes de cerrar sesión
-                      const wasAdmin = user?.role === 'admin'
-                      const wasOnAdminPage = pathname === '/admin' || pathname === '/dashboard'
-                      
-                      await logout()
-                      
-                      // Si era administrador, redirigir a la página principal
-                      if (wasAdmin && wasOnAdminPage) {
-                        router.push('/')
-                      }
-                      
-                      toast.success(t.header.sessionClosed, {
-                        description: t.header.sessionClosedDescription,
-                        duration: 3000,
-                      })
-                    }}
-                    style={{ color: "var(--foreground)" }}
-                  >
-                    <LogOut className="mr-2 h-4 w-4" />
-                    {t.auth.logout}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              <Button 
-                variant="ghost" 
-                className="h-9 lg:h-10 px-2.5 lg:px-4 rounded-full gap-1.5 lg:gap-2"
-                style={{ backgroundColor: "transparent" }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = styleData.loginButtonHoverBg || "var(--muted)"}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
-                onClick={() => setLoginModalOpen(true)}
-                title={t.auth.login}
-              >
-                <LogIn className="h-4 w-4 lg:h-5 lg:w-5" style={{ color: styleData.loginButtonColor || "var(--foreground)" }} />
-                <span className="text-xs lg:text-sm xl:text-base font-medium hidden xl:inline" style={{ color: styleData.loginButtonColor || "var(--foreground)" }}>{t.auth.login}</span>
-              </Button>
-            )}
-            <Button
-              variant="ghost" 
-              size="icon" 
-              className="h-9 w-9 lg:h-10 lg:w-10 rounded-full touch-manipulation relative flex-shrink-0"
-              style={{ 
-                backgroundColor: "transparent",
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = styleData.iconHoverBg || "var(--muted)"}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
-              onClick={() => router.push('/wishlist')}
-              title={t.nav.wishlist}
-            >
-              <Heart className="h-4 w-4 lg:h-5 lg:w-5" style={{ color: styleData.iconColor || "var(--foreground)" }} />
-              {getWishlistTotalItems() > 0 && (
-                <span
-                  className="absolute -top-1 -right-1 h-4 w-4 lg:h-5 lg:w-5 rounded-full flex items-center justify-center text-[10px] lg:text-xs font-bold text-white"
-                  style={{ backgroundColor: "var(--primary)" }}
-                >
-                  {getWishlistTotalItems() > 99 ? '99+' : getWishlistTotalItems()}
-                </span>
-              )}
-            </Button>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="h-9 w-9 lg:h-10 lg:w-10 rounded-full touch-manipulation relative flex-shrink-0"
-              style={{ 
-                backgroundColor: "transparent",
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = styleData.iconHoverBg || "var(--muted)"}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
-              onClick={() => setCartOpen(true)}
-              title={t.nav.cart}
-            >
-              <ShoppingCart className="h-4 w-4 lg:h-5 lg:w-5" style={{ color: styleData.iconColor || "var(--foreground)" }} />
-              {getTotalItems() > 0 && (
-                <span
-                  className="absolute -top-1 -right-1 h-4 w-4 lg:h-5 lg:w-5 rounded-full flex items-center justify-center text-[10px] lg:text-xs font-bold text-white"
-                  style={{ backgroundColor: "var(--primary)" }}
-                >
-                  {getTotalItems() > 99 ? '99+' : getTotalItems()}
-                </span>
-              )}
-            </Button>
-          </div>
+            <X className="h-3.5 w-3.5" />
+          </button>
         </div>
+      )}
+      <div
+        className={cn(
+          "container mx-auto px-4 py-3",
+          // classic es más compacto en escritorio: dos filas + un solo divisor no necesitan
+          // el mismo aire vertical que las variantes de una sola fila.
+          layoutVariant === "classic" ? "md:py-3" : "md:py-6",
+        )}
+      >
+        {/* Desktop y Tablet: variante "classic" (referencia, 2 filas: utilidad + navegación) */}
+        {layoutVariant === "classic" && (
+          <div className="hidden md:flex flex-col gap-2" data-testid="header-desktop-classic">
+            {/* Fila de utilidad: 3 zonas iguales (promo / búsqueda / iconos) para que la
+                búsqueda quede centrada sin importar si la promo está presente o cerrada. */}
+            <div className="relative grid grid-cols-3 items-center gap-3 lg:gap-6" data-testid="header-row">
+              <div className="flex justify-start">{renderPromoPill()}</div>
+              {renderDesktopSearchForm("mx-auto w-full max-w-md lg:max-w-xl relative search-container")}
+              <div className="flex items-center justify-end gap-1.5 lg:gap-2 z-10">
+                {renderActionIcons()}
+              </div>
+            </div>
+
+            {renderCategoryNavArea(
+              <div className="flex items-center justify-between gap-3 lg:gap-6" data-testid="header-row">
+                {renderDesktopLogo("h-11 lg:h-14", "max-w-[180px]")}
+                {renderCategoryLinks("flex items-center gap-6 lg:gap-8", true, "text-base lg:text-[17px]")}
+              </div>,
+              "relative",
+            )}
+          </div>
+        )}
+
+        {/* Desktop y Tablet: variante "compact" (una sola fila densa, enlaces planos sin mega-menu) */}
+        {layoutVariant === "compact" && (
+          <div className="hidden md:flex flex-col gap-2 mb-4" data-testid="header-desktop-compact">
+            <div className="flex items-center gap-3 lg:gap-6" data-testid="header-row">
+              {renderDesktopLogo("h-10 lg:h-12")}
+              {renderCategoryLinks("flex items-center gap-4 lg:gap-8 flex-shrink-0", false)}
+              {renderDesktopSearchForm("flex-1 max-w-sm lg:max-w-md mx-2 lg:mx-4 relative search-container")}
+              <div className="flex items-center gap-1.5 lg:gap-2 flex-shrink-0">
+                {renderActionIcons()}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Desktop y Tablet: variante "centered" (logo y navegación centrados, enlaces planos sin mega-menu) */}
+        {layoutVariant === "centered" && (
+          <div className="hidden md:flex flex-col gap-3 mb-4" data-testid="header-desktop-centered">
+            <div className="grid grid-cols-3 items-center gap-3 lg:gap-6" data-testid="header-row">
+              <div className="flex items-center gap-3 justify-start">
+                {renderPromoPill()}
+                {renderDesktopSearchForm("flex-1 max-w-xs relative search-container")}
+              </div>
+              <div className="flex justify-center">
+                {renderDesktopLogo("h-10 lg:h-12")}
+              </div>
+              <div className="flex items-center justify-end gap-1.5 lg:gap-2">
+                {renderActionIcons()}
+              </div>
+            </div>
+
+            <div className="flex justify-center">
+              <div className="flex justify-center" data-testid="header-row">
+                {renderCategoryLinks("flex items-center justify-center gap-6 lg:gap-8", false, "text-base lg:text-[17px]")}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Móvil: Layout optimizado */}
         <div className="md:hidden flex flex-col gap-3 mb-4">
           {/* Primera fila: Logo, iconos de acción */}
           <div className="flex items-center justify-between gap-2">
-            <Link href="/" className="flex items-center flex-shrink-0">
-              <Image 
+            <Link href="/" className="flex h-7 sm:h-8 items-center flex-shrink-0">
+              <Image
                 src={logoSrc}
                 alt="Osoria Logo"
                 width={100}
                 height={33}
-                className="object-contain h-7 sm:h-8"
+                className="object-contain w-auto h-7 sm:h-8 max-w-[120px]"
                 priority
               />
             </Link>
@@ -619,11 +834,11 @@ export function Header() {
                       size="icon"
                       className="h-10 w-10 rounded-full touch-manipulation"
                       style={{ backgroundColor: "transparent" }}
-                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = styleData.loginButtonHoverBg || "var(--muted)"}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = header.loginButtonHoverBg || "var(--muted)"}
                       onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
                       title={user?.role === 'admin' ? t.nav.admin : t.nav.account}
                     >
-                      <User className="h-4 w-4" style={{ color: styleData.loginButtonColor || "var(--foreground)" }} />
+                      <User className="h-4 w-4" style={{ color: header.loginButtonColor || "var(--foreground)" }} />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" style={{ backgroundColor: "var(--background)", borderColor: "var(--border)" }}>
@@ -681,65 +896,41 @@ export function Header() {
                   size="icon"
                   className="h-10 w-10 rounded-full touch-manipulation"
                   style={{ backgroundColor: "transparent" }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = styleData.loginButtonHoverBg || "var(--muted)"}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = header.loginButtonHoverBg || "var(--muted)"}
                   onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
                   onClick={() => setLoginModalOpen(true)}
                   title={t.auth.login}
                 >
-                  <LogIn className="h-4.5 w-4.5" style={{ color: styleData.loginButtonColor || "var(--foreground)" }} />
+                  <LogIn className="h-4.5 w-4.5" style={{ color: header.loginButtonColor || "var(--foreground)" }} />
                 </Button>
               )}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-10 w-10 rounded-full touch-manipulation relative flex-shrink-0"
-                style={{ backgroundColor: "transparent" }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = styleData.iconHoverBg || "var(--muted)"}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
-                onClick={() => router.push('/wishlist')}
-                title={t.nav.wishlist}
-              >
-                <Heart className="h-4 w-4" style={{ color: styleData.iconColor || "var(--foreground)" }} />
-                {getWishlistTotalItems() > 0 && (
-                  <span
-                    className="absolute -top-1 -right-1 h-4 w-4 rounded-full flex items-center justify-center text-[10px] font-bold text-white"
-                    style={{ backgroundColor: "var(--primary)" }}
-                  >
-                    {getWishlistTotalItems() > 99 ? '99+' : getWishlistTotalItems()}
-                  </span>
-                )}
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-10 w-10 rounded-full relative touch-manipulation flex-shrink-0"
-                style={{ backgroundColor: "transparent" }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = styleData.iconHoverBg || "var(--muted)"}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
-                onClick={() => setCartOpen(true)}
-                title={t.nav.cart}
-              >
-                <ShoppingCart className="h-4 w-4" style={{ color: styleData.iconColor || "var(--foreground)" }} />
-                {getTotalItems() > 0 && (
-                  <span
-                    className="absolute -top-1 -right-1 h-4 w-4 rounded-full flex items-center justify-center text-[10px] font-bold text-white"
-                    style={{ backgroundColor: "var(--primary)" }}
-                  >
-                    {getTotalItems() > 99 ? '99+' : getTotalItems()}
-                  </span>
-                )}
-              </Button>
+              {renderBadgeIconButton({
+                icon: <Heart className="h-4 w-4" style={{ color: header.iconColor || "var(--foreground)" }} />,
+                count: getWishlistTotalItems(),
+                onClick: () => router.push('/wishlist'),
+                title: t.nav.wishlist,
+                buttonClassName: "h-10 w-10 rounded-full touch-manipulation relative flex-shrink-0",
+                badgeClassName: "absolute -top-1 -right-1 h-4 w-4 rounded-full flex items-center justify-center text-[10px] font-bold text-white",
+              })}
+              {renderBadgeIconButton({
+                icon: <ShoppingCart className="h-4 w-4" style={{ color: header.iconColor || "var(--foreground)" }} />,
+                count: getTotalItems(),
+                onClick: () => setCartOpen(true),
+                title: t.nav.cart,
+                buttonClassName: "h-10 w-10 rounded-full relative touch-manipulation flex-shrink-0",
+                badgeClassName: "absolute -top-1 -right-1 h-4 w-4 rounded-full flex items-center justify-center text-[10px] font-bold text-white",
+              })}
               <Button
                 variant="ghost"
                 size="icon"
                 className="h-10 w-10 rounded-full touch-manipulation flex-shrink-0"
                 style={{ backgroundColor: "transparent" }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = styleData.menuButtonHoverBg || "var(--muted)"}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = header.menuButtonHoverBg || "var(--muted)"}
                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
                 onClick={() => setMenuOpen(true)}
                 title={t.header.menu}
               >
-                <Menu className="h-4 w-4" style={{ color: styleData.menuButtonColor || "var(--foreground)" }} />
+                <Menu className="h-4 w-4" style={{ color: header.menuButtonColor || "var(--foreground)" }} />
               </Button>
             </div>
           </div>
@@ -750,7 +941,7 @@ export function Header() {
             onSubmit={handleSearch}
           >
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 z-10 pointer-events-none" style={{ color: styleData.searchIconColor || "var(--muted-foreground)" }} />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 z-10 pointer-events-none" style={{ color: header.searchIconColor || "var(--muted-foreground)" }} />
               <Input
                 type="search"
                 placeholder={t.header.searchPlaceholder}
@@ -769,9 +960,9 @@ export function Header() {
                 }}
                 className="pl-10 pr-10 h-10 rounded-full w-full text-sm border"
                 style={{
-                  backgroundColor: styleData.searchBgColor || "var(--muted)",
-                  borderColor: styleData.searchBorderColor || "var(--border)",
-                  color: styleData.searchTextColor || "var(--foreground)",
+                  backgroundColor: header.searchBgColor || "var(--muted)",
+                  borderColor: header.searchBorderColor || "var(--border)",
+                  color: header.searchTextColor || "var(--foreground)",
                   paddingLeft: "2.5rem",
                 }}
               />
@@ -784,119 +975,51 @@ export function Header() {
                 onClick={handleSearch}
                 title={t.header.search}
               >
-                <Search className="h-4 w-4" style={{ color: styleData.searchIconColor || "var(--muted-foreground)" }} />
+                <Search className="h-4 w-4" style={{ color: header.searchIconColor || "var(--muted-foreground)" }} />
               </Button>
 
               {/* Dropdown de sugerencias - Móvil */}
               {showSuggestions && searchQuery.trim().length >= 2 && (
-                <div 
-                  className="absolute top-full left-0 right-0 mt-2 bg-background border rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto"
-                  style={{
-                    borderColor: "var(--border)",
-                    backgroundColor: "var(--background)",
-                  }}
-                >
-                  {isSearching ? (
-                    <div className="p-4 text-center text-sm" style={{ color: "var(--muted-foreground)" }}>
-                      Buscando...
-                    </div>
-                  ) : searchSuggestions.length > 0 ? (
-                    <>
-                      <div className="p-2 border-b" style={{ borderColor: "var(--border)" }}>
-                        <p className="text-xs font-medium px-2" style={{ color: "var(--muted-foreground)" }}>
-                          Productos sugeridos
-                        </p>
-                      </div>
-                      {searchSuggestions.map((suggestion) => (
-                        <button
-                          key={suggestion.id}
-                          type="button"
-                          onClick={() => handleSelectSuggestion(suggestion.slug)}
-                          className="w-full flex items-center gap-3 p-3 hover:bg-muted transition-colors text-left"
-                          style={{ 
-                            backgroundColor: "transparent",
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = "var(--muted)"
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = "transparent"
-                          }}
-                        >
-                          {suggestion.image ? (
-                            <img 
-                              src={suggestion.image} 
-                              alt={suggestion.title}
-                              className="w-12 h-12 object-cover rounded"
-                              onError={(e) => {
-                                e.currentTarget.src = "/placeholder.svg"
-                              }}
-                            />
-                          ) : (
-                            <div 
-                              className="w-12 h-12 rounded flex items-center justify-center"
-                              style={{ backgroundColor: "var(--muted)" }}
-                            >
-                              <Search className="h-5 w-5" style={{ color: "var(--muted-foreground)" }} />
-                            </div>
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate" style={{ color: "var(--foreground)" }}>
-                              {suggestion.title}
-                            </p>
-                          </div>
-                        </button>
-                      ))}
-                      <div className="p-2 border-t" style={{ borderColor: "var(--border)" }}>
-                        <button
-                          type="button"
-                          onClick={handleSearch}
-                          className="w-full text-sm font-medium text-center py-2 hover:underline"
-                          style={{ color: "var(--primary)" }}
-                        >
-                          {t.header.viewAllResults.replace('{query}', searchQuery)}
-                        </button>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="p-4 text-center text-sm" style={{ color: "var(--muted-foreground)" }}>
-                      {t.header.noProductsFound}
-                    </div>
-                  )}
-                </div>
+                <HeaderSearchSuggestions
+                  isSearching={isSearching}
+                  suggestions={searchSuggestions}
+                  searchQuery={searchQuery}
+                  onSelectSuggestion={handleSelectSuggestion}
+                  onViewAllResults={handleSearch}
+                  t={t}
+                />
               )}
             </div>
           </form>
         </div>
 
-        {/* Navegación eliminada - categorías y banner Big Sale removidos */}
       </div>
       <ThemeSelectorModal open={themeModalOpen} onOpenChange={setThemeModalOpen} />
       <FontSelectorModal open={fontModalOpen} onOpenChange={setFontModalOpen} />
       
       {/* Menú lateral */}
       <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
-        <SheetContent 
-          side="left" 
-          className="w-[300px] sm:w-[400px] p-0"
+        <SheetContent
+          side="left"
+          className="w-[300px] sm:w-[400px] p-0 flex flex-col"
           style={{ backgroundColor: "var(--background)" }}
         >
-          <SheetHeader className="p-6 border-b" style={{ borderColor: "var(--border)" }}>
+          <SheetHeader className="p-6 border-b flex-shrink-0" style={{ borderColor: "var(--border)" }}>
             <SheetTitle className="text-xl font-inter font-semibold" style={{ color: "var(--foreground)" }}>
               {t.header.menu}
             </SheetTitle>
             {/* Mensaje de bienvenida para usuarios autenticados - Solo en desktop */}
             {isAuthenticated && user && (
               <p className="hidden md:block text-base font-medium mt-4" style={{ color: "var(--foreground)" }}>
-                {user?.role === 'admin' 
+                {user?.role === 'admin'
                   ? t.header.welcomeAdmin
                   : t.header.welcome.replace('{name}', user.first_name || user.email.split('@')[0])}
               </p>
             )}
           </SheetHeader>
-          
-          <div className="flex flex-col h-full">
-            <div className="flex flex-col p-6 gap-4 flex-1">
+
+          <div className="flex flex-col flex-1 min-h-0">
+            <div className="flex flex-col p-6 gap-4 flex-1 min-h-0 overflow-y-auto">
               <Link
                 href="/"
                 className="text-base font-inter font-medium py-3 px-4 rounded-lg transition-colors"
@@ -997,7 +1120,7 @@ export function Header() {
             
             {/* Botones de tema y tipografía - Solo visibles para administradores */}
             {user?.role === 'admin' && (
-              <div className="pt-4 mt-auto border-t p-6" style={{ borderColor: "var(--border)" }}>
+              <div className="flex-shrink-0 border-t p-6" style={{ borderColor: "var(--border)" }}>
                 {/* Botón de tema - Oculto para subdominio reposteria */}
                 {store?.subdomain !== 'reposteria' && (
                   <Button

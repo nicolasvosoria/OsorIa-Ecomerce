@@ -1,7 +1,25 @@
-/* eslint-disable @next/next/no-img-element, jsx-a11y/alt-text -- Test-only next/image mock renders a native img. */
-import React from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  authApiMock,
+  cartContextMock,
+  checkoutOptionsDialogMock,
+  fontSelectorModalMock,
+  lucideReactMock,
+  nextImageMock,
+  nextLinkMock,
+  sonnerMock,
+  storeContextMock,
+  themeContextMock,
+  themeSelectorModalMock,
+  uiAlertDialogMock,
+  uiButtonMock,
+  uiDialogMock,
+  uiDropdownMenuMock,
+  uiInputMock,
+  uiSheetMock,
+  wishlistContextMock,
+} from "./_helpers/header-test-mocks";
 
 const routerPush = vi.hoisted(() => vi.fn());
 const searchParamsGet = vi.hoisted(() => vi.fn());
@@ -14,70 +32,23 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => ({ get: searchParamsGet }),
 }));
 
-vi.mock("next/image", () => ({ default: ({ priority: _priority, ...props }: React.ImgHTMLAttributes<HTMLImageElement> & { priority?: boolean }) => <img {...props} /> }));
-vi.mock("next/link", () => ({ default: ({ children, href, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { href: string }) => <a href={href} {...props}>{children}</a> }));
+vi.mock("next/image", () => nextImageMock);
+vi.mock("next/link", () => nextLinkMock);
 
-vi.mock("lucide-react", () => ({
-  Search: () => <span aria-hidden="true" />,
-  Heart: () => <span aria-hidden="true" />,
-  ShoppingCart: () => <span aria-hidden="true" />,
-  Palette: () => <span aria-hidden="true" />,
-  AlignLeft: () => <span aria-hidden="true" />,
-  Menu: () => <span aria-hidden="true" />,
-  LogIn: () => <span aria-hidden="true" />,
-  LogOut: () => <span aria-hidden="true" />,
-  User: () => <span aria-hidden="true" />,
-  Eye: () => <span aria-hidden="true" />,
-  EyeOff: () => <span aria-hidden="true" />,
-  CreditCard: () => <span aria-hidden="true" />,
-  Building2: () => <span aria-hidden="true" />,
-  Wallet: () => <span aria-hidden="true" />,
-  LayoutDashboard: () => <span aria-hidden="true" />,
-  Edit: () => <span aria-hidden="true" />,
-  Trash2: () => <span aria-hidden="true" />,
-  Plus: () => <span aria-hidden="true" />,
-  Minus: () => <span aria-hidden="true" />,
-}));
+vi.mock("lucide-react", () => lucideReactMock);
 
-vi.mock("@/components/ui/button", () => ({ Button: ({ children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) => <button {...props}>{children}</button> }));
-vi.mock("@/components/ui/input", () => ({ Input: (props: React.InputHTMLAttributes<HTMLInputElement>) => <input {...props} /> }));
-vi.mock("@/components/ui/sheet", () => ({
-  Sheet: ({ children }: React.PropsWithChildren) => <>{children}</>,
-  SheetContent: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
-  SheetHeader: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
-  SheetTitle: ({ children }: React.PropsWithChildren) => <h2>{children}</h2>,
-}));
-vi.mock("@/components/ui/dialog", () => ({
-  Dialog: ({ children, open }: React.PropsWithChildren<{ open?: boolean }>) => open ? <div role="dialog">{children}</div> : null,
-  DialogContent: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
-  DialogDescription: ({ children }: React.PropsWithChildren) => <p>{children}</p>,
-  DialogHeader: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
-  DialogTitle: ({ children }: React.PropsWithChildren) => <h2>{children}</h2>,
-}));
-vi.mock("@/components/ui/alert-dialog", () => ({
-  AlertDialog: ({ children }: React.PropsWithChildren) => <>{children}</>,
-  AlertDialogAction: ({ children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) => <button {...props}>{children}</button>,
-  AlertDialogCancel: ({ children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) => <button {...props}>{children}</button>,
-  AlertDialogContent: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
-  AlertDialogDescription: ({ children }: React.PropsWithChildren) => <p>{children}</p>,
-  AlertDialogFooter: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
-  AlertDialogHeader: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
-  AlertDialogTitle: ({ children }: React.PropsWithChildren) => <h2>{children}</h2>,
-}));
-vi.mock("@/components/ui/dropdown-menu", () => ({
-  DropdownMenu: ({ children }: React.PropsWithChildren) => <>{children}</>,
-  DropdownMenuContent: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
-  DropdownMenuItem: ({ children, ...props }: React.HTMLAttributes<HTMLDivElement>) => <div {...props}>{children}</div>,
-  DropdownMenuLabel: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
-  DropdownMenuSeparator: () => <hr />,
-  DropdownMenuTrigger: ({ children }: React.PropsWithChildren) => <>{children}</>,
-}));
+vi.mock("@/components/ui/button", () => uiButtonMock);
+vi.mock("@/components/ui/input", () => uiInputMock);
+vi.mock("@/components/ui/sheet", () => uiSheetMock);
+vi.mock("@/components/ui/dialog", () => uiDialogMock);
+vi.mock("@/components/ui/alert-dialog", () => uiAlertDialogMock);
+vi.mock("@/components/ui/dropdown-menu", () => uiDropdownMenuMock);
 
 vi.mock("@/contexts/styles-context", () => ({ useComponentStyle: (_name: string, defaults: Record<string, string>) => ({ styles: defaults }) }));
-vi.mock("@/contexts/theme-context", () => ({ useTheme: () => ({ activeTheme: null }) }));
-vi.mock("@/contexts/store-context", () => ({ useStore: () => ({ store: null }) }));
-vi.mock("@/contexts/cart-context", () => ({ useCart: () => ({ items: [], removeFromCart: vi.fn(), updateQuantity: vi.fn(), getTotal: () => 0, getItemSubtotal: () => 0, getTotalItems: () => 0 }) }));
-vi.mock("@/contexts/wishlist-context", () => ({ useWishlist: () => ({ getTotalItems: () => 0 }) }));
+vi.mock("@/contexts/theme-context", () => themeContextMock);
+vi.mock("@/contexts/store-context", () => storeContextMock);
+vi.mock("@/contexts/cart-context", () => cartContextMock);
+vi.mock("@/contexts/wishlist-context", () => wishlistContextMock);
 vi.mock("@/contexts/auth-context", () => ({ useAuth: () => ({ user: null, isAuthenticated: false, login: loginMock, register: vi.fn(), logout: vi.fn(), refreshUser: refreshUserMock }) }));
 vi.mock("@/contexts/language-context", () => ({
   useLanguage: () => ({
@@ -104,11 +75,11 @@ vi.mock("@/contexts/language-context", () => ({
     },
   }),
 }));
-vi.mock("@/components/theme/theme-selector-modal", () => ({ ThemeSelectorModal: () => null }));
-vi.mock("@/components/font/font-selector-modal", () => ({ FontSelectorModal: () => null }));
-vi.mock("@/components/cart/checkout-options-dialog", () => ({ CheckoutOptionsDialog: () => null }));
-vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
-vi.mock("@/lib/supabase/auth-api", () => ({ resetPassword: vi.fn() }));
+vi.mock("@/components/theme/theme-selector-modal", () => themeSelectorModalMock);
+vi.mock("@/components/font/font-selector-modal", () => fontSelectorModalMock);
+vi.mock("@/components/cart/checkout-options-dialog", () => checkoutOptionsDialogMock);
+vi.mock("sonner", () => sonnerMock);
+vi.mock("@/lib/supabase/auth-api", () => authApiMock);
 
 import { Header } from "@/components/layout/header";
 
