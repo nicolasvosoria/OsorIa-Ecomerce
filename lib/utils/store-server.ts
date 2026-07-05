@@ -3,8 +3,6 @@
  * Solo debe usarse en Server Components o Server Actions
  */
 
-import { normalizeRuntimeStoreId } from "@/lib/utils/store";
-
 /**
  * Obtiene el store_id del servidor usando headers y cookies de Next.js
  * SOLO funciona en Server Components o Server Actions
@@ -45,7 +43,3 @@ export async function getStoreIdServer(): Promise<string | null> {
   return "default";
 }
 
-export async function getRuntimeStoreIdServer(): Promise<string | null> {
-  const storeId = await getStoreIdServer();
-  return normalizeRuntimeStoreId(storeId);
-}

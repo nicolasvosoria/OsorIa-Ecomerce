@@ -3,7 +3,7 @@
 import { checkEnvs } from '@/lib/actions';
 import { SetupToolbar } from '@joycostudio/v0-setup';
 
-export const V0Setup = () => {
+const V0Setup = () => {
   return (
     <SetupToolbar
       title="V0 Ecommerce Setup"

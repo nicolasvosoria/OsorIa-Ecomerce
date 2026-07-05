@@ -56,10 +56,6 @@ export function normalizeComboSlug(value: string) {
     .replace(/^-+|-+$/g, '')
 }
 
-function generateSlug(name: string) {
-  return normalizeComboSlug(name)
-}
-
 function comboCategoryId(combo: any): string | null {
   const categoryId = combo?.category_id ?? combo?.metadata?.category_id
   return typeof categoryId === 'string' && categoryId.trim() ? categoryId.trim() : null

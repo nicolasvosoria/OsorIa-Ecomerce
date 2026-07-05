@@ -6,20 +6,6 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatPrice(amount: string | number, currencyCode: string) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: currencyCode,
-  }).format(Number(amount));
-}
-
-export function createUrl(pathname: string, params: URLSearchParams | string) {
-  const paramsString = params?.toString();
-  const queryString = `${paramsString.length ? '?' : ''}${paramsString}`;
-
-  return `${pathname}${queryString}`;
-}
-
 export function getColorHex(colorName: string): string | [string, string] {
   const lowerColorName = colorName.toLowerCase();
 
@@ -39,7 +25,3 @@ export function getColorHex(colorName: string): string | [string, string] {
   return '#666666';
 }
 
-export const getLabelPosition = (index: number): 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' => {
-  const positions = ['top-left', 'bottom-right', 'top-right', 'bottom-left'] as const;
-  return positions[index % positions.length];
-};

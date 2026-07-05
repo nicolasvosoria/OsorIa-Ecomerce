@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react"
 import { deferStateUpdate } from "@/lib/react/defer-state-update"
 
-export interface WishlistItem {
+interface WishlistItem {
   id: string
   title: string
   handle: string

@@ -166,7 +166,7 @@ export function VariantOptionSelector({ option, variant, product }: VariantOptio
   );
 }
 
-export const useSelectedOptions = (product: Product): Record<string, string> => {
+const useSelectedOptions = (product: Product): Record<string, string> => {
   const { options } = product;
   const searchParams = useSearchParams();
 

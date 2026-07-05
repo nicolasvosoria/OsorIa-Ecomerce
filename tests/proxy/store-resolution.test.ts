@@ -1,4 +1,12 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+  type MockInstance,
+} from "vitest";
 import { NextRequest } from "next/server";
 
 const defaultStore = {
@@ -44,7 +52,7 @@ function mockStoreFetch() {
 
 describe("proxy store resolution", () => {
   let fetchMock: ReturnType<typeof mockStoreFetch>;
-  let errorSpy: ReturnType<typeof vi.spyOn>;
+  let errorSpy: MockInstance;
 
   beforeEach(() => {
     vi.resetModules();

@@ -3,10 +3,10 @@ import type { CommerceProductPrice } from "@/lib/types/products"
 const DEFAULT_PRICE_LOCALE = "es-CO"
 const DEFAULT_CURRENCY = "COP"
 
-export const INVALID_COMPARE_AT_PRICE_NOTICE =
+const INVALID_COMPARE_AT_PRICE_NOTICE =
   "El precio anterior debe ser mayor al precio de venta actual para mostrar descuento. Se guardará sin precio tachado."
 
-export function parseProductPrice(value: number | string | null | undefined): number | null {
+function parseProductPrice(value: number | string | null | undefined): number | null {
   if (value === null || value === undefined || value === "") return null
 
   const numericValue = typeof value === "number" ? value : Number.parseFloat(value)

@@ -22,7 +22,7 @@ function formatMoney(amount: number, currencyCode: string = 'COP'): Money {
   };
 }
 
-export function normalizeCommercePrice(
+function normalizeCommercePrice(
   amount: number,
   currencyCode: string = 'COP',
   compareAtAmount?: number | null,

@@ -13,7 +13,7 @@ import React, {
 } from 'react';
 import * as CartActions from '@/components/cart/actions';
 
-export type UpdateType = 'plus' | 'minus' | 'delete';
+type UpdateType = 'plus' | 'minus' | 'delete';
 
 type CartAction =
   | {

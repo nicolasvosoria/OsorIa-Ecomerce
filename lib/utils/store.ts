@@ -6,8 +6,6 @@
  * IMPORTANTE: Durante build time (generateStaticParams, etc.), retorna null
  * para evitar errores. Las funciones que usen esto deben manejar el caso null.
  */
-import { resolveStoreLookupSubdomain } from "@/lib/utils/store-host";
-
 const SYMBOLIC_DEFAULT_STORE_ID = "default";
 
 export function normalizeRuntimeStoreId(
@@ -89,7 +87,7 @@ export async function getStoreId(): Promise<string | null> {
 /**
  * Obtiene el store_id de forma síncrona (solo cliente)
  */
-export function getStoreIdSync(): string | null {
+function getStoreIdSync(): string | null {
   // Si multi-tenant está deshabilitado, retornar store_id por defecto
   const disableMultiTenant =
     process.env.NEXT_PUBLIC_DISABLE_SUBDOMAIN_MULTI_TENANT === "true";
@@ -119,13 +117,3 @@ export function getRuntimeStoreIdSync(): string | null {
   return normalizeRuntimeStoreId(getStoreIdSync());
 }
 
-/**
- * Obtiene el subdominio del hostname actual
- */
-export function getSubdomain(): string | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  return resolveStoreLookupSubdomain(window.location.hostname);
-}

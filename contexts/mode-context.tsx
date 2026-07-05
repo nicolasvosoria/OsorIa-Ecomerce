@@ -27,7 +27,7 @@ import { deferStateUpdate } from "@/lib/react/defer-state-update";
  * the resolved axis `applyRuntimeTheme` renders): `"system"` is a preference
  * that resolves to one of those two via `matchMedia`.
  */
-export type ModePreference = "light" | "dark" | "system";
+type ModePreference = "light" | "dark" | "system";
 
 const ACTIVE_THEME_STORAGE_KEY = "osoria_active_theme";
 

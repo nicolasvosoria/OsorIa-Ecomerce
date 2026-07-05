@@ -249,19 +249,3 @@ export type CartItem = {
 
 export type CartProduct = Product;
 
-// Menu and page types for static content
-export type Menu = {
-  title: string;
-  path: string;
-};
-
-export type Page = {
-  id: string;
-  title: string;
-  handle: string;
-  body: string;
-  bodySummary: string;
-  seo?: SEO;
-  createdAt: string;
-  updatedAt: string;
-};

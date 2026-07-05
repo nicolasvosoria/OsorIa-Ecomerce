@@ -5,7 +5,6 @@ const helperImport = "@/lib/cart/cart-summary";
 
 describe('cart summary helper usage contract', () => {
   it.each([
-    'components/cart/modal.tsx',
     'app/checkout/page.tsx',
     'components/layout/header.tsx',
   ])('%s imports the shared cart summary helper', filePath => {

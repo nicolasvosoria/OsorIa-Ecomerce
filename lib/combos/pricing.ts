@@ -7,9 +7,7 @@ import type {
   ComboPricingTrace,
 } from './types'
 
-export const COMBO_DISCOUNT_TYPES = ['percentage', 'fixed_cop'] as const satisfies readonly ComboDiscountType[]
-
-export function clampComboDiscount(
+function clampComboDiscount(
   subtotal: number,
   discount: ComboDiscountConfig,
 ): { discountType: ComboDiscountType; discountValue: number; discountAmount: number } {

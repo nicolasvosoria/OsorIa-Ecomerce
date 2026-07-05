@@ -2,7 +2,7 @@
  * Obtiene la URL base de la aplicación
  * Funciona tanto en desarrollo como en producción (Vercel)
  */
-export function getBaseUrl(): string {
+function getBaseUrl(): string {
   // En el cliente, usar window.location.origin
   if (typeof window !== 'undefined') {
     return window.location.origin

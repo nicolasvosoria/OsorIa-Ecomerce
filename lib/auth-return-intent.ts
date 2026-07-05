@@ -1,6 +1,6 @@
 import type { UserProfile } from "@/lib/types/user";
 
-export const AUTH_CONFIRMATION_SUCCESS_PATH = "/auth/cuenta-confirmada";
+const AUTH_CONFIRMATION_SUCCESS_PATH = "/auth/cuenta-confirmada";
 export const ADMIN_ACCESS_DENIED_PATH = "/?admin_access=denied";
 
 export type AuthReturnUser = Pick<UserProfile, "role"> | null | undefined;
