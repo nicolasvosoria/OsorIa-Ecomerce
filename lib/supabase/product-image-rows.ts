@@ -1,4 +1,4 @@
-const PRODUCT_IMAGE_TYPE = 'product'
+const PRODUCT_IMAGE_TYPE = 'product' as const
 
 export type ProductImageInput = {
   primary_image_url?: string | null
@@ -37,7 +37,7 @@ export function buildProductImageRows(
     ...additionalImages
       .map((url) => url.trim())
       .filter(Boolean)
-      .map((url, index) => ({
+      .map((url, index): ProductImageRow => ({
         item_id: itemId,
         image_url: url,
         image_alt: `${itemName} - Imagen ${index + 2}`,

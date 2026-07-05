@@ -22,11 +22,16 @@ import { resolveHeroColors, resolveHeroShellProps } from "./hero/hero-view-model
 
 const HERO_STYLE_FALLBACKS = {
   label: "Electronics",
-  title: "BALFE",
-  subtitle: "NUEVO MODELO",
+  title: "Smarthome Speaker",
+  subtitle: "",
   description:
-    "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua",
-  buttonText: "Comprar ahora",
+    "It won’t be a bigger problem to find one video game lover in your neighbor",
+  buttonText: "Buy now",
+  layoutMode: "full-image",
+  backgroundMode: "stage",
+  fullImageContentAlign: "left",
+  imagePositionY: "bottom",
+  buttonColor: "#33d17a",
 } satisfies HeroStyleInput;
 
 export function HeroBanner() {

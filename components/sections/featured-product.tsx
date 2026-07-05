@@ -14,10 +14,10 @@ export const FEATURED_DEFAULTS = {
   linkText: "Ver todos los productos",
   linkHref: "/shop",
   mainImage: "/woman-wearing-headphones-smiling.jpg",
-  bgColor: "#b8fff5",
-  textColor: "var(--secondary-foreground)",
-  cardBgColor: "var(--card)",
-  productBgColor: "var(--background)",
+  bgColor: "",
+  textColor: "",
+  cardBgColor: "",
+  productBgColor: "",
 }
 
 export function FeaturedProduct() {
@@ -26,6 +26,11 @@ export function FeaturedProduct() {
 
   const edits = componentEdits.get("featured") || {}
   const featured = { ...FEATURED_DEFAULTS, ...styleData, ...edits }
+
+  const panelBg = featured.bgColor || "var(--sec-featured-bg)"
+  const cardBg = featured.cardBgColor || "var(--sec-featured-card-bg)"
+  const productBg = featured.productBgColor || "var(--sec-featured-product-bg)"
+  const textColor = featured.textColor || "var(--sec-featured-text)"
 
   const { card } = useHydratedProductCard(featured.productId)
   const originalPrice =
@@ -37,14 +42,14 @@ export function FeaturedProduct() {
     // que flota encima del fondo.
     <section
       data-component="featured"
-      className="relative overflow-hidden rounded-2xl md:rounded-3xl mx-2 md:mx-4 my-4 md:my-8 flex items-center min-h-[480px] md:min-h-[560px] lg:min-h-[600px]"
+      className="relative overflow-hidden rounded-[var(--card-radius,1.5rem)] mx-2 md:mx-4 my-4 md:my-8 flex items-center min-h-[480px] md:min-h-[560px] lg:min-h-[600px]"
       style={{
-        backgroundColor: featured.bgColor,
+        backgroundColor: panelBg,
         backgroundImage: `url(${featured.mainImage || "/placeholder.svg"})`,
         backgroundRepeat: "no-repeat",
         backgroundPosition: "15% bottom",
         backgroundSize: "contain",
-        color: featured.textColor,
+        color: textColor,
       }}
     >
       <div className="container mx-auto px-4 py-10 md:py-14">
@@ -68,11 +73,10 @@ export function FeaturedProduct() {
           {card ? (
             <Link href={card.href} className="mx-auto block w-full max-w-lg md:mx-0">
               <div
-                className="cursor-pointer rounded-2xl p-6 text-left shadow-lg transition-shadow hover:shadow-xl md:p-8"
+                className="cursor-pointer rounded-[var(--card-radius,1.5rem)] border border-[var(--border)] p-6 text-left shadow-[var(--shadow-card,none)] transition-shadow hover:shadow-[var(--shadow-elevated,none)] md:p-8"
                 style={{
-                  backgroundColor: featured.cardBgColor,
+                  backgroundColor: cardBg,
                   color: "var(--card-foreground)",
-                  border: "1px solid var(--border)",
                 }}
               >
                 <h3
@@ -104,8 +108,8 @@ export function FeaturedProduct() {
                   </span>
                 </div>
                 <div
-                  className="flex aspect-square items-center justify-center rounded-lg"
-                  style={{ backgroundColor: featured.productBgColor }}
+                  className="flex aspect-square items-center justify-center rounded-[var(--card-radius,1.5rem)]"
+                  style={{ backgroundColor: productBg }}
                 >
                   <VisualProductCardImage
                     src={card.imageUrl}
@@ -119,11 +123,10 @@ export function FeaturedProduct() {
           ) : isEditMode ? (
             <div className="mx-auto block w-full max-w-lg md:mx-0">
               <div
-                className="rounded-2xl p-6 text-left shadow-lg md:p-8"
+                className="rounded-[var(--card-radius,1.5rem)] border border-[var(--border)] p-6 text-left shadow-[var(--shadow-card,none)] md:p-8"
                 style={{
-                  backgroundColor: featured.cardBgColor,
+                  backgroundColor: cardBg,
                   color: "var(--card-foreground)",
-                  border: "1px solid var(--border)",
                 }}
               >
                 <p
@@ -133,8 +136,8 @@ export function FeaturedProduct() {
                   Elegí un producto del catálogo para mostrarlo acá
                 </p>
                 <div
-                  className="mt-4 flex aspect-square items-center justify-center rounded-lg"
-                  style={{ backgroundColor: featured.productBgColor }}
+                  className="mt-4 flex aspect-square items-center justify-center rounded-[var(--card-radius,1.5rem)]"
+                  style={{ backgroundColor: productBg }}
                 >
                   <VisualProductCardImage
                     alt="Producto destacado sin elegir"
@@ -149,7 +152,7 @@ export function FeaturedProduct() {
           <Button
             variant="link"
             className="mx-auto flex min-h-[44px] w-fit items-center gap-2 p-0 touch-manipulation md:mx-0"
-            style={{ color: featured.textColor }}
+            style={{ color: textColor }}
             onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.8")}
             onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
             asChild

@@ -6,6 +6,7 @@ import {
   checkoutOptionsDialogMock,
   fontSelectorModalMock,
   lucideReactMock,
+  modeContextMock,
   nextImageMock,
   nextLinkMock,
   sonnerMock,
@@ -46,6 +47,7 @@ vi.mock("@/components/ui/dropdown-menu", () => uiDropdownMenuMock);
 
 vi.mock("@/contexts/styles-context", () => ({ useComponentStyle: (_name: string, defaults: Record<string, string>) => ({ styles: defaults }) }));
 vi.mock("@/contexts/theme-context", () => themeContextMock);
+vi.mock("@/contexts/mode-context", () => modeContextMock);
 vi.mock("@/contexts/store-context", () => storeContextMock);
 vi.mock("@/contexts/cart-context", () => cartContextMock);
 vi.mock("@/contexts/wishlist-context", () => wishlistContextMock);

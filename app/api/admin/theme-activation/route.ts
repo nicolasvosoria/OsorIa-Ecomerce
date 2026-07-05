@@ -8,6 +8,9 @@ import {
 } from "@/lib/supabase/contract";
 import { requireAdminUser } from "@/lib/supabase/admin-route-auth";
 import { normalizeThemeRecord } from "@/lib/theme-font/runtime-contract";
+import { resolveThemeDefinition } from "@/lib/theme-font/theme-presets";
+import { stripSectionStyleKeys } from "@/lib/theme/section-style-keys";
+import type { ThemeColors } from "@/lib/types/theme";
 
 function getSupabaseServiceClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -141,10 +144,65 @@ export async function POST(request: NextRequest) {
 
     let activatedVersionId = existing?.id as string | undefined;
 
+    // Persist the resolved two-axis bundle alongside the `is_current` flip so
+    // `getActiveTheme` can read it back verbatim next time (Slice 4 storage).
+    // `theme.colors` is the same jsonb the route already selected above.
+    const definition = resolveThemeDefinition(
+      themeName,
+      theme.colors as ThemeColors,
+    );
+    const storedFonts = { fontPairingId: definition.fontPairingId ?? null };
+
+    // Applying a theme resets only the STYLE fields of each section
+    // (`SECTION_STYLE_KEYS`), keeping all CONTENT intact, but only after a
+    // reversible backup has been taken. The backup is nested under
+    // `variables.backup_component_styles` (an unknown key to
+    // `normalizeThemeRecord`, which only ever lifts the known definition keys
+    // above, so it is safely ignored at read time).
+    // Backup-before-modify, store-scoped only: if the read fails for any
+    // reason, skip the reset entirely and leave existing customizations
+    // intact (fail safe).
+    let backupComponentStyles: {
+      snapshot: unknown[];
+      backedUpAt: string;
+      source: string;
+    } | null = null;
+
+    try {
+      const { data: componentStyleRows, error: componentStylesReadError } =
+        await supabase
+          .from(ECOMMERCE_TABLES.componentStyles)
+          .select("*")
+          .eq("store_id", storeId);
+
+      if (componentStylesReadError) {
+        throw componentStylesReadError;
+      }
+
+      backupComponentStyles = {
+        snapshot: componentStyleRows ?? [],
+        backedUpAt: new Date().toISOString(),
+        source: "theme-activation-reset",
+      };
+    } catch (backupError) {
+      console.error(
+        "[Theme Activation API] Failed to back up component styles, skipping reset:",
+        backupError,
+      );
+    }
+
+    const storedVariables = backupComponentStyles
+      ? { ...definition, backup_component_styles: backupComponentStyles }
+      : definition;
+
     if (existing?.id) {
       const { error: activateError } = await supabase
         .from(ECOMMERCE_TABLES.appThemeVersions)
-        .update({ is_current: true })
+        .update({
+          is_current: true,
+          variables: storedVariables,
+          fonts: storedFonts,
+        })
         .eq("id", existing.id);
 
       if (activateError) {
@@ -158,10 +216,49 @@ export async function POST(request: NextRequest) {
           store_id: storeId,
           theme_id: theme.id,
           is_current: true,
+          variables: storedVariables,
+          fonts: storedFonts,
         });
 
       if (insertError) {
         throw insertError;
+      }
+    }
+
+    // Only reset per-section styles once the backup above is confirmed safe.
+    // Each row is updated (never deleted) so its content survives; only rows
+    // whose section has registered style keys, and whose variables actually
+    // change, get written. Every update stays store-scoped: never a global
+    // wipe.
+    if (backupComponentStyles) {
+      const componentStyleRows = backupComponentStyles.snapshot as Array<{
+        id: string | number;
+        component_name: string;
+        variables: Record<string, unknown> | null;
+      }>;
+
+      for (const row of componentStyleRows) {
+        const currentVariables = row.variables ?? {};
+        const strippedVariables = stripSectionStyleKeys(
+          row.component_name,
+          currentVariables,
+        );
+
+        if (strippedVariables === currentVariables) continue;
+
+        const { error: resetError } = await supabase
+          .from(ECOMMERCE_TABLES.componentStyles)
+          .update({ variables: strippedVariables })
+          .eq("store_id", storeId)
+          .eq("id", row.id);
+
+        if (resetError) {
+          console.error(
+            "[Theme Activation API] Failed to reset style for component:",
+            row.component_name,
+            resetError,
+          );
+        }
       }
     }
 

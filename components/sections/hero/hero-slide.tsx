@@ -8,6 +8,7 @@ import type {
 } from "@/lib/hero/hero-layer-model";
 import {
   HERO_FULL_IMAGE_PRODUCT_SIDE_CLASSES,
+  HERO_FULL_IMAGE_STAGE_SIZE_CLASS,
   getContentCompositionStyle,
   getProductCompositionStyle,
   resolveHeroProductFrames,
@@ -151,7 +152,33 @@ function HeroFullImageSlide({
     slide.secondaryProductPreset ?? "primary-right-secondary-left";
 
   return (
-    <div className="relative h-auto min-h-[clamp(520px,calc(100dvh-96px),860px)]">
+    <div className={`relative w-full ${HERO_FULL_IMAGE_STAGE_SIZE_CLASS}`}>
+      <div
+        data-testid={isFirstSlide ? "hero-full-content-container" : undefined}
+        data-hero-mobile-sizing="content-safe"
+        className={`absolute inset-0 z-30 mx-auto flex w-full max-w-7xl items-start px-6 py-8 pointer-events-none md:h-full md:items-center md:px-10 md:py-12 lg:px-16 ${alignment.contentPositionClass}`}
+      >
+        <HeroContentBlock
+          content={content}
+          buttonColor={buttonColor}
+          buttonTextColor={buttonTextColor}
+          contentLayerAttributes={getHeroLayerAttributes(
+            "content",
+            selectedHeroLayer,
+          )}
+          ctaLayerAttributes={getHeroLayerAttributes(
+            "cta",
+            selectedHeroLayer,
+          )}
+          compositionStyle={getContentCompositionStyle(slide)}
+          isFullImageLayout
+          slideIndex={index}
+          isFirstSlide={isFirstSlide}
+          textAlignClass={alignment.textAlignClass}
+          contentMaxWidthClass={alignment.contentMaxWidthClass}
+        />
+      </div>
+
       <HeroFullImageBackground
         backgroundMode={backgroundMode}
         displayImage={content.displayImage}
@@ -170,86 +197,58 @@ function HeroFullImageSlide({
           selectedHeroLayer,
         )}
       />
-      <div
-        data-hero-stage="foreground"
-        className="relative z-20 mx-auto h-auto min-h-[clamp(520px,calc(100dvh-96px),860px)] max-w-7xl"
-      >
-        {primaryFrame && (
+      {primaryFrame && (
+        <div
+          data-hero-stage="foreground"
+          {...getHeroLayerAttributes("product", selectedHeroLayer)}
+          data-testid={`hero-product-media-${index}`}
+          data-product-placement={primaryFrame.placement}
+          data-secondary-preset={secondaryFrame ? secondaryPreset : undefined}
+          data-product-presence={content.productPresence}
+          className="absolute inset-0 z-10 mx-auto max-w-7xl pointer-events-none"
+        >
           <div
-            {...getHeroLayerAttributes("product", selectedHeroLayer)}
-            data-testid={`hero-product-media-${index}`}
-            data-product-placement={primaryFrame.placement}
-            data-secondary-preset={secondaryFrame ? secondaryPreset : undefined}
-            data-product-presence={content.productPresence}
-            className="absolute inset-0 z-40 pointer-events-none"
+            className={`absolute inset-x-6 bottom-1 mx-auto flex max-w-xl items-end justify-center opacity-95 md:bottom-10 md:w-1/2 ${HERO_FULL_IMAGE_PRODUCT_SIDE_CLASSES[primaryFrame.placement]}`}
           >
+            <HeroProductFrame
+              src={primaryFrame.src}
+              alt={primaryFrame.alt}
+              width={primaryFrame.width}
+              height={primaryFrame.height}
+              imageClassName={primaryFrame.imageClassName}
+              sizes={primaryFrame.sizes}
+              priority={isFirstSlide}
+              hotspots={slide.hotspots}
+              frameTarget={primaryFrame.target}
+              presence={content.productPresence}
+              productCompositionStyle={getProductCompositionStyle(slide)}
+              {...hotspotProps}
+            />
+          </div>
+          {secondaryFrame && (
             <div
-              className={`absolute inset-x-6 bottom-16 mx-auto flex max-w-xl justify-center opacity-95 md:inset-y-10 md:w-1/2 md:items-center ${HERO_FULL_IMAGE_PRODUCT_SIDE_CLASSES[primaryFrame.placement]}`}
+              data-hero-secondary-product="true"
+              data-secondary-preset={secondaryPreset}
+              className={`absolute inset-x-6 bottom-1 mx-auto hidden max-w-sm items-end justify-center opacity-90 md:flex md:bottom-10 md:w-1/3 ${HERO_FULL_IMAGE_PRODUCT_SIDE_CLASSES[secondaryFrame.placement]}`}
             >
               <HeroProductFrame
-                src={primaryFrame.src}
-                alt={primaryFrame.alt}
-                width={primaryFrame.width}
-                height={primaryFrame.height}
-                imageClassName={primaryFrame.imageClassName}
-                sizes={primaryFrame.sizes}
+                src={secondaryFrame.src}
+                alt={secondaryFrame.alt}
+                width={secondaryFrame.width}
+                height={secondaryFrame.height}
+                imageClassName={secondaryFrame.imageClassName}
+                sizes={secondaryFrame.sizes}
                 priority={isFirstSlide}
                 hotspots={slide.hotspots}
-                frameTarget={primaryFrame.target}
+                frameTarget={secondaryFrame.target}
                 presence={content.productPresence}
                 productCompositionStyle={getProductCompositionStyle(slide)}
                 {...hotspotProps}
               />
             </div>
-            {secondaryFrame && (
-              <div
-                data-hero-secondary-product="true"
-                data-secondary-preset={secondaryPreset}
-                className={`absolute inset-x-6 bottom-6 mx-auto hidden max-w-sm justify-center opacity-90 md:flex md:inset-y-16 md:w-1/3 md:items-center ${HERO_FULL_IMAGE_PRODUCT_SIDE_CLASSES[secondaryFrame.placement]}`}
-              >
-                <HeroProductFrame
-                  src={secondaryFrame.src}
-                  alt={secondaryFrame.alt}
-                  width={secondaryFrame.width}
-                  height={secondaryFrame.height}
-                  imageClassName={secondaryFrame.imageClassName}
-                  sizes={secondaryFrame.sizes}
-                  priority={isFirstSlide}
-                  hotspots={slide.hotspots}
-                  frameTarget={secondaryFrame.target}
-                  presence={content.productPresence}
-                  productCompositionStyle={getProductCompositionStyle(slide)}
-                  {...hotspotProps}
-                />
-              </div>
-            )}
-          </div>
-        )}
-        <div
-          data-testid={isFirstSlide ? "hero-full-content-container" : undefined}
-          data-hero-mobile-sizing="content-safe"
-          className={`relative z-30 flex h-auto min-h-[clamp(520px,calc(100dvh-96px),860px)] items-center px-6 py-12 pointer-events-none md:px-10 lg:px-16 ${alignment.contentPositionClass}`}
-        >
-          <HeroContentBlock
-            content={content}
-            buttonColor={buttonColor}
-            buttonTextColor={buttonTextColor}
-            contentLayerAttributes={getHeroLayerAttributes(
-              "content",
-              selectedHeroLayer,
-            )}
-            ctaLayerAttributes={getHeroLayerAttributes(
-              "cta",
-              selectedHeroLayer,
-            )}
-            compositionStyle={getContentCompositionStyle(slide)}
-            isFullImageLayout
-            slideIndex={index}
-            isFirstSlide={isFirstSlide}
-            textAlignClass={alignment.textAlignClass}
-          />
+          )}
         </div>
-      </div>
+      )}
     </div>
   );
 }

@@ -15,12 +15,15 @@ export const PRODUCTS_DEFAULTS = {
   title: "Productos populares",
   eyebrow: "Electrónica",
   description: "Descubrí los productos más buscados, seleccionados de nuestro catálogo destacado.",
-  bgColor: "#ffffff",
-  textColor: "#1e354e",
-  cardBgColor: "#f2f2f2",
-  priceColor: "#1e354e",
+  // Empty by default: the section follows the active theme (transparent
+  // background, --foreground heading, text-primary price). Setting any of
+  // these fields overrides it per section.
+  bgColor: "",
+  textColor: "",
+  cardBgColor: "",
+  cornerRadius: "",
+  priceColor: "",
   columns: "4",
-  cornerRadius: "xl",
   showCategory: "si",
   showPrice: "si",
   selectionMode: "display_order",
@@ -51,9 +54,9 @@ export function ProductsGrid({ initialProducts }: ProductsGridProps = {}) {
     bgColor,
     textColor,
     cardBgColor,
+    cornerRadius,
     priceColor,
     columns,
-    cornerRadius,
     showCategory,
     showPrice,
     selectionMode,
@@ -64,7 +67,7 @@ export function ProductsGrid({ initialProducts }: ProductsGridProps = {}) {
   }
 
   const columnsClass = COLUMNS_CLASS[columns] || COLUMNS_CLASS["4"]
-  const radiusClass = RADIUS_CLASS[cornerRadius] || RADIUS_CLASS.xl
+  const radiusClass = cornerRadius ? RADIUS_CLASS[cornerRadius] : undefined
 
   // El live homepage pasa initialProducts (vía ProductsGridWrapper), usando
   // getPopularProductCards() directamente en el servidor. El editor no pasa
@@ -145,8 +148,8 @@ export function ProductsGrid({ initialProducts }: ProductsGridProps = {}) {
               showDescription={false}
               showCta={false}
               mediaPosition="bottom"
-              cardBackground={cardBgColor}
-              priceColor={priceColor}
+              cardBackground={cardBgColor || undefined}
+              priceColor={priceColor || undefined}
               radiusClass={radiusClass}
               imageBlendsWithCard
               showCategory={showCategory === "si"}

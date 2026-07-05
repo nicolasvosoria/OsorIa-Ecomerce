@@ -1,6 +1,49 @@
 import '@testing-library/jest-dom'
 import { vi } from 'vitest'
 
+function createMemoryStorage(): Storage {
+  const entries = new Map<string, string>()
+
+  return {
+    get length() {
+      return entries.size
+    },
+    clear: () => entries.clear(),
+    getItem: (key: string) => entries.get(key) ?? null,
+    key: (index: number) => Array.from(entries.keys())[index] ?? null,
+    removeItem: (key: string) => {
+      entries.delete(key)
+    },
+    setItem: (key: string, value: string) => {
+      entries.set(key, value)
+    },
+  }
+}
+
+function getBrowserStorage(): Storage {
+  try {
+    if (typeof window.localStorage !== 'undefined') {
+      return window.localStorage
+    }
+  } catch {
+    // jsdom or Node may expose localStorage but make it unavailable.
+  }
+
+  return createMemoryStorage()
+}
+
+const testLocalStorage = getBrowserStorage()
+
+Object.defineProperty(window, 'localStorage', {
+  configurable: true,
+  value: testLocalStorage,
+})
+
+Object.defineProperty(globalThis, 'localStorage', {
+  configurable: true,
+  value: testLocalStorage,
+})
+
 // Mock de Next.js router
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -33,4 +76,3 @@ Object.defineProperty(window, 'matchMedia', {
     dispatchEvent: vi.fn(),
   })),
 })
-

@@ -2,7 +2,7 @@ import React, { Suspense } from 'react';
 import Link from 'next/link';
 import { Product } from '@/lib/shopify/types';
 import { AddToCart, AddToCartButton } from '@/components/cart/add-to-cart';
-import { formatPrice } from '@/lib/shopify/utils';
+import { resolveProductPricing } from '@/lib/shopify/utils';
 import { VariantSelector } from '../variant-selector';
 import { ProductImage } from './product-image';
 import { Button } from '@/components/ui/button';
@@ -14,10 +14,11 @@ export const ProductCard = ({ product }: { product: Product }) => {
   const hasNoOptions = product.options.length === 0;
   const hasOneOptionWithOneValue = product.options.length === 1 && product.options[0].values.length === 1;
   const justHasColorOption = product.options.length === 1 && product.options[0].name.toLowerCase() === 'color';
-  const formattedPrice = formatPrice(
-    product.priceRange.minVariantPrice.amount,
-    product.priceRange.minVariantPrice.currencyCode,
+  const pricing = resolveProductPricing(
+    product.priceRange.minVariantPrice,
+    product.compareAtPrice,
   );
+  const formattedPrice = pricing.label;
   const isCombo = product.productKind === 'combo';
 
   const renderInCardAddToCart = hasNoOptions || hasOneOptionWithOneValue || justHasColorOption;
@@ -49,10 +50,10 @@ export const ProductCard = ({ product }: { product: Product }) => {
         <div className="flex gap-6 justify-between items-baseline px-3 py-1 w-full font-semibold transition-all duration-300 translate-y-0 max-md:hidden group-hover:opacity-0 group-focus-visible:opacity-0 group-hover:-translate-y-full group-focus-visible:-translate-y-full">
           <p className="text-sm uppercase 2xl:text-base text-balance">{product.title}</p>
           <div className="flex gap-2 items-center text-sm uppercase 2xl:text-base">
-            {formatPrice(product.priceRange.minVariantPrice.amount, product.priceRange.minVariantPrice.currencyCode)}
-            {product.compareAtPrice && (
+            {formattedPrice}
+            {pricing.compareAtLabel && (
               <span className="line-through opacity-30">
-                {formatPrice(product.compareAtPrice.amount, product.compareAtPrice.currencyCode)}
+                {pricing.compareAtLabel}
               </span>
             )}
           </div>
@@ -65,10 +66,10 @@ export const ProductCard = ({ product }: { product: Product }) => {
               <Badge variant="outline" className="w-fit">Combo</Badge>
             )}
             <div className="flex gap-2 items-center place-self-end text-lg font-semibold">
-              {formatPrice(product.priceRange.minVariantPrice.amount, product.priceRange.minVariantPrice.currencyCode)}
-              {product.compareAtPrice && (
+              {formattedPrice}
+              {pricing.compareAtLabel && (
                 <span className="text-base line-through opacity-30">
-                  {formatPrice(product.compareAtPrice.amount, product.compareAtPrice.currencyCode)}
+                  {pricing.compareAtLabel}
                 </span>
               )}
             </div>

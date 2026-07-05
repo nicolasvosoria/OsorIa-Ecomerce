@@ -9,6 +9,7 @@ import { CatalogProductsList } from "@/components/catalog/catalog-products-list"
 import { getStoreId } from "@/lib/utils/store"
 import { notFound } from "next/navigation"
 import { getStoreIdServer } from "@/lib/utils/store-server"
+import { generateCategorySlug } from "@/lib/utils/category-slug"
 
 // Helper para formatear precio
 function formatPrice(price: number | string, currencyCode: string = "COP"): string {
@@ -19,16 +20,6 @@ function formatPrice(price: number | string, currencyCode: string = "COP"): stri
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(numPrice)
-}
-
-// Helper para generar slug desde el nombre de categoría
-function generateCategorySlug(name: string): string {
-  return name
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "")
 }
 
 // Contenido de la categoría
@@ -104,7 +95,7 @@ async function CategoryContent({ categorySlug }: { categorySlug: string }) {
     return (
       <div className="space-y-8">
         <div className="mb-8">
-          <h1 className="text-4xl md:text-6xl lg:text-[72px] font-inter font-bold mb-4" style={{ color: "var(--foreground)" }}>
+          <h1 className="text-4xl md:text-6xl lg:text-[72px] font-heading font-bold mb-4" style={{ color: "var(--foreground)" }}>
             {category.category_name}
           </h1>
           {category.category_description && (

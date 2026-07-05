@@ -6,6 +6,7 @@ import {
   checkoutOptionsDialogMock,
   fontSelectorModalMock,
   lucideReactMock,
+  modeContextMock,
   nextImageMock,
   nextLinkMock,
   sonnerMock,
@@ -51,6 +52,7 @@ vi.mock("@/contexts/styles-context", () => ({
   }),
 }))
 vi.mock("@/contexts/theme-context", () => themeContextMock)
+vi.mock("@/contexts/mode-context", () => modeContextMock)
 vi.mock("@/contexts/store-context", () => storeContextMock)
 vi.mock("@/contexts/cart-context", () => cartContextMock)
 vi.mock("@/contexts/wishlist-context", () => wishlistContextMock)

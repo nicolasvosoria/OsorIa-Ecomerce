@@ -46,6 +46,7 @@ export function NewsletterSection() {
   const edits = componentEdits.get("newsletter") || {};
   const newsletter = { ...NEWSLETTER_DEFAULTS, ...styleData, ...edits };
   const overlayOpacity = clampOverlayOpacity(newsletter.overlayOpacity);
+  const buttonColor = newsletter.buttonColor || "var(--sec-newsletter-button)";
 
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<SubscribeStatus>("idle");
@@ -84,7 +85,7 @@ export function NewsletterSection() {
 
   return (
     <section data-component="newsletter" className="px-2 py-4 md:px-4 md:py-8">
-      <div className="relative mx-2 my-4 overflow-hidden rounded-2xl md:mx-4 md:my-8 md:rounded-3xl">
+      <div className="relative mx-2 my-4 overflow-hidden rounded-[var(--card-radius,1.5rem)] md:mx-4 md:my-8">
         <div
           className={cn(
             "absolute inset-0 bg-cover bg-center",
@@ -139,17 +140,13 @@ export function NewsletterSection() {
               placeholder={newsletter.emailPlaceholder}
               aria-label="Newsletter email"
               required
-              className="h-12 rounded-full border-none bg-white px-6 text-foreground"
+              className="h-12 rounded-[var(--button-radius)] border-none bg-white px-6 text-foreground"
             />
             <Button
               type="submit"
               disabled={isLoading}
-              className="h-12 shrink-0 rounded-full px-8"
-              style={
-                newsletter.buttonColor
-                  ? { backgroundColor: newsletter.buttonColor }
-                  : undefined
-              }
+              className="h-12 shrink-0 rounded-[var(--button-radius)] px-8"
+              style={{ backgroundColor: buttonColor }}
             >
               {isLoading ? LOADING_LABEL : newsletter.buttonText}
             </Button>

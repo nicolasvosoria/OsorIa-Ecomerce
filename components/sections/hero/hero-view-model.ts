@@ -42,6 +42,7 @@ export interface HeroShellProps {
 export interface HeroFullImageAlignmentClasses {
   contentPositionClass: string;
   textAlignClass: string;
+  contentMaxWidthClass: string;
 }
 
 export interface HeroSlideContentViewModel {
@@ -89,11 +90,11 @@ export function resolveHeroColors({
     ),
     textColor: readStringValue(
       edits.textColor,
-      readStringValue(styleData.textColor, "var(--primary-foreground)"),
+      readStringValue(styleData.textColor, "var(--foreground)"),
     ),
     buttonColor: readStringValue(
       edits.buttonColor,
-      readStringValue(styleData.buttonColor, "var(--accent)"),
+      readStringValue(styleData.buttonColor, "var(--sec-hero-button)"),
     ),
     buttonTextColor: readStringValue(
       edits.buttonTextColor,
@@ -117,29 +118,44 @@ export function resolveHeroShellProps(
       backgroundMode,
       sideGutters: "24px",
       className:
-        "container relative mx-6 w-auto max-w-none overflow-hidden rounded-2xl md:rounded-3xl mt-2 md:mt-4 mb-4 md:mb-8",
+        "container relative mx-6 w-auto max-w-none overflow-hidden rounded-[var(--card-radius,1.5rem)] mt-2 md:mt-4 mb-4 md:mb-8",
     };
   }
 
   return {
     layout: layoutMode,
     className:
-      "container relative w-full overflow-hidden rounded-2xl md:rounded-3xl mx-auto px-2 md:px-4 mt-2 md:mt-4 mb-4 md:mb-8",
+      "container relative w-full overflow-hidden rounded-[var(--card-radius,1.5rem)] mx-auto px-2 md:px-4 mt-2 md:mt-4 mb-4 md:mb-8",
   };
 }
+
+const SIDE_ALIGNED_CONTENT_MAX_WIDTH = "max-w-3xl md:max-w-[46%]";
+const CENTERED_CONTENT_MAX_WIDTH = "max-w-3xl";
 
 export function resolveFullImageAlignmentClasses(
   contentAlign: HeroContentAlign,
 ): HeroFullImageAlignmentClasses {
   if (contentAlign === "center") {
-    return { contentPositionClass: "justify-center", textAlignClass: "text-center" };
+    return {
+      contentPositionClass: "justify-center",
+      textAlignClass: "text-center",
+      contentMaxWidthClass: CENTERED_CONTENT_MAX_WIDTH,
+    };
   }
 
   if (contentAlign === "right") {
-    return { contentPositionClass: "justify-end", textAlignClass: "text-right" };
+    return {
+      contentPositionClass: "justify-end",
+      textAlignClass: "text-right",
+      contentMaxWidthClass: SIDE_ALIGNED_CONTENT_MAX_WIDTH,
+    };
   }
 
-  return { contentPositionClass: "justify-start", textAlignClass: "text-left" };
+  return {
+    contentPositionClass: "justify-start",
+    textAlignClass: "text-left",
+    contentMaxWidthClass: SIDE_ALIGNED_CONTENT_MAX_WIDTH,
+  };
 }
 
 export function resolveHeroBackgroundObjectFit(

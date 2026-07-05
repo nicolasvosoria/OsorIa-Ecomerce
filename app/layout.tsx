@@ -20,6 +20,7 @@ import { V0Provider } from "../lib/context"
 import { cn } from "../lib/utils"
 import { StylesProvider } from "@/contexts/styles-context"
 import { ThemeProvider } from "@/contexts/theme-context"
+import { ModeProvider } from "@/contexts/mode-context"
 import { FontProvider } from "@/contexts/font-context"
 import { AuthProvider } from "@/contexts/auth-context"
 import { AdminPermissionsProvider } from "@/contexts/admin-permissions-context"
@@ -176,6 +177,7 @@ export default async function RootLayout({
                   <AuthProvider>
                 <AdminPermissionsProvider>
                   <ThemeProvider>
+                  <ModeProvider>
                   <SiteBackground />
                   <FontProvider>
                     <ShopifyCartProvider>
@@ -199,6 +201,7 @@ export default async function RootLayout({
                       </CartProvider>
                     </ShopifyCartProvider>
                     </FontProvider>
+                  </ModeProvider>
                   </ThemeProvider>
                 </AdminPermissionsProvider>
               </AuthProvider>

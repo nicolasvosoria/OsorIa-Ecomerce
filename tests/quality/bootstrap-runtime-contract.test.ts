@@ -1,16 +1,19 @@
 /** @vitest-environment jsdom */
 
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import {
   applyRuntimeFont,
   applyRuntimePairing,
+  applyRuntimeTheme,
   buildPairingStylesheetUrl,
+  resolveActiveMode,
   resolveThemeBootstrapPayload,
   ensureStylesheetLink,
   shouldLoadFontStylesheet,
 } from "@/lib/theme-font/bootstrap";
 import { DEFAULT_RUNTIME_THEME } from "@/lib/theme-font/runtime-contract";
+import { DEFAULT_DARK_FALLBACK } from "@/lib/theme-font/theme-definition";
 
 describe("font stylesheet bootstrap", () => {
   it("loads stylesheet only once for active custom fonts", () => {
@@ -193,5 +196,72 @@ describe("theme cache bootstrap fingerprint contract", () => {
     expect(result.theme.theme_fingerprint).toBe(
       DEFAULT_RUNTIME_THEME.theme_fingerprint,
     );
+  });
+});
+
+describe("applyRuntimeTheme per-section surface colors", () => {
+  beforeEach(() => {
+    document.documentElement.removeAttribute("style");
+  });
+
+  it("writes --sec-<section>-<kebab-key> for each theme.sections entry", () => {
+    applyRuntimeTheme(
+      {
+        ...DEFAULT_RUNTIME_THEME,
+        sections: {
+          featured: {
+            bg: "#7baeaf",
+            cardBg: "#f6f6f6",
+            productBg: "#77767b",
+            text: "#ffffff",
+          },
+        },
+      },
+      "light",
+    );
+
+    const root = document.documentElement.style;
+    expect(root.getPropertyValue("--sec-featured-bg")).toBe("#7baeaf");
+    expect(root.getPropertyValue("--sec-featured-card-bg")).toBe("#f6f6f6");
+    expect(root.getPropertyValue("--sec-featured-product-bg")).toBe("#77767b");
+    expect(root.getPropertyValue("--sec-featured-text")).toBe("#ffffff");
+  });
+
+  it("writes no section vars when the theme has no sections", () => {
+    applyRuntimeTheme({ ...DEFAULT_RUNTIME_THEME, sections: undefined }, "light");
+
+    const root = document.documentElement.style;
+    expect(root.getPropertyValue("--sec-featured-bg")).toBe("");
+  });
+});
+
+describe("applyRuntimeTheme mode resolution when `mode` is omitted", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    document.documentElement.classList.remove("dark");
+    document.documentElement.removeAttribute("style");
+  });
+
+  it("defaults to light (byte-identical) when there is no stored mode preference", () => {
+    expect(resolveActiveMode()).toBe("light");
+
+    applyRuntimeTheme(DEFAULT_RUNTIME_THEME);
+
+    expect(document.documentElement.classList.contains("dark")).toBe(false);
+    expect(
+      document.documentElement.style.getPropertyValue("--foreground"),
+    ).toBe(DEFAULT_RUNTIME_THEME.colors.foreground);
+  });
+
+  it("keeps dark mode active (does not revert to light) when the active mode is dark", () => {
+    localStorage.setItem("osoria_mode", "dark");
+    expect(resolveActiveMode()).toBe("dark");
+
+    applyRuntimeTheme(DEFAULT_RUNTIME_THEME);
+
+    expect(document.documentElement.classList.contains("dark")).toBe(true);
+    expect(
+      document.documentElement.style.getPropertyValue("--foreground"),
+    ).toBe(DEFAULT_DARK_FALLBACK.foreground);
   });
 });

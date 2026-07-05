@@ -12,40 +12,26 @@ import type {
 
 export const DEFAULT_HERO_PRODUCTS: HeroSlideLayerFields[] = [
   {
-    label: "Electrónica",
-    title: "BALFE",
-    subtitle: "NUEVO MODELO",
+    label: "Electronics",
+    title: "Smarthome Speaker",
+    subtitle: "",
     description:
-      "Descubre la última tecnología en dispositivos electrónicos. Calidad premium y diseño innovador para una experiencia única.",
-    buttonText: "Comprar ahora",
-    image: "/black-smart-speaker.jpg",
-  },
-  {
-    label: "Audio",
-    title: "PREMIUM",
-    subtitle: "HEADPHONES",
-    description:
-      "Experimenta el sonido de alta calidad con nuestros auriculares premium. Diseño ergonómico y cancelación de ruido activa.",
-    buttonText: "Ver más",
-    image: "/premium-headphones.png",
-  },
-  {
-    label: "Accesorios",
-    title: "LAPTOP STAND",
-    subtitle: "ERGONÓMICO",
-    description:
-      "Mejora tu espacio de trabajo con nuestro soporte para laptop. Diseño moderno y ajustable para mayor comodidad.",
-    buttonText: "Comprar ahora",
-    image: "/laptop-stand.png",
-  },
-  {
-    label: "Proyección",
-    title: "MINI PROJECTOR",
-    subtitle: "PORTÁTIL",
-    description:
-      "Lleva el cine contigo. Proyector compacto con alta resolución y conectividad inalámbrica para tus presentaciones.",
-    buttonText: "Descubrir",
+      "It won’t be a bigger problem to find one video game lover in your neighbor",
+    buttonText: "Buy now",
     image: "/mini-projector.jpg",
+    backgroundImage:
+      "https://feqsjdhcsrksvrfsjsfv.supabase.co/storage/v1/object/public/products/hero-background-image-1781645821935-80w5f5ac.webp",
+    productImage:
+      "https://feqsjdhcsrksvrfsjsfv.supabase.co/storage/v1/object/public/products/hero-product-image-1781916251606-n880hnhj.webp",
+    productPlacement: "right",
+    productPresence: "balanced",
+    productScale: 140,
+    productOffsetX: 0,
+    productOffsetY: 0,
+    contentOffsetX: 0,
+    contentOffsetY: 0,
+    textSize: "feature",
+    hotspots: [],
   },
 ];
 
@@ -166,11 +152,11 @@ export const HERO_BACKGROUND_MODE_VALUES = HERO_BACKGROUND_MODE_OPTIONS.map(
 ) as HeroBackgroundMode[];
 
 export const DEFAULT_HERO_LAYER_MODEL: HeroLayerModel = {
-  layoutMode: "split",
+  layoutMode: "full-image",
   imageFit: "cover",
-  backgroundMode: "fill",
+  backgroundMode: "stage",
   imagePositionX: "center",
-  imagePositionY: "center",
+  imagePositionY: "bottom",
   contentAlign: "left",
   overlayColor: "#101828",
   overlayOpacity: 0.45,

@@ -31,33 +31,20 @@ export function SiteBackground() {
       // Obtener color de fondo del tema activo (desde CSS variable)
       // Esto funciona porque ApplyStylesScript y ThemeProvider ya aplicaron las variables
       const themeBackgroundColor = getComputedStyle(root).getPropertyValue('--background').trim() || '#ffffff';
-      
-      // Determinar si hay configuración personalizada de fondo
-      const hasCustomBackground = backgroundStyles.backgroundColor && 
-                                  backgroundStyles.backgroundColor !== '' &&
-                                  backgroundStyles.backgroundColor !== '#ffffff';
       const hasCustomImage = backgroundStyles.type === 'image' && backgroundStyles.backgroundImage;
 
       if (hasCustomImage) {
-        // Aplicar imagen de fondo personalizada
-        body.style.backgroundColor = backgroundStyles.backgroundColor || themeBackgroundColor || 'transparent';
+        // Aplicar imagen de fondo personalizada (override de contenido, se mantiene igual sea cual sea el tema)
+        body.style.backgroundColor = backgroundStyles.backgroundColor || themeBackgroundColor;
         body.style.backgroundImage = `url(${backgroundStyles.backgroundImage})`;
         body.style.backgroundPosition = backgroundStyles.backgroundPosition || 'center';
         body.style.backgroundRepeat = backgroundStyles.backgroundRepeat || 'no-repeat';
         body.style.backgroundSize = backgroundStyles.backgroundSize || 'cover';
         body.style.backgroundAttachment = 'fixed';
-      } else if (hasCustomBackground) {
-        // Aplicar color de fondo personalizado desde admin
-        body.style.backgroundColor = backgroundStyles.backgroundColor;
-        body.style.backgroundImage = 'none';
-        body.style.backgroundPosition = '';
-        body.style.backgroundRepeat = '';
-        body.style.backgroundSize = '';
-        body.style.backgroundAttachment = '';
       } else {
-        // Usar color de fondo del tema activo (desde CSS variable)
-        // Esto permite que los temas oscuros funcionen correctamente
-        body.style.backgroundColor = themeBackgroundColor;
+        // Sin imagen: el override de color del admin gana; si no hay override, cae al
+        // color de fondo del tema activo (permite que los temas oscuros funcionen bien).
+        body.style.backgroundColor = backgroundStyles.backgroundColor || themeBackgroundColor;
         body.style.backgroundImage = 'none';
         body.style.backgroundPosition = '';
         body.style.backgroundRepeat = '';

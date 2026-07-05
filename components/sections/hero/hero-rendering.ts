@@ -52,6 +52,9 @@ export const HERO_FULL_IMAGE_PRODUCT_SIDE_CLASSES: Record<
   right: "md:right-8 md:left-auto",
 };
 
+export const HERO_FULL_IMAGE_STAGE_SIZE_CLASS =
+  "min-h-[580px] md:aspect-[16/9] md:min-h-[700px] max-h-[900px]";
+
 export const HERO_PRODUCT_PRESENCE_FRAME_CLASSES: Record<
   HeroProductPresence,
   string
@@ -179,7 +182,7 @@ export function resolveHeroProductFrames({
       height: 720,
       sizes: "(max-width: 768px) 80vw, 45vw",
       imageClassName:
-        "max-h-[220px] w-auto object-contain md:max-h-[420px] lg:max-h-[520px]",
+        "max-h-[280px] w-auto object-contain md:max-h-[420px] lg:max-h-[520px]",
     },
   ];
 

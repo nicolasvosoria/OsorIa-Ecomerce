@@ -40,7 +40,9 @@ export function ReposteriaHero() {
   const description = edits.description ?? styleData.description ?? "Deliciosos pasteles, postres y dulces artesanales\nHechos con amor y los mejores ingredientes"
   
   // Separar descripción en líneas si contiene \n
-  const descriptionLines = description.split('\n').filter(line => line.trim())
+  const descriptionLines = String(description)
+    .split('\n')
+    .filter((line: string) => line.trim())
   
   // Obtener imagen de fondo
   const backgroundImage = edits.backgroundImage ?? styleData.backgroundImage ?? "/reposteria/pastel-boda.jpg"
@@ -96,7 +98,7 @@ export function ReposteriaHero() {
             className="text-base sm:text-lg md:text-xl lg:text-2xl mb-6 sm:mb-8 font-light drop-shadow-md px-2"
             style={{ color: descriptionTextColor }}
           >
-            {descriptionLines.map((line, index) => (
+            {descriptionLines.map((line: string, index: number) => (
               <span key={index}>
                 {line}
                 {index < descriptionLines.length - 1 && (
@@ -121,5 +123,4 @@ export function ReposteriaHero() {
     </section>
   )
 }
-
 

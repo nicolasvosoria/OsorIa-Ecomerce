@@ -1,0 +1,108 @@
+{
+  "store": {
+    "subdomain": "default"
+  },
+  "componentStyles": {
+    "footer": {},
+    "header": {
+      "brandName": "OsorIA.Ecomerce",
+      "brandSubtitle": "Café",
+      "layoutVariant": "classic"
+    },
+    "site_background": {
+      "backgroundColor": "#ffffff",
+      "backgroundImage": "",
+      "backgroundPosition": "bottom right",
+      "type": "color"
+    },
+    "hero": {
+      "backgroundMode": "stage",
+      "buttonColor": "#33d17a",
+      "fullImageContentAlign": "left",
+      "imagePositionY": "bottom",
+      "layoutMode": "full-image",
+      "products": [
+        {
+          "backgroundImage": "https://feqsjdhcsrksvrfsjsfv.supabase.co/storage/v1/object/public/products/hero-background-image-1781645821935-80w5f5ac.webp",
+          "buttonText": "Buy now",
+          "contentOffsetX": 0,
+          "contentOffsetY": 0,
+          "description": "It won’t be a bigger problem to find one video game lover in your neighbor",
+          "hotspots": [],
+          "image": "/mini-projector.jpg",
+          "label": "Electronics",
+          "productImage": "https://feqsjdhcsrksvrfsjsfv.supabase.co/storage/v1/object/public/products/hero-product-image-1781916251606-n880hnhj.webp",
+          "productOffsetX": 0,
+          "productOffsetY": 0,
+          "productPlacement": "right",
+          "productPresence": "balanced",
+          "productScale": 140,
+          "subtitle": "",
+          "textSize": "feature",
+          "title": "Smarthome Speaker"
+        }
+      ]
+    },
+    "popular": {
+      "priceLabel": "Desde $29.000",
+      "title": "Lo más vendido"
+    },
+    "products": {
+      "cardBgColor": "#f6f6f6",
+      "columns": "2",
+      "cornerRadius": "xl",
+      "description": "",
+      "eyebrow": "",
+      "selectionMode": "best_selling",
+      "title": "Productos populares"
+    },
+    "featured": {
+      "bgColor": "#7baeaf",
+      "cardBgColor": "#f6f6f6",
+      "linkText": "Ver todos los productos",
+      "mainImage": "https://feqsjdhcsrksvrfsjsfv.supabase.co/storage/v1/object/public/products/featured-mainimage-1783095031839-7mo8snxg.webp",
+      "originalPrice": "$99.00",
+      "productBgColor": "#77767b",
+      "productId": "b1bd5a44-dd35-4e1b-a5d9-07fefd8b270d",
+      "productImage": "",
+      "productName": "BePhones XTR4 earphones",
+      "salePrice": "$79.00",
+      "subtitle": "La elección de los usuarios esta semana",
+      "textColor": "#ffffff",
+      "title": "¡Por favor, no detengas la música!"
+    },
+    "specialOffer": {
+      "accentColor": "#f5c211",
+      "bgColor": "#ed333b",
+      "claimedLabel": "Ya reclamado 32%",
+      "countdownLabel": "La oferta termina en:",
+      "description": "Una oferta por tiempo limitado configurada como referencia visual para paridad de staging.",
+      "endDate": "2026-07-10T10:22",
+      "eyebrow": "Electrónica",
+      "href": "/products/w00dy-cx700",
+      "image": "https://feqsjdhcsrksvrfsjsfv.supabase.co/storage/v1/object/public/products/visual-reference/computershop2/home/computershop2-home-pic6.webp",
+      "linkText": "Comprar Ahora",
+      "originalPrice": "$875.00",
+      "productBgColor": "#f66151",
+      "productId": "d42efba9-0b67-4ab2-86f2-2bed3e506d6a",
+      "productName": "W00DY CX700",
+      "salePrice": "$699.00",
+      "textColor": "#ffffff",
+      "title": "Oferta Especial"
+    },
+    "whyus": {
+      "title": "¿Por qué nosotros?"
+    },
+    "newsletter": {
+      "backgroundImage": "https://feqsjdhcsrksvrfsjsfv.supabase.co/storage/v1/object/public/products/newsletter-backgroundimage-1783112895435-1qb07546.webp",
+      "buttonColor": "#c01c28",
+      "buttonText": "Suscribirse",
+      "description": "Recibí lanzamientos de productos, ofertas exclusivas y un 10% de descuento en tu próxima compra.",
+      "discountText": "Obtené un 10% de descuento en tu próxima compra",
+      "emailPlaceholder": "Correo electrónico",
+      "logoImage": "https://feqsjdhcsrksvrfsjsfv.supabase.co/storage/v1/object/public/products/newsletter-logoimage-1783112906736-oc68prk4.webp",
+      "overlayOpacity": "0.55",
+      "title": "Unite a Nuestro Newsletter"
+    }
+  }
+}

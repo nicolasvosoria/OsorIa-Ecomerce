@@ -223,6 +223,7 @@ const COMPONENT_FIELDS: Record<
     styles: [
       { key: "bgColor", label: "Color de Fondo", type: "color" },
       { key: "textColor", label: "Color de Texto", type: "color" },
+      { key: "buttonColor", label: "Color del Botón", type: "color" },
     ],
     defaults: POPULAR_DEFAULTS,
   },

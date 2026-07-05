@@ -19,8 +19,10 @@ import { resolveHeaderStickyMode } from "@/lib/header/header-sticky-mode"
 import { useHeaderScrollHidden } from "@/lib/hooks/use-header-scroll-hidden"
 import { cn } from "@/lib/utils"
 import { useTheme } from "@/contexts/theme-context"
+import { useMode } from "@/contexts/mode-context"
 import { useStore } from "@/contexts/store-context"
 import { ThemeSelectorModal } from "@/components/theme/theme-selector-modal"
+import { ModeToggle } from "@/components/mode-toggle"
 import { FontSelectorModal } from "@/components/font/font-selector-modal"
 import Image from "next/image"
 import { useCart } from "@/contexts/cart-context"
@@ -138,6 +140,7 @@ export function Header() {
   const [openMegaMenuCategoryId, setOpenMegaMenuCategoryId] = useState<string | null>(null)
   const [categoryFeaturedProductId, setCategoryFeaturedProductId] = useState<Record<string, string | null>>({})
   const { activeTheme } = useTheme()
+  const { isDark } = useMode()
   const { items, removeFromCart, updateQuantity, getTotal, getItemSubtotal, getTotalItems } = useCart()
   const { getTotalItems: getWishlistTotalItems } = useWishlist()
   const { user, isAuthenticated, login, register, logout, refreshUser } = useAuth()
@@ -179,10 +182,20 @@ export function Header() {
     return false
   }, [activeTheme])
 
-  // Usar logo desde configuración o valores por defecto
-  const logoSrc = isDarkTheme 
+  // Usar logo desde configuración o valores por defecto. `isDarkTheme` (tema de color oscuro,
+  // p.ej. "Oscuro") ya elegía el logo oscuro; también lo hacemos cuando el modo claro/oscuro
+  // del sitio (`useMode().isDark`) está activo y hay un logo oscuro configurado.
+  const logoSrc = isDarkTheme
     ? (header.logoImageDark || "/logo-osoria-blanco.svg")
-    : (header.logoImage || "/logo-negro.svg")
+    : isDark && header.logoImageDark
+      ? header.logoImageDark
+      : (header.logoImage || "/logo-negro.svg")
+  // Sin logo oscuro dedicado: invertir el logo por defecto en modo oscuro para que el
+  // wordmark (típicamente negro/monocromático) siga siendo visible sobre fondo oscuro.
+  // Sólo se activa vía la variante `dark:` (clase `.dark` en <html>), así que no afecta
+  // al modo claro ni duplica la inversión cuando ya se usa un logo oscuro dedicado.
+  const logoDarkModeInvertClassName =
+    !isDarkTheme && !header.logoImageDark ? "dark:invert dark:brightness-0" : undefined
   const pathname = usePathname()
 
   useEffect(() => {
@@ -499,6 +512,7 @@ export function Header() {
   // Iconos de acción (cuenta, wishlist, carrito), compartidos por las 3 variantes
   const renderActionIcons = () => (
     <>
+      <ModeToggle />
       {isAuthenticated ? (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -629,7 +643,7 @@ export function Header() {
         alt="Osoria Logo"
         width={160}
         height={48}
-        className={cn("object-contain w-auto", heightClass, maxWidthClass)}
+        className={cn("object-contain w-auto", heightClass, maxWidthClass, logoDarkModeInvertClassName)}
         priority
       />
     </Link>
@@ -821,11 +835,12 @@ export function Header() {
                 alt="Osoria Logo"
                 width={100}
                 height={33}
-                className="object-contain w-auto h-7 sm:h-8 max-w-[120px]"
+                className={cn("object-contain w-auto h-7 sm:h-8 max-w-[120px]", logoDarkModeInvertClassName)}
                 priority
               />
             </Link>
             <div className="flex items-center gap-1.5 flex-shrink-0">
+              <ModeToggle />
               {isAuthenticated ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>

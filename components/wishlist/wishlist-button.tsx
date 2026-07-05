@@ -26,6 +26,7 @@ export function WishlistButton({
   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist()
   const { t } = useLanguage()
   const inWishlist = isInWishlist(product.id)
+  const buttonVariant = variant === "icon" ? "ghost" : variant
 
   const handleToggle = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -50,7 +51,7 @@ export function WishlistButton({
 
   return (
     <Button
-      variant={variant}
+      variant={buttonVariant}
       size={size}
       className={cn(
         "relative",
@@ -75,7 +76,6 @@ export function WishlistButton({
     </Button>
   )
 }
-
 
 
 

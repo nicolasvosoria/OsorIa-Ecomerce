@@ -18,6 +18,7 @@ interface HeroContentBlockProps {
   slideIndex: number;
   isFirstSlide: boolean;
   textAlignClass?: string;
+  contentMaxWidthClass?: string;
   splitBadgeBackground?: string;
 }
 
@@ -32,13 +33,14 @@ export function HeroContentBlock({
   slideIndex,
   isFirstSlide,
   textAlignClass = "",
+  contentMaxWidthClass = "max-w-3xl",
   splitBadgeBackground = "rgba(255, 255, 255, 0.2)",
 }: HeroContentBlockProps) {
   if (isFullImageLayout) {
     return (
       <div
         {...contentLayerAttributes}
-        className={`max-w-3xl space-y-4 pointer-events-auto md:space-y-6 md:[transform:translate(var(--hero-content-offset-x),var(--hero-content-offset-y))] ${textAlignClass}`}
+        className={`space-y-4 pointer-events-auto md:space-y-6 [transform:translate(var(--hero-content-offset-x),var(--hero-content-offset-y))] ${contentMaxWidthClass} ${textAlignClass}`}
         style={{
           ...compositionStyle,
           color: content.slideTextColor,
@@ -106,10 +108,10 @@ function HeroTextContent({
         {content.displayLabel}
       </span>
       <div>
-        <h1 className={`${content.titleSizeClass} font-inter font-medium tracking-tight leading-tight`}>
+        <h1 className={`${content.titleSizeClass} font-heading font-medium tracking-tight leading-tight ${split ? "" : "line-clamp-2 md:line-clamp-none"}`}>
           {content.displayTitle}
         </h1>
-        <h2 className="text-2xl md:text-4xl lg:text-[51px] font-inter font-light tracking-tight">
+        <h2 className={`text-2xl md:text-4xl lg:text-[51px] font-heading font-light tracking-tight ${split ? "" : "line-clamp-1 md:line-clamp-none"}`}>
           {content.displaySubtitle}
         </h2>
       </div>
@@ -117,7 +119,7 @@ function HeroTextContent({
         className={
           split
             ? "text-sm md:text-[16px] font-inter font-medium max-w-md mx-auto md:mx-0 leading-relaxed"
-            : "max-w-2xl text-sm font-inter font-medium leading-relaxed md:text-[16px]"
+            : "max-w-2xl text-sm font-inter font-medium leading-relaxed md:text-[16px] line-clamp-2 md:line-clamp-none"
         }
         style={{ opacity: split ? 0.9 : 0.92 }}
       >
@@ -141,7 +143,7 @@ function HeroCtaButton({
   return (
     <Button
       size="lg"
-      className="text-sm md:text-[16px] font-inter font-medium rounded px-6 md:px-8 w-full md:w-auto transition-all duration-200 min-h-[44px] touch-manipulation mb-4 md:mb-0"
+      className="text-sm md:text-[16px] font-inter font-medium rounded-[var(--button-radius)] px-6 md:px-8 w-full md:w-auto transition-all duration-200 min-h-[44px] touch-manipulation mb-4 md:mb-0"
       style={{
         backgroundColor: buttonColor,
         color: buttonTextColor,

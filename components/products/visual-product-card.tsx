@@ -41,7 +41,7 @@ export function VisualProductCard({
   className = "",
   cardBackground,
   priceColor,
-  radiusClass = "rounded-3xl",
+  radiusClass = "rounded-[var(--card-radius,1.5rem)]",
   imageBlendsWithCard = false,
   showCategory = true,
   showPrice = true,
@@ -85,7 +85,7 @@ export function VisualProductCard({
 
   return (
     <article
-      className={`group relative overflow-hidden ${radiusClass} ${cardBackground ? "" : "bg-muted"} text-card-foreground transition-transform duration-300 hover:-translate-y-0.5 focus-within:ring-2 focus-within:ring-primary/50 ${className}`}
+      className={`group relative overflow-hidden ${radiusClass} shadow-[var(--shadow-card,none)] ${cardBackground ? "" : "bg-muted"} text-card-foreground transition-transform duration-300 hover:-translate-y-0.5 hover:shadow-[var(--shadow-elevated,none)] focus-within:ring-2 focus-within:ring-primary/50 ${className}`}
       style={cardBackground ? { backgroundColor: cardBackground } : undefined}
     >
       {mediaPosition === "top" ? media : null}

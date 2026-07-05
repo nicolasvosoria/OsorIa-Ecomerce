@@ -139,4 +139,12 @@ describe("VisualProductCard", () => {
     expect(screen.queryByText("$ 389.000")).not.toBeInTheDocument()
     expect(screen.queryByText("$ 459.000")).not.toBeInTheDocument()
   })
+
+  it("consumes the theme's card radius and shadow tokens, falling back to today's no-shadow rounded-3xl look", () => {
+    const { container } = render(<VisualProductCard product={discountedProduct} />)
+
+    const article = container.querySelector("article")
+    expect(article?.className).toContain("rounded-[var(--card-radius,1.5rem)]")
+    expect(article?.className).toContain("shadow-[var(--shadow-card,none)]")
+  })
 })

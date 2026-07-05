@@ -99,7 +99,7 @@ export default function SalePage() {
               Volver al inicio
             </Button>
           </Link>
-          <h1 className="text-4xl md:text-6xl lg:text-[72px] font-inter font-bold mb-4" style={{ color: "var(--foreground)" }}>
+          <h1 className="text-4xl md:text-6xl lg:text-[72px] font-heading font-bold mb-4" style={{ color: "var(--foreground)" }}>
             Gran Oferta
           </h1>
           <p className="text-lg md:text-xl" style={{ color: "var(--muted-foreground)" }}>
@@ -142,7 +142,7 @@ export default function SalePage() {
                 <p className="text-sm md:text-base font-inter font-medium mb-1" style={{ color: "var(--muted-foreground)" }}>
                   {product.category}
                 </p>
-                <h3 className="text-lg md:text-xl font-inter font-semibold mb-3" style={{ color: "var(--card-foreground)" }}>
+                <h3 className="text-lg md:text-xl font-heading font-semibold mb-3" style={{ color: "var(--card-foreground)" }}>
                   {product.name}
                 </h3>
                 

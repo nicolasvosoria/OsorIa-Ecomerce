@@ -58,7 +58,7 @@ async function CategorySection({ categoryId, categoryName, storeId }: { category
     
     return (
       <section className="mb-12 md:mb-16">
-        <h2 className="text-3xl md:text-4xl lg:text-5xl font-inter font-bold mb-6 md:mb-8" style={{ color: "var(--foreground)" }}>
+        <h2 className="text-3xl md:text-4xl lg:text-5xl font-heading font-bold mb-6 md:mb-8" style={{ color: "var(--foreground)" }}>
           {categoryName}
         </h2>
         <CatalogProductsList products={products} />
@@ -134,7 +134,7 @@ async function CatalogContent() {
           key={category.id}
           fallback={
             <section className="mb-12 md:mb-16">
-              <h2 className="text-3xl md:text-4xl lg:text-5xl font-inter font-bold mb-6 md:mb-8" style={{ color: "var(--foreground)" }}>
+              <h2 className="text-3xl md:text-4xl lg:text-5xl font-heading font-bold mb-6 md:mb-8" style={{ color: "var(--foreground)" }}>
                 {category.category_name}
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 md:gap-8">
@@ -177,7 +177,7 @@ export default async function CatalogPage() {
               Volver al inicio
             </Button>
           </Link>
-          <h1 className="text-4xl md:text-6xl lg:text-[72px] font-inter font-bold mb-4" style={{ color: "var(--foreground)" }}>
+          <h1 className="text-4xl md:text-6xl lg:text-[72px] font-heading font-bold mb-4" style={{ color: "var(--foreground)" }}>
             Catálogo Completo
           </h1>
           <p className="text-lg md:text-xl" style={{ color: "var(--muted-foreground)" }}>

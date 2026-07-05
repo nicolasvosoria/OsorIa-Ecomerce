@@ -146,6 +146,7 @@ describe("EditorPanel", () => {
     mockUseAdmin.mockReturnValue(heroAdminState({
       selectedHeroLayer: "background",
       setSelectedHeroLayer,
+      componentEdits: new Map([["hero", { backgroundMode: "fill" }]]),
     }));
 
     render(<EditorPanel />);
@@ -243,7 +244,7 @@ describe("EditorPanel", () => {
 
     const { rerender } = render(<EditorPanel />);
 
-    expect(screen.getByLabelText("Título")).toHaveValue("BALFE");
+    expect(screen.getByLabelText("Título")).toHaveValue("Smarthome Speaker");
 
     mockUseAdmin.mockReturnValue(heroAdminState({
       selectedHeroLayer: "content",
@@ -290,7 +291,8 @@ describe("EditorPanel", () => {
       expect.arrayContaining([
         expect.objectContaining({
           title: "NUEVO HERO",
-          backgroundImage: "/black-smart-speaker.jpg",
+          backgroundImage:
+            "https://feqsjdhcsrksvrfsjsfv.supabase.co/storage/v1/object/public/products/hero-background-image-1781645821935-80w5f5ac.webp",
         }),
       ]),
     );

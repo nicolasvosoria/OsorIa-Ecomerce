@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ThemeSelectorModal } from "@/components/theme/theme-selector-modal";
 
 const changeTheme = vi.fn();
+let storeSubdomain = "default";
 
 vi.mock("@/contexts/theme-context", () => ({
   useTheme: () => ({
@@ -29,15 +30,51 @@ vi.mock("@/contexts/theme-context", () => ({
 }));
 
 vi.mock("@/contexts/store-context", () => ({
-  useStore: () => ({ store: { subdomain: "default" } }),
+  useStore: () => ({ store: { subdomain: storeSubdomain } }),
 }));
 
-describe("ThemeSelectorModal publication feedback", () => {
+async function confirmPendingThemeApply() {
+  await userEvent.click(
+    screen.getByRole("button", { name: /Continuar/i }),
+  );
+}
+
+describe("ThemeSelectorModal confirmation before reset", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    storeSubdomain = "default";
   });
 
-  it("keeps confirmed publication success visible after activation returns a fingerprint", async () => {
+  it("opens a confirmation dialog instead of applying the theme immediately", async () => {
+    render(<ThemeSelectorModal open onOpenChange={vi.fn()} />);
+
+    await userEvent.click(screen.getByRole("button", { name: /Océano/i }));
+
+    expect(
+      await screen.findByRole("alertdialog"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Aplicar tema")).toBeInTheDocument();
+    expect(
+      screen.getByText(/los estilos de tus secciones se restablecen al nuevo tema/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/tu contenido \(productos, imágenes y textos\) se mantiene/i),
+    ).toBeInTheDocument();
+    expect(changeTheme).not.toHaveBeenCalled();
+  });
+
+  it("does NOT call changeTheme when the confirmation is cancelled", async () => {
+    render(<ThemeSelectorModal open onOpenChange={vi.fn()} />);
+
+    await userEvent.click(screen.getByRole("button", { name: /Océano/i }));
+    await screen.findByRole("alertdialog");
+    await userEvent.click(screen.getByRole("button", { name: /Cancelar/i }));
+
+    expect(changeTheme).not.toHaveBeenCalled();
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  });
+
+  it("calls changeTheme only after the confirmation is accepted", async () => {
     changeTheme.mockResolvedValue({
       success: true,
       activeTheme: {
@@ -45,15 +82,31 @@ describe("ThemeSelectorModal publication feedback", () => {
         theme_fingerprint: "v1:store-1:version-2:theme-2:stamp:hash",
       },
     });
-    const onOpenChange = vi.fn();
 
-    render(<ThemeSelectorModal open onOpenChange={onOpenChange} />);
+    render(<ThemeSelectorModal open onOpenChange={vi.fn()} />);
+
     await userEvent.click(screen.getByRole("button", { name: /Océano/i }));
+    await screen.findByRole("alertdialog");
+    await confirmPendingThemeApply();
 
+    expect(changeTheme).toHaveBeenCalledWith("Océano");
     expect(
       await screen.findByText(/Tema publicado: Océano/i),
     ).toBeInTheDocument();
-    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+  });
+
+  it("keeps theme changes disabled for the reposteria subdomain and never opens the confirmation", async () => {
+    storeSubdomain = "reposteria";
+
+    render(<ThemeSelectorModal open onOpenChange={vi.fn()} />);
+
+    const oceanoButton = screen.getByRole("button", { name: /Océano/i });
+    expect(oceanoButton).toBeDisabled();
+
+    await userEvent.click(oceanoButton);
+
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(changeTheme).not.toHaveBeenCalled();
   });
 
   it("keeps activation failure visible without closing as published", async () => {
@@ -64,7 +117,10 @@ describe("ThemeSelectorModal publication feedback", () => {
     const onOpenChange = vi.fn();
 
     render(<ThemeSelectorModal open onOpenChange={onOpenChange} />);
+
     await userEvent.click(screen.getByRole("button", { name: /Océano/i }));
+    await screen.findByRole("alertdialog");
+    await confirmPendingThemeApply();
 
     expect(
       await screen.findByText("No se pudo confirmar la publicación"),

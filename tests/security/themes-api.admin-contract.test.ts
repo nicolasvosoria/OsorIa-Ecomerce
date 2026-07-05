@@ -292,7 +292,7 @@ describe("theme activation admin client contract", () => {
       }),
     );
     expect(versionSelect).toHaveBeenCalledWith(
-      "id, store_id, theme_id, created_at",
+      "id, store_id, theme_id, created_at, variables, fonts",
     );
   });
 

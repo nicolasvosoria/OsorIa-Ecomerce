@@ -284,11 +284,8 @@ export default function ChatbotConfigPage() {
                         <TooltipTrigger asChild>
                           <button
                             type="button"
-                            className="inline-flex items-center justify-center rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2"
+                            className="inline-flex items-center justify-center rounded-full focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2"
                             aria-label="Información sobre temperatura"
-                            style={{ 
-                              focusRingColor: "var(--accent)",
-                            }}
                           >
                             <HelpCircle className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors" />
                           </button>

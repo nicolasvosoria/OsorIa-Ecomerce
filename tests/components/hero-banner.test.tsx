@@ -445,6 +445,29 @@ describe("HeroBanner", () => {
     expect(screen.getByAltText("PREMIUM")).toHaveClass("object-contain");
   });
 
+  it("sources hero text color from var(--foreground) so it follows light/dark mode", () => {
+    mockUseComponentStyle.mockReturnValue({
+      styles: {
+        layoutMode: "split",
+        products: [
+          {
+            title: "PREMIUM",
+            buttonText: "Comprar ahora",
+            image: "/premium-headphones.png",
+          },
+        ],
+      },
+    });
+
+    const { container } = render(<HeroBanner />);
+    const hero = container.querySelector('[data-component="hero"]');
+
+    expect(hero).toHaveStyle({ color: "var(--foreground)" });
+    expect(screen.getByTestId("hero-slide-content-0")).toHaveStyle({
+      color: "var(--foreground)",
+    });
+  });
+
   it("renders the new full-image layout with a full-bleed image layer", () => {
     mockUseComponentStyle.mockReturnValue({
       styles: {
@@ -529,11 +552,11 @@ describe("HeroBanner", () => {
     );
 
     expect(layers).toEqual([
+      "content",
+      "cta",
       "background",
       "overlay",
       "product",
-      "content",
-      "cta",
     ]);
     expect(screen.getByTestId("hero-full-background-image")).toHaveAttribute(
       "src",
@@ -546,6 +569,28 @@ describe("HeroBanner", () => {
     expect(
       screen.getByRole("link", { name: /comprar ahora/i }),
     ).toHaveAttribute("href", "/products/premium");
+  });
+
+  it("sources the CTA button radius from --button-radius so it follows the theme", () => {
+    mockUseComponentStyle.mockReturnValue({
+      styles: {
+        layoutMode: "full-image",
+        products: [
+          {
+            title: "PREMIUM",
+            buttonText: "Comprar ahora",
+            backgroundImage: "/hero-bg.jpg",
+            productImage: "/floating-product.png",
+          },
+        ],
+      },
+    });
+
+    render(<HeroBanner />);
+
+    expect(
+      screen.getByRole("link", { name: /comprar ahora/i }).className,
+    ).toContain("rounded-[var(--button-radius)]");
   });
 
   it("omits optional product media placeholders while preserving text and CTA", () => {
@@ -763,7 +808,7 @@ describe("HeroBanner", () => {
       "--hero-product-offset-y": "-8%",
     });
     expect(primaryFrame?.className).toContain(
-      "md:[transform:translate(var(--hero-product-offset-x),var(--hero-product-offset-y))_scale(var(--hero-product-scale))]",
+      "[transform:translate(var(--hero-product-offset-x),var(--hero-product-offset-y))_scale(var(--hero-product-scale))]",
     );
   });
 
@@ -811,7 +856,7 @@ describe("HeroBanner", () => {
     expect(hero).toHaveAttribute("data-hero-background-mode", "fill");
     expect(stage).toHaveAttribute("data-hero-stage", "foreground");
     expect(stage).toContainElement(productLayer);
-    expect(stage).toContainElement(screen.getByTestId("hero-full-content-container"));
+    expect(stage).not.toContainElement(screen.getByTestId("hero-full-content-container"));
     expect(stage).not.toContainElement(background);
     expect(background).toHaveAttribute("data-hero-background-fit", "fill");
     expect(background).toHaveStyle({ objectFit: "fill" });
@@ -821,14 +866,14 @@ describe("HeroBanner", () => {
       "--hero-product-offset-y": "6%",
     });
     expect(productFrame?.className).toContain(
-      "md:[transform:translate(var(--hero-product-offset-x),var(--hero-product-offset-y))_scale(var(--hero-product-scale))]",
+      "[transform:translate(var(--hero-product-offset-x),var(--hero-product-offset-y))_scale(var(--hero-product-scale))]",
     );
     expect(screen.getByTestId("hero-full-content-block")).toHaveStyle({
       "--hero-content-offset-x": "9%",
       "--hero-content-offset-y": "-7%",
     });
     expect(screen.getByTestId("hero-full-content-block").className).toContain(
-      "md:[transform:translate(var(--hero-content-offset-x),var(--hero-content-offset-y))]",
+      "[transform:translate(var(--hero-content-offset-x),var(--hero-content-offset-y))]",
     );
   });
 
@@ -881,7 +926,7 @@ describe("HeroBanner", () => {
     });
   });
 
-  it("keeps composition offsets desktop-only and hides secondary product on mobile", () => {
+  it("keeps composition offsets active at every breakpoint and hides secondary product on mobile", () => {
     mockUseComponentStyle.mockReturnValue({
       styles: {
         layoutMode: "full-image",
@@ -907,10 +952,10 @@ describe("HeroBanner", () => {
     const secondaryProduct = container.querySelector('[data-hero-secondary-product="true"]');
 
     expect(primaryFrame?.className).toContain(
-      "md:[transform:translate(var(--hero-product-offset-x),var(--hero-product-offset-y))_scale(var(--hero-product-scale))]",
+      "[transform:translate(var(--hero-product-offset-x),var(--hero-product-offset-y))_scale(var(--hero-product-scale))]",
     );
     expect(contentBlock.className).toContain(
-      "md:[transform:translate(var(--hero-content-offset-x),var(--hero-content-offset-y))]",
+      "[transform:translate(var(--hero-content-offset-x),var(--hero-content-offset-y))]",
     );
     expect(secondaryProduct?.className).toContain("hidden");
     expect(secondaryProduct?.className).toContain("md:flex");
@@ -1331,8 +1376,7 @@ describe("HeroBanner", () => {
 
     expect(hero).toHaveClass("container");
     expect(hero).not.toHaveClass("max-w-7xl");
-    expect(hero).toHaveClass("rounded-2xl");
-    expect(hero).toHaveClass("md:rounded-3xl");
+    expect(hero?.className).toContain("rounded-[var(--card-radius,1.5rem)]");
     expect(hero).not.toHaveClass("px-2");
     expect(hero).not.toHaveClass("md:px-4");
     expect(screen.queryByTestId("hero-bottom-bar")).not.toBeInTheDocument();

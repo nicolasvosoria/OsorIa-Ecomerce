@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ThemeProvider, useTheme } from "@/contexts/theme-context";
 import { getActiveTheme, getThemes } from "@/lib/supabase/themes-api";
+import { DEFAULT_DARK_FALLBACK } from "@/lib/theme-font/theme-definition";
 
 vi.mock("@/contexts/auth-context", () => ({
   useAuth: () => ({ isAuthenticated: false }),
@@ -103,5 +104,63 @@ describe("ThemeProvider publication fingerprint refresh", () => {
         theme_fingerprint: "v1:store-1:version-new:theme-1:stamp:new",
       }),
     );
+  });
+
+  it("keeps dark mode active when reapplying a republished theme (does not revert to light)", async () => {
+    localStorage.setItem("osoria_mode", "dark");
+    document.documentElement.classList.add("dark");
+
+    (window as any).__osoria_applied_theme = {
+      theme_name: "Claro Original",
+      theme_fingerprint: "v1:store-1:version-old:theme-1:stamp:old",
+    };
+    localStorage.setItem(
+      "osoria_active_theme",
+      JSON.stringify({
+        theme_name: "Claro Original",
+        theme_fingerprint: "v1:store-1:version-old:theme-1:stamp:old",
+        colors: colorsA,
+      }),
+    );
+
+    vi.mocked(getThemes).mockResolvedValue([
+      {
+        id: "theme-1",
+        theme_name: "Claro Original",
+        colors: colorsB,
+        is_active: true,
+        created_at: "2026-05-14T10:00:00Z",
+        updated_at: "2026-05-14T10:30:00Z",
+        theme_fingerprint: "v1:store-1:version-new:theme-1:stamp:new",
+      },
+    ]);
+    vi.mocked(getActiveTheme).mockResolvedValue({
+      id: "theme-1",
+      theme_name: "Claro Original",
+      colors: colorsB,
+      is_active: true,
+      created_at: "2026-05-14T10:00:00Z",
+      updated_at: "2026-05-14T10:30:00Z",
+      theme_fingerprint: "v1:store-1:version-new:theme-1:stamp:new",
+    });
+
+    render(
+      <ThemeProvider>
+        <Probe />
+      </ThemeProvider>,
+    );
+
+    await waitFor(() =>
+      expect(
+        screen.getByText("v1:store-1:version-new:theme-1:stamp:new"),
+      ).toBeInTheDocument(),
+    );
+
+    // Reapply happened in the user's active DARK mode: `.dark` stays, and the
+    // dark color set (not the light one) is what got rendered.
+    expect(document.documentElement.classList.contains("dark")).toBe(true);
+    expect(
+      document.documentElement.style.getPropertyValue("--foreground"),
+    ).toBe(DEFAULT_DARK_FALLBACK.foreground);
   });
 });

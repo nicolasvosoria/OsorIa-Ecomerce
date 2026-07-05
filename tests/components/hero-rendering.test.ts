@@ -120,7 +120,31 @@ describe("hero rendering helpers", () => {
       backgroundMode: "fill",
       sideGutters: "24px",
       className:
-        "container relative mx-6 w-auto max-w-none overflow-hidden rounded-2xl md:rounded-3xl mt-2 md:mt-4 mb-4 md:mb-8",
+        "container relative mx-6 w-auto max-w-none overflow-hidden rounded-[var(--card-radius,1.5rem)] mt-2 md:mt-4 mb-4 md:mb-8",
+    });
+  });
+
+  it("falls back to the theme's --sec-hero-button token when no buttonColor is set", () => {
+    expect(
+      resolveHeroColors({
+        activeTheme: null,
+        styleData: {},
+        edits: {},
+      }),
+    ).toMatchObject({
+      buttonColor: "var(--sec-hero-button)",
+    });
+  });
+
+  it("falls back to var(--foreground) for hero text so it follows light/dark mode", () => {
+    expect(
+      resolveHeroColors({
+        activeTheme: null,
+        styleData: {},
+        edits: {},
+      }),
+    ).toMatchObject({
+      textColor: "var(--foreground)",
     });
   });
 
@@ -145,6 +169,7 @@ describe("hero rendering helpers", () => {
     expect(resolveFullImageAlignmentClasses("right")).toEqual({
       contentPositionClass: "justify-end",
       textAlignClass: "text-right",
+      contentMaxWidthClass: "max-w-3xl md:max-w-[46%]",
     });
 
     expect(getHeroLayerAttributes("product", "product")).toEqual({

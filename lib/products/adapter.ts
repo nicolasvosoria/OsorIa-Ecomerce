@@ -4,17 +4,74 @@
  */
 
 import type {
+  CommerceProductBadge,
+  CommerceProductCard,
+  CommerceProductPrice,
   StoreItemWithDetails,
   ItemCategory,
   ItemOption,
 } from '@/lib/types/products';
 import type { Product, Collection, ProductVariant, ProductOption, Money, Image } from '@/lib/shopify/types';
+import { resolveCommercePrice } from '@/lib/products/pricing';
 
 // Helper para convertir precio a formato Money
 function formatMoney(amount: number, currencyCode: string = 'COP'): Money {
   return {
     amount: amount.toString(),
     currencyCode,
+  };
+}
+
+export function normalizeCommercePrice(
+  amount: number,
+  currencyCode: string = 'COP',
+  compareAtAmount?: number | null,
+): CommerceProductPrice {
+  return resolveCommercePrice({
+    amount,
+    currencyCode,
+    compareAtAmount,
+  });
+}
+
+function getCommerceImageUrl(item: StoreItemWithDetails): string {
+  if (item.primary_image_url && item.primary_image_url.trim() !== '') {
+    return item.primary_image_url;
+  }
+
+  const firstImage = item.images?.find((image) => image.image_url?.trim());
+  return firstImage?.image_url || '/placeholder.svg';
+}
+
+function getCommerceBadges(item: StoreItemWithDetails): CommerceProductBadge[] {
+  if (item.item_kind === 'combo') {
+    return [{ label: 'Combo', tone: 'combo' }];
+  }
+
+  // Discounts are shown as a strikethrough price only (no badge), matching
+  // the reference theme: it never pairs a percentage badge with the price.
+  return [];
+}
+
+export function toCommerceProductCard(item: StoreItemWithDetails): CommerceProductCard {
+  const price = normalizeCommercePrice(
+    item.base_price,
+    item.currency_code || 'COP',
+    item.compare_at_price,
+  );
+
+  return {
+    id: item.id,
+    title: item.item_name,
+    description: item.item_description,
+    href: `/products/${item.item_slug || item.id}`,
+    imageUrl: getCommerceImageUrl(item),
+    imageAlt: item.primary_image_alt || item.item_name,
+    category: item.category?.category_name,
+    price,
+    badges: getCommerceBadges(item),
+    ctaLabel: 'Ver detalles',
+    availableForSale: item.is_available_for_sale && item.is_active,
   };
 }
 
@@ -257,4 +314,3 @@ export function adaptSupabaseProducts(items: StoreItemWithDetails[]): Product[] 
 export function adaptSupabaseCategories(categories: ItemCategory[]): Collection[] {
   return categories.map(adaptSupabaseCategory);
 }
-

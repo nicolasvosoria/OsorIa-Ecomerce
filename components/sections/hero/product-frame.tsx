@@ -53,7 +53,7 @@ export function HeroProductFrame({
     <div
       data-hero-product-frame={frameTarget}
       data-product-presence={presence}
-      className={`relative inline-flex max-w-full items-center justify-center pointer-events-none transition-transform md:[transform:translate(var(--hero-product-offset-x),var(--hero-product-offset-y))_scale(var(--hero-product-scale))] ${HERO_PRODUCT_PRESENCE_FRAME_CLASSES[presence]}`}
+      className={`relative inline-flex max-w-full origin-bottom items-center justify-center pointer-events-none transition-transform [transform:translate(var(--hero-product-offset-x),var(--hero-product-offset-y))_scale(min(var(--hero-product-scale),1.1))] md:[transform:translate(var(--hero-product-offset-x),var(--hero-product-offset-y))_scale(var(--hero-product-scale))] ${HERO_PRODUCT_PRESENCE_FRAME_CLASSES[presence]}`}
       style={productCompositionStyle}
     >
       <Image

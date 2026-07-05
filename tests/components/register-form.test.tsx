@@ -5,6 +5,7 @@ import { AuthProvider } from '@/contexts/auth-context'
 import { CartProvider } from '@/contexts/cart-context'
 import { FontProvider } from '@/contexts/font-context'
 import { LanguageProvider } from '@/contexts/language-context'
+import { ModeProvider } from '@/contexts/mode-context'
 import { StoreProvider } from '@/contexts/store-context'
 import { StylesProvider } from '@/contexts/styles-context'
 import { ThemeProvider } from '@/contexts/theme-context'
@@ -96,13 +97,15 @@ describe('Formulario de Registro - Componente Header', () => {
           <StylesProvider>
             <AuthProvider>
               <ThemeProvider>
-                <FontProvider>
-                  <CartProvider>
-                    <WishlistProvider>
-                      <Header />
-                    </WishlistProvider>
-                  </CartProvider>
-                </FontProvider>
+                <ModeProvider>
+                  <FontProvider>
+                    <CartProvider>
+                      <WishlistProvider>
+                        <Header />
+                      </WishlistProvider>
+                    </CartProvider>
+                  </FontProvider>
+                </ModeProvider>
               </ThemeProvider>
             </AuthProvider>
           </StylesProvider>

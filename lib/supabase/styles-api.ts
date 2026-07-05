@@ -3,7 +3,7 @@ import { ECOMMERCE_SCHEMA, ECOMMERCE_TABLES, ECOMMERCE_VIEWS } from "./contract"
 import type { ComponentStyle } from "./types";
 import { requireAdmin } from "./permissions-api";
 import { getAdminRequestHeaders } from "./admin-request-headers";
-import { getStoreId } from "@/lib/utils/store";
+import { getRuntimeStoreId } from "@/lib/utils/store";
 
 function mapLegacyStyle(row: any): ComponentStyle {
   return {
@@ -15,11 +15,39 @@ function mapLegacyStyle(row: any): ComponentStyle {
   };
 }
 
+async function resolveDefaultComponentStyleStoreId(
+  supabase: ReturnType<typeof getSupabaseEcommerce>,
+): Promise<string | null> {
+  if (!supabase) return null;
+
+  const { data, error } = await supabase
+    .from(ECOMMERCE_VIEWS.storesLegacy)
+    .select("id")
+    .eq("subdomain", "default")
+    .single();
+
+  if (error || !data?.id) {
+    console.warn("[v0] Default store not found for component styles");
+    return null;
+  }
+
+  return data.id as string;
+}
+
+async function resolveComponentStyleStoreId(
+  supabase: ReturnType<typeof getSupabaseEcommerce>,
+): Promise<string | null> {
+  const runtimeStoreId = await getRuntimeStoreId();
+  if (runtimeStoreId) return runtimeStoreId;
+
+  return resolveDefaultComponentStyleStoreId(supabase);
+}
+
 export async function getComponentStyles() {
   const supabase = getSupabaseEcommerce();
   if (!supabase) return [];
 
-  const storeId = await getStoreId();
+  const storeId = await resolveComponentStyleStoreId(supabase);
   if (!storeId) {
     console.warn("[v0] No store_id available, returning empty array");
     return [];
@@ -43,24 +71,10 @@ export async function getComponentStyleByName(componentName: string) {
   const supabase = getSupabaseEcommerce();
   if (!supabase) return null;
 
-  let storeId: string | null = null;
-  if (componentName === "hero") {
-    const { data: defaultStore } = await supabase
-      .from(ECOMMERCE_VIEWS.storesLegacy)
-      .select("id")
-      .eq("subdomain", "default")
-      .single();
-    if (!defaultStore?.id) {
-      console.warn(`[v0] Default store not found for ${componentName}`);
-      return null;
-    }
-    storeId = defaultStore.id;
-  } else {
-    storeId = await getStoreId();
-    if (!storeId) {
-      console.warn(`[v0] No store_id available for ${componentName}`);
-      return null;
-    }
+  const storeId = await resolveComponentStyleStoreId(supabase);
+  if (!storeId) {
+    console.warn(`[v0] No store_id available for ${componentName}`);
+    return null;
   }
 
   const { data, error } = await supabase
@@ -128,7 +142,7 @@ export async function subscribeToStyleChanges(
   if (!supabase) return { unsubscribe: () => {} };
 
   try {
-    const storeId = await getStoreId();
+    const storeId = await resolveComponentStyleStoreId(supabase);
     if (!storeId) return { unsubscribe: () => {} };
 
     const channel = supabase

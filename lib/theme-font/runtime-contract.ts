@@ -1,4 +1,12 @@
-import type { ThemeColors } from "@/lib/types/theme";
+import type {
+  ThemeColors,
+  ThemeDensity,
+  ThemeRadiusScale,
+  ThemeShadow,
+  ThemeShape,
+} from "@/lib/types/theme";
+import { themeColorsToDefinition } from "@/lib/theme-font/theme-definition";
+import { resolveThemeDefinition } from "@/lib/theme-font/theme-presets";
 
 export interface RuntimeTheme {
   theme_name: string;
@@ -7,6 +15,18 @@ export interface RuntimeTheme {
   theme_version_id?: string | null;
   theme_published_at?: string | null;
   store_id?: string | null;
+  // Two-axis theme system (additive, optional): mirrors `ThemeDefinition` so
+  // existing constructions of `RuntimeTheme` (legacy 10-color only) keep
+  // typechecking. `normalizeThemeRecord` fills these in via
+  // `themeColorsToDefinition` when a record only carries legacy colors.
+  colorsLight?: ThemeColors;
+  colorsDark?: ThemeColors;
+  radius?: ThemeRadiusScale;
+  density?: ThemeDensity;
+  shadow?: ThemeShadow;
+  shape?: ThemeShape;
+  fontPairingId?: string | null;
+  sections?: Record<string, Record<string, string>>;
 }
 
 export interface RuntimeFont {
@@ -23,21 +43,38 @@ export interface RuntimePairing {
   bodyFontAxis: string | null;
 }
 
+const DEFAULT_RUNTIME_THEME_COLORS: ThemeColors = {
+  primary: "#005aa1",
+  secondary: "#c4faff",
+  accent: "#005aa1",
+  background: "#ffffff",
+  foreground: "#1a1a1a",
+  card: "#ffffff",
+  cardForeground: "#1a1a1a",
+  border: "#e5e5e5",
+  muted: "#f5f5f5",
+  mutedForeground: "#737373",
+};
+
+// The fallback path stays fully specified on both axes: its resolved light
+// output must remain byte-identical to today's, so it is built through the
+// same identical-by-default adapter every legacy record goes through.
+const DEFAULT_RUNTIME_THEME_DEFINITION = themeColorsToDefinition(
+  DEFAULT_RUNTIME_THEME_COLORS,
+);
+
 export const DEFAULT_RUNTIME_THEME: RuntimeTheme = {
   theme_name: "Claro Original",
-  colors: {
-    primary: "#005aa1",
-    secondary: "#c4faff",
-    accent: "#005aa1",
-    background: "#ffffff",
-    foreground: "#1a1a1a",
-    card: "#ffffff",
-    cardForeground: "#1a1a1a",
-    border: "#e5e5e5",
-    muted: "#f5f5f5",
-    mutedForeground: "#737373",
-  },
+  colors: DEFAULT_RUNTIME_THEME_COLORS,
   theme_fingerprint: "default:claro-original",
+  colorsLight: DEFAULT_RUNTIME_THEME_DEFINITION.colorsLight,
+  colorsDark: DEFAULT_RUNTIME_THEME_DEFINITION.colorsDark,
+  radius: DEFAULT_RUNTIME_THEME_DEFINITION.radius,
+  density: DEFAULT_RUNTIME_THEME_DEFINITION.density,
+  shadow: DEFAULT_RUNTIME_THEME_DEFINITION.shadow,
+  shape: DEFAULT_RUNTIME_THEME_DEFINITION.shape,
+  fontPairingId: DEFAULT_RUNTIME_THEME_DEFINITION.fontPairingId ?? null,
+  sections: DEFAULT_RUNTIME_THEME_DEFINITION.sections,
 };
 
 const THEME_COLOR_KEYS: (keyof ThemeColors)[] = [
@@ -144,6 +181,64 @@ function normalizeThemeColors(value: unknown): ThemeColors | null {
   };
 }
 
+function normalizeThemeRadius(value: unknown): ThemeRadiusScale | null {
+  const raw = toRecord(parseJsonIfNeeded(value));
+  if (!raw) return null;
+  const base = readString(raw.base);
+  return base ? { base } : null;
+}
+
+function normalizeThemeDensity(value: unknown): ThemeDensity | null {
+  const raw = toRecord(parseJsonIfNeeded(value));
+  if (!raw) return null;
+  const scale =
+    typeof raw.scale === "number" && Number.isFinite(raw.scale)
+      ? raw.scale
+      : null;
+  return scale !== null ? { scale } : null;
+}
+
+function normalizeThemeShadow(value: unknown): ThemeShadow | null {
+  const raw = toRecord(parseJsonIfNeeded(value));
+  if (!raw) return null;
+  const card = readString(raw.card);
+  const elevated = readString(raw.elevated);
+  return card && elevated ? { card, elevated } : null;
+}
+
+function normalizeThemeShape(value: unknown): ThemeShape | null {
+  const raw = toRecord(parseJsonIfNeeded(value));
+  if (!raw) return null;
+  const button = readString(raw.button);
+  const card = readString(raw.card);
+  return button && card ? { button, card } : null;
+}
+
+function normalizeThemeSections(
+  value: unknown,
+): Record<string, Record<string, string>> | null {
+  const raw = toRecord(parseJsonIfNeeded(value));
+  if (!raw) return null;
+
+  const sections: Record<string, Record<string, string>> = {};
+  for (const [sectionName, sectionColors] of Object.entries(raw)) {
+    const rawSectionColors = toRecord(sectionColors);
+    if (!rawSectionColors) continue;
+
+    const normalizedColors: Record<string, string> = {};
+    for (const [colorKey, colorValue] of Object.entries(rawSectionColors)) {
+      const normalizedValue = readString(colorValue);
+      if (normalizedValue) normalizedColors[colorKey] = normalizedValue;
+    }
+
+    if (Object.keys(normalizedColors).length > 0) {
+      sections[sectionName] = normalizedColors;
+    }
+  }
+
+  return Object.keys(sections).length > 0 ? sections : null;
+}
+
 export function normalizeThemeRecord(input: unknown): RuntimeTheme | null {
   const raw = toRecord(input);
   if (!raw) return null;
@@ -168,6 +263,30 @@ export function normalizeThemeRecord(input: unknown): RuntimeTheme | null {
       ? `v1:${storeId}:${versionId}:${themeId}:${updatedAt}:${colorHash}`
       : `legacy:${themeId ?? themeName}:${updatedAt}:${colorHash}`);
 
+  // Records only ever carry the legacy 10-color set today, so this always
+  // synthesizes the definition via the preset-aware, identical-by-default
+  // resolver (light output stays byte-identical; only colorsDark/tokens may
+  // vary by theme_name). The explicit reads below exist so that a future
+  // record carrying its own two-axis definition/variables bundle is
+  // preferred over the synthesized one, without requiring any change to
+  // this normalizer later.
+  const synthesizedDefinition = resolveThemeDefinition(themeName, colors);
+  const colorsLight =
+    normalizeThemeColors(raw.colorsLight) ?? synthesizedDefinition.colorsLight;
+  const colorsDark =
+    normalizeThemeColors(raw.colorsDark) ?? synthesizedDefinition.colorsDark;
+  const radius = normalizeThemeRadius(raw.radius) ?? synthesizedDefinition.radius;
+  const density =
+    normalizeThemeDensity(raw.density) ?? synthesizedDefinition.density;
+  const shadow = normalizeThemeShadow(raw.shadow) ?? synthesizedDefinition.shadow;
+  const shape = normalizeThemeShape(raw.shape) ?? synthesizedDefinition.shape;
+  const fontPairingId =
+    readString(raw.fontPairingId ?? raw.font_pairing_id) ??
+    synthesizedDefinition.fontPairingId ??
+    null;
+  const sections =
+    normalizeThemeSections(raw.sections) ?? synthesizedDefinition.sections;
+
   return {
     theme_name: themeName,
     colors,
@@ -175,6 +294,14 @@ export function normalizeThemeRecord(input: unknown): RuntimeTheme | null {
     theme_version_id: versionId,
     theme_published_at: publishedAt,
     store_id: storeId,
+    colorsLight,
+    colorsDark,
+    radius,
+    density,
+    shadow,
+    shape,
+    fontPairingId,
+    sections,
   };
 }
 

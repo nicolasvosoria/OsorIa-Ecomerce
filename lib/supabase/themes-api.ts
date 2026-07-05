@@ -1,10 +1,62 @@
 import { getSupabaseEcommerce } from "./client";
 import { ECOMMERCE_TABLES, ECOMMERCE_VIEWS } from "./contract";
-import type { AppTheme } from "@/lib/types/theme";
+import type { AppTheme, ThemeDefinition } from "@/lib/types/theme";
 import { requireAdmin } from "./permissions-api";
 import { getAdminRequestHeaders } from "./admin-request-headers";
 import { getStoreId, normalizeRuntimeStoreId } from "@/lib/utils/store";
 import { normalizeThemeRecord } from "@/lib/theme-font/runtime-contract";
+
+function toPlainRecord(value: unknown): Record<string, unknown> | null {
+  if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+
+  return null;
+}
+
+/**
+ * Defensively lifts `app_theme_versions.variables`/`.fonts` jsonb into the
+ * raw-record keys `normalizeThemeRecord` already knows how to merge
+ * (`colorsLight`, `colorsDark`, `radius`, `density`, `shadow`, `shape`,
+ * `fontPairingId`). Each field is re-validated independently inside
+ * `normalizeThemeRecord`, so a partially malformed bundle only drops the bad
+ * field(s) instead of failing the whole merge. A non-object bundle (or NULL,
+ * the real state for every store today) yields an empty overlay, so the
+ * caller falls straight through to the `resolveThemeDefinition` fallback —
+ * i.e. no behavior change.
+ */
+function extractStoredDefinitionOverlay(
+  variables: unknown,
+  fonts: unknown,
+): Record<string, unknown> {
+  const variablesRecord = toPlainRecord(variables) ?? {};
+  const fontsRecord = toPlainRecord(fonts) ?? {};
+  const overlay: Record<string, unknown> = {};
+
+  if ("colorsLight" in variablesRecord) {
+    overlay.colorsLight = variablesRecord.colorsLight;
+  }
+  if ("colorsDark" in variablesRecord) {
+    overlay.colorsDark = variablesRecord.colorsDark;
+  }
+  if ("radius" in variablesRecord) {
+    overlay.radius = variablesRecord.radius;
+  }
+  if ("density" in variablesRecord) {
+    overlay.density = variablesRecord.density;
+  }
+  if ("shadow" in variablesRecord) {
+    overlay.shadow = variablesRecord.shadow;
+  }
+  if ("shape" in variablesRecord) {
+    overlay.shape = variablesRecord.shape;
+  }
+  if ("fontPairingId" in fontsRecord) {
+    overlay.fontPairingId = fontsRecord.fontPairingId;
+  }
+
+  return overlay;
+}
 
 // Helper para agregar timeout a las promesas
 function withTimeout<T>(
@@ -31,6 +83,28 @@ function normalizeThemeRow(
     return null;
   }
 
+  // `normalizeThemeRecord` always populates these (falling back to
+  // `resolveThemeDefinition` when no stored bundle overrides them), so
+  // `definition` is always present here. The guard just keeps this callsite
+  // defensive against a future change to that guarantee.
+  const definition: ThemeDefinition | undefined =
+    normalized.colorsLight &&
+    normalized.colorsDark &&
+    normalized.radius &&
+    normalized.density &&
+    normalized.shadow &&
+    normalized.shape
+      ? {
+          colorsLight: normalized.colorsLight,
+          colorsDark: normalized.colorsDark,
+          radius: normalized.radius,
+          density: normalized.density,
+          shadow: normalized.shadow,
+          shape: normalized.shape,
+          fontPairingId: normalized.fontPairingId ?? null,
+        }
+      : undefined;
+
   return {
     ...theme,
     theme_name: normalized.theme_name,
@@ -39,6 +113,7 @@ function normalizeThemeRow(
     theme_version_id: normalized.theme_version_id,
     theme_published_at: normalized.theme_published_at,
     store_id: normalized.store_id,
+    definition,
   } as AppTheme;
 }
 
@@ -145,7 +220,7 @@ export async function getActiveTheme(): Promise<AppTheme | null> {
   if (storeId) {
     const { data: version } = await supabase
       .from(ECOMMERCE_TABLES.appThemeVersions)
-      .select("id, store_id, theme_id, created_at")
+      .select("id, store_id, theme_id, created_at, variables, fonts")
       .eq("store_id", storeId)
       .eq("is_current", true)
       .maybeSingle();
@@ -156,10 +231,15 @@ export async function getActiveTheme(): Promise<AppTheme | null> {
         .eq("id", version.theme_id)
         .maybeSingle();
       if (!themeError && theme) {
+        const storedDefinitionOverlay = extractStoredDefinitionOverlay(
+          version.variables,
+          version.fonts,
+        );
         const normalizedTheme = normalizeThemeRow(theme, {
           store_id: version.store_id ?? storeId,
           theme_version_id: version.id,
           theme_published_at: version.created_at,
+          ...storedDefinitionOverlay,
         });
         if (normalizedTheme) {
           return normalizedTheme;

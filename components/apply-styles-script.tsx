@@ -5,9 +5,11 @@
 import Script from "next/script";
 import { DEFAULT_RUNTIME_THEME } from "@/lib/theme-font/runtime-contract";
 import { THEME_CONTRAST_HELPER_SOURCE } from "@/lib/theme-font/contrast";
+import { DEFAULT_DARK_FALLBACK } from "@/lib/theme-font/theme-definition";
 
 export function ApplyStylesScript() {
   const runtimeDefaultTheme = JSON.stringify(DEFAULT_RUNTIME_THEME);
+  const runtimeDarkFallbackColors = JSON.stringify(DEFAULT_DARK_FALLBACK);
 
   return (
     // eslint-disable-next-line @next/next/no-before-interactive-script-outside-document -- Runtime theme must be applied before hydration to avoid unstyled flashes.
@@ -43,10 +45,26 @@ export function ApplyStylesScript() {
       if (!colors || typeof colors !== 'object') return null;
       if (!payload.theme_name || typeof payload.theme_name !== 'string') return null;
       if (!payload.theme_fingerprint || typeof payload.theme_fingerprint !== 'string') return null;
+      const colorsLight = payload.colorsLight && typeof payload.colorsLight === 'object' ? payload.colorsLight : null;
+      const colorsDark = payload.colorsDark && typeof payload.colorsDark === 'object' ? payload.colorsDark : null;
+      const radius = payload.radius && typeof payload.radius === 'object' ? payload.radius : null;
+      const density = payload.density && typeof payload.density === 'object' ? payload.density : null;
+      const shadow = payload.shadow && typeof payload.shadow === 'object' ? payload.shadow : null;
+      const shape = payload.shape && typeof payload.shape === 'object' ? payload.shape : null;
+      const fontPairingId = typeof payload.fontPairingId === 'string' ? payload.fontPairingId : null;
+      const sections = payload.sections && typeof payload.sections === 'object' ? payload.sections : null;
       return {
         theme_name: payload.theme_name,
         theme_fingerprint: payload.theme_fingerprint,
         colors,
+        colorsLight,
+        colorsDark,
+        radius,
+        density,
+        shadow,
+        shape,
+        fontPairingId,
+        sections,
       };
     }
 
@@ -91,8 +109,18 @@ export function ApplyStylesScript() {
     
     // Tema por defecto "Claro Original" - se usa solo si no hay tema guardado
     const defaultTheme = ${runtimeDefaultTheme};
+    // Paleta oscura curada usada cuando el tema activo no trae un set colorsDark propio.
+    const darkFallbackColors = ${runtimeDarkFallbackColors};
 ${THEME_CONTRAST_HELPER_SOURCE}
-    
+
+    // Resolver la preferencia de modo (claro/oscuro/sistema) antes de aplicar colores,
+    // para que el toggle de modo nunca produzca un "flash" del modo contrario.
+    const savedMode = localStorage.getItem('osoria_mode');
+    const modePreference = savedMode === 'dark' || savedMode === 'light' || savedMode === 'system' ? savedMode : 'light';
+    const prefersDarkSystem = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const isDarkMode = modePreference === 'dark' || (modePreference === 'system' && prefersDarkSystem);
+    root.classList.toggle('dark', isDarkMode);
+
     // Aplicar tema desde localStorage (que será actualizado por el ThemeProvider con el tema activo de BD)
     // Si no hay tema guardado, usar el por defecto
     const savedTheme = localStorage.getItem('osoria_active_theme');
@@ -108,10 +136,13 @@ ${THEME_CONTRAST_HELPER_SOURCE}
       }
     }
     
-    // Aplicar el tema (guardado o por defecto)
+    // Aplicar el tema (guardado o por defecto), en el color set del modo resuelto
     if (themeToApply.colors) {
       const body = document.body;
-      const resolvedCssVariables = resolveThemeCssVariables(themeToApply);
+      const selectedColors = isDarkMode
+        ? (themeToApply.colorsDark || darkFallbackColors)
+        : (themeToApply.colorsLight || themeToApply.colors);
+      const resolvedCssVariables = resolveThemeCssVariables({ colors: selectedColors });
       CRITICAL_THEME_CSS_VARIABLES.forEach(function(variableName) {
         root.style.setProperty(variableName, resolvedCssVariables[variableName]);
       });
@@ -123,7 +154,41 @@ ${THEME_CONTRAST_HELPER_SOURCE}
       // Marcar qué tema fue aplicado
       window.__osoria_applied_theme = { theme_name: themeToApply.theme_name, theme_fingerprint: themeToApply.theme_fingerprint || null };
     }
-    
+
+    // Aplicar tokens de forma/sombra (opt-in, independientes del modo). Los
+    // fallbacks reproducen el look actual byte a byte: '--radius' y
+    // '--button-radius' ya coinciden con app/globals.css, y '--card-radius'/
+    // '--shadow-card' coinciden con el radio y la sombra reales en reposo de
+    // VisualProductCard (ver DEFAULT_THEME_TOKENS).
+    var themeRadius = themeToApply.radius || {};
+    var themeShape = themeToApply.shape || {};
+    var themeShadow = themeToApply.shadow || {};
+    root.style.setProperty('--radius', themeRadius.base || '0.5rem');
+    root.style.setProperty('--button-radius', themeShape.button || 'var(--radius)');
+    root.style.setProperty('--card-radius', themeShape.card || '1.5rem');
+    root.style.setProperty('--shadow-card', themeShadow.card || 'none');
+    root.style.setProperty('--shadow-elevated', themeShadow.elevated || 'none');
+
+    // Escala de densidad (independiente del modo). Alimenta el ancla global
+    // '--spacing' en app/globals.css; escala 1 no tiene efecto sobre el
+    // valor por defecto de Tailwind.
+    var themeDensity = themeToApply.density || {};
+    root.style.setProperty('--density-scale', String(themeDensity.scale != null ? themeDensity.scale : 1));
+
+    // Colores de superficie por sección (independientes del modo por ahora).
+    // Cada 'theme.sections.<seccion>' se vuelve '--sec-<seccion>-<clave-kebab>',
+    // ej. 'cardBg' en 'featured' escribe '--sec-featured-card-bg'.
+    var themeSections = themeToApply.sections || {};
+    Object.keys(themeSections).forEach(function(sectionName) {
+      var sectionColors = themeSections[sectionName];
+      if (typeof sectionColors === 'object' && sectionColors !== null) {
+        Object.keys(sectionColors).forEach(function(colorKey) {
+          var kebabKey = colorKey.replace(/([A-Z])/g, '-$1').toLowerCase();
+          root.style.setProperty('--sec-' + sectionName + '-' + kebabKey, sectionColors[colorKey]);
+        });
+      }
+    });
+
     // Aplicar combinación de fuentes (heading + body) desde localStorage
     var pairingApplied = false;
     const savedPairing = localStorage.getItem('osoria_active_pairing');

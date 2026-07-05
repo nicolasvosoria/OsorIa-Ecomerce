@@ -47,50 +47,47 @@ export function StylesProvider({ children }: { children: ReactNode }) {
       setLoading(true);
       setError(null);
 
-      // Obtener store_id actual
+      // Obtener store_id actual para cache local si ya existe como UUID.
       const currentStoreId = getCurrentStoreId();
-      if (!currentStoreId) {
-        console.warn("[v0] No store_id available, skipping style load");
-        setLoading(false);
-        return;
-      }
 
       // Primero intentar cargar desde localStorage para mostrar datos inmediatamente
-      try {
-        const storageKey = resolveScopedStorageKey(
-          "osoria_component_styles",
-          currentStoreId,
-        );
-        if (!storageKey) {
-          setLoading(false);
-          return;
-        }
-        const cachedStyles = localStorage.getItem(storageKey);
-        if (cachedStyles) {
-          const cachedData = JSON.parse(cachedStyles) as Record<
-            string,
-            Record<string, any>
-          >;
-          const cachedMap = new Map<string, Record<string, any>>(
-            Object.entries(cachedData),
+      if (currentStoreId) {
+        try {
+          const storageKey = resolveScopedStorageKey(
+            "osoria_component_styles",
+            currentStoreId,
           );
-          setStyles(cachedMap);
-          console.log(
-            `[v0] Loaded cached styles from localStorage for store ${currentStoreId}:`,
-            cachedMap.size,
-            "components",
-          );
+          if (storageKey) {
+            const cachedStyles = localStorage.getItem(storageKey);
+            if (cachedStyles) {
+              const cachedData = JSON.parse(cachedStyles) as Record<
+                string,
+                Record<string, any>
+              >;
+              const cachedMap = new Map<string, Record<string, any>>(
+                Object.entries(cachedData),
+              );
+              setStyles(cachedMap);
+              console.log(
+                `[v0] Loaded cached styles from localStorage for store ${currentStoreId}:`,
+                cachedMap.size,
+                "components",
+              );
+            }
+          }
+        } catch (e) {
+          console.warn("[v0] Error loading cached styles from localStorage:", e);
         }
-      } catch (e) {
-        console.warn("[v0] Error loading cached styles from localStorage:", e);
       }
 
-      // Luego cargar desde Supabase para obtener la versión más actualizada
+      // Luego cargar desde Supabase para obtener la versión más actualizada.
+      // getComponentStyles resuelve el UUID real del default store cuando el runtime local usa "default".
       const data = await getComponentStyles();
       const stylesMap = new Map<string, Record<string, any>>(
         data.map(
           (style: {
             component_name: string;
+            store_id?: string;
             variables: Record<string, any>;
           }) => [style.component_name, style.variables],
         ),
@@ -99,18 +96,21 @@ export function StylesProvider({ children }: { children: ReactNode }) {
 
       // Guardar en localStorage con store_id para evitar conflictos entre tiendas
       try {
-        const stylesObject = Object.fromEntries(stylesMap);
+        const resolvedStoreId = currentStoreId ?? data[0]?.store_id ?? null;
         const storageKey = resolveScopedStorageKey(
           "osoria_component_styles",
-          currentStoreId,
+          resolvedStoreId,
         );
         if (!storageKey) {
           return;
         }
+        const stylesObject = Object.fromEntries(stylesMap);
         localStorage.setItem(storageKey, JSON.stringify(stylesObject));
 
         // También guardar el store_id actual para referencia
-        localStorage.setItem("osoria_current_store_id", currentStoreId);
+        if (resolvedStoreId) {
+          localStorage.setItem("osoria_current_store_id", resolvedStoreId);
+        }
 
         // Limpiar estilos de otras tiendas si existen (opcional, para ahorrar espacio)
         // Esto se puede hacer periódicamente, no en cada carga
@@ -121,7 +121,7 @@ export function StylesProvider({ children }: { children: ReactNode }) {
       // Logs reducidos para evitar spam en consola
       if (stylesMap.size > 0) {
         console.log(
-          `[v0] Loaded styles from Supabase for store ${currentStoreId}:`,
+          "[v0] Loaded styles from Supabase:",
           stylesMap.size,
           "components",
         );
@@ -150,7 +150,9 @@ export function StylesProvider({ children }: { children: ReactNode }) {
           refreshStyles();
           return true;
         }
-        return false;
+
+        void refreshStyles();
+        return true;
       };
 
       // Intentar cargar inmediatamente

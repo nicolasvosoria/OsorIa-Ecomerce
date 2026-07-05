@@ -67,7 +67,7 @@ export default async function SpeakersPage() {
               Volver al inicio
             </Button>
           </Link>
-          <h1 className="text-4xl md:text-6xl lg:text-[72px] font-inter font-bold mb-4" style={{ color: "var(--foreground)" }}>
+          <h1 className="text-4xl md:text-6xl lg:text-[72px] font-heading font-bold mb-4" style={{ color: "var(--foreground)" }}>
             Speakers
           </h1>
           <p className="text-lg md:text-xl" style={{ color: "var(--muted-foreground)" }}>

@@ -112,16 +112,79 @@ describe("ProductsGrid", () => {
     expect(grid).not.toHaveClass("lg:grid-cols-4")
   })
 
-  it("applies the configured card background and price color to each card", () => {
+  it("applies the configured price color to each card", () => {
     mockUseComponentStyle.mockImplementation((_name: string, defaults: Record<string, unknown>) => ({
-      styles: { ...defaults, cardBgColor: "#f2f2f2", priceColor: "#1e354e" },
+      styles: { ...defaults, priceColor: "#1e354e" },
+    }))
+
+    render(<ProductsGrid initialProducts={[speaker]} />)
+
+    expect(screen.getByText("$ 389.000")).toHaveStyle({ color: "#1e354e" })
+  })
+
+  it("renders no inline background when bgColor is empty, so the section stays transparent and follows the theme", () => {
+    const { container } = render(<ProductsGrid initialProducts={[speaker]} />)
+
+    const section = container.querySelector('section[data-component="products"]')
+    expect(section?.getAttribute("style")).toBeNull()
+  })
+
+  it("applies a configured bgColor as the section's inline background", () => {
+    mockUseComponentStyle.mockImplementation((_name: string, defaults: Record<string, unknown>) => ({
+      styles: { ...defaults, bgColor: "#123456" },
+    }))
+
+    const { container } = render(<ProductsGrid initialProducts={[speaker]} />)
+
+    const section = container.querySelector('section[data-component="products"]')
+    expect(section).toHaveStyle({ backgroundColor: "rgb(18, 52, 86)" })
+  })
+
+  it("falls back to var(--foreground) for the heading when textColor is empty", () => {
+    render(<ProductsGrid initialProducts={[speaker]} />)
+
+    expect(screen.getByText("Productos populares")).toHaveStyle({ color: "var(--foreground)" })
+  })
+
+  it("uses a configured textColor for the heading instead of the theme fallback", () => {
+    mockUseComponentStyle.mockImplementation((_name: string, defaults: Record<string, unknown>) => ({
+      styles: { ...defaults, textColor: "#1e354e" },
+    }))
+
+    render(<ProductsGrid initialProducts={[speaker]} />)
+
+    expect(screen.getByText("Productos populares")).toHaveStyle({ color: "#1e354e" })
+  })
+
+  it("passes no priceColor to the card when it is empty, so the card falls back to text-primary", () => {
+    render(<ProductsGrid initialProducts={[speaker]} />)
+
+    const price = screen.getByText("$ 389.000")
+    expect(price.getAttribute("style")).toBeNull()
+    expect(price).toHaveClass("text-primary")
+  })
+
+  it("lets the card background and corner radius come from the theme instead of a per-section edit", () => {
+    const { container } = render(<ProductsGrid initialProducts={[speaker]} />)
+
+    const article = container.querySelector("article")
+    expect(article?.getAttribute("style")).toBeNull()
+    expect(article).toHaveClass("bg-muted")
+    expect(article).toHaveClass("rounded-[var(--card-radius,1.5rem)]")
+  })
+
+  it("overrides the theme's card background and corner radius when they are set per section", () => {
+    mockUseComponentStyle.mockImplementation((_name: string, defaults: Record<string, unknown>) => ({
+      styles: { ...defaults, cardBgColor: "#f2f2f2", cornerRadius: "xl" },
     }))
 
     const { container } = render(<ProductsGrid initialProducts={[speaker]} />)
 
     const article = container.querySelector("article")
     expect(article).toHaveStyle({ backgroundColor: "#f2f2f2" })
-    expect(screen.getByText("$ 389.000")).toHaveStyle({ color: "#1e354e" })
+    expect(article).not.toHaveClass("bg-muted")
+    expect(article).toHaveClass("rounded-3xl")
+    expect(article).not.toHaveClass("rounded-[var(--card-radius,1.5rem)]")
   })
 
   it("hides the category when showCategory is 'no'", () => {

@@ -17,11 +17,11 @@ export const SPECIAL_OFFER_DEFAULTS = {
     "Una oferta por tiempo limitado configurada como referencia visual para paridad de staging.",
   countdownLabel: "La oferta termina en:",
   linkText: "Comprar ahora",
-  bgColor: "var(--card)",
+  bgColor: "",
   sectionBgColor: "var(--background)",
-  textColor: "var(--secondary-foreground)",
-  productBgColor: "var(--background)",
-  accentColor: "var(--primary)",
+  textColor: "",
+  productBgColor: "",
+  accentColor: "",
   claimedPercent: 32,
 };
 
@@ -63,9 +63,11 @@ export function SpecialOffer() {
   const { componentEdits, isEditMode } = useAdmin();
   const edits = componentEdits.get("specialOffer") || {};
   const offer = { ...SPECIAL_OFFER_DEFAULTS, ...styleData, ...edits };
-  // Deja el color sin definir cuando no está configurado, para que el texto
-  // herede en vez de forzar el token por defecto sobre un bgColor oscuro.
-  const textColor = edits.textColor ?? styleData.textColor;
+
+  const panelBg = offer.bgColor || "var(--sec-specialOffer-bg)";
+  const accentColor = offer.accentColor || "var(--sec-specialOffer-accent)";
+  const productBg = offer.productBgColor || "var(--sec-specialOffer-product-bg)";
+  const textColor = offer.textColor || "var(--sec-specialOffer-text)";
   const claimedPercent = Number.isFinite(Number(offer.claimedPercent))
     ? Math.min(Math.max(Number(offer.claimedPercent), 0), 100)
     : SPECIAL_OFFER_DEFAULTS.claimedPercent;
@@ -111,10 +113,10 @@ export function SpecialOffer() {
     >
       {/* Márgenes alineados con la sección Destacado (mx-2/md:mx-4). */}
       <div
-        className="mx-2 my-4 overflow-hidden rounded-2xl p-6 md:mx-4 md:my-8 md:rounded-3xl md:p-10 lg:p-12"
+        className="mx-2 my-4 overflow-hidden rounded-[var(--card-radius,1.5rem)] p-6 md:mx-4 md:my-8 md:p-10 lg:p-12"
         style={{
-          backgroundColor: offer.bgColor,
-          ...(textColor && { color: textColor }),
+          backgroundColor: panelBg,
+          color: textColor,
         }}
       >
           <div className="mb-8 md:mb-10">
@@ -130,8 +132,8 @@ export function SpecialOffer() {
 
           <div className="grid gap-8 md:grid-cols-2 md:items-center md:gap-10 lg:gap-16">
             <div
-              className="relative flex min-h-[280px] items-center justify-center rounded-2xl p-8 md:min-h-[380px]"
-              style={{ backgroundColor: offer.productBgColor }}
+              className="relative flex min-h-[280px] items-center justify-center rounded-[var(--card-radius,1.5rem)] p-8 md:min-h-[380px]"
+              style={{ backgroundColor: productBg }}
             >
               <VisualProductCardImage
                 src={offer.showcaseImage || card?.imageUrl}
@@ -155,7 +157,7 @@ export function SpecialOffer() {
                     ) : null}
                     <span
                       className="text-3xl font-bold"
-                      style={{ color: offer.accentColor }}
+                      style={{ color: accentColor }}
                     >
                       {card.price.label}
                     </span>
@@ -181,7 +183,7 @@ export function SpecialOffer() {
                     className="h-0.5"
                     style={{
                       width: `${claimedPercent}%`,
-                      backgroundColor: offer.accentColor,
+                      backgroundColor: accentColor,
                     }}
                   />
                 </div>
@@ -221,8 +223,8 @@ export function SpecialOffer() {
               {card && !isExpired ? (
                 <Button
                   asChild
-                  className="w-fit rounded-full px-8"
-                  style={{ backgroundColor: offer.accentColor }}
+                  className="w-fit rounded-[var(--button-radius)] px-8"
+                  style={{ backgroundColor: accentColor }}
                 >
                   <Link href={card.href}>
                     {offer.linkText} <span aria-hidden>→</span>

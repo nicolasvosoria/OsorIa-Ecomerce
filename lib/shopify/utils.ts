@@ -1,13 +1,28 @@
 import { thumbHashToDataURL } from 'thumbhash';
+import {
+  formatCommercePrice,
+  getAdminCompareAtPriceNotice,
+  getValidCompareAtPrice,
+  resolveCommercePrice,
+} from '@/lib/products/pricing';
+import type { Money } from './types';
 import { ProductCollectionSortKey, ProductSortKey } from './types';
 
 // Format price utility
-export const formatPrice = (price: string, currencyCode: string): string => {
-  return new Intl.NumberFormat(undefined, {
-    style: 'currency',
-    currency: currencyCode,
-    currencyDisplay: 'narrowSymbol',
-  }).format(parseFloat(price));
+export const formatPrice = (price: number | string, currencyCode: string = 'COP'): string =>
+  formatCommercePrice(price, currencyCode);
+
+export function resolveProductPricing(currentPrice: Money, compareAtPrice?: Money) {
+  return resolveCommercePrice({
+    amount: currentPrice.amount,
+    currencyCode: currentPrice.currencyCode,
+    compareAtAmount: compareAtPrice?.amount,
+  });
+}
+
+export {
+  getAdminCompareAtPriceNotice,
+  getValidCompareAtPrice,
 };
 
 // Helper for returning the expected error state to actions instead of throwing.

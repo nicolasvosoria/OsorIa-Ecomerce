@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { Fragment, useState } from "react"
 import { useTheme } from "@/contexts/theme-context"
 import { useStore } from "@/contexts/store-context"
 import {
@@ -10,6 +10,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { Loader2 } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -25,6 +35,7 @@ export function ThemeSelectorModal({ open, onOpenChange }: ThemeSelectorModalPro
   const [changing, setChanging] = useState<string | null>(null)
   const [publicationMessage, setPublicationMessage] = useState<string | null>(null)
   const [publicationError, setPublicationError] = useState<string | null>(null)
+  const [pendingThemeName, setPendingThemeName] = useState<string | null>(null)
 
   // Verificar si el cambio de tema está deshabilitado para este subdominio
   const isThemeChangeDisabled = store?.subdomain === 'reposteria'
@@ -48,81 +59,123 @@ export function ThemeSelectorModal({ open, onOpenChange }: ThemeSelectorModalPro
     setPublicationError(result.error || "No se pudo confirmar la publicación")
   }
 
+  // Aplicar un tema restablece los estilos por sección de la tienda al
+  // nuevo tema (el contenido se mantiene), así que se confirma antes de
+  // llamar a changeTheme.
+  const requestThemeChange = (themeName: string) => {
+    if (changing) return
+    if (isThemeChangeDisabled) return
+
+    setPendingThemeName(themeName)
+  }
+
+  const confirmPendingThemeChange = async () => {
+    const themeName = pendingThemeName
+    setPendingThemeName(null)
+    if (!themeName) return
+
+    await handleThemeChange(themeName)
+  }
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] max-w-[500px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-lg md:text-xl">Seleccionar Tema</DialogTitle>
-          <DialogDescription className="text-sm">
-            {isThemeChangeDisabled 
-              ? "Los temas solo pueden ser modificados desde el panel de administración"
-              : "Elige un tema para personalizar los colores de la página"}
-          </DialogDescription>
-        </DialogHeader>
+    <Fragment>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="w-[95vw] max-w-[500px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-lg md:text-xl">Seleccionar Tema</DialogTitle>
+            <DialogDescription className="text-sm">
+              {isThemeChangeDisabled
+                ? "Los temas solo pueden ser modificados desde el panel de administración"
+                : "Elige un tema para personalizar los colores de la página"}
+            </DialogDescription>
+          </DialogHeader>
 
-        {publicationMessage && (
-          <Alert className="mb-4">
-            <AlertDescription className="text-sm">{publicationMessage}</AlertDescription>
-          </Alert>
-        )}
+          {publicationMessage && (
+            <Alert className="mb-4">
+              <AlertDescription className="text-sm">{publicationMessage}</AlertDescription>
+            </Alert>
+          )}
 
-        {publicationError && (
-          <Alert className="mb-4" variant="destructive">
-            <AlertDescription className="text-sm">{publicationError}</AlertDescription>
-          </Alert>
-        )}
+          {publicationError && (
+            <Alert className="mb-4" variant="destructive">
+              <AlertDescription className="text-sm">{publicationError}</AlertDescription>
+            </Alert>
+          )}
 
-        {isThemeChangeDisabled && (
-          <Alert className="mb-4">
-            <AlertDescription className="text-sm">
-              En esta tienda, los temas solo pueden ser modificados desde el panel de administración.
-            </AlertDescription>
-          </Alert>
-        )}
+          {isThemeChangeDisabled && (
+            <Alert className="mb-4">
+              <AlertDescription className="text-sm">
+                En esta tienda, los temas solo pueden ser modificados desde el panel de administración.
+              </AlertDescription>
+            </Alert>
+          )}
 
-        {loading ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
-        ) : themes.length === 0 ? (
-          <div className="py-8 text-center text-sm text-muted-foreground">
-            No hay temas disponibles
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-2 md:gap-3 py-2 md:py-4">
-            {themes.map((theme) => {
-              const isActive = activeTheme?.theme_name === theme.theme_name
-              const isChanging = changing === theme.theme_name
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : themes.length === 0 ? (
+            <div className="py-8 text-center text-sm text-muted-foreground">
+              No hay temas disponibles
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-2 md:gap-3 py-2 md:py-4">
+              {themes.map((theme) => {
+                const isActive = activeTheme?.theme_name === theme.theme_name
+                const isChanging = changing === theme.theme_name
 
-              return (
-                <Button
-                  key={theme.id}
-                  variant={isActive ? "default" : "outline"}
-                  className="w-full justify-start h-auto p-3 md:p-4 text-sm md:text-base"
-                  onClick={() => handleThemeChange(theme.theme_name)}
-                  disabled={isChanging || isActive || isThemeChangeDisabled}
-                >
-                  <div className="flex items-center gap-2 md:gap-3 w-full">
-                    <div
-                      className="w-6 h-6 md:w-8 md:h-8 rounded-full border-2 border-border flex-shrink-0"
-                      style={{ backgroundColor: theme.colors.primary }}
-                    />
-                    <div className="flex-1 text-left min-w-0">
-                      <div className="font-medium truncate">{theme.theme_name}</div>
-                      {isActive && (
-                        <div className="text-xs text-muted-foreground">Activo</div>
+                return (
+                  <Button
+                    key={theme.id}
+                    variant={isActive ? "default" : "outline"}
+                    className="w-full justify-start h-auto p-3 md:p-4 text-sm md:text-base"
+                    onClick={() => requestThemeChange(theme.theme_name)}
+                    disabled={isChanging || isActive || isThemeChangeDisabled}
+                  >
+                    <div className="flex items-center gap-2 md:gap-3 w-full">
+                      <div
+                        className="w-6 h-6 md:w-8 md:h-8 rounded-full border-2 border-border flex-shrink-0"
+                        style={{ backgroundColor: theme.colors.primary }}
+                      />
+                      <div className="flex-1 text-left min-w-0">
+                        <div className="font-medium truncate">{theme.theme_name}</div>
+                        {isActive && (
+                          <div className="text-xs text-muted-foreground">Activo</div>
+                        )}
+                      </div>
+                      {isChanging && (
+                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground flex-shrink-0" />
                       )}
                     </div>
-                    {isChanging && (
-                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground flex-shrink-0" />
-                    )}
-                  </div>
-                </Button>
-              )
-            })}
-          </div>
-        )}
-      </DialogContent>
-    </Dialog>
+                  </Button>
+                )
+              })}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog
+        open={pendingThemeName !== null}
+        onOpenChange={(next) => {
+          if (!next) setPendingThemeName(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Aplicar tema</AlertDialogTitle>
+            <AlertDialogDescription>
+              {`Al aplicar «${pendingThemeName ?? ""}», los estilos de tus secciones se restablecen al nuevo tema. Tu contenido (productos, imágenes y textos) se mantiene. ¿Continuar?`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmPendingThemeChange}>
+              Continuar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </Fragment>
   )
 }

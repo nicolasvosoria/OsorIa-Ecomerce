@@ -27,6 +27,10 @@ import { updateItem, getCategories, getItemById } from "@/lib/supabase/products-
 import type { ItemCategory } from "@/lib/types/products"
 import { MultiImageUpload } from "@/components/admin/multi-image-upload"
 import { toast } from "sonner"
+import {
+  getAdminCompareAtPriceNotice,
+  getValidCompareAtPrice,
+} from "@/lib/products/pricing"
 
 export default function EditProductPage() {
   const { isAdmin, loading } = useAdminPermissions()
@@ -62,6 +66,10 @@ export default function EditProductPage() {
   })
   
   const [images, setImages] = useState<string[]>([])
+  const compareAtPriceNotice = getAdminCompareAtPriceNotice(
+    formData.base_price,
+    formData.compare_at_price,
+  )
 
   useEffect(() => {
     if (!loading && !isAdmin) {
@@ -196,6 +204,14 @@ export default function EditProductPage() {
         // Si está vacío, eliminar ai_details del metadata
         delete metadata.ai_details
       }
+      const validCompareAtPrice = getValidCompareAtPrice(
+        formData.base_price,
+        formData.compare_at_price,
+      )
+
+      if (formData.compare_at_price && compareAtPriceNotice) {
+        toast.warning(compareAtPriceNotice)
+      }
 
       const result = await updateItem(
         productId,
@@ -205,7 +221,7 @@ export default function EditProductPage() {
           item_description: formData.item_description.trim() || undefined,
           category_id: formData.category_id || undefined,
           base_price: parseFloat(formData.base_price),
-          compare_at_price: formData.compare_at_price ? parseFloat(formData.compare_at_price) : undefined,
+          compare_at_price: validCompareAtPrice,
           currency_code: formData.currency_code,
           is_active: formData.is_active,
           is_featured: formData.is_featured,
@@ -423,11 +439,14 @@ export default function EditProductPage() {
               <Card>
                 <CardHeader>
                   <CardTitle>Precios</CardTitle>
+                  <CardDescription>
+                    El precio de venta actual es el que paga el cliente. El precio anterior solo se muestra tachado si es mayor.
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-3 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="base_price">Precio Base *</Label>
+                      <Label htmlFor="base_price">Precio base / venta actual *</Label>
                       <Input
                         id="base_price"
                         type="number"
@@ -441,7 +460,7 @@ export default function EditProductPage() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="compare_at_price">Precio Comparación</Label>
+                      <Label htmlFor="compare_at_price">Precio anterior / precio de comparación</Label>
                       <Input
                         id="compare_at_price"
                         type="number"
@@ -451,6 +470,15 @@ export default function EditProductPage() {
                         onChange={(e) => setFormData({ ...formData, compare_at_price: e.target.value })}
                         placeholder="0.00"
                       />
+                      {compareAtPriceNotice ? (
+                        <p className="text-xs font-medium text-destructive">
+                          {compareAtPriceNotice}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">
+                          Déjalo vacío si el producto no tiene descuento.
+                        </p>
+                      )}
                     </div>
 
                     <div className="space-y-2">
@@ -675,5 +703,3 @@ export default function EditProductPage() {
     </div>
   )
 }
-
-

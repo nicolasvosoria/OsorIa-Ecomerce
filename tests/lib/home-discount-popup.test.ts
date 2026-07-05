@@ -169,16 +169,28 @@ describe("isHomeDiscountPopupEligible", () => {
 });
 
 describe("datetime-local helpers", () => {
-  it("formats stored ISO strings using local wall-clock values", () => {
+  it("formats stored ISO strings using runtime local wall-clock values", () => {
+    const date = new Date("2026-04-23T10:45:00.000Z");
+    const expectedDate = [
+      date.getFullYear(),
+      String(date.getMonth() + 1).padStart(2, "0"),
+      String(date.getDate()).padStart(2, "0"),
+    ].join("-");
+    const expectedTime = [
+      String(date.getHours()).padStart(2, "0"),
+      String(date.getMinutes()).padStart(2, "0"),
+    ].join(":");
+
     expect(toDateTimeLocalValue("2026-04-23T10:45:00.000Z")).toBe(
-      "2026-04-23T10:45",
+      `${expectedDate}T${expectedTime}`,
     );
   });
 
-  it("parses datetime-local input back to ISO", () => {
-    expect(parseDateTimeLocalValue("2026-04-23T10:45")).toBe(
-      "2026-04-23T10:45:00.000Z",
-    );
+  it("round-trips datetime-local input back to the original ISO instant", () => {
+    const isoValue = "2026-04-23T10:45:00.000Z";
+    const localValue = toDateTimeLocalValue(isoValue);
+
+    expect(parseDateTimeLocalValue(localValue)).toBe(isoValue);
   });
 });
 

@@ -1,0 +1,314 @@
+{
+  "reference": {
+    "name": "BeComputerShop2",
+    "url": "https://themes.muffingroup.com/be/computershop2/",
+    "licenseNote": "User confirmed licensed use for staging/default-store visual parity. Do not hardcode assets in React components."
+  },
+  "store": {
+    "subdomain": "default",
+    "storeName": "Osoria Computer Shop",
+    "currencyCode": "COP"
+  },
+  "storage": {
+    "bucket": "products",
+    "prefix": "visual-reference/computershop2"
+  },
+  "assets": [
+    {
+      "key": "logo",
+      "url": "https://themes.muffingroup.com/be/computershop2/wp-content/uploads/2024/11/computershop2-logo.svg",
+      "path": "brand/computershop2-logo.svg"
+    },
+    {
+      "key": "headerIcon",
+      "url": "https://themes.muffingroup.com/be/computershop2/wp-content/uploads/2024/11/computershop2-header-icon1.svg",
+      "path": "brand/computershop2-header-icon1.svg"
+    },
+    {
+      "key": "speakerHero",
+      "url": "https://themes.muffingroup.com/be/computershop2/wp-content/uploads/2024/11/computershop2-home-pic1.webp",
+      "path": "home/computershop2-home-pic1.webp"
+    },
+    {
+      "key": "speakerTile",
+      "url": "https://themes.muffingroup.com/be/computershop2/wp-content/uploads/2024/11/computershop2-home-pic2.webp",
+      "path": "home/computershop2-home-pic2.webp"
+    },
+    {
+      "key": "earphonesTile",
+      "url": "https://themes.muffingroup.com/be/computershop2/wp-content/uploads/2024/11/computershop2-home-pic3.webp",
+      "path": "home/computershop2-home-pic3.webp"
+    },
+    {
+      "key": "standsTile",
+      "url": "https://themes.muffingroup.com/be/computershop2/wp-content/uploads/2024/11/computershop2-home-pic4.webp",
+      "path": "home/computershop2-home-pic4.webp"
+    },
+    {
+      "key": "projectorsTile",
+      "url": "https://themes.muffingroup.com/be/computershop2/wp-content/uploads/2024/11/computershop2-home-pic5.webp",
+      "path": "home/computershop2-home-pic5.webp"
+    },
+    {
+      "key": "specialOffer",
+      "url": "https://themes.muffingroup.com/be/computershop2/wp-content/uploads/2024/11/computershop2-home-pic6.webp",
+      "path": "home/computershop2-home-pic6.webp"
+    },
+    {
+      "key": "smartSpeakJessica",
+      "url": "https://themes.muffingroup.com/be/computershop2/wp-content/uploads/2024/11/computershop2-product11.webp",
+      "path": "products/computershop2-product11.webp"
+    },
+    {
+      "key": "earphonesLorem",
+      "url": "https://themes.muffingroup.com/be/computershop2/wp-content/uploads/2024/11/computershop2-product4.webp",
+      "path": "products/computershop2-product4.webp"
+    },
+    {
+      "key": "beshow4k",
+      "url": "https://themes.muffingroup.com/be/computershop2/wp-content/uploads/2024/11/computershop2-product16.webp",
+      "path": "products/computershop2-product16.webp"
+    },
+    {
+      "key": "woodenStand",
+      "url": "https://themes.muffingroup.com/be/computershop2/wp-content/uploads/2024/11/computershop2-product15.webp",
+      "path": "products/computershop2-product15.webp"
+    },
+    {
+      "key": "beshowIsland",
+      "url": "https://themes.muffingroup.com/be/computershop2/wp-content/uploads/2024/11/computershop2-product8.webp",
+      "path": "products/computershop2-product8.webp"
+    },
+    {
+      "key": "earphonesC48",
+      "url": "https://themes.muffingroup.com/be/computershop2/wp-content/uploads/2024/11/computershop2-product6.webp",
+      "path": "products/computershop2-product6.webp"
+    },
+    {
+      "key": "bephonesXrt",
+      "url": "https://themes.muffingroup.com/be/computershop2/wp-content/uploads/2024/11/computershop2-product2.webp",
+      "path": "products/computershop2-product2.webp"
+    },
+    {
+      "key": "bebudsMega",
+      "url": "https://themes.muffingroup.com/be/computershop2/wp-content/uploads/2024/11/computershop2-product1.webp",
+      "path": "products/computershop2-product1.webp"
+    },
+    {
+      "key": "supportIcon",
+      "url": "https://themes.muffingroup.com/be/computershop2/wp-content/uploads/2024/11/computershop2-home-icon1.svg",
+      "path": "icons/computershop2-home-icon1.svg"
+    },
+    {
+      "key": "shippingIcon",
+      "url": "https://themes.muffingroup.com/be/computershop2/wp-content/uploads/2024/11/computershop2-home-icon2.svg",
+      "path": "icons/computershop2-home-icon2.svg"
+    },
+    {
+      "key": "paymentIcon",
+      "url": "https://themes.muffingroup.com/be/computershop2/wp-content/uploads/2024/11/computershop2-home-icon3.svg",
+      "path": "icons/computershop2-home-icon3.svg"
+    },
+    {
+      "key": "discountIcon",
+      "url": "https://themes.muffingroup.com/be/computershop2/wp-content/uploads/2024/11/computershop2-home-icon4.svg",
+      "path": "icons/computershop2-home-icon4.svg"
+    },
+    {
+      "key": "newsletterIcon",
+      "url": "https://themes.muffingroup.com/be/computershop2/wp-content/uploads/2024/11/computershop2-home-icon5.svg",
+      "path": "icons/computershop2-home-icon5.svg"
+    }
+  ],
+  "categories": [
+    {
+      "name": "Speakers",
+      "description": "Living in today's metropolitan world with high-tech gadgets.",
+      "assetKey": "speakerTile",
+      "displayOrder": 1
+    },
+    {
+      "name": "Earphones",
+      "description": "Portable sound and music accessories.",
+      "assetKey": "earphonesTile",
+      "displayOrder": 2
+    },
+    {
+      "name": "Projectors",
+      "description": "Home cinema and presentation projectors.",
+      "assetKey": "projectorsTile",
+      "displayOrder": 3
+    },
+    {
+      "name": "Stands",
+      "description": "Laptop and desk accessories.",
+      "assetKey": "standsTile",
+      "displayOrder": 4
+    }
+  ],
+  "products": [
+    {
+      "sku": "CS2-SPEAKER-JESSICA",
+      "name": "SmartSpeak Jessica",
+      "slug": "smartspeak-jessica",
+      "category": "Speakers",
+      "basePrice": 389000,
+      "compareAtPrice": 459000,
+      "assetKey": "smartSpeakJessica",
+      "featured": true,
+      "displayOrder": 1
+    },
+    {
+      "sku": "CS2-EAR-C48L3",
+      "name": "Earphones Lorem C48L3",
+      "slug": "earphones-lorem-c48l3",
+      "category": "Earphones",
+      "basePrice": 29000,
+      "assetKey": "earphonesLorem",
+      "featured": true,
+      "displayOrder": 2
+    },
+    {
+      "sku": "CS2-PROJ-D00D1",
+      "name": "BeShow 4k D00D1-CK",
+      "slug": "beshow-4k-d00d1-ck",
+      "category": "Projectors",
+      "basePrice": 2899000,
+      "compareAtPrice": 3225000,
+      "assetKey": "beshow4k",
+      "featured": true,
+      "displayOrder": 3
+    },
+    {
+      "sku": "CS2-STAND-WOOD",
+      "name": "Prestige wooden laptop stand",
+      "slug": "prestige-wooden-laptop-stand",
+      "category": "Stands",
+      "basePrice": 259000,
+      "assetKey": "woodenStand",
+      "featured": true,
+      "displayOrder": 4
+    },
+    {
+      "sku": "CS2-PROJ-ISLAND",
+      "name": "BeShow Island",
+      "slug": "beshow-island",
+      "category": "Projectors",
+      "basePrice": 2299000,
+      "assetKey": "beshowIsland",
+      "featured": false,
+      "displayOrder": 5
+    },
+    {
+      "sku": "CS2-EAR-XRT555",
+      "name": "BePhones XRT-555",
+      "slug": "bephones-xrt-555",
+      "category": "Earphones",
+      "basePrice": 299000,
+      "assetKey": "bephonesXrt",
+      "featured": false,
+      "displayOrder": 6
+    },
+    {
+      "sku": "CS2-EAR-MEGA2",
+      "name": "BeBuds Mega 2",
+      "slug": "bebuds-mega-2",
+      "category": "Earphones",
+      "basePrice": 129000,
+      "assetKey": "bebudsMega",
+      "featured": false,
+      "displayOrder": 7
+    },
+    {
+      "sku": "CS2-EAR-XTR4",
+      "name": "BePhones XTR4 earphones",
+      "slug": "bephones-xtr4-earphones",
+      "category": "Earphones",
+      "basePrice": 79000,
+      "compareAtPrice": 99000,
+      "assetKey": "earphonesC48",
+      "featured": true,
+      "displayOrder": 8
+    },
+    {
+      "sku": "CS2-SPECIAL-W00DY",
+      "name": "W00DY CX700",
+      "slug": "w00dy-cx700",
+      "category": "Speakers",
+      "basePrice": 699000,
+      "compareAtPrice": 875000,
+      "assetKey": "specialOffer",
+      "featured": true,
+      "displayOrder": 9
+    }
+  ],
+  "componentStyles": {
+    "hero": {
+      "layoutMode": "split",
+      "backgroundMode": "fill",
+      "imageFit": "contain",
+      "title": "Smarthome Speaker",
+      "label": "Electronics",
+      "subtitle": "Big Sale! Hurry up!",
+      "description": "It won\u2019t be a bigger problem to find one video game lover in your neighbor.",
+      "buttonText": "BUY NOW",
+      "products": [
+        {
+          "label": "Electronics",
+          "title": "Smarthome Speaker",
+          "subtitle": "Big Sale",
+          "description": "It won\u2019t be a bigger problem to find one video game lover in your neighbor.",
+          "buttonText": "BUY NOW",
+          "imageAssetKey": "speakerHero",
+          "productImageAssetKey": "speakerHero",
+          "textSize": "feature",
+          "productPresence": "prominent"
+        }
+      ]
+    },
+    "popular": {
+      "title": "Popular Items",
+      "priceLabel": "Starting at $29"
+    },
+    "products": {
+      "eyebrow": "Electronics",
+      "title": "Popular products",
+      "description": "Reference-aligned product cards powered by the default store catalog."
+    },
+    "featured": {
+      "title": "Please, don\u2019t stop the music!",
+      "subtitle": "Users choice in this week!",
+      "productName": "BePhones XTR4 earphones",
+      "originalPrice": "$99.00",
+      "salePrice": "$79.00",
+      "linkText": "See all products",
+      "mainImageAssetKey": "earphonesTile",
+      "productImageAssetKey": "earphonesC48",
+      "bgColor": "#b8fff5"
+    },
+    "specialOffer": {
+      "eyebrow": "Electronics",
+      "title": "Special Offer",
+      "productName": "W00DY CX700",
+      "originalPrice": "$875.00",
+      "salePrice": "$699.00",
+      "description": "A limited-time Computershop2 reference offer prepared for default-store staging parity.",
+      "claimedLabel": "Already Claimed 32%",
+      "countdownLabel": "Deal ends in:",
+      "linkText": "BUY NOW",
+      "href": "/products/w00dy-cx700",
+      "imageAssetKey": "specialOffer",
+      "bgColor": "#f7f4ed"
+    },
+    "whyus": {
+      "title": "Why us?"
+    },
+    "newsletter": {
+      "title": "Join Our Newsletter",
+      "description": "Get product drops, reference-aligned offers, and a 10% discount for your next purchase.",
+      "discountText": "Get a 10% discount for your next purchase",
+      "emailPlaceholder": "Email address",
+      "buttonText": "Subscribe"
+    }
+  }
+}

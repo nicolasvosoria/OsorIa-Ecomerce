@@ -36,6 +36,8 @@ export const lucideReactMock = {
   Plus: () => <span aria-hidden="true" />,
   Minus: () => <span aria-hidden="true" />,
   X: () => <span aria-hidden="true" />,
+  Sun: () => <span aria-hidden="true" />,
+  Moon: () => <span aria-hidden="true" />,
 }
 
 export const uiButtonMock = {
@@ -82,6 +84,9 @@ export const uiDropdownMenuMock = {
 }
 
 export const themeContextMock = { useTheme: () => ({ activeTheme: null }) }
+export const modeContextMock = {
+  useMode: () => ({ mode: "light", isDark: false, setMode: vi.fn() }),
+}
 export const storeContextMock = { useStore: () => ({ store: null }) }
 export const cartContextMock = {
   useCart: () => ({

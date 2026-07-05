@@ -14,10 +14,15 @@ import {
   setActiveTheme,
 } from "@/lib/supabase/themes-api";
 import { useAuth } from "@/contexts/auth-context";
+import { useStyles } from "@/contexts/styles-context";
 import type { AppTheme } from "@/lib/types/theme";
 import { applyRuntimeTheme } from "@/lib/theme-font/bootstrap";
 import { normalizeThemeRecord } from "@/lib/theme-font/runtime-contract";
 import { deferStateUpdate } from "@/lib/react/defer-state-update";
+import {
+  getRuntimeStoreIdSync,
+  resolveScopedStorageKey,
+} from "@/lib/utils/store";
 
 interface ThemeContextType {
   themes: AppTheme[];
@@ -38,6 +43,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { isAuthenticated } = useAuth();
+  const { refreshStyles } = useStyles();
   const appliedThemeRef = useRef<string | null>(null); // Para evitar aplicar el mismo tema múltiples veces
 
   const refreshThemes = async () => {
@@ -148,6 +154,27 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
           setActiveThemeState(selectedTheme);
         }
         await refreshThemes();
+
+        // Slice 5 (D3): the server just reset this store's per-section
+        // `component_styles`. Drop the local cache and refetch so the
+        // editor/storefront stop showing the now-deleted overrides.
+        if (typeof window !== "undefined") {
+          try {
+            const storageKey = resolveScopedStorageKey(
+              "osoria_component_styles",
+              getRuntimeStoreIdSync(),
+            );
+            if (storageKey) {
+              localStorage.removeItem(storageKey);
+            }
+          } catch (e) {
+            console.warn(
+              "[Theme] Error clearing component styles cache:",
+              e,
+            );
+          }
+          await refreshStyles();
+        }
       }
       return result;
     } catch (err) {

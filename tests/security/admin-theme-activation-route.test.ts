@@ -281,6 +281,15 @@ describe("theme activation admin route", () => {
     });
     expect(themeVersionsTable.update).toHaveBeenCalledWith({
       is_current: true,
+      variables: expect.objectContaining({
+        colorsLight: expect.objectContaining({ primary: "#111111" }),
+        colorsDark: expect.any(Object),
+        radius: expect.any(Object),
+        density: expect.any(Object),
+        shadow: expect.any(Object),
+        shape: expect.any(Object),
+      }),
+      fonts: { fontPairingId: null },
     });
     expect(activateChain.eq).toHaveBeenCalledWith("id", "version-1");
     expect(getUser).toHaveBeenCalledWith("preview-token");
