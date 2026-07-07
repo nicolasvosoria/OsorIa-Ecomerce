@@ -35,7 +35,7 @@ export interface AppTheme {
 
 /**
  * A "mode" is the real light/dark toggle. It selects which color set of a
- * `ThemeDefinition` renders. Wiring the toggle itself is a later slice.
+ * `ThemeDefinition` renders.
  */
 export type ThemeMode = "light" | "dark"
 
@@ -55,6 +55,19 @@ export interface ThemeShadow {
 export interface ThemeShape {
   button: string
   card: string
+}
+
+/**
+ * One row of a store's theme version history (D3): who it is (custom vs.
+ * preset), whether it is the version currently live, and when it was
+ * published. Never carries `variables`/`fonts` — those stay server-side.
+ */
+export interface ThemeVersionSummary {
+  id: string
+  isCurrent: boolean
+  isCustom: boolean
+  createdAt: string
+  baseThemeName: string
 }
 
 /**

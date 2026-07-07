@@ -86,6 +86,101 @@
   --sidebar-ring: oklch(0.439 0 0);
 }
 
+/* Neutral chrome for the theme editor (D24): its own UI (topbar, sidebar,
+   panels, portaled Select content) must look the same no matter which store
+   theme is active, so it redeclares every semantic token this subtree's
+   shadcn components read. A plain, unlayered selector — like `--spacing`
+   above — beats `@theme`/`@layer` in the cascade, so it overrides the
+   theme bootstrap's inline vars on `:root` regardless of source order.
+   Applied to the editor root and to portaled Select/Popover/Tooltip content
+   the editor itself renders. Its light/dark axis follows the app's `.dark`
+   class (the SAME signal shadcn's `dark:` variants use) so the neutral chrome
+   and the form controls inside it are always consistent — only the palette is
+   neutral, decoupled from the store theme's colors. */
+.editor-chrome {
+  /* Establish the neutral color as the inherited default so elements without an
+     explicit text-* class don't fall back to the store theme's foreground
+     (which would be unreadable on the neutral surface). */
+  color: var(--foreground);
+  --background: #f7f8fa;
+  --foreground: #1f2328;
+  --card: #ffffff;
+  --card-foreground: #1f2328;
+  --popover: #ffffff;
+  --popover-foreground: #1f2328;
+  --primary: #4f46e5;
+  --primary-foreground: #ffffff;
+  --secondary: #eef0f3;
+  --secondary-foreground: #1f2328;
+  --muted: #eef0f3;
+  --muted-foreground: #5b6270;
+  --accent: #e8eaf6;
+  --accent-foreground: #1f2328;
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: #ffffff;
+  --border: #d8dce2;
+  --input: #d8dce2;
+  --ring: #4f46e5;
+  --success: #059669;
+}
+
+.dark .editor-chrome {
+  --background: #1c1e22;
+  --foreground: #e8e9ec;
+  --card: #232529;
+  --card-foreground: #e8e9ec;
+  --popover: #232529;
+  --popover-foreground: #e8e9ec;
+  --primary: #4f46e5;
+  --primary-foreground: #ffffff;
+  --secondary: #2b2e33;
+  --secondary-foreground: #e8e9ec;
+  --muted: #2b2e33;
+  --muted-foreground: #a8adb8;
+  --accent: #2f3340;
+  --accent-foreground: #e8e9ec;
+  --destructive: oklch(0.396 0.141 25.723);
+  --destructive-foreground: #ffffff;
+  /* Brighter than the light editor-chrome's border/input pairing so the
+     border stays visible (>=3:1) against this block's own --background and
+     --card — the previous #3a3d43 sat at ~1.5:1, blending inputs into the
+     panel. */
+  --border: #6b7280;
+  --input: #6b7280;
+  --ring: #818cf8;
+  --success: #34d399;
+}
+
+/* shadcn's SelectTrigger (components/ui/select.tsx) hardcodes `bg-white` with
+   no dark variant, unlike Input's `bg-transparent` + `dark:bg-input/30`. Left
+   as-is, that hardcoded white ignores this subtree's neutral surface and
+   clashes with the dark editor-chrome panel. Scoped to the editor instead of
+   editing the shared select.tsx (used across the whole storefront): make the
+   trigger match Input's background treatment so both controls read as the
+   same "form field" surface. */
+.editor-chrome [data-slot='select-trigger'] {
+  background-color: transparent;
+}
+
+.dark .editor-chrome [data-slot='select-trigger'] {
+  background-color: color-mix(in oklab, var(--input) 30%, transparent);
+}
+
+/* shadcn's TooltipContent (components/ui/tooltip.tsx) uses `bg-foreground
+   text-background` (an inverted tooltip) plus a foreground-colored arrow. In
+   the dark editor chrome that renders as a glaring near-white box that clashes
+   with the neutral popover surface every other editor overlay uses. Scope the
+   editor's tooltips to the popover surface instead of editing the shared
+   component (used across the storefront). */
+.editor-chrome[data-slot='tooltip-content'] {
+  background-color: var(--popover);
+  color: var(--popover-foreground);
+  border: 1px solid var(--border);
+}
+.editor-chrome[data-slot='tooltip-content'] svg {
+  fill: var(--popover);
+}
+
 @theme inline {
   --font-family-sans: var(--font-geist-sans), sans-serif;
   --font-family-heading: var(--font-geist-sans), sans-serif;
@@ -130,6 +225,10 @@
 
 @utility font-heading {
   font-family: var(--font-family-heading, var(--font-family-sans));
+}
+
+@utility rounded-card {
+  border-radius: var(--card-radius, 1.5rem);
 }
 
 @layer base {

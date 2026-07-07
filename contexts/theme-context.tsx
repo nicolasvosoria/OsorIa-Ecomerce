@@ -12,12 +12,18 @@ import {
   getThemes,
   getActiveTheme,
   setActiveTheme,
+  setActiveThemeCustom,
+  revertToThemeVersion,
 } from "@/lib/supabase/themes-api";
 import { useAuth } from "@/contexts/auth-context";
 import { useStyles } from "@/contexts/styles-context";
-import type { AppTheme } from "@/lib/types/theme";
+import type { AppTheme, ThemeDefinition } from "@/lib/types/theme";
 import { applyRuntimeTheme } from "@/lib/theme-font/bootstrap";
 import { normalizeThemeRecord } from "@/lib/theme-font/runtime-contract";
+import {
+  isThemePreviewMode,
+  parseThemePreviewMessage,
+} from "@/lib/theme-font/preview-mode";
 import { deferStateUpdate } from "@/lib/react/defer-state-update";
 import {
   getRuntimeStoreIdSync,
@@ -31,6 +37,13 @@ interface ThemeContextType {
   error: string | null;
   changeTheme: (
     themeName: string,
+  ) => Promise<{ success: boolean; error?: string; activeTheme?: AppTheme }>;
+  changeThemeCustom: (
+    baseThemeName: string,
+    definition: ThemeDefinition,
+  ) => Promise<{ success: boolean; error?: string; activeTheme?: AppTheme }>;
+  revertToVersion: (
+    versionId: string,
   ) => Promise<{ success: boolean; error?: string; activeTheme?: AppTheme }>;
   refreshThemes: () => Promise<void>;
 }
@@ -104,6 +117,43 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Shared post-activation handling for both preset and custom applies: apply
+  // + cache the confirmed theme, refresh the list, and drop/refetch the
+  // per-section styles the server reset (D3).
+  const finalizeThemeActivation = async (
+    result: { success: boolean; error?: string; activeTheme?: AppTheme },
+    fallbackThemeName?: string,
+  ) => {
+    if (!result.success) return;
+
+    const confirmedTheme = result.activeTheme;
+    const selectedTheme =
+      confirmedTheme ??
+      (fallbackThemeName
+        ? themes.find((t) => t.theme_name === fallbackThemeName)
+        : undefined);
+    if (selectedTheme) {
+      applyTheme(selectedTheme, true);
+      setActiveThemeState(selectedTheme);
+    }
+    await refreshThemes();
+
+    if (typeof window !== "undefined") {
+      try {
+        const storageKey = resolveScopedStorageKey(
+          "osoria_component_styles",
+          getRuntimeStoreIdSync(),
+        );
+        if (storageKey) {
+          localStorage.removeItem(storageKey);
+        }
+      } catch (e) {
+        console.warn("[Theme] Error clearing component styles cache:", e);
+      }
+      await refreshStyles();
+    }
+  };
+
   const changeTheme = async (
     themeName: string,
   ): Promise<{ success: boolean; error?: string }> => {
@@ -145,41 +195,45 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       }
 
       const result = await setActiveTheme(themeName);
-      if (result.success) {
-        const confirmedTheme = result.activeTheme;
-        const selectedTheme =
-          confirmedTheme ?? themes.find((t) => t.theme_name === themeName);
-        if (selectedTheme) {
-          applyTheme(selectedTheme, true);
-          setActiveThemeState(selectedTheme);
-        }
-        await refreshThemes();
-
-        // Slice 5 (D3): the server just reset this store's per-section
-        // `component_styles`. Drop the local cache and refetch so the
-        // editor/storefront stop showing the now-deleted overrides.
-        if (typeof window !== "undefined") {
-          try {
-            const storageKey = resolveScopedStorageKey(
-              "osoria_component_styles",
-              getRuntimeStoreIdSync(),
-            );
-            if (storageKey) {
-              localStorage.removeItem(storageKey);
-            }
-          } catch (e) {
-            console.warn(
-              "[Theme] Error clearing component styles cache:",
-              e,
-            );
-          }
-          await refreshStyles();
-        }
-      }
+      await finalizeThemeActivation(result, themeName);
       return result;
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "Error al cambiar tema";
+      return { success: false, error: errorMessage };
+    }
+  };
+
+  const changeThemeCustom = async (
+    baseThemeName: string,
+    definition: ThemeDefinition,
+  ): Promise<{ success: boolean; error?: string; activeTheme?: AppTheme }> => {
+    // The customizer page (`/admin/theme`) already blocks the `reposteria`
+    // subdomain and requires an admin, and the activation route is admin-gated,
+    // so no extra client subdomain guard is needed here.
+    try {
+      const result = await setActiveThemeCustom(baseThemeName, definition);
+      await finalizeThemeActivation(result);
+      return result;
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Error al aplicar el tema";
+      return { success: false, error: errorMessage };
+    }
+  };
+
+  const revertToVersion = async (
+    versionId: string,
+  ): Promise<{ success: boolean; error?: string; activeTheme?: AppTheme }> => {
+    // Same admin gating as the customizer page/route; no extra client guard
+    // needed here (mirrors changeThemeCustom above).
+    try {
+      const result = await revertToThemeVersion(versionId);
+      await finalizeThemeActivation(result);
+      return result;
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Error al restaurar el tema";
       return { success: false, error: errorMessage };
     }
   };
@@ -232,21 +286,31 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     // Solo cargar en el cliente, no durante SSR/prerendering
-    if (typeof window !== "undefined") {
-      console.log("[Theme] Provider montado, iniciando carga de temas...");
-      deferStateUpdate(() => {
-        void refreshThemes();
-      });
-    } else {
+    if (typeof window === "undefined") {
       // Durante SSR, usar valores por defecto
       deferStateUpdate(() => setLoading(false));
+      return;
     }
+
+    // Modo de vista previa del customizer (/admin/theme): el padre controla
+    // el tema vía postMessage, así que nunca se debe cargar ni aplicar el
+    // tema persistido en BD (ver el listener de mensajes más abajo).
+    if (isThemePreviewMode()) {
+      deferStateUpdate(() => setLoading(false));
+      return;
+    }
+
+    console.log("[Theme] Provider montado, iniciando carga de temas...");
+    deferStateUpdate(() => {
+      void refreshThemes();
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Refrescar temas periódicamente para detectar cambios del admin
   // Esto permite que todos los usuarios vean el tema activo actualizado
   useEffect(() => {
+    if (isThemePreviewMode()) return;
     if (!loading && themes.length > 0) {
       // Refrescar cada 30 segundos para detectar cambios de tema del admin
       const interval = setInterval(() => {
@@ -258,8 +322,30 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, themes.length]);
 
+  // Modo de vista previa del customizer: el tema activo lo empuja el padre
+  // (app/admin/theme) por postMessage en lugar del ciclo normal de BD/poll.
+  useEffect(() => {
+    if (!isThemePreviewMode()) return;
+
+    const handlePreviewMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+
+      const message = parseThemePreviewMessage(event.data);
+      if (!message) return;
+
+      applyRuntimeTheme(message.theme, message.mode);
+    };
+
+    window.addEventListener("message", handlePreviewMessage);
+    return () => window.removeEventListener("message", handlePreviewMessage);
+  }, []);
+
   // Aplicar tema solo cuando se determine el tema activo final
   useEffect(() => {
+    // En modo de vista previa, el listener de mensajes de arriba es la única
+    // fuente de verdad: nunca se aplica un tema persistido.
+    if (isThemePreviewMode()) return;
+
     // Esperar a que termine la carga antes de aplicar
     if (loading) return;
 
@@ -326,6 +412,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     loading,
     error,
     changeTheme,
+    changeThemeCustom,
+    revertToVersion,
     refreshThemes,
   };
 

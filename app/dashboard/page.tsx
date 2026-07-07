@@ -20,7 +20,6 @@ import {
   Users,
   ArrowRight,
   Eye,
-  Edit,
   BarChart3,
   Bot,
   Percent,
@@ -145,13 +144,6 @@ function DashboardContent() {
       color: "bg-indigo-500",
     },
     {
-      title: "Editor de Página",
-      description: "Edita el diseño de tu tienda",
-      icon: Edit,
-      href: "/admin",
-      color: "bg-orange-500",
-    },
-    {
       title: "Asistente Virtual",
       description: "Configura el chatbot y su comportamiento",
       icon: Bot,
@@ -212,17 +204,6 @@ function DashboardContent() {
                 <Link href="/">
                   <Eye className="h-4 w-4 shrink-0" />
                   <span className="hidden sm:inline">Ver Tienda</span>
-                </Link>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5 sm:gap-2"
-                asChild
-              >
-                <Link href="/admin">
-                  <Edit className="h-4 w-4 shrink-0" />
-                  <span className="hidden sm:inline">Editor</span>
                 </Link>
               </Button>
             </div>
@@ -353,12 +334,6 @@ function DashboardContent() {
               <Link href="/">
                 <Eye className="h-4 w-4 mr-2" />
                 Ver Tienda Pública
-              </Link>
-            </Button>
-            <Button variant="outline" asChild>
-              <Link href="/admin">
-                <Edit className="h-4 w-4 mr-2" />
-                Editor de Página
               </Link>
             </Button>
             <Button variant="outline" asChild>

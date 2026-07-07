@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createElement, type ReactNode } from "react";
-import { HeroBanner } from "@/components/sections/hero-banner";
+import { HERO_STYLE_FALLBACKS, HeroBanner } from "@/components/sections/hero-banner";
 import {
   HERO_SECONDARY_PRODUCT_PRESET_OPTIONS,
   createNextHeroHotspotId,
@@ -466,6 +466,34 @@ describe("HeroBanner", () => {
     expect(screen.getByTestId("hero-slide-content-0")).toHaveStyle({
       color: "var(--foreground)",
     });
+  });
+
+  it("falls back to the theme's --sec-hero-button token when no color override is set", () => {
+    mockUseComponentStyle.mockImplementation((_name: string, defaults: Record<string, unknown>) => ({
+      styles: defaults,
+    }));
+
+    render(<HeroBanner />);
+
+    expect(screen.getByRole("link", { name: /buy now/i })).toHaveStyle({
+      backgroundColor: "var(--sec-hero-button, var(--primary))",
+    });
+  });
+
+  it("uses an explicit buttonColor override instead of the theme token", () => {
+    mockUseComponentStyle.mockImplementation((_name: string, defaults: Record<string, unknown>) => ({
+      styles: { ...defaults, buttonColor: "#123456" },
+    }));
+
+    render(<HeroBanner />);
+
+    expect(screen.getByRole("link", { name: /buy now/i })).toHaveStyle({
+      backgroundColor: "rgb(18, 52, 86)",
+    });
+  });
+
+  it("keeps HERO_STYLE_FALLBACKS.buttonColor empty so it falls through to the theme token", () => {
+    expect(HERO_STYLE_FALLBACKS.buttonColor).toBe("");
   });
 
   it("renders the new full-image layout with a full-bleed image layer", () => {
@@ -1376,7 +1404,7 @@ describe("HeroBanner", () => {
 
     expect(hero).toHaveClass("container");
     expect(hero).not.toHaveClass("max-w-7xl");
-    expect(hero?.className).toContain("rounded-[var(--card-radius,1.5rem)]");
+    expect(hero?.className).toContain("rounded-card");
     expect(hero).not.toHaveClass("px-2");
     expect(hero).not.toHaveClass("md:px-4");
     expect(screen.queryByTestId("hero-bottom-bar")).not.toBeInTheDocument();

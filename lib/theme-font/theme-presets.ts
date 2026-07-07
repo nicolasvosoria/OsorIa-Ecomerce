@@ -5,8 +5,7 @@ import { themeColorsToDefinition } from "@/lib/theme-font/theme-definition";
  * Per-theme overrides layered on top of the identical-by-default adapter.
  * `colorsLight` is intentionally excluded: the light set always comes from
  * the DB row (`ecommerce.app_themes.colors`) so it can never drift from
- * today's output. `fontPairingId` stays `null` for every preset in this
- * slice; wiring real pairings is a later step.
+ * today's output. `fontPairingId` stays `null` for every preset.
  */
 export type ThemePresetOverride = Partial<
   Pick<
@@ -100,13 +99,6 @@ export const THEME_PRESETS: Record<string, ThemePresetOverride> = {
     colorsDark: TECH_DARK_PALETTE,
     shape: { button: "9999px", card: "1.5rem" },
     fontPairingId: null,
-    sections: {
-      featured: { bg: "#7baeaf", cardBg: "#f6f6f6", productBg: "#77767b", text: "#ffffff" },
-      specialOffer: { bg: "#ed333b", accent: "#f5c211", productBg: "#f66151", text: "#ffffff" },
-      newsletter: { button: "#c01c28" },
-      hero: { button: "#33d17a" },
-      popular: { button: "#33d17a" },
-    },
   },
   Minimal: {
     colorsDark: MINIMAL_DARK_PALETTE,
@@ -115,13 +107,6 @@ export const THEME_PRESETS: Record<string, ThemePresetOverride> = {
     shadow: { card: "none", elevated: "0 0 0 1px var(--border)" },
     shape: { button: "0px", card: "0px" },
     fontPairingId: null,
-    sections: {
-      featured: { bg: "#eceae5", cardBg: "#fdfdfb", productBg: "#d8d5cc", text: "#1b1b18" },
-      specialOffer: { bg: "#1b1b18", accent: "#8a8574", productBg: "#2a2a26", text: "#f6f5f2" },
-      newsletter: { button: "#1b1b18" },
-      hero: { button: "#1b1b18" },
-      popular: { button: "#1b1b18" },
-    },
   },
   Suave: {
     colorsDark: SUAVE_DARK_PALETTE,
@@ -133,13 +118,6 @@ export const THEME_PRESETS: Record<string, ThemePresetOverride> = {
     },
     shape: { button: "9999px", card: "1.25rem" },
     fontPairingId: null,
-    sections: {
-      featured: { bg: "#fdeef0", cardBg: "#ffffff", productBg: "#f6d3da", text: "#4a3b34" },
-      specialOffer: { bg: "#ec6a80", accent: "#ffd166", productBg: "#f58aa0", text: "#ffffff" },
-      newsletter: { button: "#ec6a80" },
-      hero: { button: "#ec6a80" },
-      popular: { button: "#ec6a80" },
-    },
   },
   Bold: {
     colorsDark: BOLD_DARK_PALETTE,
@@ -148,13 +126,6 @@ export const THEME_PRESETS: Record<string, ThemePresetOverride> = {
     shadow: { card: "4px 4px 0 var(--border)", elevated: "7px 7px 0 var(--border)" },
     shape: { button: "0.15rem", card: "0.15rem" },
     fontPairingId: null,
-    sections: {
-      featured: { bg: "#0a0a0a", cardBg: "#161616", productBg: "#262626", text: "#fafafa" },
-      specialOffer: { bg: "#0a0a0a", accent: "#ffe600", productBg: "#1c1c1c", text: "#ffffff" },
-      newsletter: { button: "#ff2d55" },
-      hero: { button: "#0a0a0a" },
-      popular: { button: "#0a0a0a" },
-    },
   },
   Boutique: {
     colorsDark: BOUTIQUE_DARK_PALETTE,
@@ -166,13 +137,6 @@ export const THEME_PRESETS: Record<string, ThemePresetOverride> = {
     },
     shape: { button: "0.5rem", card: "0.9rem" },
     fontPairingId: null,
-    sections: {
-      featured: { bg: "#f2e5d5", cardBg: "#fffaf3", productBg: "#e6d5bf", text: "#4a3527" },
-      specialOffer: { bg: "#b0603f", accent: "#e8b04b", productBg: "#c47a5c", text: "#fff8f1" },
-      newsletter: { button: "#b0603f" },
-      hero: { button: "#b0603f" },
-      popular: { button: "#b0603f" },
-    },
   },
 };
 

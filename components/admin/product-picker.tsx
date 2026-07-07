@@ -15,14 +15,15 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils"
 import { getItems } from "@/lib/supabase/products-api"
 import type { StoreItemWithDetails } from "@/lib/types/products"
-
-// "" (sin producto elegido) se representa con este sentinel dentro del
-// combobox porque CommandItem no acepta un value vacío.
-const NONE_VALUE = "__none__"
+import { EMPTY_SELECT_VALUE } from "@/lib/ui/select-empty-value"
 
 interface ProductPickerProps {
   value: string
   onChange: (productId: string) => void
+  // Lets a caller scope the portaled dropdown to its own chrome (e.g. the
+  // neutral theme editor's `.editor-chrome`) without restyling this shared
+  // picker for every other caller.
+  contentClassName?: string
 }
 
 /**
@@ -32,7 +33,7 @@ interface ProductPickerProps {
  * para el admin); para sumar otro criterio de filtrado a futuro, usar la prop
  * `keywords` de cada CommandItem.
  */
-export function ProductPicker({ value, onChange }: ProductPickerProps) {
+export function ProductPicker({ value, onChange, contentClassName }: ProductPickerProps) {
   const [items, setItems] = useState<StoreItemWithDetails[]>([])
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
@@ -82,14 +83,14 @@ export function ProductPicker({ value, onChange }: ProductPickerProps) {
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+      <PopoverContent className={cn("editor-chrome w-[--radix-popover-trigger-width] p-0", contentClassName)}>
         <Command>
           <CommandInput placeholder="Buscar por nombre…" />
           <CommandList>
             <CommandEmpty>Sin resultados</CommandEmpty>
             <CommandGroup>
               <CommandItem
-                value={NONE_VALUE}
+                value={EMPTY_SELECT_VALUE}
                 onSelect={() => {
                   onChange("")
                   setOpen(false)

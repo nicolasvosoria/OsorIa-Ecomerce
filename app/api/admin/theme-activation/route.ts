@@ -1,61 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { cookies } from "next/headers";
-import {
-  ECOMMERCE_SCHEMA,
-  ECOMMERCE_TABLES,
-  ECOMMERCE_VIEWS,
-} from "@/lib/supabase/contract";
+import { ECOMMERCE_TABLES } from "@/lib/supabase/contract";
 import { requireAdminUser } from "@/lib/supabase/admin-route-auth";
-import { normalizeThemeRecord } from "@/lib/theme-font/runtime-contract";
+import {
+  getSupabaseServiceClient,
+  resolveTargetStoreId,
+} from "@/lib/supabase/admin-store";
+import {
+  normalizeThemeDefinition,
+  normalizeThemeRecord,
+} from "@/lib/theme-font/runtime-contract";
 import { resolveThemeDefinition } from "@/lib/theme-font/theme-presets";
 import { stripSectionStyleKeys } from "@/lib/theme/section-style-keys";
 import type { ThemeColors } from "@/lib/types/theme";
-
-function getSupabaseServiceClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceKey) {
-    return null;
-  }
-
-  return createClient(supabaseUrl, serviceKey).schema(ECOMMERCE_SCHEMA) as any;
-}
-
-async function getRuntimeStoreId() {
-  const disableMultiTenant =
-    process.env.DISABLE_SUBDOMAIN_MULTI_TENANT === "true";
-  if (disableMultiTenant) {
-    return process.env.DEFAULT_STORE_ID || "default";
-  }
-
-  const cookieStore = await cookies();
-  return cookieStore.get("store_id")?.value ?? null;
-}
-
-async function resolveDefaultStoreId(supabase: any) {
-  const { data: defaultStore, error } = await supabase
-    .from(ECOMMERCE_VIEWS.storesLegacy)
-    .select("id")
-    .eq("subdomain", "default")
-    .single();
-
-  if (error || !defaultStore?.id) {
-    throw new Error("Default store not found");
-  }
-
-  return defaultStore.id as string;
-}
-
-async function resolveTargetStoreId(supabase: any) {
-  const storeId = await getRuntimeStoreId();
-  if (storeId && storeId !== "default") {
-    return storeId;
-  }
-
-  return resolveDefaultStoreId(supabase);
-}
 
 async function readConfirmedActiveTheme(supabase: any, storeId: string) {
   const { data: version, error: versionError } = await supabase
@@ -83,14 +39,78 @@ async function readConfirmedActiveTheme(supabase: any, storeId: string) {
   });
 }
 
+// Reactivates a version that already exists in history: flips `is_current`
+// onto that row only (never inserts a new one, never touches
+// `component_styles`). D3/Option A — a revert restores the theme's stored
+// tokens only.
+async function revertThemeVersion(
+  supabase: any,
+  storeId: string,
+  versionId: string,
+) {
+  const { data: version, error: versionError } = await supabase
+    .from(ECOMMERCE_TABLES.appThemeVersions)
+    .select("id")
+    .eq("id", versionId)
+    .eq("store_id", storeId)
+    .maybeSingle();
+
+  if (versionError || !version?.id) {
+    return NextResponse.json(
+      { error: "Versión no encontrada" },
+      { status: 404 },
+    );
+  }
+
+  const { error: deactivateError } = await supabase
+    .from(ECOMMERCE_TABLES.appThemeVersions)
+    .update({ is_current: false })
+    .eq("store_id", storeId);
+  if (deactivateError) {
+    throw deactivateError;
+  }
+
+  const { error: activateError } = await supabase
+    .from(ECOMMERCE_TABLES.appThemeVersions)
+    .update({ is_current: true })
+    .eq("id", versionId);
+  if (activateError) {
+    throw activateError;
+  }
+
+  return NextResponse.json({
+    success: true,
+    activeTheme: await readConfirmedActiveTheme(supabase, storeId),
+  });
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+    const versionId =
+      typeof body?.versionId === "string" ? body.versionId.trim() : "";
     const themeName =
       typeof body?.themeName === "string" ? body.themeName.trim() : "";
+    const baseThemeName =
+      typeof body?.baseThemeName === "string" ? body.baseThemeName.trim() : "";
+    const isCustomRequest = body?.definition !== undefined;
+    const customDefinition = isCustomRequest
+      ? normalizeThemeDefinition(body.definition)
+      : null;
 
-    if (!themeName) {
-      return NextResponse.json({ error: "Payload inválido" }, { status: 400 });
+    if (!versionId) {
+      if (isCustomRequest && (!customDefinition || !baseThemeName)) {
+        return NextResponse.json(
+          { error: "Payload inválido" },
+          { status: 400 },
+        );
+      }
+      if (!isCustomRequest && !themeName) {
+        return NextResponse.json(
+          { error: "Payload inválido" },
+          { status: 400 },
+        );
+      }
     }
 
     const supabase = getSupabaseServiceClient();
@@ -112,10 +132,16 @@ export async function POST(request: NextRequest) {
 
     const storeId = await resolveTargetStoreId(supabase);
 
+    if (versionId) {
+      return await revertThemeVersion(supabase, storeId, versionId);
+    }
+
+    const lookupThemeName = isCustomRequest ? baseThemeName : themeName;
+
     const { data: theme, error: themeError } = await supabase
       .from(ECOMMERCE_TABLES.appThemes)
       .select("*")
-      .eq("theme_name", themeName)
+      .eq("theme_name", lookupThemeName)
       .single();
     if (themeError || !theme?.id) {
       return NextResponse.json(
@@ -132,25 +158,13 @@ export async function POST(request: NextRequest) {
       throw deactivateError;
     }
 
-    const { data: existing, error: existingError } = await supabase
-      .from(ECOMMERCE_TABLES.appThemeVersions)
-      .select("id")
-      .eq("store_id", storeId)
-      .eq("theme_id", theme.id)
-      .maybeSingle();
-    if (existingError && existingError.code !== "PGRST116") {
-      throw existingError;
-    }
-
-    let activatedVersionId = existing?.id as string | undefined;
-
-    // Persist the resolved two-axis bundle alongside the `is_current` flip so
-    // `getActiveTheme` can read it back verbatim next time (Slice 4 storage).
-    // `theme.colors` is the same jsonb the route already selected above.
-    const definition = resolveThemeDefinition(
-      themeName,
-      theme.colors as ThemeColors,
-    );
+    // Persist the resolved (preset path) or edited (custom path) two-axis
+    // bundle alongside the `is_current` flip so `getActiveTheme` can read it
+    // back verbatim next time (Slice 4 storage). `theme.colors` is the same
+    // jsonb the route already selected above.
+    const definition =
+      customDefinition ??
+      resolveThemeDefinition(themeName, theme.colors as ThemeColors);
     const storedFonts = { fontPairingId: definition.fontPairingId ?? null };
 
     // Applying a theme resets only the STYLE fields of each section
@@ -195,34 +209,21 @@ export async function POST(request: NextRequest) {
       ? { ...definition, backup_component_styles: backupComponentStyles }
       : definition;
 
-    if (existing?.id) {
-      const { error: activateError } = await supabase
-        .from(ECOMMERCE_TABLES.appThemeVersions)
-        .update({
-          is_current: true,
-          variables: storedVariables,
-          fonts: storedFonts,
-        })
-        .eq("id", existing.id);
+    const activatedVersionId = crypto.randomUUID();
+    const { error: insertError } = await supabase
+      .from(ECOMMERCE_TABLES.appThemeVersions)
+      .insert({
+        id: activatedVersionId,
+        store_id: storeId,
+        theme_id: theme.id,
+        is_current: true,
+        variables: storedVariables,
+        fonts: storedFonts,
+        is_custom: isCustomRequest,
+      });
 
-      if (activateError) {
-        throw activateError;
-      }
-    } else {
-      const { error: insertError } = await supabase
-        .from(ECOMMERCE_TABLES.appThemeVersions)
-        .insert({
-          id: (activatedVersionId = crypto.randomUUID()),
-          store_id: storeId,
-          theme_id: theme.id,
-          is_current: true,
-          variables: storedVariables,
-          fonts: storedFonts,
-        });
-
-      if (insertError) {
-        throw insertError;
-      }
+    if (insertError) {
+      throw insertError;
     }
 
     // Only reset per-section styles once the backup above is confirmed safe.

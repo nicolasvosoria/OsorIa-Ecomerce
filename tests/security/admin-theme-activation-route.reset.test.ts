@@ -74,22 +74,18 @@ function makeThemeQuery() {
 }
 
 function makeThemeVersionsTable() {
-  const existingQuery = {
+  const currentVersionQuery = {
     eq: vi.fn().mockReturnThis(),
-    maybeSingle: vi
-      .fn()
-      .mockResolvedValue({ data: { id: "version-1" }, error: null }),
+    maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
   };
   const deactivateChain = { eq: vi.fn().mockResolvedValue({ error: null }) };
-  const activateChain = { eq: vi.fn().mockResolvedValue({ error: null }) };
-  const update = vi.fn((payload: { is_current?: boolean }) =>
-    payload.is_current === false ? deactivateChain : activateChain,
-  );
+  const update = vi.fn(() => deactivateChain);
+  const insert = vi.fn().mockResolvedValue({ error: null });
 
   return {
     update,
-    activateChain,
-    select: vi.fn().mockReturnValue(existingQuery),
+    insert,
+    select: vi.fn().mockReturnValue(currentVersionQuery),
   };
 }
 
@@ -190,7 +186,7 @@ describe("theme activation route: reset + backup (D3)", () => {
     // The backup snapshot is nested under `variables.backup_component_styles`
     // in the same `app_theme_versions` write, and never as its own top-level
     // column (so the Slice-4 definition parser safely ignores it).
-    expect(themeVersionsTable.update).toHaveBeenCalledWith(
+    expect(themeVersionsTable.insert).toHaveBeenCalledWith(
       expect.objectContaining({
         is_current: true,
         variables: expect.objectContaining({
@@ -276,7 +272,7 @@ describe("theme activation route: reset + backup (D3)", () => {
     // ...but the reset is skipped entirely: no update call at all.
     expect(componentStylesTable.update).not.toHaveBeenCalled();
     // And the version row never carries a backup key it can't vouch for.
-    expect(themeVersionsTable.update).toHaveBeenCalledWith(
+    expect(themeVersionsTable.insert).toHaveBeenCalledWith(
       expect.objectContaining({
         is_current: true,
         variables: expect.not.objectContaining({

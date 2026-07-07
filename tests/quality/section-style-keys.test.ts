@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest"
 
 import {
+  PRODUCTS_RADIUS_LENGTH,
+  SECTION_FIELD_THEME_TOKEN,
   SECTION_STYLE_KEYS,
   stripSectionStyleKeys,
 } from "@/lib/theme/section-style-keys"
@@ -25,12 +27,13 @@ describe("SECTION_STYLE_KEYS", () => {
     ])
   })
 
-  it("registers bgColor, accentColor, productBgColor and textColor as the specialOffer style keys", () => {
+  it("registers bgColor, accentColor, productBgColor, textColor and sectionBgColor as the specialOffer style keys", () => {
     expect(SECTION_STYLE_KEYS.specialOffer).toEqual([
       "bgColor",
       "accentColor",
       "productBgColor",
       "textColor",
+      "sectionBgColor",
     ])
   })
 
@@ -63,6 +66,70 @@ describe("SECTION_STYLE_KEYS", () => {
       "titleColor",
       "subtitleColor",
     ])
+  })
+})
+
+describe("SECTION_FIELD_THEME_TOKEN", () => {
+  it("maps the newsletter button field to the theme's primary color, matching its var(--sec-newsletter-button, var(--primary)) fallback", () => {
+    expect(SECTION_FIELD_THEME_TOKEN.newsletter).toEqual({ button: "primary" })
+  })
+
+  it("maps the hero button field to the theme's primary color, matching its var(--sec-hero-button, var(--primary)) fallback", () => {
+    expect(SECTION_FIELD_THEME_TOKEN.hero).toEqual({ button: "primary" })
+  })
+
+  it("maps the popular button field to the theme's primary color, matching its var(--sec-popular-button, var(--primary)) fallback", () => {
+    expect(SECTION_FIELD_THEME_TOKEN.popular).toEqual({ button: "primary" })
+  })
+
+  it("maps every products color field to the theme token its var(--sec-products-*) fallback resolves to", () => {
+    expect(SECTION_FIELD_THEME_TOKEN.products).toEqual({
+      cardBg: "muted",
+      bg: null,
+      text: "foreground",
+      price: "primary",
+    })
+  })
+
+  it("maps every featured color field to the theme token its var(--sec-featured-*) fallback resolves to", () => {
+    expect(SECTION_FIELD_THEME_TOKEN.featured).toEqual({
+      bg: "secondary",
+      cardBg: "card",
+      productBg: "muted",
+      text: "foreground",
+    })
+  })
+
+  it("maps every specialOffer color field to the theme token its var(--sec-specialOffer-*) fallback resolves to", () => {
+    expect(SECTION_FIELD_THEME_TOKEN.specialOffer).toEqual({
+      bg: "secondary",
+      accent: "primary",
+      productBg: "muted",
+      text: "foreground",
+      sectionBg: "background",
+    })
+  })
+
+  it("maps every whyus color field to the theme token its var(--sec-whyus-*) fallback resolves to", () => {
+    expect(SECTION_FIELD_THEME_TOKEN.whyus).toEqual({
+      sectionBg: "muted",
+      cardBg: "card",
+      iconBg: "muted",
+      icon: "foreground",
+      title: "foreground",
+      subtitle: "mutedForeground",
+    })
+  })
+})
+
+describe("PRODUCTS_RADIUS_LENGTH", () => {
+  it("maps every cornerRadius preset key to a valid CSS length matching the project's Tailwind radius scale", () => {
+    expect(PRODUCTS_RADIUS_LENGTH).toEqual({
+      none: "0px",
+      md: "0.75rem",
+      lg: "1rem",
+      xl: "1.5rem",
+    })
   })
 })
 
@@ -112,7 +179,7 @@ describe("stripSectionStyleKeys", () => {
     })
   })
 
-  it("removes the specialOffer style keys while keeping its content", () => {
+  it("removes the specialOffer style keys, including sectionBgColor, while keeping its content", () => {
     const variables = {
       title: "Oferta Especial",
       productId: "item-2",
@@ -120,6 +187,7 @@ describe("stripSectionStyleKeys", () => {
       accentColor: "#f5c211",
       productBgColor: "#f66151",
       textColor: "#ffffff",
+      sectionBgColor: "#0f172a",
     }
 
     const result = stripSectionStyleKeys("specialOffer", variables)

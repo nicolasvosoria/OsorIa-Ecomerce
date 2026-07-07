@@ -120,7 +120,7 @@ describe("hero rendering helpers", () => {
       backgroundMode: "fill",
       sideGutters: "24px",
       className:
-        "container relative mx-6 w-auto max-w-none overflow-hidden rounded-[var(--card-radius,1.5rem)] mt-2 md:mt-4 mb-4 md:mb-8",
+        "container relative mx-6 w-auto max-w-none overflow-hidden rounded-card mt-2 md:mt-4 mb-4 md:mb-8",
     });
   });
 
@@ -132,7 +132,7 @@ describe("hero rendering helpers", () => {
         edits: {},
       }),
     ).toMatchObject({
-      buttonColor: "var(--sec-hero-button)",
+      buttonColor: "var(--sec-hero-button, var(--primary))",
     });
   });
 

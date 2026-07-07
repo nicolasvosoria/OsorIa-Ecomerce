@@ -43,14 +43,6 @@ vi.mock("@/components/ui/floating-contact-button", () => ({
   FloatingContactButton: () => <div data-testid="floating-contact-button">Contact</div>,
 }))
 
-vi.mock("@/components/admin/edit-mode-toggle", () => ({
-  EditModeToggle: () => <button data-testid="edit-mode-toggle">Edit mode</button>,
-}))
-
-vi.mock("@/components/admin/editor-panel", () => ({
-  EditorPanel: () => <aside data-testid="editor-panel">Editor panel</aside>,
-}))
-
 vi.mock("@/components/admin/main-content-wrapper", () => ({
   MainContentWrapper: ({ children }: { children: ReactNode }) => (
     <section data-testid="main-content-wrapper">{children}</section>
@@ -116,8 +108,6 @@ describe("RouteAwareChrome", () => {
     expect(markup).toContain("Route children")
     expect(markup).not.toContain("Storefront header")
     expect(markup).not.toContain("Contact")
-    expect(markup).not.toContain("Edit mode")
-    expect(markup).not.toContain("Editor panel")
     expect(markup).not.toContain("Cerrar sesión")
   })
 
@@ -128,8 +118,6 @@ describe("RouteAwareChrome", () => {
     expect(screen.getByTestId("editable-wrapper-header")).toBeInTheDocument()
     expect(screen.getAllByTestId("storefront-header")).toHaveLength(1)
     expect(screen.getByTestId("floating-contact-button")).toBeInTheDocument()
-    expect(screen.getByTestId("edit-mode-toggle")).toBeInTheDocument()
-    expect(screen.getByTestId("editor-panel")).toBeInTheDocument()
     expect(screen.getByTestId("route-children")).toBeInTheDocument()
   })
 
@@ -143,8 +131,6 @@ describe("RouteAwareChrome", () => {
       expect(screen.queryByTestId("editable-wrapper-header")).not.toBeInTheDocument()
       expect(screen.queryByTestId("storefront-header")).not.toBeInTheDocument()
       expect(screen.queryByTestId("floating-contact-button")).not.toBeInTheDocument()
-      expect(screen.queryByTestId("edit-mode-toggle")).not.toBeInTheDocument()
-      expect(screen.queryByTestId("editor-panel")).not.toBeInTheDocument()
       expect(screen.getByRole("button", { name: /cerrar sesión/i })).toBeInTheDocument()
     },
   )
@@ -169,6 +155,15 @@ describe("RouteAwareChrome", () => {
     expect(screen.queryByRole("button", { name: /cerrar sesión/i })).not.toBeInTheDocument()
   })
 
+  it("hides admin session actions on /admin/theme while still rendering them on other admin routes", () => {
+    const themeEditor = renderChrome("/admin/theme")
+    expect(screen.queryByRole("button", { name: /cerrar sesión/i })).not.toBeInTheDocument()
+    themeEditor.unmount()
+
+    renderChrome("/admin")
+    expect(screen.getByRole("button", { name: /cerrar sesión/i })).toBeInTheDocument()
+  })
+
   it("hides only the root chrome on /admin while preserving an embedded preview header from the route children", () => {
     renderChrome(
       "/admin",
@@ -183,7 +178,5 @@ describe("RouteAwareChrome", () => {
     expect(screen.getAllByTestId("storefront-header")).toHaveLength(1)
     expect(screen.getAllByTestId("editable-wrapper-header")).toHaveLength(1)
     expect(screen.queryByTestId("floating-contact-button")).not.toBeInTheDocument()
-    expect(screen.queryByTestId("edit-mode-toggle")).not.toBeInTheDocument()
-    expect(screen.queryByTestId("editor-panel")).not.toBeInTheDocument()
   })
 })

@@ -43,84 +43,86 @@ function GalleryImageWithFallback({ src, alt }: { src: string; alt: string }) {
   )
 }
 
+export const REPOSTERIA_GALLERY_DEFAULTS = {
+  title: "Nuestro Mundo Dulce",
+  description: "Descubre la creatividad y el arte detrás de cada producto que preparamos con amor",
+  images: [
+    {
+      src: "/reposteria/cupcakes-decorados.jpg",
+      alt: "Cupcakes decorados con sprinkles en colores pastel - azul, amarillo y rosa",
+      title: "Cupcakes Decorados",
+      category: "Productos"
+    },
+    {
+      src: "/reposteria/tarta-berries.jpg",
+      alt: "Tarta de frutas con berries frescos, azúcar glass y menta",
+      title: "Tarta de Berries",
+      category: "Productos"
+    },
+    {
+      src: "/reposteria/macarons-colores.jpg",
+      alt: "Macarons en colores pastel - verde, rosa, amarillo y blanco",
+      title: "Macarons Artesanales",
+      category: "Productos"
+    },
+    {
+      src: "/reposteria/mini-cakes-cheesecakes.jpg",
+      alt: "Mini cakes y cheesecakes decorados con berries, chocolate y caramelo",
+      title: "Mini Cakes y Cheesecakes",
+      category: "Productos"
+    },
+    {
+      src: "/reposteria/galletas-chocolate.jpg",
+      alt: "Galletas de chocolate chip caseras",
+      title: "Galletas de Chocolate",
+      category: "Productos"
+    },
+    {
+      src: "/reposteria/pastel-cumpleanos.jpg",
+      alt: "Pastel de cumpleaños decorado con temática festiva y colorida",
+      title: "Pasteles de Cumpleaños",
+      category: "Productos"
+    },
+    {
+      src: "/reposteria/pastel-boda.jpg",
+      alt: "Pastel de boda estilo naked cake decorado con flores frescas",
+      title: "Pasteles de Boda",
+      category: "Productos"
+    },
+    {
+      src: "/reposteria/herramientas-decoracion.jpg",
+      alt: "Herramientas de decoración de pasteles - boquillas, pinceles y fondant",
+      title: "Herramientas de Decoración",
+      category: "Accesorios"
+    },
+    {
+      src: "/reposteria/sprinkles-candies.jpg",
+      alt: "Sprinkles y candies coloridos para decorar postres",
+      title: "Sprinkles y Candies",
+      category: "Decoraciones"
+    },
+    {
+      src: "/reposteria/chocolates-truffles.jpg",
+      alt: "Deliciosos chocolates y truffles artesanales",
+      title: "Chocolates Artesanales",
+      category: "Productos"
+    },
+    {
+      src: "/reposteria/empaque-presentacion.jpg",
+      alt: "Elementos de empaque y presentación para productos de repostería",
+      title: "Empaque y Presentación",
+      category: "Accesorios"
+    }
+  ]
+}
+
 /**
  * Galería de imágenes para la tienda de repostería
  * Muestra imágenes de productos, herramientas y decoraciones
  */
 export function ReposteriaGallery() {
   const { store } = useStore()
-  const { styles: styleData } = useComponentStyle("gallery", {
-    title: "Nuestro Mundo Dulce",
-    description: "Descubre la creatividad y el arte detrás de cada producto que preparamos con amor",
-    images: [
-      {
-        src: "/reposteria/cupcakes-decorados.jpg",
-        alt: "Cupcakes decorados con sprinkles en colores pastel - azul, amarillo y rosa",
-        title: "Cupcakes Decorados",
-        category: "Productos"
-      },
-      {
-        src: "/reposteria/tarta-berries.jpg",
-        alt: "Tarta de frutas con berries frescos, azúcar glass y menta",
-        title: "Tarta de Berries",
-        category: "Productos"
-      },
-      {
-        src: "/reposteria/macarons-colores.jpg",
-        alt: "Macarons en colores pastel - verde, rosa, amarillo y blanco",
-        title: "Macarons Artesanales",
-        category: "Productos"
-      },
-      {
-        src: "/reposteria/mini-cakes-cheesecakes.jpg",
-        alt: "Mini cakes y cheesecakes decorados con berries, chocolate y caramelo",
-        title: "Mini Cakes y Cheesecakes",
-        category: "Productos"
-      },
-      {
-        src: "/reposteria/galletas-chocolate.jpg",
-        alt: "Galletas de chocolate chip caseras",
-        title: "Galletas de Chocolate",
-        category: "Productos"
-      },
-      {
-        src: "/reposteria/pastel-cumpleanos.jpg",
-        alt: "Pastel de cumpleaños decorado con temática festiva y colorida",
-        title: "Pasteles de Cumpleaños",
-        category: "Productos"
-      },
-      {
-        src: "/reposteria/pastel-boda.jpg",
-        alt: "Pastel de boda estilo naked cake decorado con flores frescas",
-        title: "Pasteles de Boda",
-        category: "Productos"
-      },
-      {
-        src: "/reposteria/herramientas-decoracion.jpg",
-        alt: "Herramientas de decoración de pasteles - boquillas, pinceles y fondant",
-        title: "Herramientas de Decoración",
-        category: "Accesorios"
-      },
-      {
-        src: "/reposteria/sprinkles-candies.jpg",
-        alt: "Sprinkles y candies coloridos para decorar postres",
-        title: "Sprinkles y Candies",
-        category: "Decoraciones"
-      },
-      {
-        src: "/reposteria/chocolates-truffles.jpg",
-        alt: "Deliciosos chocolates y truffles artesanales",
-        title: "Chocolates Artesanales",
-        category: "Productos"
-      },
-      {
-        src: "/reposteria/empaque-presentacion.jpg",
-        alt: "Elementos de empaque y presentación para productos de repostería",
-        title: "Empaque y Presentación",
-        category: "Accesorios"
-      }
-    ]
-  })
+  const { styles: styleData } = useComponentStyle("gallery", REPOSTERIA_GALLERY_DEFAULTS)
   const { componentEdits } = useAdmin()
 
   if (store?.subdomain !== 'reposteria') {
@@ -129,8 +131,8 @@ export function ReposteriaGallery() {
 
   // Combinar estilos de BD con ediciones locales para mostrar cambios en tiempo real
   const edits = componentEdits.get("gallery") || {}
-  const title = edits.title ?? styleData.title ?? "Nuestro Mundo Dulce"
-  const description = edits.description ?? styleData.description ?? "Descubre la creatividad y el arte detrás de cada producto que preparamos con amor"
+  const title = edits.title ?? styleData.title ?? REPOSTERIA_GALLERY_DEFAULTS.title
+  const description = edits.description ?? styleData.description ?? REPOSTERIA_GALLERY_DEFAULTS.description
   const bgColor = edits.bgColor ?? styleData.bgColor
   const textColor = edits.textColor ?? styleData.textColor
   

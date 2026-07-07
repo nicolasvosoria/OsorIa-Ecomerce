@@ -154,6 +154,29 @@ describe("getActiveTheme definition merge (variables/fonts jsonb)", () => {
     expect(theme?.definition).toEqual(expected);
   });
 
+  it("round-trips a stored `sections` overlay instead of dropping it", async () => {
+    const storedSections = { featured: { bg: "#123456" } };
+    const storedVariables = {
+      colorsLight: THEME_COLORS,
+      colorsDark: THEME_COLORS,
+      radius: { base: "1rem" },
+      density: { scale: 1.2 },
+      shadow: { card: "0 1px 2px rgb(0 0 0 / 0.2)", elevated: "0 4px 8px rgb(0 0 0 / 0.3)" },
+      shape: { button: "9999px", card: "1rem" },
+      sections: storedSections,
+    };
+
+    mockThemeVersionAndThemeQueries({
+      ...CURRENT_VERSION_BASE,
+      variables: storedVariables,
+      fonts: null,
+    });
+
+    const theme = await getActiveTheme();
+
+    expect(theme?.definition?.sections).toEqual(storedSections);
+  });
+
   it("falls back per-field when variables is a partial/invalid bundle", async () => {
     // `radius` is malformed (missing `base`); every other field is a valid
     // stored override. Only `radius` should fall back to the adapter value.

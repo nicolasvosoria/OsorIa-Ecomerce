@@ -12,6 +12,7 @@ import {
   resolveThemeCssVariables,
 } from "@/lib/theme-font/contrast";
 import { DEFAULT_DARK_FALLBACK } from "@/lib/theme-font/theme-definition";
+import { sectionStyleApplier } from "@/lib/theme/section-style-keys";
 import type { ThemeMode } from "@/lib/types/theme";
 
 type ThemeBootstrapStatus = "valid" | "missing" | "corrupt" | "stale";
@@ -174,18 +175,25 @@ export function applyRuntimeTheme(theme: RuntimeTheme, mode?: ThemeMode): void {
   // section palettes are a later concern). Each `theme.sections.<section>`
   // entry becomes `--sec-<section>-<kebab-key>`, e.g. `cardBg` on `featured`
   // writes `--sec-featured-card-bg`.
-  Object.entries(theme.sections ?? {}).forEach(([sectionName, sectionColors]) => {
-    Object.entries(sectionColors).forEach(([colorKey, colorValue]) => {
-      root.style.setProperty(
-        `--sec-${sectionName}-${toKebabCase(colorKey)}`,
-        colorValue,
-      );
-    });
-  });
-}
+  //
+  // Clear every previously emitted `--sec-*` var first: this function re-runs
+  // with a changing `theme.sections` (editor preview, reset-to-theme), and a
+  // key absent from the new theme must stop resolving to its old value
+  // instead of lingering as a stale inline override. Iterate backwards since
+  // `removeProperty` shifts `root.style` indices.
+  //
+  // This clear lives ONLY here, not in the shared `sectionStyleApplier`: the
+  // pre-hydration inline script (`apply-styles-script.tsx`) runs once against
+  // a clean `:root` on a fresh document load, so it never accumulates stale
+  // `--sec-*` overrides and doesn't need this step.
+  for (let i = root.style.length - 1; i >= 0; i--) {
+    const property = root.style[i];
+    if (property.startsWith("--sec-")) root.style.removeProperty(property);
+  }
 
-function toKebabCase(value: string): string {
-  return value.replace(/([A-Z])/g, "-$1").toLowerCase();
+  sectionStyleApplier.apply(theme.sections, (name, value) => {
+    root.style.setProperty(name, value);
+  });
 }
 
 export function ensureStylesheetLink(

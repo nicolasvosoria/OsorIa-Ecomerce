@@ -28,7 +28,7 @@ describe("NewsletterSection colors", () => {
     const { container } = render(<NewsletterSection />)
 
     const button = container.querySelector("button") as HTMLButtonElement
-    expect(button.style.backgroundColor).toBe("var(--sec-newsletter-button)")
+    expect(button.style.backgroundColor).toBe("var(--sec-newsletter-button, var(--primary))")
   })
 
   it("uses an explicit color override instead of the theme token", () => {
@@ -59,7 +59,7 @@ describe("NewsletterSection structure", () => {
     const { container } = render(<NewsletterSection />)
 
     const panel = container.querySelector('[data-component="newsletter"] > div') as HTMLElement
-    expect(panel.className).toContain("rounded-[var(--card-radius,1.5rem)]")
+    expect(panel.className).toContain("rounded-card")
   })
 
   it("sources the email input and subscribe button radius from --button-radius so they follow the theme", () => {

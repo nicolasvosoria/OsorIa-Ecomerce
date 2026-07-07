@@ -41,7 +41,7 @@ export function VisualProductCard({
   className = "",
   cardBackground,
   priceColor,
-  radiusClass = "rounded-[var(--card-radius,1.5rem)]",
+  radiusClass = "rounded-card",
   imageBlendsWithCard = false,
   showCategory = true,
   showPrice = true,

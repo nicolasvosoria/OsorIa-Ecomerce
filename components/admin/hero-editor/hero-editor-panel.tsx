@@ -40,7 +40,7 @@ export function HeroEditorPanel({
       <div className="space-y-2">
         <h3 className="text-base font-semibold">Editor del Hero</h3>
         <p className="text-sm text-muted-foreground">
-          Primero definí el banner, después elegí el slide y por último ajustá
+          Primero define el banner, después elige el slide y por último ajusta
           el componente actual con controles simples.
         </p>
       </div>
@@ -54,7 +54,7 @@ export function HeroEditorPanel({
           <SelectTrigger id="hero-layout-mode" className="w-full">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="editor-chrome">
             <SelectItem value="split">Split</SelectItem>
             <SelectItem value="full-image">Full Image</SelectItem>
           </SelectContent>
@@ -70,7 +70,7 @@ export function HeroEditorPanel({
           <div>
             <h4 className="text-sm font-semibold">Gestión de slides</h4>
             <p className="text-xs text-muted-foreground">
-              Sumá, elegí o eliminá slides sin salir del panel lateral.
+              Agrega, elige o elimina slides sin salir del panel lateral.
             </p>
           </div>
           <div className="flex gap-2">
@@ -105,7 +105,7 @@ export function HeroEditorPanel({
             <SelectTrigger id="hero-slide-select" className="w-full">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="editor-chrome">
               {(heroLayerModel?.products ?? []).map((slide, index) => (
                 <SelectItem key={index} value={String(index)}>
                   {`Slide ${index + 1} - ${slide.title || slide.label || "sin título"}`}
@@ -122,7 +122,7 @@ export function HeroEditorPanel({
           <SelectTrigger id="hero-layer-select" className="w-full">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="editor-chrome">
             {HERO_LAYER_OPTIONS.map((option) => (
               <SelectItem key={option.value} value={option.value}>
                 {option.label}

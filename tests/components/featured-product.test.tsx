@@ -58,11 +58,11 @@ describe("FeaturedProduct colors", () => {
     const { container } = render(<FeaturedProduct />)
 
     const section = container.querySelector('[data-component="featured"]') as HTMLElement
-    expect(section.style.backgroundColor).toBe("var(--sec-featured-bg)")
-    expect(section.style.color).toBe("var(--sec-featured-text)")
+    expect(section.style.backgroundColor).toBe("var(--sec-featured-bg, var(--secondary))")
+    expect(section.style.color).toBe("var(--sec-featured-text, var(--secondary-foreground))")
 
     const card = container.querySelector("a > div") as HTMLElement
-    expect(card.style.backgroundColor).toBe("var(--sec-featured-card-bg)")
+    expect(card.style.backgroundColor).toBe("var(--sec-featured-card-bg, var(--card))")
   })
 
   it("uses an explicit color override instead of the theme token", () => {
@@ -100,10 +100,10 @@ describe("FeaturedProduct structure", () => {
     const { container } = render(<FeaturedProduct />)
 
     const section = container.querySelector('[data-component="featured"]') as HTMLElement
-    expect(section.className).toContain("rounded-[var(--card-radius,1.5rem)]")
+    expect(section.className).toContain("rounded-card")
 
     const card = container.querySelector("a > div") as HTMLElement
-    expect(card.className).toContain("rounded-[var(--card-radius,1.5rem)]")
+    expect(card.className).toContain("rounded-card")
   })
 
   it("sources the card shadow from --shadow-card/--shadow-elevated", () => {
@@ -125,6 +125,6 @@ describe("FeaturedProduct structure", () => {
     const { container } = render(<FeaturedProduct />)
 
     const productImageBox = container.querySelector(".aspect-square") as HTMLElement
-    expect(productImageBox.className).toContain("rounded-[var(--card-radius,1.5rem)]")
+    expect(productImageBox.className).toContain("rounded-card")
   })
 })

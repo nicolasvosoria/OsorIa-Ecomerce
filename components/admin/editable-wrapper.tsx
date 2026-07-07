@@ -1,7 +1,9 @@
 "use client"
 
 import { useAdmin } from "@/contexts/admin-context"
-import { type ReactNode, useCallback, useRef } from "react"
+import { type ReactNode, useCallback, useSyncExternalStore } from "react"
+import { isThemePreviewMode, THEME_PREVIEW_SELECT_SOURCE } from "@/lib/theme-font/preview-mode"
+import { usePreviewSelection } from "@/lib/theme-font/preview-selection"
 
 interface EditableWrapperProps {
   componentName: string
@@ -9,44 +11,66 @@ interface EditableWrapperProps {
   label: string
 }
 
+// `isThemePreviewMode()` reads `window.location.search`, which is unavailable
+// during SSR. Gating it behind a post-hydration flag (mirrors
+// `route-aware-chrome.tsx`) keeps the first client render identical to the
+// server render, so React never reports a hydration mismatch.
+const subscribeToHydrationStore = () => () => undefined
+const clientHydrationSnapshot = () => true
+const serverHydrationSnapshot = () => false
+
 export function EditableWrapper({ componentName, children, label }: EditableWrapperProps) {
   const { isEditMode, selectedComponent, selectComponent } = useAdmin()
-  const wrapperRef = useRef<HTMLDivElement>(null)
+  const hasHydrated = useSyncExternalStore(
+    subscribeToHydrationStore,
+    clientHydrationSnapshot,
+    serverHydrationSnapshot,
+  )
+  const isPreviewMode = hasHydrated && isThemePreviewMode()
+  const previewSelectedComponent = usePreviewSelection()
+
+  const selectThisComponent = useCallback(() => {
+    if (isPreviewMode) {
+      window.parent.postMessage(
+        { source: THEME_PREVIEW_SELECT_SOURCE, componentName },
+        window.location.origin,
+      )
+      return
+    }
+    selectComponent(componentName)
+  }, [componentName, isPreviewMode, selectComponent])
 
   const handleClick = useCallback((e: React.MouseEvent) => {
-    // Solo seleccionar si el clic no fue en un elemento interactivo
     const target = e.target as HTMLElement
     const isInteractive = target.closest('button, a, input, select, textarea, [role="button"]')
-    
+
     if (isInteractive) {
-      // Permitir que los elementos interactivos funcionen normalmente
       return
     }
 
     e.preventDefault()
     e.stopPropagation()
-    console.log("[EditableWrapper] Clicked on component:", componentName, { isEditMode, target: target.tagName })
-    selectComponent(componentName)
-  }, [componentName, selectComponent, isEditMode])
+    selectThisComponent()
+  }, [selectThisComponent])
 
-  if (!isEditMode) {
+  if (!isPreviewMode && !isEditMode) {
     return <>{children}</>
   }
 
-  const isSelected = selectedComponent === componentName
+  const isSelected = isPreviewMode
+    ? previewSelectedComponent === componentName
+    : selectedComponent === componentName
 
   return (
     <div
-      ref={wrapperRef}
       className="relative group"
       onClick={handleClick}
-      style={{ 
-        cursor: isEditMode ? 'pointer' : 'default',
+      style={{
+        cursor: 'pointer',
         position: 'relative',
         zIndex: isSelected ? 10 : 1
       }}
     >
-      {/* Visual overlay - solo visual, no bloquea clics */}
       <div
         className={`absolute inset-0 pointer-events-none transition-all ${
           isSelected
@@ -58,7 +82,6 @@ export function EditableWrapper({ componentName, children, label }: EditableWrap
         }}
       />
 
-      {/* Label - siempre visible en modo edición, clickeable para seleccionar */}
       <div
         className={`absolute top-2 left-2 px-3 py-1 text-xs font-semibold rounded-md shadow-lg transition-all z-50 cursor-pointer ${
           isSelected
@@ -68,7 +91,7 @@ export function EditableWrapper({ componentName, children, label }: EditableWrap
         onClick={(e) => {
           e.preventDefault()
           e.stopPropagation()
-          selectComponent(componentName)
+          selectThisComponent()
         }}
         style={{
           zIndex: 100,
@@ -79,7 +102,6 @@ export function EditableWrapper({ componentName, children, label }: EditableWrap
         {isSelected && <span className="ml-2">✓</span>}
       </div>
 
-      {/* Children - funcionan normalmente */}
       <div
         style={{
           position: 'relative',

@@ -144,7 +144,7 @@ describe("VisualProductCard", () => {
     const { container } = render(<VisualProductCard product={discountedProduct} />)
 
     const article = container.querySelector("article")
-    expect(article?.className).toContain("rounded-[var(--card-radius,1.5rem)]")
+    expect(article?.className).toContain("rounded-card")
     expect(article?.className).toContain("shadow-[var(--shadow-card,none)]")
   })
 })

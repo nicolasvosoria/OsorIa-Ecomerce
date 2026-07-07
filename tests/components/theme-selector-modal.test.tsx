@@ -7,7 +7,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ThemeSelectorModal } from "@/components/theme/theme-selector-modal";
 
 const changeTheme = vi.fn();
+const routerPush = vi.fn();
 let storeSubdomain = "default";
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: routerPush }),
+}));
 
 vi.mock("@/contexts/theme-context", () => ({
   useTheme: () => ({
@@ -107,6 +112,22 @@ describe("ThemeSelectorModal confirmation before reset", () => {
 
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
     expect(changeTheme).not.toHaveBeenCalled();
+  });
+
+  it("navigates to the theme customizer when 'Theme Custom' is clicked", async () => {
+    render(<ThemeSelectorModal open onOpenChange={vi.fn()} />);
+
+    await userEvent.click(screen.getByRole("button", { name: /Theme Custom/i }));
+
+    expect(routerPush).toHaveBeenCalledWith("/admin/theme");
+  });
+
+  it("disables the 'Theme Custom' entry for the reposteria subdomain", async () => {
+    storeSubdomain = "reposteria";
+
+    render(<ThemeSelectorModal open onOpenChange={vi.fn()} />);
+
+    expect(screen.getByRole("button", { name: /Theme Custom/i })).toBeDisabled();
   });
 
   it("keeps activation failure visible without closing as published", async () => {

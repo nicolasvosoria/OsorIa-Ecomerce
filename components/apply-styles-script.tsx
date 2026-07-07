@@ -6,6 +6,7 @@ import Script from "next/script";
 import { DEFAULT_RUNTIME_THEME } from "@/lib/theme-font/runtime-contract";
 import { THEME_CONTRAST_HELPER_SOURCE } from "@/lib/theme-font/contrast";
 import { DEFAULT_DARK_FALLBACK } from "@/lib/theme-font/theme-definition";
+import { SECTION_STYLE_APPLIER_SOURCE } from "@/lib/theme/section-style-keys";
 
 export function ApplyStylesScript() {
   const runtimeDefaultTheme = JSON.stringify(DEFAULT_RUNTIME_THEME);
@@ -112,6 +113,7 @@ export function ApplyStylesScript() {
     // Paleta oscura curada usada cuando el tema activo no trae un set colorsDark propio.
     const darkFallbackColors = ${runtimeDarkFallbackColors};
 ${THEME_CONTRAST_HELPER_SOURCE}
+${SECTION_STYLE_APPLIER_SOURCE}
 
     // Resolver la preferencia de modo (claro/oscuro/sistema) antes de aplicar colores,
     // para que el toggle de modo nunca produzca un "flash" del modo contrario.
@@ -121,73 +123,79 @@ ${THEME_CONTRAST_HELPER_SOURCE}
     const isDarkMode = modePreference === 'dark' || (modePreference === 'system' && prefersDarkSystem);
     root.classList.toggle('dark', isDarkMode);
 
-    // Aplicar tema desde localStorage (que será actualizado por el ThemeProvider con el tema activo de BD)
-    // Si no hay tema guardado, usar el por defecto
-    const savedTheme = localStorage.getItem('osoria_active_theme');
-    let themeToApply = defaultTheme;
-    
-    if (savedTheme) {
-      const parsedTheme = parseJson(savedTheme);
-      const normalizedTheme = normalizeThemePayload(parsedTheme);
-      if (normalizedTheme) {
-        themeToApply = normalizedTheme;
-      } else {
-        console.warn('[ApplyStyles] Saved theme cache is stale/corrupt, usando tema por defecto');
+    // El customizer (/admin/theme) carga el storefront real en un iframe con
+    // ?themePreview=1: ese frame nunca debe pintar el tema persistido, el
+    // padre lo empuja por postMessage (ver contexts/theme-context.tsx). Sin
+    // esta guarda habría un flash del tema en BD antes del primer mensaje.
+    var isThemePreviewMode = window.location.search.indexOf('themePreview=1') !== -1;
+
+    if (!isThemePreviewMode) {
+      // Aplicar tema desde localStorage (que será actualizado por el ThemeProvider con el tema activo de BD)
+      // Si no hay tema guardado, usar el por defecto
+      const savedTheme = localStorage.getItem('osoria_active_theme');
+      let themeToApply = defaultTheme;
+
+      if (savedTheme) {
+        const parsedTheme = parseJson(savedTheme);
+        const normalizedTheme = normalizeThemePayload(parsedTheme);
+        if (normalizedTheme) {
+          themeToApply = normalizedTheme;
+        } else {
+          console.warn('[ApplyStyles] Saved theme cache is stale/corrupt, usando tema por defecto');
+        }
       }
-    }
-    
-    // Aplicar el tema (guardado o por defecto), en el color set del modo resuelto
-    if (themeToApply.colors) {
-      const body = document.body;
-      const selectedColors = isDarkMode
-        ? (themeToApply.colorsDark || darkFallbackColors)
-        : (themeToApply.colorsLight || themeToApply.colors);
-      const resolvedCssVariables = resolveThemeCssVariables({ colors: selectedColors });
-      CRITICAL_THEME_CSS_VARIABLES.forEach(function(variableName) {
-        root.style.setProperty(variableName, resolvedCssVariables[variableName]);
-      });
-      
-      // Aplicar color de fondo al body para temas oscuros
-      // Esto evita el "flash" de fondo blanco antes de que React se monte
-      body.style.backgroundColor = resolvedCssVariables['--background'];
-      
-      // Marcar qué tema fue aplicado
-      window.__osoria_applied_theme = { theme_name: themeToApply.theme_name, theme_fingerprint: themeToApply.theme_fingerprint || null };
-    }
 
-    // Aplicar tokens de forma/sombra (opt-in, independientes del modo). Los
-    // fallbacks reproducen el look actual byte a byte: '--radius' y
-    // '--button-radius' ya coinciden con app/globals.css, y '--card-radius'/
-    // '--shadow-card' coinciden con el radio y la sombra reales en reposo de
-    // VisualProductCard (ver DEFAULT_THEME_TOKENS).
-    var themeRadius = themeToApply.radius || {};
-    var themeShape = themeToApply.shape || {};
-    var themeShadow = themeToApply.shadow || {};
-    root.style.setProperty('--radius', themeRadius.base || '0.5rem');
-    root.style.setProperty('--button-radius', themeShape.button || 'var(--radius)');
-    root.style.setProperty('--card-radius', themeShape.card || '1.5rem');
-    root.style.setProperty('--shadow-card', themeShadow.card || 'none');
-    root.style.setProperty('--shadow-elevated', themeShadow.elevated || 'none');
-
-    // Escala de densidad (independiente del modo). Alimenta el ancla global
-    // '--spacing' en app/globals.css; escala 1 no tiene efecto sobre el
-    // valor por defecto de Tailwind.
-    var themeDensity = themeToApply.density || {};
-    root.style.setProperty('--density-scale', String(themeDensity.scale != null ? themeDensity.scale : 1));
-
-    // Colores de superficie por sección (independientes del modo por ahora).
-    // Cada 'theme.sections.<seccion>' se vuelve '--sec-<seccion>-<clave-kebab>',
-    // ej. 'cardBg' en 'featured' escribe '--sec-featured-card-bg'.
-    var themeSections = themeToApply.sections || {};
-    Object.keys(themeSections).forEach(function(sectionName) {
-      var sectionColors = themeSections[sectionName];
-      if (typeof sectionColors === 'object' && sectionColors !== null) {
-        Object.keys(sectionColors).forEach(function(colorKey) {
-          var kebabKey = colorKey.replace(/([A-Z])/g, '-$1').toLowerCase();
-          root.style.setProperty('--sec-' + sectionName + '-' + kebabKey, sectionColors[colorKey]);
+      // Aplicar el tema (guardado o por defecto), en el color set del modo resuelto
+      if (themeToApply.colors) {
+        const body = document.body;
+        const selectedColors = isDarkMode
+          ? (themeToApply.colorsDark || darkFallbackColors)
+          : (themeToApply.colorsLight || themeToApply.colors);
+        const resolvedCssVariables = resolveThemeCssVariables({ colors: selectedColors });
+        CRITICAL_THEME_CSS_VARIABLES.forEach(function(variableName) {
+          root.style.setProperty(variableName, resolvedCssVariables[variableName]);
         });
+
+        // Aplicar color de fondo al body para temas oscuros
+        // Esto evita el "flash" de fondo blanco antes de que React se monte
+        body.style.backgroundColor = resolvedCssVariables['--background'];
+
+        // Marcar qué tema fue aplicado
+        window.__osoria_applied_theme = { theme_name: themeToApply.theme_name, theme_fingerprint: themeToApply.theme_fingerprint || null };
       }
-    });
+
+      // Aplicar tokens de forma/sombra (opt-in, independientes del modo). Los
+      // fallbacks reproducen el look actual byte a byte: '--radius' y
+      // '--button-radius' ya coinciden con app/globals.css, y '--card-radius'/
+      // '--shadow-card' coinciden con el radio y la sombra reales en reposo de
+      // VisualProductCard (ver DEFAULT_THEME_TOKENS).
+      var themeRadius = themeToApply.radius || {};
+      var themeShape = themeToApply.shape || {};
+      var themeShadow = themeToApply.shadow || {};
+      root.style.setProperty('--radius', themeRadius.base || '0.5rem');
+      root.style.setProperty('--button-radius', themeShape.button || 'var(--radius)');
+      root.style.setProperty('--card-radius', themeShape.card || '1.5rem');
+      root.style.setProperty('--shadow-card', themeShadow.card || 'none');
+      root.style.setProperty('--shadow-elevated', themeShadow.elevated || 'none');
+
+      // Escala de densidad (independiente del modo). Alimenta el ancla global
+      // '--spacing' en app/globals.css; escala 1 no tiene efecto sobre el
+      // valor por defecto de Tailwind.
+      var themeDensity = themeToApply.density || {};
+      root.style.setProperty('--density-scale', String(themeDensity.scale != null ? themeDensity.scale : 1));
+
+      // Colores de superficie por sección (independientes del modo por ahora).
+      // Cada 'theme.sections.<seccion>' se vuelve '--sec-<seccion>-<clave-kebab>',
+      // ej. 'cardBg' en 'featured' escribe '--sec-featured-card-bg'. Runs the
+      // SAME createSectionStyleApplier logic (and the same
+      // PRODUCTS_RADIUS_LENGTH values) as applyRuntimeTheme in
+      // lib/theme-font/bootstrap.ts, via sectionStyleApplier embedded above
+      // from lib/theme/section-style-keys.ts's SECTION_STYLE_APPLIER_SOURCE
+      // (single source of truth -- see that file for the cornerRadius mapping).
+      sectionStyleApplier.apply(themeToApply.sections, function(name, value) {
+        root.style.setProperty(name, value);
+      });
+    }
 
     // Aplicar combinación de fuentes (heading + body) desde localStorage
     var pairingApplied = false;

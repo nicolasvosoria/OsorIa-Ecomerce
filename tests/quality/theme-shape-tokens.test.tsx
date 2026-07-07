@@ -85,11 +85,11 @@ describe("VisualProductCard shape token wiring", () => {
     ctaLabel: "Ver detalles",
   };
 
-  it("uses --card-radius (with the current 1.5rem no-op fallback) by default", () => {
+  it("uses the shared card-radius utility (--card-radius, with the current 1.5rem no-op fallback) by default", () => {
     const { container } = render(<VisualProductCard product={product} />);
 
     const article = container.querySelector("article");
-    expect(article?.className).toContain("var(--card-radius,1.5rem)");
+    expect(article?.className).toContain("rounded-card");
     expect(article?.className).not.toContain("rounded-3xl");
   });
 });

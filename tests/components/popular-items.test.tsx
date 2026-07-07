@@ -106,7 +106,7 @@ describe("PopularItems", () => {
     render(<PopularItems initialTiles={[speakerTile]} />)
 
     const button = screen.getByText("Ver detalles")
-    expect(button).toHaveStyle({ backgroundColor: "var(--sec-popular-button)" })
+    expect(button).toHaveStyle({ backgroundColor: "var(--sec-popular-button, var(--primary))" })
   })
 
   it("uses an explicit buttonColor override instead of the theme token", () => {
@@ -124,7 +124,7 @@ describe("PopularItems", () => {
     render(<PopularItems initialTiles={[speakerTile]} />)
 
     const tile = screen.getByRole("link", { name: /bocinas bluetooth/i })
-    expect(tile.className).toContain("rounded-[var(--card-radius,1.5rem)]")
+    expect(tile.className).toContain("rounded-card")
   })
 
   it("sources the 'Ver detalles' button radius from --button-radius so it follows the theme", () => {
@@ -138,10 +138,10 @@ describe("PopularItems", () => {
     expect(POPULAR_DEFAULTS.buttonColor).toBe("")
   })
 
-  it("renders the 'Ver detalles' button text in white, not var(--accent-foreground), so it stays readable on dark button colors", () => {
+  it("renders the 'Ver detalles' button text in var(--primary-foreground) so it pairs with the primary button background", () => {
     render(<PopularItems initialTiles={[speakerTile]} />)
 
     const button = screen.getByText("Ver detalles")
-    expect(button).toHaveStyle({ color: "#ffffff" })
+    expect(button).toHaveStyle({ color: "var(--primary-foreground)" })
   })
 })

@@ -217,23 +217,17 @@ describe("theme activation admin route", () => {
         error: null,
       }),
     };
-    const existingQuery = {
+    const currentVersionQuery = {
       eq: vi.fn().mockReturnThis(),
-      maybeSingle: vi
-        .fn()
-        .mockResolvedValue({ data: { id: "version-1" }, error: null }),
+      maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
     };
     const deactivateChain = {
       eq: vi.fn().mockResolvedValue({ error: null }),
     };
-    const activateChain = {
-      eq: vi.fn().mockResolvedValue({ error: null }),
-    };
     const themeVersionsTable = {
-      update: vi.fn((payload: { is_current?: boolean }) =>
-        payload.is_current === false ? deactivateChain : activateChain,
-      ),
-      select: vi.fn().mockReturnValue(existingQuery),
+      update: vi.fn(() => deactivateChain),
+      insert: vi.fn().mockResolvedValue({ error: null }),
+      select: vi.fn().mockReturnValue(currentVersionQuery),
     };
 
     const serviceSchema = {
@@ -267,31 +261,37 @@ describe("theme activation admin route", () => {
       success: true,
       activeTheme: expect.objectContaining({
         theme_name: "Claro Original",
-        theme_fingerprint: expect.stringMatching(
-          /^v1:store-1:version-1:theme-1:/,
-        ),
+        theme_fingerprint: expect.stringMatching(/^v1:store-1:.+:theme-1:/),
       }),
     });
     expect(createClient).toHaveBeenCalledWith(
       "https://test.supabase.co",
       "test-service-role-key",
     );
+    // Insert-not-upsert: activation never updates an existing version row,
+    // it only ever flips every row for the store to not-current, then
+    // inserts a brand new one — so history accumulates on every apply.
+    expect(themeVersionsTable.update).toHaveBeenCalledTimes(1);
     expect(themeVersionsTable.update).toHaveBeenCalledWith({
       is_current: false,
     });
-    expect(themeVersionsTable.update).toHaveBeenCalledWith({
-      is_current: true,
-      variables: expect.objectContaining({
-        colorsLight: expect.objectContaining({ primary: "#111111" }),
-        colorsDark: expect.any(Object),
-        radius: expect.any(Object),
-        density: expect.any(Object),
-        shadow: expect.any(Object),
-        shape: expect.any(Object),
+    expect(themeVersionsTable.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        store_id: "store-1",
+        theme_id: "theme-1",
+        is_current: true,
+        is_custom: false,
+        variables: expect.objectContaining({
+          colorsLight: expect.objectContaining({ primary: "#111111" }),
+          colorsDark: expect.any(Object),
+          radius: expect.any(Object),
+          density: expect.any(Object),
+          shadow: expect.any(Object),
+          shape: expect.any(Object),
+        }),
+        fonts: { fontPairingId: null },
       }),
-      fonts: { fontPairingId: null },
-    });
-    expect(activateChain.eq).toHaveBeenCalledWith("id", "version-1");
+    );
     expect(getUser).toHaveBeenCalledWith("preview-token");
   });
 
@@ -313,23 +313,17 @@ describe("theme activation admin route", () => {
         .fn()
         .mockResolvedValue({ data: { id: "theme-1" }, error: null }),
     };
-    const existingQuery = {
+    const currentVersionQuery = {
       eq: vi.fn().mockReturnThis(),
-      maybeSingle: vi
-        .fn()
-        .mockResolvedValue({ data: { id: "version-1" }, error: null }),
+      maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
     };
     const deactivateChain = {
       eq: vi.fn().mockResolvedValue({ error: null }),
     };
-    const activateChain = {
-      eq: vi.fn().mockResolvedValue({ error: null }),
-    };
     const themeVersionsTable = {
-      update: vi.fn((payload: { is_current?: boolean }) =>
-        payload.is_current === false ? deactivateChain : activateChain,
-      ),
-      select: vi.fn().mockReturnValue(existingQuery),
+      update: vi.fn(() => deactivateChain),
+      insert: vi.fn().mockResolvedValue({ error: null }),
+      select: vi.fn().mockReturnValue(currentVersionQuery),
     };
     const serviceSchema = {
       from: vi.fn((table: string) => {
@@ -384,23 +378,17 @@ describe("theme activation admin route", () => {
         .fn()
         .mockResolvedValue({ data: { id: "theme-1" }, error: null }),
     };
-    const existingQuery = {
+    const currentVersionQuery = {
       eq: vi.fn().mockReturnThis(),
-      maybeSingle: vi
-        .fn()
-        .mockResolvedValue({ data: { id: "version-1" }, error: null }),
+      maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
     };
     const deactivateChain = {
       eq: vi.fn().mockResolvedValue({ error: null }),
     };
-    const activateChain = {
-      eq: vi.fn().mockResolvedValue({ error: null }),
-    };
     const themeVersionsTable = {
-      update: vi.fn((payload: { is_current?: boolean }) =>
-        payload.is_current === false ? deactivateChain : activateChain,
-      ),
-      select: vi.fn().mockReturnValue(existingQuery),
+      update: vi.fn(() => deactivateChain),
+      insert: vi.fn().mockResolvedValue({ error: null }),
+      select: vi.fn().mockReturnValue(currentVersionQuery),
     };
     const serviceSchema = {
       from: vi.fn((table: string) => {
@@ -432,5 +420,138 @@ describe("theme activation admin route", () => {
     await expect(response.json()).resolves.toEqual({ success: true });
     expect(getUser).toHaveBeenCalledWith("preview-token");
     expect(getUser).toHaveBeenCalledWith();
+  });
+
+  it("persists an arbitrary custom definition as a new is_custom version anchored to its base preset", async () => {
+    createServerClient.mockReturnValue({
+      auth: {
+        getUser: vi
+          .fn()
+          .mockResolvedValue({ data: { user: { id: "user-1" } }, error: null }),
+      },
+    });
+
+    const userProfilesQuery = makeUserProfilesQuery("admin");
+    const themeQuery = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: vi
+        .fn()
+        .mockResolvedValue({ data: { id: "theme-tech" }, error: null }),
+    };
+    const currentVersionQuery = {
+      eq: vi.fn().mockReturnThis(),
+      maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+    };
+    const deactivateChain = {
+      eq: vi.fn().mockResolvedValue({ error: null }),
+    };
+    const themeVersionsTable = {
+      update: vi.fn(() => deactivateChain),
+      insert: vi.fn().mockResolvedValue({ error: null }),
+      select: vi.fn().mockReturnValue(currentVersionQuery),
+    };
+    const serviceSchema = {
+      from: vi.fn((table: string) => {
+        if (table === "user_profiles") return userProfilesQuery;
+        if (table === "app_themes") return themeQuery;
+        if (table === "app_theme_versions") return themeVersionsTable;
+        throw new Error(`unexpected table ${table}`);
+      }),
+    };
+
+    createClient.mockReturnValue({
+      schema: vi.fn().mockReturnValue(serviceSchema),
+    });
+
+    const colors = {
+      primary: "#101010",
+      secondary: "#202020",
+      accent: "#303030",
+      background: "#ffffff",
+      foreground: "#0a0a0a",
+      card: "#f5f5f5",
+      cardForeground: "#101010",
+      border: "#dedede",
+      muted: "#eeeeee",
+      mutedForeground: "#444444",
+    };
+    const customDefinition = {
+      colorsLight: colors,
+      colorsDark: { ...colors, background: "#0a0a0a", foreground: "#ffffff" },
+      radius: { base: "0.5rem" },
+      density: { scale: 1 },
+      shadow: { card: "0 1px 2px rgba(0,0,0,.1)", elevated: "0 4px 8px rgba(0,0,0,.2)" },
+      shape: { button: "9999px", card: "1rem" },
+      fontPairingId: "custom-pairing",
+    };
+
+    const response = await POST(
+      new NextRequest("http://localhost/api/admin/theme-activation", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          themeName: "Tech",
+          baseThemeName: "Tech",
+          definition: customDefinition,
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(themeVersionsTable.update).toHaveBeenCalledTimes(1);
+    expect(themeVersionsTable.update).toHaveBeenCalledWith({
+      is_current: false,
+    });
+    expect(themeVersionsTable.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        theme_id: "theme-tech",
+        is_current: true,
+        is_custom: true,
+        variables: expect.objectContaining({
+          colorsLight: colors,
+          fontPairingId: "custom-pairing",
+        }),
+        fonts: { fontPairingId: "custom-pairing" },
+      }),
+    );
+  });
+
+  it("rejects a malformed custom definition before writing any row", async () => {
+    createServerClient.mockReturnValue({
+      auth: {
+        getUser: vi
+          .fn()
+          .mockResolvedValue({ data: { user: { id: "user-1" } }, error: null }),
+      },
+    });
+
+    const serviceSchema = {
+      from: vi.fn((table: string) => {
+        throw new Error(`unexpected table ${table}`);
+      }),
+    };
+
+    createClient.mockReturnValue({
+      schema: vi.fn().mockReturnValue(serviceSchema),
+    });
+
+    const response = await POST(
+      new NextRequest("http://localhost/api/admin/theme-activation", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          themeName: "Tech",
+          baseThemeName: "Tech",
+          definition: { colorsLight: { primary: "#101010" } },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "Payload inválido",
+    });
+    expect(serviceSchema.from).not.toHaveBeenCalled();
   });
 });

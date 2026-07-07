@@ -74,6 +74,11 @@ function readOptionalStringValue(value: unknown): string | undefined {
   return typeof value === "string" && value.trim().length > 0 ? value : undefined;
 }
 
+/** Resolves a color with "edit > theme > factory" precedence. */
+function pickColor(edit: unknown, style: unknown, fallback: string): string {
+  return readStringValue(edit, readStringValue(style, fallback));
+}
+
 export function resolveHeroColors({
   activeTheme,
   styleData,
@@ -84,21 +89,17 @@ export function resolveHeroColors({
   edits: HeroStyleInput;
 }): HeroResolvedColors {
   return {
-    bgColor: readStringValue(
-      edits.bgColor,
-      readStringValue(styleData.bgColor, "var(--primary)"),
-    ),
-    textColor: readStringValue(
-      edits.textColor,
-      readStringValue(styleData.textColor, "var(--foreground)"),
-    ),
-    buttonColor: readStringValue(
+    bgColor: pickColor(edits.bgColor, styleData.bgColor, "var(--primary)"),
+    textColor: pickColor(edits.textColor, styleData.textColor, "var(--foreground)"),
+    buttonColor: pickColor(
       edits.buttonColor,
-      readStringValue(styleData.buttonColor, "var(--sec-hero-button)"),
+      styleData.buttonColor,
+      "var(--sec-hero-button, var(--primary))",
     ),
-    buttonTextColor: readStringValue(
+    buttonTextColor: pickColor(
       edits.buttonTextColor,
-      readStringValue(styleData.buttonTextColor, "var(--accent-foreground)"),
+      styleData.buttonTextColor,
+      "var(--primary-foreground)",
     ),
     barColor: readOptionalStringValue(edits.barColor) ?? readOptionalStringValue(styleData.barColor),
     accentColor: activeTheme?.colors.accent || "#005aa1",
@@ -118,14 +119,14 @@ export function resolveHeroShellProps(
       backgroundMode,
       sideGutters: "24px",
       className:
-        "container relative mx-6 w-auto max-w-none overflow-hidden rounded-[var(--card-radius,1.5rem)] mt-2 md:mt-4 mb-4 md:mb-8",
+        "container relative mx-6 w-auto max-w-none overflow-hidden rounded-card mt-2 md:mt-4 mb-4 md:mb-8",
     };
   }
 
   return {
     layout: layoutMode,
     className:
-      "container relative w-full overflow-hidden rounded-[var(--card-radius,1.5rem)] mx-auto px-2 md:px-4 mt-2 md:mt-4 mb-4 md:mb-8",
+      "container relative w-full overflow-hidden rounded-card mx-auto px-2 md:px-4 mt-2 md:mt-4 mb-4 md:mb-8",
   };
 }
 

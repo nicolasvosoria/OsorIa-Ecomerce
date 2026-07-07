@@ -20,6 +20,10 @@ import {
   applyRuntimeFont,
   applyRuntimePairing,
 } from "@/lib/theme-font/bootstrap";
+import {
+  isThemePreviewMode,
+  parseThemePreviewFontMessage,
+} from "@/lib/theme-font/preview-mode";
 import { deferStateUpdate } from "@/lib/react/defer-state-update";
 
 interface FontContextType {
@@ -193,6 +197,13 @@ export function FontProvider({ children }: { children: ReactNode }) {
     }
   };
   useEffect(() => {
+    // En modo preview del customizer, el padre (postMessage) es la única
+    // fuente de la tipografía: no cargamos ni aplicamos el pairing persistido.
+    if (typeof window !== "undefined" && isThemePreviewMode()) {
+      deferStateUpdate(() => setLoading(false));
+      return;
+    }
+
     // Solo cargar en el cliente, no durante SSR/prerendering
     if (typeof window !== "undefined") {
       console.log(
@@ -205,6 +216,24 @@ export function FontProvider({ children }: { children: ReactNode }) {
       // Durante SSR, usar valores por defecto
       deferStateUpdate(() => setLoading(false));
     }
+  }, []);
+
+  // Preview mode: apply the ephemeral pairing pushed by the customizer parent.
+  // Applies directly via `applyRuntimePairing` (never the localStorage-writing
+  // `applyPairing`), so the preview is fully ephemeral. Guarded so normal loads
+  // never register this listener.
+  useEffect(() => {
+    if (!isThemePreviewMode()) return;
+
+    const handleMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      const message = parseThemePreviewFontMessage(event.data);
+      if (!message) return;
+      applyRuntimePairing(message.pairing);
+    };
+
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
   }, []);
 
   useEffect(() => {

@@ -1,5 +1,6 @@
 import type {
   ThemeColors,
+  ThemeDefinition,
   ThemeDensity,
   ThemeRadiusScale,
   ThemeShadow,
@@ -237,6 +238,33 @@ function normalizeThemeSections(
   }
 
   return Object.keys(sections).length > 0 ? sections : null;
+}
+
+export function normalizeThemeDefinition(input: unknown): ThemeDefinition | null {
+  const raw = toRecord(parseJsonIfNeeded(input));
+  if (!raw) return null;
+
+  const colorsLight = normalizeThemeColors(raw.colorsLight);
+  const colorsDark = normalizeThemeColors(raw.colorsDark);
+  const radius = normalizeThemeRadius(raw.radius);
+  const density = normalizeThemeDensity(raw.density);
+  const shadow = normalizeThemeShadow(raw.shadow);
+  const shape = normalizeThemeShape(raw.shape);
+
+  if (!colorsLight || !colorsDark || !radius || !density || !shadow || !shape) {
+    return null;
+  }
+
+  return {
+    colorsLight,
+    colorsDark,
+    radius,
+    density,
+    shadow,
+    shape,
+    fontPairingId: readString(raw.fontPairingId ?? raw.font_pairing_id) ?? null,
+    sections: normalizeThemeSections(raw.sections) ?? undefined,
+  };
 }
 
 export function normalizeThemeRecord(input: unknown): RuntimeTheme | null {

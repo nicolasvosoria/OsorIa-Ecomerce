@@ -1,6 +1,10 @@
 import { getSupabaseEcommerce } from "./client";
 import { ECOMMERCE_TABLES, ECOMMERCE_VIEWS } from "./contract";
-import type { AppTheme, ThemeDefinition } from "@/lib/types/theme";
+import type {
+  AppTheme,
+  ThemeDefinition,
+  ThemeVersionSummary,
+} from "@/lib/types/theme";
 import { requireAdmin } from "./permissions-api";
 import { getAdminRequestHeaders } from "./admin-request-headers";
 import { getStoreId, normalizeRuntimeStoreId } from "@/lib/utils/store";
@@ -18,7 +22,7 @@ function toPlainRecord(value: unknown): Record<string, unknown> | null {
  * Defensively lifts `app_theme_versions.variables`/`.fonts` jsonb into the
  * raw-record keys `normalizeThemeRecord` already knows how to merge
  * (`colorsLight`, `colorsDark`, `radius`, `density`, `shadow`, `shape`,
- * `fontPairingId`). Each field is re-validated independently inside
+ * `sections`, `fontPairingId`). Each field is re-validated independently inside
  * `normalizeThemeRecord`, so a partially malformed bundle only drops the bad
  * field(s) instead of failing the whole merge. A non-object bundle (or NULL,
  * the real state for every store today) yields an empty overlay, so the
@@ -50,6 +54,9 @@ function extractStoredDefinitionOverlay(
   }
   if ("shape" in variablesRecord) {
     overlay.shape = variablesRecord.shape;
+  }
+  if ("sections" in variablesRecord) {
+    overlay.sections = variablesRecord.sections;
   }
   if ("fontPairingId" in fontsRecord) {
     overlay.fontPairingId = fontsRecord.fontPairingId;
@@ -102,6 +109,7 @@ function normalizeThemeRow(
           shadow: normalized.shadow,
           shape: normalized.shape,
           fontPairingId: normalized.fontPairingId ?? null,
+          sections: normalized.sections,
         }
       : undefined;
 
@@ -331,6 +339,13 @@ export async function getActiveTheme(): Promise<AppTheme | null> {
 export async function setActiveTheme(
   themeName: string,
 ): Promise<{ success: boolean; error?: string; activeTheme?: AppTheme }> {
+  return postThemeActivation({ themeName }, "Error al activar tema");
+}
+
+async function postThemeActivation(
+  body: Record<string, unknown>,
+  fallbackError: string,
+): Promise<{ success: boolean; error?: string; activeTheme?: AppTheme }> {
   try {
     await requireAdmin();
   } catch (error) {
@@ -347,9 +362,7 @@ export async function setActiveTheme(
     const response = await fetch("/api/admin/theme-activation", {
       method: "POST",
       headers: await getAdminRequestHeaders(),
-      body: JSON.stringify({
-        themeName,
-      }),
+      body: JSON.stringify(body),
     });
 
     const payload = await response.json().catch(() => null);
@@ -360,7 +373,7 @@ export async function setActiveTheme(
         "error" in payload &&
         typeof payload.error === "string"
           ? payload.error
-          : "Error al activar tema";
+          : fallbackError;
 
       return { success: false, error: message };
     }
@@ -376,4 +389,65 @@ export async function setActiveTheme(
       err instanceof Error ? err.message : "Error desconocido";
     return { success: false, error: errorMessage };
   }
+}
+
+/**
+ * Publishes an arbitrary edited `ThemeDefinition` as a new custom version for
+ * the store (the customizer "Aplicar" path). Anchors to the base preset by
+ * name; the route stores the full definition (colors, shape, sections) in the
+ * new `app_theme_versions` row and flips `is_current`.
+ */
+export async function setActiveThemeCustom(
+  baseThemeName: string,
+  definition: ThemeDefinition,
+): Promise<{ success: boolean; error?: string; activeTheme?: AppTheme }> {
+  return postThemeActivation(
+    { baseThemeName, definition },
+    "Error al aplicar el tema personalizado",
+  );
+}
+
+/**
+ * Fetches this store's theme version history (newest first) for the
+ * customizer's history panel. Admin-gated server-side; returns an empty list
+ * on any failure so the panel can render an empty state instead of throwing.
+ */
+export async function getThemeVersions(): Promise<ThemeVersionSummary[]> {
+  try {
+    await requireAdmin();
+  } catch (error) {
+    console.error("[Theme Versions] Acceso no autorizado:", error);
+    return [];
+  }
+
+  try {
+    const response = await fetch("/api/admin/theme-versions", {
+      method: "GET",
+      headers: await getAdminRequestHeaders(),
+    });
+
+    const payload = await response.json().catch(() => null);
+    if (!response.ok || !payload || !Array.isArray(payload.versions)) {
+      return [];
+    }
+
+    return payload.versions as ThemeVersionSummary[];
+  } catch (err) {
+    console.error("[Theme Versions] Error al obtener el historial:", err);
+    return [];
+  }
+}
+
+/**
+ * Reactivates a version already in history (the customizer's "Restaurar"
+ * action). Never inserts a new version row; the route only flips
+ * `is_current` onto the chosen one (D3, Option A).
+ */
+export async function revertToThemeVersion(
+  versionId: string,
+): Promise<{ success: boolean; error?: string; activeTheme?: AppTheme }> {
+  return postThemeActivation(
+    { versionId },
+    "No se pudo restaurar la versión del tema",
+  );
 }

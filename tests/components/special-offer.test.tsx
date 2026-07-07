@@ -63,11 +63,19 @@ describe("SpecialOffer colors", () => {
 
     const { container } = render(<SpecialOffer />)
 
-    const panel = container.querySelector('[data-component="specialOffer"] > div') as HTMLElement
-    expect(panel.style.backgroundColor).toBe("var(--sec-specialOffer-bg)")
-    expect(panel.style.color).toBe("var(--sec-specialOffer-text)")
+    const section = container.querySelector('[data-component="specialOffer"]') as HTMLElement
+    expect(section.style.backgroundColor).toBe(
+      "var(--sec-specialOffer-section-bg, var(--background))",
+    )
 
-    const productBox = findByBackgroundColor(container, "var(--sec-specialOffer-product-bg)")
+    const panel = container.querySelector('[data-component="specialOffer"] > div') as HTMLElement
+    expect(panel.style.backgroundColor).toBe("var(--sec-specialOffer-bg, var(--secondary))")
+    expect(panel.style.color).toBe("var(--sec-specialOffer-text, var(--secondary-foreground))")
+
+    const productBox = findByBackgroundColor(
+      container,
+      "var(--sec-specialOffer-product-bg, var(--muted))",
+    )
     expect(productBox).toBeDefined()
   })
 
@@ -79,10 +87,14 @@ describe("SpecialOffer colors", () => {
         textColor: "#abcdef",
         productBgColor: "#654321",
         accentColor: "#0f0f0f",
+        sectionBgColor: "#0f172a",
       },
     }))
 
     const { container } = render(<SpecialOffer />)
+
+    const section = container.querySelector('[data-component="specialOffer"]') as HTMLElement
+    expect(section.style.backgroundColor).toBe("rgb(15, 23, 42)")
 
     const panel = container.querySelector('[data-component="specialOffer"] > div') as HTMLElement
     expect(panel.style.backgroundColor).toBe("rgb(18, 52, 86)")
@@ -97,6 +109,7 @@ describe("SpecialOffer colors", () => {
     expect(SPECIAL_OFFER_DEFAULTS.accentColor).toBe("")
     expect(SPECIAL_OFFER_DEFAULTS.productBgColor).toBe("")
     expect(SPECIAL_OFFER_DEFAULTS.textColor).toBe("")
+    expect(SPECIAL_OFFER_DEFAULTS.sectionBgColor).toBe("")
   })
 })
 
@@ -113,14 +126,17 @@ describe("SpecialOffer structure", () => {
     const { container } = render(<SpecialOffer />)
 
     const panel = container.querySelector('[data-component="specialOffer"] > div') as HTMLElement
-    expect(panel.className).toContain("rounded-[var(--card-radius,1.5rem)]")
+    expect(panel.className).toContain("rounded-card")
   })
 
   it("sources the product image card and CTA button radius from theme tokens", () => {
     const { container } = render(<SpecialOffer />)
 
-    const productBox = findByBackgroundColor(container, "var(--sec-specialOffer-product-bg)")
-    expect(productBox?.className).toContain("rounded-[var(--card-radius,1.5rem)]")
+    const productBox = findByBackgroundColor(
+      container,
+      "var(--sec-specialOffer-product-bg, var(--muted))",
+    )
+    expect(productBox?.className).toContain("rounded-card")
 
     const ctaLink = container.querySelector(`a[href="${offerCard.href}"]`) as HTMLAnchorElement
     expect(ctaLink.className).toContain("rounded-[var(--button-radius)]")

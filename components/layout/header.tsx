@@ -70,8 +70,8 @@ import { buildLocalCartSummary, formatCartMoney } from "@/lib/cart/cart-summary"
 
 /**
  * Single source of truth for the header's editable defaults. Imported by
- * `editor-panel.tsx` for `COMPONENT_FIELDS.header.defaults` so the live
- * header and the admin editor never drift apart.
+ * `lib/section-editor/component-fields.ts` for `COMPONENT_FIELDS.header.defaults`
+ * so the live header and the admin editor never drift apart.
  */
 export const HEADER_DEFAULTS = {
   brandName: "Osoria",

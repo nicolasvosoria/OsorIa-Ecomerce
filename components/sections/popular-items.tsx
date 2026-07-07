@@ -30,7 +30,7 @@ export function PopularItems({ initialTiles }: PopularItemsProps = {}) {
   const bgColor = edits.bgColor ?? styleData.bgColor
   const textColor = edits.textColor ?? styleData.textColor
   const buttonColor =
-    (edits.buttonColor ?? styleData.buttonColor) || "var(--sec-popular-button)"
+    (edits.buttonColor ?? styleData.buttonColor) || "var(--sec-popular-button, var(--primary))"
 
   // El live homepage pasa initialTiles (vía PopularItemsWrapper). El editor no
   // pasa props, así que el preview busca las MISMAS categorías directamente
@@ -104,7 +104,7 @@ export function PopularItems({ initialTiles }: PopularItemsProps = {}) {
             <Link
               key={tile.id}
               href={tile.href}
-              className="group relative block aspect-[6/5] overflow-hidden rounded-[var(--card-radius,1.5rem)] bg-muted"
+              className="group relative block aspect-[6/5] overflow-hidden rounded-card bg-muted"
             >
               <VisualProductCardImage src={tile.imageUrl} alt={tile.name} title={tile.name} isOverlay />
 
@@ -121,7 +121,7 @@ export function PopularItems({ initialTiles }: PopularItemsProps = {}) {
                   className="mt-2 inline-flex min-h-[44px] items-center justify-center rounded-[var(--button-radius)] px-5 text-base font-inter font-medium opacity-100 transition-opacity duration-200 md:opacity-0 md:group-hover:opacity-100 md:group-focus-visible:opacity-100"
                   style={{
                     backgroundColor: buttonColor,
-                    color: "#ffffff",
+                    color: "var(--primary-foreground)",
                   }}
                 >
                   {t.wishlist.viewDetails}

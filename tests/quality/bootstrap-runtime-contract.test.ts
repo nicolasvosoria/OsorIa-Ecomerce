@@ -233,6 +233,60 @@ describe("applyRuntimeTheme per-section surface colors", () => {
     const root = document.documentElement.style;
     expect(root.getPropertyValue("--sec-featured-bg")).toBe("");
   });
+
+  it("emits a CSS length (not the raw preset key) for products.cornerRadius", () => {
+    applyRuntimeTheme(
+      {
+        ...DEFAULT_RUNTIME_THEME,
+        sections: {
+          products: { cornerRadius: "lg" },
+        },
+      },
+      "light",
+    );
+
+    const root = document.documentElement.style;
+    expect(root.getPropertyValue("--sec-products-corner-radius")).toBe("1rem");
+  });
+
+  it("maps every products.cornerRadius preset key to its CSS length equivalent", () => {
+    applyRuntimeTheme(
+      { ...DEFAULT_RUNTIME_THEME, sections: { products: { cornerRadius: "none" } } },
+      "light",
+    );
+    expect(
+      document.documentElement.style.getPropertyValue("--sec-products-corner-radius"),
+    ).toBe("0px");
+  });
+
+  it("removes a stale --sec-<...> var when the new theme drops that section (reset to theme)", () => {
+    applyRuntimeTheme(
+      {
+        ...DEFAULT_RUNTIME_THEME,
+        sections: { hero: { button: "#ff0000" } },
+      },
+      "light",
+    );
+    expect(
+      document.documentElement.style.getPropertyValue("--sec-hero-button"),
+    ).toBe("#ff0000");
+
+    applyRuntimeTheme({ ...DEFAULT_RUNTIME_THEME, sections: {} }, "light");
+
+    expect(
+      document.documentElement.style.getPropertyValue("--sec-hero-button"),
+    ).toBe("");
+  });
+
+  it("falls back to the raw value for an unknown products.cornerRadius key", () => {
+    applyRuntimeTheme(
+      { ...DEFAULT_RUNTIME_THEME, sections: { products: { cornerRadius: "1.25rem" } } },
+      "light",
+    );
+    expect(
+      document.documentElement.style.getPropertyValue("--sec-products-corner-radius"),
+    ).toBe("1.25rem");
+  });
 });
 
 describe("applyRuntimeTheme mode resolution when `mode` is omitted", () => {

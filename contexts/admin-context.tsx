@@ -10,6 +10,10 @@ import {
 import { useAuth } from "@/contexts/auth-context";
 import { isCurrentUserAdmin } from "@/lib/supabase/permissions-api";
 import type { HeroLayerId } from "@/lib/hero/hero-layer-model";
+import {
+  isThemePreviewMode,
+  parseThemePreviewContentMessage,
+} from "@/lib/theme-font/preview-mode";
 
 interface AdminContextType {
   isEditMode: boolean;
@@ -95,6 +99,34 @@ export function AdminProvider({ children }: { children: ReactNode }) {
 
     checkAdminStatus();
   }, [isAuthenticated, user]);
+
+  // Preview mode: the theme customizer's parent window (components/theme/
+  // theme-custom-editor.tsx) pushes staged CONTENT edits over postMessage for
+  // live preview. Applied directly via `setComponentEdits`, bypassing the
+  // `isAdmin` gate below entirely — mirrors the preview-message listeners in
+  // theme-context.tsx/font-context.tsx and never runs outside the customizer
+  // iframe (`isThemePreviewMode()`), so the real storefront's admin gating is
+  // untouched.
+  useEffect(() => {
+    if (!isThemePreviewMode()) return;
+
+    const handlePreviewContentMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+
+      const message = parseThemePreviewContentMessage(event.data);
+      if (!message) return;
+
+      setComponentEdits((prev) => {
+        const newMap = new Map(prev);
+        newMap.set(message.componentName, message.edits);
+        return newMap;
+      });
+    };
+
+    window.addEventListener("message", handlePreviewContentMessage);
+    return () =>
+      window.removeEventListener("message", handlePreviewContentMessage);
+  }, []);
 
   const toggleEditMode = () => {
     if (!isAdmin) {

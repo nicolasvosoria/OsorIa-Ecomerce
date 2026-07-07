@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest"
 
 import { ApplyStylesScript } from "@/components/apply-styles-script"
+import { applyRuntimeTheme } from "@/lib/theme-font/bootstrap"
 import { DEFAULT_RUNTIME_THEME } from "@/lib/theme-font/runtime-contract"
+import { SECTION_STYLE_APPLIER_SOURCE } from "@/lib/theme/section-style-keys"
 
 interface NormalizedThemePayload {
   theme_name: string
@@ -115,5 +117,58 @@ describe("ApplyStylesScript pre-hydration normalizeThemePayload", () => {
       fontPairingId: DEFAULT_RUNTIME_THEME.fontPairingId,
       sections: null,
     })
+  })
+})
+
+describe("ApplyStylesScript pre-hydration --sec-* emission (single-source cross-check)", () => {
+  it("embeds the exact SECTION_STYLE_APPLIER_SOURCE the runtime module exports (no hand-copied duplicate)", () => {
+    const element = ApplyStylesScript() as unknown as {
+      props: { dangerouslySetInnerHTML: { __html: string } }
+    }
+    const scriptSource = element.props.dangerouslySetInnerHTML.__html
+
+    expect(scriptSource).toContain(SECTION_STYLE_APPLIER_SOURCE)
+  })
+
+  it("matches applyRuntimeTheme's --sec-* emission byte-for-byte for a representative sections payload", () => {
+    const sections = {
+      hero: { button: "#f00" },
+      products: { cornerRadius: "lg" },
+      featured: { cardBg: "#fff" },
+    }
+
+    // Runtime path (lib/theme-font/bootstrap.ts).
+    document.documentElement.removeAttribute("style")
+    applyRuntimeTheme({ ...DEFAULT_RUNTIME_THEME, sections }, "light")
+    const runtimeVars: Record<string, string> = {}
+    const runtimeStyle = document.documentElement.style
+    for (let index = 0; index < runtimeStyle.length; index += 1) {
+      const name = runtimeStyle[index]
+      if (name.startsWith("--sec-")) {
+        runtimeVars[name] = runtimeStyle.getPropertyValue(name)
+      }
+    }
+
+    // Pre-hydration path: eval the EXACT stringified source the inline script embeds.
+    const inlineVars: Record<string, string> = {}
+    const buildInlineApplier = new Function(
+      `${SECTION_STYLE_APPLIER_SOURCE}\nreturn sectionStyleApplier;`,
+    )
+    const inlineApplier = buildInlineApplier() as {
+      apply: (
+        input: unknown,
+        setProperty: (name: string, value: string) => void,
+      ) => void
+    }
+    inlineApplier.apply(sections, (name, value) => {
+      inlineVars[name] = value
+    })
+
+    expect(inlineVars).toEqual({
+      "--sec-hero-button": "#f00",
+      "--sec-products-corner-radius": "1rem",
+      "--sec-featured-card-bg": "#fff",
+    })
+    expect(inlineVars).toEqual(runtimeVars)
   })
 })

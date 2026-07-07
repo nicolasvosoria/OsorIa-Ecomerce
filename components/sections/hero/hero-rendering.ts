@@ -36,7 +36,7 @@ export const HERO_TEXT_SIZE_CLASSES: Record<
   feature: "text-4xl md:text-6xl lg:text-[92px]",
 };
 
-export const HERO_SECONDARY_PRESET_PLACEMENT: Record<
+const HERO_SECONDARY_PRESET_PLACEMENT: Record<
   HeroSecondaryProductPreset,
   { primary: HeroProductPlacement; secondary: HeroProductPlacement }
 > = {
@@ -73,6 +73,15 @@ export function toHeroProductSlug(title: string): string {
     .replace(/(^-|-$)/g, "");
 }
 
+/** Extracts the r/g/b channels of a `#rrggbb`-shaped string. Callers validate the shape first. */
+function parseHexChannels(hex: string): { r: number; g: number; b: number } {
+  return {
+    r: parseInt(hex.slice(1, 3), 16),
+    g: parseInt(hex.slice(3, 5), 16),
+    b: parseInt(hex.slice(5, 7), 16),
+  };
+}
+
 export function isDarkHeroTheme(activeTheme: HeroThemeLike | null): boolean {
   if (!activeTheme) return false;
   if (activeTheme.theme_name.toLowerCase().includes("oscuro")) {
@@ -84,11 +93,9 @@ export function isDarkHeroTheme(activeTheme: HeroThemeLike | null): boolean {
     return false;
   }
 
-  const red = parseInt(backgroundColor.slice(1, 3), 16);
-  const green = parseInt(backgroundColor.slice(3, 5), 16);
-  const blue = parseInt(backgroundColor.slice(5, 7), 16);
+  const { r, g, b } = parseHexChannels(backgroundColor);
 
-  return (red + green + blue) / 3 < 128;
+  return (r + g + b) / 3 < 128;
 }
 
 export function getProductCompositionStyle(
@@ -117,21 +124,19 @@ export function getContentCompositionStyle(
   } as CSSProperties;
 }
 
-export function hexToRgba(hex: string, alpha: number): string {
+function hexToRgba(hex: string, alpha: number): string {
   const hexColor = hex.startsWith("#") ? hex : `#${hex}`;
   if (hexColor.length < 7) {
     return `rgba(0, 0, 0, ${alpha})`;
   }
 
-  const red = parseInt(hexColor.slice(1, 3), 16);
-  const green = parseInt(hexColor.slice(3, 5), 16);
-  const blue = parseInt(hexColor.slice(5, 7), 16);
+  const { r, g, b } = parseHexChannels(hexColor);
 
-  if (![red, green, blue].every(Number.isFinite)) {
+  if (![r, g, b].every(Number.isFinite)) {
     return `rgba(0, 0, 0, ${alpha})`;
   }
 
-  return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
 export function getHeroBackgroundGradient({

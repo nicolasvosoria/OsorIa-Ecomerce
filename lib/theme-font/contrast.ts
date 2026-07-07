@@ -41,26 +41,10 @@ export const CRITICAL_THEME_CONTRAST_PAIRS = [
   foreground: foreground as ThemeCssVariable,
 }));
 
-function createThemeContrastResolver(defaultTheme: RuntimeTheme) {
-  const names = [
-    "--background",
-    "--foreground",
-    "--card",
-    "--card-foreground",
-    "--muted",
-    "--muted-foreground",
-    "--primary",
-    "--primary-foreground",
-    "--secondary",
-    "--secondary-foreground",
-    "--accent",
-    "--accent-foreground",
-    "--popover",
-    "--popover-foreground",
-    "--destructive",
-    "--destructive-foreground",
-    "--border",
-  ];
+function createThemeContrastResolver(
+  defaultTheme: RuntimeTheme,
+  names: readonly string[],
+) {
   const minimum = 4.5;
   const light = "#ffffff";
   const dark = "#111111";
@@ -92,11 +76,15 @@ function createThemeContrastResolver(defaultTheme: RuntimeTheme) {
     return (ratios[0] + 0.05) / (ratios[1] + 0.05);
   }
 
-  function foreground(background: string, preferred: string) {
-    if (contrast(background, preferred) >= minimum) return preferred;
+  function autoForeground(background: string) {
     return contrast(background, light) >= contrast(background, dark)
       ? light
       : dark;
+  }
+
+  function foreground(background: string, preferred: string) {
+    if (contrast(background, preferred) >= minimum) return preferred;
+    return autoForeground(background);
   }
 
   function resolve(theme: RuntimeTheme) {
@@ -141,10 +129,13 @@ function createThemeContrastResolver(defaultTheme: RuntimeTheme) {
     };
   }
 
-  return { contrast, names, resolve };
+  return { contrast, names, resolve, autoForeground };
 }
 
-const resolver = createThemeContrastResolver(DEFAULT_RUNTIME_THEME);
+const resolver = createThemeContrastResolver(
+  DEFAULT_RUNTIME_THEME,
+  CRITICAL_THEME_CSS_VARIABLES,
+);
 
 export function getContrastRatio(background: string, foreground: string): number {
   return resolver.contrast(background, foreground);
@@ -154,8 +145,18 @@ export function resolveThemeCssVariables(theme: RuntimeTheme): ThemeCssVariableM
   return resolver.resolve(theme) as ThemeCssVariableMap;
 }
 
+/**
+ * The same light/dark tie-break `resolveThemeCssVariables` falls back to when
+ * a stored foreground fails the 4.5:1 minimum — exposed so the theme editor's
+ * "Automático" reset can preview the exact value the runtime would apply for
+ * the current background, without duplicating the contrast math.
+ */
+export function computeAutoForeground(background: string): string {
+  return resolver.autoForeground(background);
+}
+
 export const THEME_CONTRAST_HELPER_SOURCE = `
-    const themeContrastResolver = (${createThemeContrastResolver.toString()})(defaultTheme);
+    const themeContrastResolver = (${createThemeContrastResolver.toString()})(defaultTheme, ${JSON.stringify(CRITICAL_THEME_CSS_VARIABLES)});
     const CRITICAL_THEME_CSS_VARIABLES = themeContrastResolver.names;
     const resolveThemeCssVariables = themeContrastResolver.resolve;
 `;

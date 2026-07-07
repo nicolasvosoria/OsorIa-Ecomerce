@@ -114,13 +114,19 @@ export function WhyUs() {
   // no es válido y cae al token global del tema activo (edit override > tema > default de fábrica).
   const title = edits.title ?? styleData.title ?? WHYUS_DEFAULTS.title
   const sectionBgColor =
-    edits.sectionBgColor || styleData.sectionBgColor || "var(--muted)"
-  const cardBgColor = edits.cardBgColor || styleData.cardBgColor || "var(--card)"
-  const iconBgColor = edits.iconBgColor || styleData.iconBgColor || "var(--muted)"
-  const iconColor = edits.iconColor || styleData.iconColor || "var(--foreground)"
-  const titleColor = edits.titleColor || styleData.titleColor || "var(--foreground)"
+    edits.sectionBgColor || styleData.sectionBgColor || "var(--sec-whyus-section-bg,var(--muted))"
+  const cardBgColor =
+    edits.cardBgColor || styleData.cardBgColor || "var(--sec-whyus-card-bg,var(--card))"
+  const iconBgColor =
+    edits.iconBgColor || styleData.iconBgColor || "var(--sec-whyus-icon-bg,var(--muted))"
+  const iconColor =
+    edits.iconColor || styleData.iconColor || "var(--sec-whyus-icon,var(--foreground))"
+  const titleColor =
+    edits.titleColor || styleData.titleColor || "var(--sec-whyus-title,var(--foreground))"
   const subtitleColor =
-    edits.subtitleColor || styleData.subtitleColor || "var(--muted-foreground)"
+    edits.subtitleColor ||
+    styleData.subtitleColor ||
+    "var(--sec-whyus-subtitle,var(--muted-foreground))"
   const mergedItems = edits.items ?? styleData.items ?? WHYUS_DEFAULTS.items
   const items: WhyUsItem[] = mergedItems?.length ? mergedItems : WHYUS_DEFAULTS.items
 
@@ -146,7 +152,7 @@ export function WhyUs() {
             return (
               <div
                 key={`${item.icon}-${item.title}-${index}`}
-                className="flex min-h-[220px] flex-col items-start rounded-[var(--card-radius,1.5rem)] border border-[var(--border)] p-6 shadow-[var(--shadow-card,none)] md:min-h-[260px] md:p-8"
+                className="flex min-h-[220px] flex-col items-start rounded-card border border-[var(--border)] p-6 shadow-[var(--shadow-card,none)] md:min-h-[260px] md:p-8"
                 style={{
                   backgroundColor: cardBgColor,
                 }}

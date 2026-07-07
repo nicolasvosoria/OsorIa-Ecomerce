@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_RUNTIME_THEME,
   normalizeFontRecord,
+  normalizeThemeDefinition,
   normalizeThemeRecord,
   stableThemeColorsHash,
 } from "@/lib/theme-font/runtime-contract";
@@ -165,6 +166,77 @@ describe("normalizeThemeRecord", () => {
 
     expect(theme?.colors.primary).toBe("#123456");
     expect(theme?.theme_name).toBe("Legacy");
+  });
+});
+
+describe("normalizeThemeDefinition", () => {
+  const colorsLight = {
+    primary: "#001122",
+    secondary: "#112233",
+    accent: "#334455",
+    background: "#ffffff",
+    foreground: "#111111",
+    card: "#f6f6f6",
+    cardForeground: "#111111",
+    border: "#dddddd",
+    muted: "#efefef",
+    mutedForeground: "#555555",
+  };
+  const colorsDark = {
+    ...colorsLight,
+    background: "#0a0a0a",
+    foreground: "#fafafa",
+  };
+  const validDefinition = {
+    colorsLight,
+    colorsDark,
+    radius: { base: "0.5rem" },
+    density: { scale: 1.05 },
+    shadow: { card: "0 1px 2px rgba(0,0,0,.1)", elevated: "0 4px 8px rgba(0,0,0,.2)" },
+    shape: { button: "9999px", card: "1rem" },
+    fontPairingId: "space-grotesk-inter",
+    sections: {
+      featured: { bg: "#7baeaf", cardBg: "#f6f6f6" },
+    },
+  };
+
+  function omitField(field: keyof typeof validDefinition) {
+    const clone: Record<string, unknown> = { ...validDefinition };
+    delete clone[field];
+    return clone;
+  }
+
+  it("round-trips a fully specified definition, including sections", () => {
+    expect(normalizeThemeDefinition(validDefinition)).toEqual(validDefinition);
+  });
+
+  it("defaults fontPairingId to null when absent", () => {
+    const result = normalizeThemeDefinition(omitField("fontPairingId"));
+
+    expect(result?.fontPairingId).toBeNull();
+  });
+
+  it("returns undefined sections when none are present", () => {
+    const result = normalizeThemeDefinition(omitField("sections"));
+
+    expect(result?.sections).toBeUndefined();
+  });
+
+  it.each([
+    "colorsLight",
+    "colorsDark",
+    "radius",
+    "density",
+    "shadow",
+    "shape",
+  ] as const)("returns null when %s is missing", (missingField) => {
+    expect(normalizeThemeDefinition(omitField(missingField))).toBeNull();
+  });
+
+  it("returns null for malformed input", () => {
+    expect(normalizeThemeDefinition(null)).toBeNull();
+    expect(normalizeThemeDefinition("not-json")).toBeNull();
+    expect(normalizeThemeDefinition({ colorsLight: "not-an-object" })).toBeNull();
   });
 });
 

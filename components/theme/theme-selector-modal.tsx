@@ -1,6 +1,7 @@
 "use client"
 
 import { Fragment, useState } from "react"
+import { useRouter } from "next/navigation"
 import { useTheme } from "@/contexts/theme-context"
 import { useStore } from "@/contexts/store-context"
 import {
@@ -21,7 +22,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
-import { Loader2 } from "lucide-react"
+import { Loader2, Palette } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
 interface ThemeSelectorModalProps {
@@ -29,16 +30,21 @@ interface ThemeSelectorModalProps {
   onOpenChange: (open: boolean) => void
 }
 
+// Stores whose theme is locked to their bespoke design; the theme switcher is hidden for them.
+const THEME_LOCKED_SUBDOMAINS = ["reposteria"] as const
+
 export function ThemeSelectorModal({ open, onOpenChange }: ThemeSelectorModalProps) {
   const { themes, activeTheme, loading, changeTheme } = useTheme()
   const { store } = useStore()
+  const router = useRouter()
   const [changing, setChanging] = useState<string | null>(null)
   const [publicationMessage, setPublicationMessage] = useState<string | null>(null)
   const [publicationError, setPublicationError] = useState<string | null>(null)
   const [pendingThemeName, setPendingThemeName] = useState<string | null>(null)
 
-  // Verificar si el cambio de tema está deshabilitado para este subdominio
-  const isThemeChangeDisabled = store?.subdomain === 'reposteria'
+  const isThemeChangeDisabled = (THEME_LOCKED_SUBDOMAINS as readonly string[]).includes(
+    store?.subdomain ?? "",
+  )
 
   const handleThemeChange = async (themeName: string) => {
     if (changing) return
@@ -152,6 +158,16 @@ export function ThemeSelectorModal({ open, onOpenChange }: ThemeSelectorModalPro
               })}
             </div>
           )}
+
+          <Button
+            variant="outline"
+            className="w-full justify-center gap-2"
+            onClick={() => router.push("/admin/theme")}
+            disabled={isThemeChangeDisabled}
+          >
+            <Palette className="h-4 w-4" />
+            Theme Custom
+          </Button>
         </DialogContent>
       </Dialog>
 

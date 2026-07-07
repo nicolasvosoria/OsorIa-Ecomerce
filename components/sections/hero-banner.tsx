@@ -20,7 +20,7 @@ import { HeroSlide } from "./hero/hero-slide";
 import { useHeroAutoplay } from "./hero/use-hero-autoplay";
 import { resolveHeroColors, resolveHeroShellProps } from "./hero/hero-view-model";
 
-const HERO_STYLE_FALLBACKS = {
+export const HERO_STYLE_FALLBACKS = {
   label: "Electronics",
   title: "Smarthome Speaker",
   subtitle: "",
@@ -31,7 +31,7 @@ const HERO_STYLE_FALLBACKS = {
   backgroundMode: "stage",
   fullImageContentAlign: "left",
   imagePositionY: "bottom",
-  buttonColor: "#33d17a",
+  buttonColor: "",
 } satisfies HeroStyleInput;
 
 export function HeroBanner() {

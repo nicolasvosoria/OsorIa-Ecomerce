@@ -5,6 +5,7 @@ import { useComponentStyle } from "@/contexts/styles-context"
 import { useAdmin } from "@/contexts/admin-context"
 import { VisualProductCard } from "@/components/products/visual-product-card"
 import { getAdminRequestHeaders } from "@/lib/supabase/admin-request-headers"
+import { PRODUCTS_RADIUS_CLASS } from "@/lib/theme/section-style-keys"
 import type { CommerceProductCard } from "@/lib/types/products"
 
 interface ProductsGridProps {
@@ -35,12 +36,11 @@ const COLUMNS_CLASS: Record<string, string> = {
   "4": "sm:grid-cols-2 lg:grid-cols-4",
 }
 
-const RADIUS_CLASS: Record<string, string> = {
-  none: "rounded-none",
-  md: "rounded-xl",
-  lg: "rounded-2xl",
-  xl: "rounded-3xl",
-}
+// Matches VisualProductCard's own default `radiusClass` byte-for-byte: when
+// no per-section override is set, this section's cards still land on the
+// exact same corner radius as before this section gained a theme fallback.
+const DEFAULT_CARD_RADIUS_CLASS =
+  "rounded-[var(--sec-products-corner-radius,var(--card-radius,1.5rem))]"
 
 export function ProductsGrid({ initialProducts }: ProductsGridProps = {}) {
   const { styles: styleData } = useComponentStyle("products", PRODUCTS_DEFAULTS)
@@ -67,7 +67,9 @@ export function ProductsGrid({ initialProducts }: ProductsGridProps = {}) {
   }
 
   const columnsClass = COLUMNS_CLASS[columns] || COLUMNS_CLASS["4"]
-  const radiusClass = cornerRadius ? RADIUS_CLASS[cornerRadius] : undefined
+  const radiusClass = cornerRadius
+    ? PRODUCTS_RADIUS_CLASS[cornerRadius]
+    : DEFAULT_CARD_RADIUS_CLASS
 
   // El live homepage pasa initialProducts (vía ProductsGridWrapper), usando
   // getPopularProductCards() directamente en el servidor. El editor no pasa
@@ -116,8 +118,8 @@ export function ProductsGrid({ initialProducts }: ProductsGridProps = {}) {
       data-component="products"
       className="px-4 py-10 sm:px-6 md:py-16"
       style={{
-        ...(bgColor && { backgroundColor: bgColor }),
-        ...(textColor && { color: textColor }),
+        backgroundColor: bgColor || "var(--sec-products-bg,transparent)",
+        color: textColor || "var(--sec-products-text,var(--foreground))",
       }}
     >
       <div className="container mx-auto">
@@ -128,7 +130,7 @@ export function ProductsGrid({ initialProducts }: ProductsGridProps = {}) {
             </p>
             <h2
               className="text-3xl font-semibold tracking-tight md:text-5xl"
-              style={{ color: textColor || "var(--foreground)" }}
+              style={{ color: textColor || "var(--sec-products-text,var(--foreground))" }}
             >
               {title}
             </h2>
@@ -148,8 +150,8 @@ export function ProductsGrid({ initialProducts }: ProductsGridProps = {}) {
               showDescription={false}
               showCta={false}
               mediaPosition="bottom"
-              cardBackground={cardBgColor || undefined}
-              priceColor={priceColor || undefined}
+              cardBackground={cardBgColor || "var(--sec-products-card-bg,var(--muted))"}
+              priceColor={priceColor || "var(--sec-products-price,var(--primary))"}
               radiusClass={radiusClass}
               imageBlendsWithCard
               showCategory={showCategory === "si"}

@@ -157,117 +157,26 @@ describe("resolveThemeDefinition", () => {
   });
 });
 
-describe("per-section surface colors (featured)", () => {
-  const FEATURED_PALETTES: Record<string, Record<string, string>> = {
-    Tech: { bg: "#7baeaf", cardBg: "#f6f6f6", productBg: "#77767b", text: "#ffffff" },
-    Minimal: { bg: "#eceae5", cardBg: "#fdfdfb", productBg: "#d8d5cc", text: "#1b1b18" },
-    Suave: { bg: "#fdeef0", cardBg: "#ffffff", productBg: "#f6d3da", text: "#4a3b34" },
-    Bold: { bg: "#0a0a0a", cardBg: "#161616", productBg: "#262626", text: "#fafafa" },
-    Boutique: { bg: "#f2e5d5", cardBg: "#fffaf3", productBg: "#e6d5bf", text: "#4a3527" },
-  };
+describe("sections inherit the theme by default", () => {
+  // No section is baked into the presets anymore, so every section cascades
+  // from the theme tokens (primary/secondary/etc.) and editing the theme
+  // repaints it. A shop customizes an individual section only by overriding it
+  // explicitly in the editor.
+  const INHERITED_SECTIONS = [
+    "featured",
+    "newsletter",
+    "hero",
+    "popular",
+    "specialOffer",
+  ] as const;
 
-  it("gives each of the 5 presets its designed featured palette", () => {
+  it("does not bake any section palette into the presets", () => {
     for (const name of REAL_THEME_NAMES) {
       const definition = resolveThemeDefinition(name, COLORS);
-      expect(definition.sections?.featured).toEqual(FEATURED_PALETTES[name]);
+      for (const section of INHERITED_SECTIONS) {
+        expect(definition.sections?.[section]).toBeUndefined();
+      }
     }
-  });
-
-  it("keeps Tech's featured bg at #7baeaf (byte-identical to today)", () => {
-    const definition = resolveThemeDefinition("Tech", COLORS);
-    expect(definition.sections?.featured?.bg).toBe("#7baeaf");
   });
 });
 
-describe("per-section surface colors (specialOffer)", () => {
-  const SPECIAL_OFFER_PALETTES: Record<string, Record<string, string>> = {
-    Tech: { bg: "#ed333b", accent: "#f5c211", productBg: "#f66151", text: "#ffffff" },
-    Minimal: { bg: "#1b1b18", accent: "#8a8574", productBg: "#2a2a26", text: "#f6f5f2" },
-    Suave: { bg: "#ec6a80", accent: "#ffd166", productBg: "#f58aa0", text: "#ffffff" },
-    Bold: { bg: "#0a0a0a", accent: "#ffe600", productBg: "#1c1c1c", text: "#ffffff" },
-    Boutique: { bg: "#b0603f", accent: "#e8b04b", productBg: "#c47a5c", text: "#fff8f1" },
-  };
-
-  it("gives each of the 5 presets its designed specialOffer palette", () => {
-    for (const name of REAL_THEME_NAMES) {
-      const definition = resolveThemeDefinition(name, COLORS);
-      expect(definition.sections?.specialOffer).toEqual(SPECIAL_OFFER_PALETTES[name]);
-    }
-  });
-
-  it("keeps Tech's specialOffer colors byte-identical to today's live values", () => {
-    const definition = resolveThemeDefinition("Tech", COLORS);
-    expect(definition.sections?.specialOffer).toEqual({
-      bg: "#ed333b",
-      accent: "#f5c211",
-      productBg: "#f66151",
-      text: "#ffffff",
-    });
-  });
-});
-
-describe("per-section surface colors (newsletter)", () => {
-  const NEWSLETTER_PALETTES: Record<string, Record<string, string>> = {
-    Tech: { button: "#c01c28" },
-    Minimal: { button: "#1b1b18" },
-    Suave: { button: "#ec6a80" },
-    Bold: { button: "#ff2d55" },
-    Boutique: { button: "#b0603f" },
-  };
-
-  it("gives each of the 5 presets its designed newsletter palette", () => {
-    for (const name of REAL_THEME_NAMES) {
-      const definition = resolveThemeDefinition(name, COLORS);
-      expect(definition.sections?.newsletter).toEqual(NEWSLETTER_PALETTES[name]);
-    }
-  });
-
-  it("keeps Tech's newsletter button byte-identical to today's live value", () => {
-    const definition = resolveThemeDefinition("Tech", COLORS);
-    expect(definition.sections?.newsletter?.button).toBe("#c01c28");
-  });
-});
-
-describe("per-section surface colors (hero)", () => {
-  const HERO_PALETTES: Record<string, Record<string, string>> = {
-    Tech: { button: "#33d17a" },
-    Minimal: { button: "#1b1b18" },
-    Suave: { button: "#ec6a80" },
-    Bold: { button: "#0a0a0a" },
-    Boutique: { button: "#b0603f" },
-  };
-
-  it("gives each of the 5 presets its designed hero palette", () => {
-    for (const name of REAL_THEME_NAMES) {
-      const definition = resolveThemeDefinition(name, COLORS);
-      expect(definition.sections?.hero).toEqual(HERO_PALETTES[name]);
-    }
-  });
-
-  it("keeps Tech's hero button byte-identical to today's live value", () => {
-    const definition = resolveThemeDefinition("Tech", COLORS);
-    expect(definition.sections?.hero?.button).toBe("#33d17a");
-  });
-});
-
-describe("per-section surface colors (popular)", () => {
-  const POPULAR_PALETTES: Record<string, Record<string, string>> = {
-    Tech: { button: "#33d17a" },
-    Minimal: { button: "#1b1b18" },
-    Suave: { button: "#ec6a80" },
-    Bold: { button: "#0a0a0a" },
-    Boutique: { button: "#b0603f" },
-  };
-
-  it("gives each of the 5 presets its designed popular palette", () => {
-    for (const name of REAL_THEME_NAMES) {
-      const definition = resolveThemeDefinition(name, COLORS);
-      expect(definition.sections?.popular).toEqual(POPULAR_PALETTES[name]);
-    }
-  });
-
-  it("keeps Tech's popular button matching the hero button (#33d17a)", () => {
-    const definition = resolveThemeDefinition("Tech", COLORS);
-    expect(definition.sections?.popular?.button).toBe("#33d17a");
-  });
-});

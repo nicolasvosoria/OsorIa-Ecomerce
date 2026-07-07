@@ -25,25 +25,25 @@ describe("WhyUs colors", () => {
     const { container } = render(<WhyUs />)
 
     const section = container.querySelector('[data-component="whyus"]') as HTMLElement
-    expect(section.style.backgroundColor).toBe("var(--muted)")
+    expect(section.style.backgroundColor).toBe("var(--sec-whyus-section-bg,var(--muted))")
 
     const heading = container.querySelector("h2") as HTMLElement
-    expect(heading.style.color).toBe("var(--foreground)")
+    expect(heading.style.color).toBe("var(--sec-whyus-title,var(--foreground))")
 
     const card = container.querySelector('[data-component="whyus"] .grid > div') as HTMLElement
-    expect(card.style.backgroundColor).toBe("var(--card)")
+    expect(card.style.backgroundColor).toBe("var(--sec-whyus-card-bg,var(--card))")
 
     const iconChip = card.querySelector("div") as HTMLElement
-    expect(iconChip.style.backgroundColor).toBe("var(--muted)")
+    expect(iconChip.style.backgroundColor).toBe("var(--sec-whyus-icon-bg,var(--muted))")
 
     const icon = iconChip.querySelector("svg") as unknown as HTMLElement
-    expect(icon.style.color).toBe("var(--foreground)")
+    expect(icon.style.color).toBe("var(--sec-whyus-icon,var(--foreground))")
 
     const itemTitle = card.querySelector("h3") as HTMLElement
-    expect(itemTitle.style.color).toBe("var(--foreground)")
+    expect(itemTitle.style.color).toBe("var(--sec-whyus-title,var(--foreground))")
 
     const itemSubtitle = card.querySelector("p") as HTMLElement
-    expect(itemSubtitle.style.color).toBe("var(--muted-foreground)")
+    expect(itemSubtitle.style.color).toBe("var(--sec-whyus-subtitle,var(--muted-foreground))")
   })
 
   it("uses an explicit color override instead of the theme token", () => {
@@ -81,7 +81,7 @@ describe("WhyUs structure", () => {
     const { container } = render(<WhyUs />)
 
     const card = container.querySelector('[data-component="whyus"] .grid > div') as HTMLElement
-    expect(card.className).toContain("rounded-[var(--card-radius,1.5rem)]")
+    expect(card.className).toContain("rounded-card")
     expect(card.className).toContain("shadow-[var(--shadow-card,none)]")
     expect(card.className).toContain("border-[var(--border)]")
   })

@@ -46,7 +46,8 @@ export function NewsletterSection() {
   const edits = componentEdits.get("newsletter") || {};
   const newsletter = { ...NEWSLETTER_DEFAULTS, ...styleData, ...edits };
   const overlayOpacity = clampOverlayOpacity(newsletter.overlayOpacity);
-  const buttonColor = newsletter.buttonColor || "var(--sec-newsletter-button)";
+  const buttonColor =
+    newsletter.buttonColor || "var(--sec-newsletter-button, var(--primary))";
 
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<SubscribeStatus>("idle");
@@ -85,7 +86,7 @@ export function NewsletterSection() {
 
   return (
     <section data-component="newsletter" className="px-2 py-4 md:px-4 md:py-8">
-      <div className="relative mx-2 my-4 overflow-hidden rounded-[var(--card-radius,1.5rem)] md:mx-4 md:my-8">
+      <div className="relative mx-2 my-4 overflow-hidden rounded-card md:mx-4 md:my-8">
         <div
           className={cn(
             "absolute inset-0 bg-cover bg-center",
