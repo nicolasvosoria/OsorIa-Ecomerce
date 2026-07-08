@@ -28,7 +28,11 @@ export const HERO_SECTION_HEIGHT_SPLIT_CLASS: Record<HeroSectionHeight, string> 
   compact: "h-[200px] md:h-[320px] lg:h-[400px]",
   standard: "h-[250px] md:h-[400px] lg:h-[500px]",
   tall: "h-[320px] md:h-[480px] lg:h-[600px]",
-  fullscreen: "min-h-[100svh] md:min-h-screen",
+  // Capped below a full viewport: unlike `full-image` mode (a single
+  // full-bleed background), `fullscreen` here only sizes the split layout's
+  // product-media column, so a full 100svh/100vh made that column
+  // absurdly tall relative to the text column beside it.
+  fullscreen: "min-h-[70svh] md:min-h-[80vh]",
 }
 
 // Autoplay interval is stored as a number field (seconds), not an enum — a

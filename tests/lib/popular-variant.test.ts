@@ -82,12 +82,16 @@ describe("overlay sizing scales down as columns grow", () => {
       expect(POPULAR_OVERLAY_CONTAINER_CLASS[key]).not.toBe(POPULAR_OVERLAY_CONTAINER_CLASS["2"])
     }
 
-    // 4 columns is the tightest fit reported: its title/price/CTA/padding
+    // 4 columns is the tightest fit reported: at `lg` its title/CTA/padding
     // must all be smaller than (or equal to, for CTA min-height) 3 columns.
-    expect(POPULAR_OVERLAY_TITLE_CLASS["4"]).toContain("text-[16px]")
+    // On mobile the grid is always a single full-width column regardless of
+    // `columns`, so the unprefixed (mobile) base size is raised instead of
+    // shrunk — it only shrinks once the grid actually narrows, at `sm:`.
+    expect(POPULAR_OVERLAY_TITLE_CLASS["4"]).toContain("text-[22px]")
+    expect(POPULAR_OVERLAY_TITLE_CLASS["4"]).toContain("sm:text-[18px]")
     expect(POPULAR_OVERLAY_TITLE_CLASS["4"]).toContain("lg:text-[22px]")
-    expect(POPULAR_OVERLAY_CTA_CLASS["4"]).toContain("min-h-[32px]")
-    expect(POPULAR_OVERLAY_CONTAINER_CLASS["4"]).toContain("p-[14px]")
+    expect(POPULAR_OVERLAY_CTA_CLASS["4"]).toContain("sm:min-h-[32px]")
+    expect(POPULAR_OVERLAY_CONTAINER_CLASS["4"]).toContain("sm:p-[14px]")
   })
 })
 

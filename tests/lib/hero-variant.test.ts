@@ -37,6 +37,11 @@ describe("HERO_SECTION_HEIGHT_SPLIT_CLASS", () => {
   it("reproduces today's hardcoded split-mode product-media height byte-for-byte for 'standard'", () => {
     expect(HERO_SECTION_HEIGHT_SPLIT_CLASS.standard).toBe("h-[250px] md:h-[400px] lg:h-[500px]")
   })
+
+  it("caps 'fullscreen' below a full viewport (only sizes the split product-media column, not a full-bleed background)", () => {
+    expect(HERO_SECTION_HEIGHT_SPLIT_CLASS.fullscreen).toBe("min-h-[70svh] md:min-h-[80vh]")
+    expect(HERO_SECTION_HEIGHT_SPLIT_CLASS.fullscreen).not.toBe(HERO_SECTION_HEIGHT_FULL_IMAGE_CLASS.fullscreen)
+  })
 })
 
 describe("resolveAutoplayIntervalSeconds", () => {

@@ -60,28 +60,35 @@ export const POPULAR_TILE_ASPECT_CLASS: Record<PopularTileAspect, string> = {
 // image or clipping at the bottom (reported at columns=4, and to a lesser
 // extent columns=3). "below" mode already has room and is unaffected. "2"
 // reproduces today's hardcoded overlay classes byte-for-byte.
+//
+// The grid is always `grid-cols-1` on mobile regardless of `columns` (see
+// `POPULAR_COLUMNS_CLASS`), so a full-width mobile tile has as much room as
+// a narrow desktop tile at the chosen column count — the unprefixed (mobile)
+// base size in the 3/4 maps below is intentionally raised to roughly that
+// desktop (`lg:`) size, then the already-tuned `sm:`/`md:`/`lg:` steps (which
+// track the grid actually narrowing) are left as-is.
 export const POPULAR_OVERLAY_CONTAINER_CLASS: Record<PopularColumns, string> = {
   "2": "gap-2 p-[30px]",
-  "3": "gap-1.5 p-[20px]",
-  "4": "gap-1 p-[14px]",
+  "3": "gap-2 p-[30px] sm:gap-1.5 sm:p-[20px]",
+  "4": "gap-1.5 p-[20px] sm:gap-1 sm:p-[14px]",
 }
 
 export const POPULAR_OVERLAY_TITLE_CLASS: Record<PopularColumns, string> = {
   "2": "text-[24px] sm:text-[30px] md:text-[34px] lg:text-[40px] leading-tight",
-  "3": "text-[20px] sm:text-[24px] md:text-[26px] lg:text-[28px] leading-tight",
-  "4": "text-[16px] sm:text-[18px] md:text-[20px] lg:text-[22px] leading-tight",
+  "3": "text-[28px] sm:text-[24px] md:text-[26px] lg:text-[28px] leading-tight",
+  "4": "text-[22px] sm:text-[18px] md:text-[20px] lg:text-[22px] leading-tight",
 }
 
 export const POPULAR_OVERLAY_PRICE_CLASS: Record<PopularColumns, string> = {
   "2": "text-[13px] sm:text-[16px] md:text-[18px] lg:text-[21px]",
-  "3": "text-[12px] sm:text-[13px] md:text-[14px] lg:text-[15px]",
-  "4": "text-[11px] sm:text-[12px] md:text-[12px] lg:text-[13px]",
+  "3": "text-[15px] sm:text-[13px] md:text-[14px] lg:text-[15px]",
+  "4": "text-[13px] sm:text-[12px] md:text-[12px] lg:text-[13px]",
 }
 
 export const POPULAR_OVERLAY_CTA_CLASS: Record<PopularColumns, string> = {
   "2": "mt-2 min-h-[44px] px-5 text-base",
-  "3": "mt-1.5 min-h-[38px] px-4 text-sm",
-  "4": "mt-1 min-h-[32px] px-3 text-xs",
+  "3": "mt-2 min-h-[44px] px-5 text-base sm:mt-1.5 sm:min-h-[38px] sm:px-4 sm:text-sm",
+  "4": "mt-1.5 min-h-[38px] px-4 text-sm sm:mt-1 sm:min-h-[32px] sm:px-3 sm:text-xs",
 }
 
 export const POPULAR_TEXT_PLACEMENT_OPTIONS = [

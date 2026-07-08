@@ -89,7 +89,12 @@ export function resolveIconPosition(value: unknown): WhyUsIconPosition {
 
 export const WHYUS_ICON_POSITION_DIRECTION_CLASS: Record<WhyUsIconPosition, string> = {
   top: "flex-col",
-  side: "flex-row gap-4",
+  // Stacked (icon above text) until `lg`: at high column counts and on
+  // mobile/tablet a row layout leaves almost no width for the title/
+  // description, so `side` only goes row-by-row once there's real
+  // horizontal room. `gap-4` (unprefixed) works as a flex `gap` in both
+  // axes, so it reads correctly stacked or in a row.
+  side: "flex-col gap-4 lg:flex-row",
 }
 
 export const WHYUS_ICON_POSITION_TEXT_WRAPPER_CLASS: Record<WhyUsIconPosition, string> = {

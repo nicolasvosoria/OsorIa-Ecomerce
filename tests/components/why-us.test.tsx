@@ -162,7 +162,7 @@ describe("WhyUs design options", () => {
     expect(card.className).toContain("text-center")
   })
 
-  it("applies iconPosition=side (flex-row card layout)", () => {
+  it("applies iconPosition=side (stacked on mobile/tablet, row layout only at lg)", () => {
     mockUseAdmin.mockReturnValue({ componentEdits: new Map() })
     mockUseComponentStyle.mockImplementation((_name: string, defaults: Record<string, unknown>) => ({
       styles: { ...defaults, iconPosition: "side" },
@@ -170,8 +170,8 @@ describe("WhyUs design options", () => {
 
     const { container } = render(<WhyUs />)
     const card = container.querySelector('[data-component="whyus"] .grid > div') as HTMLElement
-    expect(card.className).toContain("flex-row")
-    expect(card.className).not.toContain("flex-col")
+    expect(card.className).toContain("flex-col")
+    expect(card.className).toContain("lg:flex-row")
   })
 
   it("renders the compact bar (not the card grid) when layoutFormat=bar", () => {

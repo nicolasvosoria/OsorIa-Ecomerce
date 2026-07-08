@@ -65,10 +65,21 @@ export function PopularItems({ initialTiles }: PopularItemsProps = {}) {
   const columnsClass = POPULAR_COLUMNS_CLASS[columns]
   const tileAspectClass = POPULAR_TILE_ASPECT_CLASS[tileAspect]
   const mosaicFirstItemClass = POPULAR_MOSAIC_FIRST_ITEM_CLASS[gridLayout]
+  // Equal row tracks so the mosaic's `row-span-2` first tile aligns cleanly
+  // with the two single-span rows next to it, instead of stretching or
+  // leaving a trailing gap. Only needed in mosaic mode — uniform stays as-is.
+  const mosaicAutoRowsClass = gridLayout === "mosaic" ? "auto-rows-fr" : ""
   const overlayContainerClass = POPULAR_OVERLAY_CONTAINER_CLASS[columns]
   const overlayTitleClass = POPULAR_OVERLAY_TITLE_CLASS[columns]
   const overlayPriceClass = POPULAR_OVERLAY_PRICE_CLASS[columns]
   const overlayCtaClass = POPULAR_OVERLAY_CTA_CLASS[columns]
+  // The mosaic's first tile renders 2x2 (via col/row span), so it should use
+  // the columns=2 overlay sizing regardless of the chosen `columns` value —
+  // not the shrunken 3/4-column text meant for a single-cell tile.
+  const mosaicFirstOverlayContainerClass = POPULAR_OVERLAY_CONTAINER_CLASS["2"]
+  const mosaicFirstOverlayTitleClass = POPULAR_OVERLAY_TITLE_CLASS["2"]
+  const mosaicFirstOverlayPriceClass = POPULAR_OVERLAY_PRICE_CLASS["2"]
+  const mosaicFirstOverlayCtaClass = POPULAR_OVERLAY_CTA_CLASS["2"]
 
   // Serializado a una key estable para no disparar el efecto de abajo en cada
   // render (edits/styleData entregan un array nuevo aunque el contenido no
@@ -174,10 +185,17 @@ export function PopularItems({ initialTiles }: PopularItemsProps = {}) {
           ) : null}
         </div>
 
-        <div className={`grid grid-cols-1 gap-3 ${columnsClass}`}>
+        <div className={`grid grid-cols-1 gap-3 ${mosaicAutoRowsClass} ${columnsClass}`}>
           {tiles.map((tile, index) => {
+            const isMosaicFirstTile = gridLayout === "mosaic" && index === 0
             const mosaicClass = index === 0 ? mosaicFirstItemClass : ""
             const showTilePrice = showStartingPrice && Boolean(tile.startingPriceLabel)
+            const tileOverlayContainerClass = isMosaicFirstTile
+              ? mosaicFirstOverlayContainerClass
+              : overlayContainerClass
+            const tileOverlayTitleClass = isMosaicFirstTile ? mosaicFirstOverlayTitleClass : overlayTitleClass
+            const tileOverlayPriceClass = isMosaicFirstTile ? mosaicFirstOverlayPriceClass : overlayPriceClass
+            const tileOverlayCtaClass = isMosaicFirstTile ? mosaicFirstOverlayCtaClass : overlayCtaClass
 
             if (textPlacement === "below") {
               return (
@@ -222,18 +240,18 @@ export function PopularItems({ initialTiles }: PopularItemsProps = {}) {
                 <VisualProductCardImage src={tile.imageUrl} alt={tile.name} title={tile.name} isOverlay />
 
                 <div
-                  className={`absolute inset-0 flex flex-col items-center justify-center text-center [text-shadow:0_2px_10px_rgba(0,0,0,0.55)] ${overlayContainerClass}`}
+                  className={`absolute inset-0 flex flex-col items-center justify-center text-center [text-shadow:0_2px_10px_rgba(0,0,0,0.55)] ${tileOverlayContainerClass}`}
                 >
-                  <h3 className={`font-heading font-normal text-white ${overlayTitleClass}`}>
+                  <h3 className={`font-heading font-normal text-white ${tileOverlayTitleClass}`}>
                     {tile.name}
                   </h3>
                   {showTilePrice ? (
-                    <p className={`font-inter text-white ${overlayPriceClass}`}>
+                    <p className={`font-inter text-white ${tileOverlayPriceClass}`}>
                       {tile.startingPriceLabel}
                     </p>
                   ) : null}
                   <span
-                    className={`inline-flex items-center justify-center rounded-[var(--button-radius)] font-inter font-medium opacity-100 transition-opacity duration-200 md:opacity-0 md:group-hover:opacity-100 md:group-focus-visible:opacity-100 ${overlayCtaClass}`}
+                    className={`inline-flex items-center justify-center rounded-[var(--button-radius)] font-inter font-medium opacity-100 transition-opacity duration-200 md:opacity-0 md:group-hover:opacity-100 md:group-focus-visible:opacity-100 ${tileOverlayCtaClass}`}
                     style={{
                       backgroundColor: buttonColor,
                       color: "var(--primary-foreground)",

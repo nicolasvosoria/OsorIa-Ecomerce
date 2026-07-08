@@ -245,14 +245,19 @@ describe("PopularItems", () => {
 
       const tile = screen.getByRole("link", { name: /bocinas bluetooth/i })
       const title = within(tile).getByText("Bocinas Bluetooth")
-      expect(title.className).toContain("text-[16px]")
+      // Mobile grid is always a single full-width column, so the base
+      // (unprefixed) size is raised; it only shrinks once the grid actually
+      // narrows to 2/4 columns at `sm:`/`md:`.
+      expect(title.className).toContain("text-[22px]")
+      expect(title.className).toContain("sm:text-[18px]")
       expect(title.className).not.toContain("text-[24px]")
 
       const price = within(tile).getByText("Desde $ 356.000")
-      expect(price.className).toContain("text-[11px]")
+      expect(price.className).toContain("text-[13px]")
+      expect(price.className).toContain("sm:text-[12px]")
 
       const cta = within(tile).getByText("Ver detalles")
-      expect(cta.className).toContain("min-h-[32px]")
+      expect(cta.className).toContain("sm:min-h-[32px]")
       expect(cta.className).not.toContain("min-h-[44px]")
     })
 
@@ -279,6 +284,23 @@ describe("PopularItems", () => {
       expect(firstTile.className).toContain("sm:col-span-2")
       expect(firstTile.className).toContain("sm:row-span-2")
       expect(secondTile.className).not.toContain("sm:col-span-2")
+    })
+
+    it("gives the mosaic first tile columns=2 overlay sizing even at columns=4 (it renders 2x2, not a single narrow cell)", () => {
+      mockUseComponentStyle.mockImplementation((_name: string, defaults: Record<string, unknown>) => ({
+        styles: { ...defaults, gridLayout: "mosaic", columns: "4" },
+      }))
+
+      render(<PopularItems initialTiles={[speakerTile, earphonesTile]} />)
+
+      const firstTile = screen.getByRole("link", { name: /bocinas bluetooth/i })
+      const firstTitle = within(firstTile).getByText("Bocinas Bluetooth")
+      expect(firstTitle.className).toContain("text-[24px]")
+
+      const secondTile = screen.getByRole("link", { name: /auriculares y audífonos/i })
+      const secondTitle = within(secondTile).getByText("Auriculares y Audífonos")
+      expect(secondTitle.className).toContain("text-[22px]")
+      expect(secondTitle.className).not.toContain("text-[24px]")
     })
   })
 
