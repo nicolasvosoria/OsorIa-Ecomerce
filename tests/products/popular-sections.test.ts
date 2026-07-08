@@ -129,6 +129,73 @@ describe("getPopularCategoryTiles", () => {
     expect(tiles[0].startingPriceLabel).toBe("")
     expect(tiles[0].startingPriceAmount).toBeUndefined()
   })
+
+  it("builds tiles from a curated override, in the given order, ignoring the category list's own order and the limit", async () => {
+    getCategoriesMock.mockResolvedValue([
+      makeCategory({ id: "cat-speakers", category_name: "Bocinas Bluetooth", display_order: 1, category_image_url: "/speakers.webp" }),
+      makeCategory({ id: "cat-earphones", category_name: "Auriculares y Audífonos", display_order: 2, category_image_url: "/earphones.webp" }),
+      makeCategory({ id: "cat-projectors", category_name: "Proyectores", display_order: 3 }),
+    ])
+    getItemsMock.mockResolvedValue({ items: [makeItem({ base_price: 50000 })], total: 1, has_more: false })
+
+    const tiles = await getPopularCategoryTiles(1, [
+      { categoryId: "cat-projectors" },
+      { categoryId: "cat-speakers" },
+    ])
+
+    expect(tiles).toHaveLength(2)
+    expect(tiles.map((tile) => tile.id)).toEqual(["cat-projectors", "cat-speakers"])
+  })
+
+  it("uses a curated tile's own imageUrl instead of the category's image when both are set", async () => {
+    getCategoriesMock.mockResolvedValue([
+      makeCategory({ id: "cat-speakers", category_name: "Bocinas Bluetooth", category_image_url: "/speakers.webp" }),
+    ])
+    getItemsMock.mockResolvedValue({ items: [], total: 0, has_more: false })
+
+    const tiles = await getPopularCategoryTiles(4, [
+      { categoryId: "cat-speakers", imageUrl: "/custom-tile.webp" },
+    ])
+
+    expect(tiles[0].imageUrl).toBe("/custom-tile.webp")
+  })
+
+  it("falls back to the category's own image when a curated tile has no imageUrl", async () => {
+    getCategoriesMock.mockResolvedValue([
+      makeCategory({ id: "cat-speakers", category_name: "Bocinas Bluetooth", category_image_url: "/speakers.webp" }),
+    ])
+    getItemsMock.mockResolvedValue({ items: [], total: 0, has_more: false })
+
+    const tiles = await getPopularCategoryTiles(4, [{ categoryId: "cat-speakers" }])
+
+    expect(tiles[0].imageUrl).toBe("/speakers.webp")
+  })
+
+  it("drops a curated tile whose categoryId no longer matches any category", async () => {
+    getCategoriesMock.mockResolvedValue([makeCategory({ id: "cat-speakers", category_name: "Bocinas Bluetooth" })])
+    getItemsMock.mockResolvedValue({ items: [], total: 0, has_more: false })
+
+    const tiles = await getPopularCategoryTiles(4, [
+      { categoryId: "cat-deleted" },
+      { categoryId: "cat-speakers" },
+    ])
+
+    expect(tiles.map((tile) => tile.id)).toEqual(["cat-speakers"])
+  })
+
+  it("falls back to today's first-N-categories behavior byte-for-byte when the override is empty", async () => {
+    getCategoriesMock.mockResolvedValue([
+      makeCategory({ id: "cat-speakers", category_name: "Bocinas Bluetooth", display_order: 1 }),
+      makeCategory({ id: "cat-earphones", category_name: "Auriculares y Audífonos", display_order: 2 }),
+    ])
+    getItemsMock.mockResolvedValue({ items: [makeItem({ base_price: 29000 })], total: 1, has_more: false })
+
+    const withoutOverride = await getPopularCategoryTiles(1)
+    const withEmptyOverride = await getPopularCategoryTiles(1, [])
+
+    expect(withEmptyOverride).toEqual(withoutOverride)
+    expect(withEmptyOverride.map((tile) => tile.id)).toEqual(["cat-speakers"])
+  })
 })
 
 describe("getPopularProductCards", () => {

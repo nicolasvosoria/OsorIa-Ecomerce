@@ -13,6 +13,7 @@ import { FooterNew } from "@/components/sections/footer-new";
 import { EditableWrapper } from "@/components/admin/editable-wrapper";
 import { HomeDiscountPopup } from "@/components/home-discount-popup";
 import { getStoreFromServer } from "@/lib/supabase/store-api";
+import { sectionLabel } from "@/lib/section-editor/sections-registry";
 
 /**
  * Componente que muestra contenido diferente según la tienda
@@ -27,13 +28,13 @@ export async function ConditionalHomeContent() {
     return (
       <>
         <main className="flex flex-col reposteria-main">
-          <EditableWrapper componentName="hero" label="Hero">
+          <EditableWrapper componentName="hero" label={sectionLabel("hero")}>
             <ReposteriaHero />
           </EditableWrapper>
 
           <EditableWrapper
             componentName="products"
-            label="Catálogo de Productos"
+            label={sectionLabel("products")}
           >
             <section className="py-20 px-4 bg-muted/30">
               <div className="container mx-auto">
@@ -53,15 +54,18 @@ export async function ConditionalHomeContent() {
             </section>
           </EditableWrapper>
 
-          <EditableWrapper componentName="gallery" label="Galería de Imágenes">
+          <EditableWrapper
+            componentName="gallery"
+            label={sectionLabel("gallery")}
+          >
             <ReposteriaGallery />
           </EditableWrapper>
 
-          <EditableWrapper componentName="about" label="Sobre Nosotros">
+          <EditableWrapper componentName="about" label={sectionLabel("about")}>
             <ReposteriaAbout />
           </EditableWrapper>
 
-          <EditableWrapper componentName="footer" label="Pie de Página">
+          <EditableWrapper componentName="footer" label={sectionLabel("footer")}>
             <FooterNew />
           </EditableWrapper>
         </main>
@@ -74,10 +78,10 @@ export async function ConditionalHomeContent() {
   return (
     <>
       <main className="flex flex-col">
-        <EditableWrapper componentName="hero" label="Hero">
+        <EditableWrapper componentName="hero" label={sectionLabel("hero")}>
           <HeroBanner />
         </EditableWrapper>
-        <EditableWrapper componentName="popular" label="Productos Populares">
+        <EditableWrapper componentName="popular" label={sectionLabel("popular")}>
           <Suspense
             fallback={
               <div className="py-12 text-center text-muted-foreground">
@@ -88,7 +92,10 @@ export async function ConditionalHomeContent() {
             <PopularItemsWrapper />
           </Suspense>
         </EditableWrapper>
-        <EditableWrapper componentName="products" label="Productos Populares (cards)">
+        <EditableWrapper
+          componentName="products"
+          label={sectionLabel("products")}
+        >
           <Suspense
             fallback={
               <div className="py-12 text-center text-muted-foreground">
@@ -99,19 +106,28 @@ export async function ConditionalHomeContent() {
             <ProductsGridWrapper />
           </Suspense>
         </EditableWrapper>
-        <EditableWrapper componentName="featured" label="Producto Destacado">
+        <EditableWrapper
+          componentName="featured"
+          label={sectionLabel("featured")}
+        >
           <FeaturedProduct />
         </EditableWrapper>
-        <EditableWrapper componentName="specialOffer" label="Oferta Especial">
+        <EditableWrapper
+          componentName="specialOffer"
+          label={sectionLabel("specialOffer")}
+        >
           <SpecialOffer />
         </EditableWrapper>
-        <EditableWrapper componentName="whyus" label="Por Qué Nosotros">
+        <EditableWrapper componentName="whyus" label={sectionLabel("whyus")}>
           <WhyUs />
         </EditableWrapper>
-        <EditableWrapper componentName="newsletter" label="Newsletter">
+        <EditableWrapper
+          componentName="newsletter"
+          label={sectionLabel("newsletter")}
+        >
           <NewsletterSection />
         </EditableWrapper>
-        <EditableWrapper componentName="footer" label="Pie de Página">
+        <EditableWrapper componentName="footer" label={sectionLabel("footer")}>
           <FooterNew />
         </EditableWrapper>
       </main>

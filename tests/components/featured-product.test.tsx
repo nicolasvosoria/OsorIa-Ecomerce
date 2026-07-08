@@ -128,3 +128,74 @@ describe("FeaturedProduct structure", () => {
     expect(productImageBox.className).toContain("rounded-card")
   })
 })
+
+describe("FeaturedProduct layout options", () => {
+  beforeEach(() => {
+    mockUseAdmin.mockReturnValue({ componentEdits: new Map(), isEditMode: false })
+    mockUseHydratedProductCard.mockReturnValue({ card: featuredCard, isLoading: false })
+  })
+
+  function renderWithStyles(overrides: Record<string, unknown> = {}) {
+    mockUseComponentStyle.mockImplementation((_name: string, defaults: Record<string, unknown>) => ({
+      styles: { ...defaults, ...overrides },
+    }))
+
+    return render(<FeaturedProduct />)
+  }
+
+  it("reproduces today's layout at defaults: image-right, ~56% content, left-aligned, standard height", () => {
+    const { container } = renderWithStyles()
+
+    const section = container.querySelector('[data-component="featured"]') as HTMLElement
+    expect(section.style.backgroundPosition).toBe("15% bottom")
+    expect(section.className).toContain("min-h-[480px]")
+    expect(section.className).toContain("md:min-h-[560px]")
+    expect(section.className).toContain("lg:min-h-[600px]")
+
+    const contentColumn = section.querySelector(".container > div") as HTMLElement
+    expect(contentColumn.className).toContain("ml-auto")
+    expect(contentColumn.className).not.toContain("mr-auto")
+    expect(contentColumn.className).toContain("md:w-[56%]")
+    expect(contentColumn.className).toContain("lg:w-[50%]")
+    expect(contentColumn.className).toContain("md:text-left")
+  })
+
+  it("flips content alignment and background anchor when imageSide is 'left'", () => {
+    const { container } = renderWithStyles({ imageSide: "left" })
+
+    const section = container.querySelector('[data-component="featured"]') as HTMLElement
+    expect(section.style.backgroundPosition).toBe("85% bottom")
+
+    const contentColumn = section.querySelector(".container > div") as HTMLElement
+    expect(contentColumn.className).toContain("mr-auto")
+    expect(contentColumn.className).not.toContain("ml-auto")
+  })
+
+  it("honors contentWidth", () => {
+    const { container } = renderWithStyles({ contentWidth: "content" })
+
+    const contentColumn = container.querySelector(".container > div") as HTMLElement
+    expect(contentColumn.className).toContain("md:w-[64%]")
+    expect(contentColumn.className).toContain("lg:w-[60%]")
+  })
+
+  it("honors textAlign", () => {
+    const { container } = renderWithStyles({ textAlign: "center" })
+
+    const contentColumn = container.querySelector(".container > div") as HTMLElement
+    expect(contentColumn.className).toContain("md:text-center")
+
+    const card = container.querySelector("a") as HTMLElement
+    expect(card.className).toContain("md:mx-auto")
+    expect(card.className).not.toContain("md:mx-0")
+  })
+
+  it("honors sectionHeight", () => {
+    const { container } = renderWithStyles({ sectionHeight: "tall" })
+
+    const section = container.querySelector('[data-component="featured"]') as HTMLElement
+    expect(section.className).toContain("min-h-[560px]")
+    expect(section.className).toContain("md:min-h-[640px]")
+    expect(section.className).toContain("lg:min-h-[720px]")
+  })
+})

@@ -52,9 +52,6 @@ export const HERO_FULL_IMAGE_PRODUCT_SIDE_CLASSES: Record<
   right: "md:right-8 md:left-auto",
 };
 
-export const HERO_FULL_IMAGE_STAGE_SIZE_CLASS =
-  "min-h-[580px] md:aspect-[16/9] md:min-h-[700px] max-h-[900px]";
-
 export const HERO_PRODUCT_PRESENCE_FRAME_CLASSES: Record<
   HeroProductPresence,
   string

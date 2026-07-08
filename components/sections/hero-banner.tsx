@@ -14,11 +14,18 @@ import {
   toHeroLayerModel,
   type HeroStyleInput,
 } from "@/lib/hero/hero-layer-model";
+import { isToggleOn } from "@/lib/section-editor/toggle-value";
+import {
+  resolveAutoplayIntervalSeconds,
+  resolveHeroSectionHeight,
+} from "@/lib/sections/hero-variant";
 import { HeroFeatureDialog, type HeroProductFeature } from "./hero/feature-callouts";
 import { getHeroBackgroundGradient } from "./hero/hero-rendering";
 import { HeroSlide } from "./hero/hero-slide";
 import { useHeroAutoplay } from "./hero/use-hero-autoplay";
 import { resolveHeroColors, resolveHeroShellProps } from "./hero/hero-view-model";
+
+const AUTOPLAY_SECONDS_TO_MS = 1000;
 
 export const HERO_STYLE_FALLBACKS = {
   label: "Electronics",
@@ -32,6 +39,10 @@ export const HERO_STYLE_FALLBACKS = {
   fullImageContentAlign: "left",
   imagePositionY: "bottom",
   buttonColor: "",
+  sectionHeight: "standard",
+  autoplay: true,
+  autoplayInterval: 10,
+  showBottomBar: true,
 } satisfies HeroStyleInput;
 
 export function HeroBanner() {
@@ -50,9 +61,16 @@ export function HeroBanner() {
   const [hoveredHotspotId, setHoveredHotspotId] = useState<string | null>(null);
   const [focusedHotspotId, setFocusedHotspotId] = useState<string | null>(null);
 
-  useHeroAutoplay(api);
-
   const edits = (componentEdits.get("hero") ?? {}) as HeroStyleInput;
+  const heroSectionData = { ...HERO_STYLE_FALLBACKS, ...styleData, ...edits };
+  const sectionHeight = resolveHeroSectionHeight(heroSectionData.sectionHeight);
+  const showBottomBar = isToggleOn(heroSectionData.showBottomBar);
+  const autoplayEnabled = isToggleOn(heroSectionData.autoplay);
+  const autoplayIntervalMs =
+    resolveAutoplayIntervalSeconds(heroSectionData.autoplayInterval) * AUTOPLAY_SECONDS_TO_MS;
+
+  useHeroAutoplay(api, { enabled: autoplayEnabled, intervalMs: autoplayIntervalMs });
+
   const heroLayerModel = toHeroLayerModel({ ...styleData, ...edits });
   const colors = resolveHeroColors({ activeTheme, styleData, edits });
   const shellProps = resolveHeroShellProps(
@@ -106,6 +124,7 @@ export function HeroBanner() {
                 overlayOpacity={heroLayerModel.overlayOpacity}
                 isDarkTheme={colors.isDarkTheme}
                 hasActiveTheme={Boolean(activeTheme)}
+                sectionHeight={sectionHeight}
                 selectedHeroHotspotId={selectedHeroHotspotId}
                 openHotspotId={openHotspotId}
                 hoveredHotspotId={hoveredHotspotId}
@@ -120,7 +139,7 @@ export function HeroBanner() {
         </CarouselContent>
       </Carousel>
 
-      {heroLayerModel.layoutMode !== "full-image" && (
+      {heroLayerModel.layoutMode !== "full-image" && showBottomBar && (
         <div
           data-testid="hero-bottom-bar"
           className="absolute bottom-0 left-0 right-0 h-16 pointer-events-none"

@@ -21,6 +21,20 @@ import {
 } from "lucide-react"
 import { useComponentStyle } from "@/contexts/styles-context"
 import { useAdmin } from "@/contexts/admin-context"
+import {
+  WHYUS_COLUMNS_CLASS,
+  WHYUS_CONTENT_ALIGN_CARD_CLASS,
+  WHYUS_ICON_POSITION_DIRECTION_CLASS,
+  WHYUS_ICON_POSITION_ICON_EXTRA_CLASS,
+  WHYUS_ICON_POSITION_TEXT_WRAPPER_CLASS,
+  WHYUS_ICON_STYLE_CLASS,
+  WHYUS_ICON_STYLE_HAS_BG,
+  resolveIconPosition,
+  resolveIconStyle,
+  resolveLayoutFormat,
+  resolveWhyusColumns,
+  resolveWhyusContentAlign,
+} from "@/lib/sections/whyus-variant"
 
 export type WhyUsIconKey =
   | "support"
@@ -55,6 +69,11 @@ export const WHYUS_DEFAULTS = {
   iconColor: "",
   titleColor: "",
   subtitleColor: "",
+  columns: "4",
+  iconStyle: "roundedSquare",
+  contentAlign: "left",
+  iconPosition: "top",
+  layoutFormat: "cards",
   items: [
     {
       icon: "support",
@@ -130,6 +149,26 @@ export function WhyUs() {
   const mergedItems = edits.items ?? styleData.items ?? WHYUS_DEFAULTS.items
   const items: WhyUsItem[] = mergedItems?.length ? mergedItems : WHYUS_DEFAULTS.items
 
+  const columns = resolveWhyusColumns(edits.columns ?? styleData.columns ?? WHYUS_DEFAULTS.columns)
+  const iconStyle = resolveIconStyle(edits.iconStyle ?? styleData.iconStyle ?? WHYUS_DEFAULTS.iconStyle)
+  const contentAlign = resolveWhyusContentAlign(
+    edits.contentAlign ?? styleData.contentAlign ?? WHYUS_DEFAULTS.contentAlign,
+  )
+  const iconPosition = resolveIconPosition(
+    edits.iconPosition ?? styleData.iconPosition ?? WHYUS_DEFAULTS.iconPosition,
+  )
+  const layoutFormat = resolveLayoutFormat(
+    edits.layoutFormat ?? styleData.layoutFormat ?? WHYUS_DEFAULTS.layoutFormat,
+  )
+
+  const columnsClass = WHYUS_COLUMNS_CLASS[columns]
+  const iconStyleClass = WHYUS_ICON_STYLE_CLASS[iconStyle]
+  const iconHasBg = WHYUS_ICON_STYLE_HAS_BG[iconStyle]
+  const contentAlignCardClass = WHYUS_CONTENT_ALIGN_CARD_CLASS[contentAlign]
+  const iconPositionDirectionClass = WHYUS_ICON_POSITION_DIRECTION_CLASS[iconPosition]
+  const iconPositionTextWrapperClass = WHYUS_ICON_POSITION_TEXT_WRAPPER_CLASS[iconPosition]
+  const iconPositionIconExtraClass = WHYUS_ICON_POSITION_ICON_EXTRA_CLASS[iconPosition]
+
   return (
     <section
       data-component="whyus"
@@ -146,44 +185,69 @@ export function WhyUs() {
           {title}
         </h2>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
-          {items.map((item, index) => {
-            const ItemIcon = resolveWhyUsIcon(item.icon)
-            return (
-              <div
-                key={`${item.icon}-${item.title}-${index}`}
-                className="flex min-h-[220px] flex-col items-start rounded-card border border-[var(--border)] p-6 shadow-[var(--shadow-card,none)] md:min-h-[260px] md:p-8"
-                style={{
-                  backgroundColor: cardBgColor,
-                }}
-              >
+        {layoutFormat === "bar" ? (
+          <div
+            data-testid="whyus-bar"
+            className="flex flex-wrap items-center justify-center gap-x-8 gap-y-4 md:justify-between"
+          >
+            {items.map((item, index) => {
+              const ItemIcon = resolveWhyUsIcon(item.icon)
+              return (
                 <div
-                  className="flex h-12 w-12 items-center justify-center rounded-xl md:h-14 md:w-14"
-                  style={{ backgroundColor: iconBgColor }}
+                  key={`${item.icon}-${item.title}-${index}`}
+                  className="flex items-center gap-2"
                 >
-                  <ItemIcon
-                    className="h-6 w-6 md:h-7 md:w-7"
-                    style={{ color: iconColor }}
-                  />
-                </div>
-                <div className="mt-auto">
-                  <h3
-                    className="font-heading font-normal text-sm md:text-[19px] mb-1"
+                  <ItemIcon className="h-5 w-5 shrink-0" style={{ color: iconColor }} />
+                  <span
+                    className="text-sm font-medium md:text-base"
                     style={{ color: titleColor }}
                   >
                     {item.title}
-                  </h3>
-                  <p
-                    className="text-xs md:text-[15px] font-normal"
-                    style={{ color: subtitleColor }}
-                  >
-                    {item.description}
-                  </p>
+                  </span>
                 </div>
-              </div>
-            )
-          })}
-        </div>
+              )
+            })}
+          </div>
+        ) : (
+          <div className={`grid ${columnsClass} gap-4 md:gap-8`}>
+            {items.map((item, index) => {
+              const ItemIcon = resolveWhyUsIcon(item.icon)
+              return (
+                <div
+                  key={`${item.icon}-${item.title}-${index}`}
+                  className={`flex min-h-[220px] ${iconPositionDirectionClass} ${contentAlignCardClass} rounded-card border border-[var(--border)] p-6 shadow-[var(--shadow-card,none)] md:min-h-[260px] md:p-8`}
+                  style={{
+                    backgroundColor: cardBgColor,
+                  }}
+                >
+                  <div
+                    className={`${iconStyleClass} ${iconPositionIconExtraClass}`}
+                    style={iconHasBg ? { backgroundColor: iconBgColor } : undefined}
+                  >
+                    <ItemIcon
+                      className="h-6 w-6 md:h-7 md:w-7"
+                      style={{ color: iconColor }}
+                    />
+                  </div>
+                  <div className={iconPositionTextWrapperClass}>
+                    <h3
+                      className="font-heading font-normal text-sm md:text-[19px] mb-1"
+                      style={{ color: titleColor }}
+                    >
+                      {item.title}
+                    </h3>
+                    <p
+                      className="text-xs md:text-[15px] font-normal"
+                      style={{ color: subtitleColor }}
+                    >
+                      {item.description}
+                    </p>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
     </section>
   )

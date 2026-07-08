@@ -1,13 +1,21 @@
 import { useEffect, useRef } from "react";
 import type { CarouselApi } from "@/components/ui/carousel";
 
-const HERO_AUTOPLAY_INTERVAL_MS = 10000;
+interface UseHeroAutoplayOptions {
+  /** When `false`, no auto-advance interval is scheduled at all. */
+  enabled: boolean;
+  /** Interval between auto-advances, in milliseconds. */
+  intervalMs: number;
+}
 
-export function useHeroAutoplay(api: CarouselApi | undefined) {
+export function useHeroAutoplay(
+  api: CarouselApi | undefined,
+  { enabled, intervalMs }: UseHeroAutoplayOptions,
+) {
   const autoplayRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    if (!api) return;
+    if (!api || !enabled) return;
 
     const startAutoplay = () => {
       if (autoplayRef.current) {
@@ -16,7 +24,7 @@ export function useHeroAutoplay(api: CarouselApi | undefined) {
 
       autoplayRef.current = setInterval(() => {
         api.scrollNext();
-      }, HERO_AUTOPLAY_INTERVAL_MS);
+      }, intervalMs);
     };
 
     startAutoplay();
@@ -28,7 +36,7 @@ export function useHeroAutoplay(api: CarouselApi | undefined) {
 
       setTimeout(() => {
         startAutoplay();
-      }, HERO_AUTOPLAY_INTERVAL_MS);
+      }, intervalMs);
     };
 
     api.on("select", handleSelect);
@@ -39,5 +47,5 @@ export function useHeroAutoplay(api: CarouselApi | undefined) {
       }
       api.off("select", handleSelect);
     };
-  }, [api]);
+  }, [api, enabled, intervalMs]);
 }

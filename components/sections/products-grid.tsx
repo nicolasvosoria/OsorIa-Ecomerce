@@ -5,6 +5,14 @@ import { useComponentStyle } from "@/contexts/styles-context"
 import { useAdmin } from "@/contexts/admin-context"
 import { VisualProductCard } from "@/components/products/visual-product-card"
 import { getAdminRequestHeaders } from "@/lib/supabase/admin-request-headers"
+import { isToggleOn } from "@/lib/section-editor/toggle-value"
+import {
+  PRODUCTS_COLUMNS_CLASS,
+  resolveCardStyle,
+  resolveHoverEffect,
+  resolveItemCount,
+  resolveProductsColumns,
+} from "@/lib/sections/products-variant"
 import { PRODUCTS_RADIUS_CLASS } from "@/lib/theme/section-style-keys"
 import type { CommerceProductCard } from "@/lib/types/products"
 
@@ -28,12 +36,12 @@ export const PRODUCTS_DEFAULTS = {
   showCategory: "si",
   showPrice: "si",
   selectionMode: "display_order",
-}
-
-const COLUMNS_CLASS: Record<string, string> = {
-  "2": "sm:grid-cols-2",
-  "3": "sm:grid-cols-2 lg:grid-cols-3",
-  "4": "sm:grid-cols-2 lg:grid-cols-4",
+  mediaPosition: "bottom",
+  showCta: false,
+  showDescription: false,
+  itemCount: "4",
+  cardStyle: "shadow",
+  hoverEffect: "lift",
 }
 
 // Matches VisualProductCard's own default `radiusClass` byte-for-byte: when
@@ -60,26 +68,45 @@ export function ProductsGrid({ initialProducts }: ProductsGridProps = {}) {
     showCategory,
     showPrice,
     selectionMode,
+    mediaPosition: rawMediaPosition,
+    showCta,
+    showDescription,
+    itemCount: rawItemCount,
+    cardStyle: rawCardStyle,
+    hoverEffect: rawHoverEffect,
   } = {
     ...PRODUCTS_DEFAULTS,
     ...styleData,
     ...edits,
   }
 
-  const columnsClass = COLUMNS_CLASS[columns] || COLUMNS_CLASS["4"]
+  const columnsClass = PRODUCTS_COLUMNS_CLASS[resolveProductsColumns(columns)]
   const radiusClass = cornerRadius
     ? PRODUCTS_RADIUS_CLASS[cornerRadius]
     : DEFAULT_CARD_RADIUS_CLASS
+  const mediaPosition = rawMediaPosition === "top" ? "top" : "bottom"
+  const itemCount = resolveItemCount(rawItemCount)
+  const cardStyle = resolveCardStyle(rawCardStyle)
+  const hoverEffect = resolveHoverEffect(rawHoverEffect)
+
+  // Un edit efímero (solo-preview, sin publicar) que cambia QUÉ productos se
+  // muestran nunca refleja en el preview si nos quedamos con initialProducts
+  // (pasados por el servidor antes del edit): itemCount/selectionMode
+  // cambian qué se pide, no cómo se renderiza, así que necesitan un fetch
+  // nuevo para tener efecto en el preview.
+  const hasEphemeralDataEdit = edits.itemCount !== undefined || edits.selectionMode !== undefined
 
   // El live homepage pasa initialProducts (vía ProductsGridWrapper), usando
   // getPopularProductCards() directamente en el servidor. El editor no pasa
   // props, así que el preview pide los MISMOS productos a la ruta admin
   // (que llama a la misma función bajo una sesión autenticada) — esto es lo
-  // que mantiene editor y live sincronizados.
+  // que mantiene editor y live sincronizados. También se pide de nuevo
+  // (aunque haya initialProducts) cuando hay un edit efímero de datos, para
+  // que el preview refleje itemCount/selectionMode sin necesidad de "Aplicar".
   const [fetchedProducts, setFetchedProducts] = useState<CommerceProductCard[]>([])
 
   useEffect(() => {
-    if (initialProducts) return
+    if (initialProducts && !hasEphemeralDataEdit) return
 
     let active = true
 
@@ -87,7 +114,7 @@ export function ProductsGrid({ initialProducts }: ProductsGridProps = {}) {
       try {
         const headers = await getAdminRequestHeaders()
         const response = await fetch(
-          `/api/admin/popular-products?mode=${selectionMode}&limit=4`,
+          `/api/admin/popular-products?mode=${selectionMode}&limit=${itemCount}`,
           { headers },
         )
 
@@ -107,9 +134,9 @@ export function ProductsGrid({ initialProducts }: ProductsGridProps = {}) {
     return () => {
       active = false
     }
-  }, [initialProducts, selectionMode])
+  }, [initialProducts, hasEphemeralDataEdit, selectionMode, itemCount])
 
-  const products = initialProducts ?? fetchedProducts
+  const products = hasEphemeralDataEdit ? fetchedProducts : (initialProducts ?? fetchedProducts)
 
   if (products.length === 0) return null
 
@@ -147,15 +174,17 @@ export function ProductsGrid({ initialProducts }: ProductsGridProps = {}) {
             <VisualProductCard
               key={product.id}
               product={product}
-              showDescription={false}
-              showCta={false}
-              mediaPosition="bottom"
+              showDescription={showDescription}
+              showCta={showCta}
+              mediaPosition={mediaPosition}
               cardBackground={cardBgColor || "var(--sec-products-card-bg,var(--muted))"}
               priceColor={priceColor || "var(--sec-products-price,var(--primary))"}
               radiusClass={radiusClass}
               imageBlendsWithCard
-              showCategory={showCategory === "si"}
-              showPrice={showPrice === "si"}
+              showCategory={isToggleOn(showCategory)}
+              showPrice={isToggleOn(showPrice)}
+              cardStyle={cardStyle}
+              hoverEffect={hoverEffect}
             />
           ))}
         </div>

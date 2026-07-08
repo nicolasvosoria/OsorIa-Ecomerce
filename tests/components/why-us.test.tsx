@@ -86,3 +86,103 @@ describe("WhyUs structure", () => {
     expect(card.className).toContain("border-[var(--border)]")
   })
 })
+
+describe("WhyUs design options", () => {
+  it("defaults reproduce today's look: 4 columns, left-aligned cards, top rounded-xl icon, cards format", () => {
+    mockUseAdmin.mockReturnValue({ componentEdits: new Map() })
+    mockUseComponentStyle.mockImplementation((_name: string, defaults: Record<string, unknown>) => ({
+      styles: defaults,
+    }))
+
+    const { container } = render(<WhyUs />)
+
+    const grid = container.querySelector('[data-component="whyus"] .grid') as HTMLElement
+    expect(grid.className).toContain("grid-cols-2")
+    expect(grid.className).toContain("md:grid-cols-4")
+
+    const card = grid.querySelector(":scope > div") as HTMLElement
+    expect(card.className).toContain("flex-col")
+    expect(card.className).toContain("items-start")
+    expect(card.className).toContain("text-left")
+
+    const iconChip = card.querySelector("div") as HTMLElement
+    expect(iconChip.className).toContain("rounded-xl")
+    expect(iconChip.style.backgroundColor).toBe("var(--sec-whyus-icon-bg,var(--muted))")
+
+    expect(container.querySelector('[data-testid="whyus-bar"]')).toBeNull()
+  })
+
+  it("applies columns=3", () => {
+    mockUseAdmin.mockReturnValue({ componentEdits: new Map() })
+    mockUseComponentStyle.mockImplementation((_name: string, defaults: Record<string, unknown>) => ({
+      styles: { ...defaults, columns: "3" },
+    }))
+
+    const { container } = render(<WhyUs />)
+
+    const grid = container.querySelector('[data-component="whyus"] .grid') as HTMLElement
+    expect(grid.className).toContain("md:grid-cols-3")
+    expect(grid.className).not.toContain("md:grid-cols-4")
+  })
+
+  it("applies iconStyle=circle (rounded-full) and iconStyle=plain (no background)", () => {
+    mockUseAdmin.mockReturnValue({ componentEdits: new Map() })
+    mockUseComponentStyle.mockImplementation((_name: string, defaults: Record<string, unknown>) => ({
+      styles: { ...defaults, iconStyle: "circle" },
+    }))
+
+    const { container: circleContainer } = render(<WhyUs />)
+    const circleIcon = circleContainer.querySelector(
+      '[data-component="whyus"] .grid > div > div',
+    ) as HTMLElement
+    expect(circleIcon.className).toContain("rounded-full")
+
+    mockUseComponentStyle.mockImplementation((_name: string, defaults: Record<string, unknown>) => ({
+      styles: { ...defaults, iconStyle: "plain" },
+    }))
+
+    const { container: plainContainer } = render(<WhyUs />)
+    const plainIcon = plainContainer.querySelector(
+      '[data-component="whyus"] .grid > div > div',
+    ) as HTMLElement
+    expect(plainIcon.className).not.toContain("rounded-xl")
+    expect(plainIcon.className).not.toContain("rounded-full")
+    expect(plainIcon.style.backgroundColor).toBe("")
+  })
+
+  it("applies contentAlign=center", () => {
+    mockUseAdmin.mockReturnValue({ componentEdits: new Map() })
+    mockUseComponentStyle.mockImplementation((_name: string, defaults: Record<string, unknown>) => ({
+      styles: { ...defaults, contentAlign: "center" },
+    }))
+
+    const { container } = render(<WhyUs />)
+    const card = container.querySelector('[data-component="whyus"] .grid > div') as HTMLElement
+    expect(card.className).toContain("items-center")
+    expect(card.className).toContain("text-center")
+  })
+
+  it("applies iconPosition=side (flex-row card layout)", () => {
+    mockUseAdmin.mockReturnValue({ componentEdits: new Map() })
+    mockUseComponentStyle.mockImplementation((_name: string, defaults: Record<string, unknown>) => ({
+      styles: { ...defaults, iconPosition: "side" },
+    }))
+
+    const { container } = render(<WhyUs />)
+    const card = container.querySelector('[data-component="whyus"] .grid > div') as HTMLElement
+    expect(card.className).toContain("flex-row")
+    expect(card.className).not.toContain("flex-col")
+  })
+
+  it("renders the compact bar (not the card grid) when layoutFormat=bar", () => {
+    mockUseAdmin.mockReturnValue({ componentEdits: new Map() })
+    mockUseComponentStyle.mockImplementation((_name: string, defaults: Record<string, unknown>) => ({
+      styles: { ...defaults, layoutFormat: "bar" },
+    }))
+
+    const { container } = render(<WhyUs />)
+
+    expect(container.querySelector('[data-testid="whyus-bar"]')).not.toBeNull()
+    expect(container.querySelector('[data-component="whyus"] .grid')).toBeNull()
+  })
+})

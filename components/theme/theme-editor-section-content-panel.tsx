@@ -9,6 +9,7 @@ import { useState, type ReactNode } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import {
   Select,
@@ -20,14 +21,16 @@ import {
 import { Plus, Trash2 } from "lucide-react"
 import { ImageUpload } from "@/components/admin/image-upload"
 import { ProductPicker } from "@/components/admin/product-picker"
+import { CategoryPicker } from "@/components/admin/category-picker"
 import { DatetimeLocalInput } from "@/lib/section-editor/datetime-local-input"
+import { isToggleOn } from "@/lib/section-editor/toggle-value"
 import {
   addArrayItem,
   removeArrayItem,
   updateArrayItem,
 } from "@/lib/section-editor/array-field-operations"
 import { COMPONENT_FIELDS } from "@/lib/section-editor/component-fields"
-import type { SectionArrayField, SectionContentField, SectionFieldsConfig } from "@/lib/section-editor/types"
+import type { SectionArrayField, SectionContentField } from "@/lib/section-editor/types"
 import { EMPTY_SELECT_VALUE } from "@/lib/ui/select-empty-value"
 import {
   toHeroLayerModel,
@@ -67,40 +70,49 @@ export function SectionContentPanel({
 
   if (!config || config.content.length === 0) {
     return (
-      <div className="space-y-1">
-        <h3 className="text-xs font-semibold uppercase text-muted-foreground">Contenido</h3>
-        <p className="text-sm text-muted-foreground">
-          Esta sección todavía no tiene campos de contenido editables.
-        </p>
-      </div>
+      <p className="text-sm text-muted-foreground">
+        Esta sección todavía no tiene campos de contenido editables.
+      </p>
     )
   }
 
   const values = { ...config.defaults, ...persistedContent, ...stagedContent }
+  // Layout/variant fields (`group: "design"`) render in the Diseño tab
+  // instead (via `SectionDesignFieldList`), even though they're staged
+  // through this same content path — only real content stays here.
+  const contentFields = config.content.filter((field) => field.group !== "design")
 
   return (
     <div className="space-y-3">
-      <h3 className="text-xs font-semibold uppercase text-muted-foreground">Contenido</h3>
       {sectionName === "hero" ? (
         <HeroContentEditor values={values} defaults={config.defaults} onFieldChange={onFieldChange} />
       ) : (
-        <ContentFieldList sectionName={sectionName} config={config} values={values} onFieldChange={onFieldChange} />
+        <ContentFieldList
+          sectionName={sectionName}
+          fields={contentFields}
+          values={values}
+          onFieldChange={onFieldChange}
+        />
       )}
     </div>
   )
 }
 
-interface ContentFieldListProps {
+export interface ContentFieldListProps {
   sectionName: string
-  config: SectionFieldsConfig
+  fields: SectionContentField[]
   values: Record<string, any>
   onFieldChange: (key: string, value: any) => void
 }
 
-function ContentFieldList({ sectionName, config, values, onFieldChange }: ContentFieldListProps) {
+/** Shared by the Contenido tab (above) and the Diseño tab's
+ * `SectionDesignFieldList` — both map a field list to the same
+ * `ContentField`/`ArrayContentField` dispatch, just filtered to a
+ * different `group`. */
+export function ContentFieldList({ sectionName, fields, values, onFieldChange }: ContentFieldListProps) {
   return (
     <div className="space-y-4">
-      {config.content.map((field) => {
+      {fields.map((field) => {
         if (field.isArray) {
           const items = (values[field.key] as any[]) ?? []
           return (
@@ -183,10 +195,27 @@ function ContentField({ field, value, fieldId, onChange }: ContentFieldProps) {
     )
   }
 
+  if (field.type === "toggle") {
+    return (
+      <div className="flex items-center justify-between gap-3">
+        <Label htmlFor={fieldId}>{field.label}</Label>
+        <Switch id={fieldId} checked={isToggleOn(value)} onCheckedChange={onChange} />
+      </div>
+    )
+  }
+
   if (field.type === "product") {
     return (
       <FieldShell fieldId={fieldId} label={field.label}>
         <ProductPicker value={value ?? ""} onChange={onChange} contentClassName="editor-chrome" />
+      </FieldShell>
+    )
+  }
+
+  if (field.type === "category") {
+    return (
+      <FieldShell fieldId={fieldId} label={field.label}>
+        <CategoryPicker value={value ?? ""} onChange={onChange} contentClassName="editor-chrome" />
       </FieldShell>
     )
   }

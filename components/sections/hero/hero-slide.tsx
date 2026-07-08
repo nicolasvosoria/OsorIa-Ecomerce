@@ -8,7 +8,6 @@ import type {
 } from "@/lib/hero/hero-layer-model";
 import {
   HERO_FULL_IMAGE_PRODUCT_SIDE_CLASSES,
-  HERO_FULL_IMAGE_STAGE_SIZE_CLASS,
   getContentCompositionStyle,
   getProductCompositionStyle,
   resolveHeroProductFrames,
@@ -26,6 +25,11 @@ import {
   resolveHeroBackgroundObjectFit,
   resolveHeroSlideContent,
 } from "./hero-view-model";
+import {
+  HERO_SECTION_HEIGHT_FULL_IMAGE_CLASS,
+  HERO_SECTION_HEIGHT_SPLIT_CLASS,
+  type HeroSectionHeight,
+} from "@/lib/sections/hero-variant";
 
 interface HeroHotspotInteractionProps {
   selectedHeroHotspotId?: string | null;
@@ -53,6 +57,7 @@ interface HeroSlideProps extends HeroHotspotInteractionProps {
   overlayOpacity: number;
   isDarkTheme: boolean;
   hasActiveTheme: boolean;
+  sectionHeight: HeroSectionHeight;
   onSelectFeature: (feature: HeroProductFeature) => void;
 }
 
@@ -72,6 +77,7 @@ export function HeroSlide({
   overlayOpacity,
   isDarkTheme,
   hasActiveTheme,
+  sectionHeight,
   onSelectFeature,
   ...hotspotProps
 }: HeroSlideProps) {
@@ -92,6 +98,7 @@ export function HeroSlide({
         buttonTextColor={buttonTextColor}
         overlayColor={overlayColor}
         overlayOpacity={overlayOpacity}
+        sectionHeight={sectionHeight}
         {...hotspotProps}
       />
     );
@@ -109,6 +116,7 @@ export function HeroSlide({
         hasActiveTheme,
         isDarkTheme,
       })}
+      sectionHeight={sectionHeight}
       onSelectFeature={onSelectFeature}
       {...hotspotProps}
     />
@@ -128,6 +136,7 @@ function HeroFullImageSlide({
   buttonTextColor,
   overlayColor,
   overlayOpacity,
+  sectionHeight,
   ...hotspotProps
 }: Omit<
   HeroSlideProps,
@@ -152,7 +161,7 @@ function HeroFullImageSlide({
     slide.secondaryProductPreset ?? "primary-right-secondary-left";
 
   return (
-    <div className={`relative w-full ${HERO_FULL_IMAGE_STAGE_SIZE_CLASS}`}>
+    <div className={`relative w-full ${HERO_SECTION_HEIGHT_FULL_IMAGE_CLASS[sectionHeight]}`}>
       <div
         data-testid={isFirstSlide ? "hero-full-content-container" : undefined}
         data-hero-mobile-sizing="content-safe"
@@ -261,6 +270,7 @@ function HeroSplitSlide({
   buttonColor,
   buttonTextColor,
   splitBadgeBackground,
+  sectionHeight,
   onSelectFeature,
   ...hotspotProps
 }: Omit<
@@ -296,7 +306,7 @@ function HeroSplitSlide({
           {...getHeroLayerAttributes("product", selectedHeroLayer)}
           data-testid={`hero-product-media-${index}`}
           data-product-placement={content.productPlacement}
-          className={`relative h-[250px] md:h-[400px] lg:h-[500px] ${content.productMediaOrderClass}`}
+          className={`relative ${HERO_SECTION_HEIGHT_SPLIT_CLASS[sectionHeight]} ${content.productMediaOrderClass}`}
         >
           <HeroProductFrame
             src={content.productMediaImage}

@@ -7,6 +7,12 @@ import { useAdmin } from "@/contexts/admin-context";
 import { useComponentStyle } from "@/contexts/styles-context";
 import { VisualProductCardImage } from "@/components/products/visual-product-card-image";
 import { useHydratedProductCard } from "@/lib/products/use-hydrated-product-card";
+import { isToggleOn } from "@/lib/section-editor/toggle-value";
+import {
+  SPECIAL_OFFER_DETAILS_COLUMN_CLASS,
+  SPECIAL_OFFER_IMAGE_COLUMN_CLASS,
+  resolveSpecialOfferImageSide,
+} from "@/lib/sections/special-offer-variant";
 
 export const SPECIAL_OFFER_DEFAULTS = {
   title: "Oferta Especial",
@@ -23,6 +29,10 @@ export const SPECIAL_OFFER_DEFAULTS = {
   productBgColor: "",
   accentColor: "",
   claimedPercent: 32,
+  imageSide: "left",
+  showCountdown: true,
+  showUrgencyBar: true,
+  showBadge: true,
 };
 
 const COUNTDOWN_UNIT_LABELS = ["days", "hours", "minutes", "seconds"] as const;
@@ -83,6 +93,12 @@ export function SpecialOffer() {
   const claimedPercent = Number.isFinite(Number(offer.claimedPercent))
     ? Math.min(Math.max(Number(offer.claimedPercent), 0), 100)
     : SPECIAL_OFFER_DEFAULTS.claimedPercent;
+  const imageSide = resolveSpecialOfferImageSide(offer.imageSide);
+  const imageColumnClass = SPECIAL_OFFER_IMAGE_COLUMN_CLASS[imageSide];
+  const detailsColumnClass = SPECIAL_OFFER_DETAILS_COLUMN_CLASS[imageSide];
+  const showCountdown = isToggleOn(offer.showCountdown);
+  const showUrgencyBar = isToggleOn(offer.showUrgencyBar);
+  const showBadge = isToggleOn(offer.showBadge);
 
   const { card } = useHydratedProductCard(offer.productId);
   const originalPrice =
@@ -132,7 +148,7 @@ export function SpecialOffer() {
         }}
       >
           <div className="mb-4 md:mb-6">
-            {card?.category ? (
+            {showBadge && card?.category ? (
               <span
                 className="mb-3 inline-block rounded-md px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.2em] opacity-80"
                 style={{ backgroundColor: subtleAccentBg }}
@@ -147,7 +163,7 @@ export function SpecialOffer() {
 
           <div className="grid gap-5 md:grid-cols-2 md:items-center md:gap-6 lg:gap-8">
             <div
-              className="relative flex min-h-[180px] items-center justify-center rounded-card p-4 md:min-h-[240px]"
+              className={`relative flex min-h-[180px] items-center justify-center rounded-card p-4 md:min-h-[200px] lg:min-h-[240px] ${imageColumnClass}`}
               style={{ backgroundColor: productBg }}
             >
               <VisualProductCardImage
@@ -158,7 +174,7 @@ export function SpecialOffer() {
               />
             </div>
 
-            <div className="flex flex-col gap-4">
+            <div className={`flex flex-col gap-4 ${detailsColumnClass}`}>
               {card ? (
                 <div>
                   <h3 className="mb-2 text-2xl font-semibold tracking-tight md:text-3xl lg:text-4xl">
@@ -188,26 +204,28 @@ export function SpecialOffer() {
                 {offer.description}
               </p>
 
-              <div className="space-y-3">
-                <div className="flex items-center justify-between text-sm font-semibold uppercase tracking-wide">
-                  <span>Ya reclamado</span>
-                  <span>{claimedPercent}%</span>
-                </div>
-                <div
-                  className="h-0.5 w-full"
-                  style={{ backgroundColor: subtleAccentBg }}
-                >
+              {showUrgencyBar ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-sm font-semibold uppercase tracking-wide">
+                    <span>Ya reclamado</span>
+                    <span>{claimedPercent}%</span>
+                  </div>
                   <div
-                    className="h-0.5"
-                    style={{
-                      width: `${claimedPercent}%`,
-                      backgroundColor: accentColor,
-                    }}
-                  />
+                    className="h-0.5 w-full"
+                    style={{ backgroundColor: subtleAccentBg }}
+                  >
+                    <div
+                      className="h-0.5"
+                      style={{
+                        width: `${claimedPercent}%`,
+                        backgroundColor: accentColor,
+                      }}
+                    />
+                  </div>
                 </div>
-              </div>
+              ) : null}
 
-              {offer.endDate ? (
+              {offer.endDate && showCountdown ? (
                 <div className="space-y-3">
                   <p className="text-sm font-semibold opacity-70">
                     {offer.countdownLabel}
@@ -215,19 +233,19 @@ export function SpecialOffer() {
                   {isExpired ? (
                     <p className="text-base font-semibold">Oferta finalizada</p>
                   ) : (
-                    <div className="flex flex-wrap items-start gap-2">
+                    <div className="flex flex-wrap items-start gap-1.5 md:gap-2">
                       {COUNTDOWN_UNIT_LABELS.map((label, index) => (
                         <Fragment key={label}>
                           {index > 0 ? (
-                            <span className="px-1 pt-2 text-xl font-semibold opacity-40">
+                            <span className="px-0.5 pt-1.5 text-base font-semibold opacity-40 md:px-1 md:pt-2 md:text-xl">
                               :
                             </span>
                           ) : null}
                           <span
-                            className="rounded-lg px-3 py-2 text-center"
+                            className="rounded-lg px-2 py-1.5 text-center md:px-3 md:py-2"
                             style={{ backgroundColor: subtleAccentBg }}
                           >
-                            <span className="block text-xl font-semibold">
+                            <span className="block text-base font-semibold md:text-xl">
                               {countdownValues[label]}
                             </span>
                             <span className="text-[10px] uppercase tracking-wide opacity-60">

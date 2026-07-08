@@ -16,7 +16,7 @@ import { toCommerceProductCard } from "@/lib/products/adapter"
 import { getCategories, getItemById, getItems } from "@/lib/supabase/products-api"
 import { getTopSellingProductIds } from "@/lib/supabase/stats-api"
 import { getRuntimeStoreId } from "@/lib/utils/store"
-import type { CommerceProductCard, GetItemsParams } from "@/lib/types/products"
+import type { CommerceProductCard, GetItemsParams, ItemCategory } from "@/lib/types/products"
 
 /**
  * Cómo se eligen los productos que se muestran en la sección "products" del home:
@@ -35,6 +35,13 @@ export interface PopularCategoryTile {
   startingPriceLabel: string
   startingPriceAmount?: number
   href: string
+}
+
+/** A store owner's curated pick for "Popular Items": which category, and an
+ * optional per-tile image overriding the category's own `category_image_url`. */
+export interface PopularCategoryTileOverride {
+  categoryId: string
+  imageUrl?: string
 }
 
 const POPULAR_CATEGORY_TILES_LIMIT = 4
@@ -59,28 +66,49 @@ async function resolveStartingPrice(categoryId: string): Promise<{ label: string
   }
 }
 
-/** Category tiles for "Popular Items": image + name + starting price + link to the category. */
+async function buildCategoryTile(category: ItemCategory, imageOverride?: string): Promise<PopularCategoryTile> {
+  const slug = generateCategorySlug(category.category_name)
+  const startingPrice = await resolveStartingPrice(category.id)
+
+  return {
+    id: category.id,
+    name: category.category_name,
+    slug,
+    imageUrl: imageOverride || category.category_image_url || undefined,
+    startingPriceLabel: startingPrice.label,
+    startingPriceAmount: startingPrice.amount,
+    href: `/catalog/${slug}`,
+  }
+}
+
+/**
+ * Category tiles for "Popular Items": image + name + starting price + link
+ * to the category. When `curatedTiles` is given and non-empty, builds tiles
+ * from exactly those categories, in that order, using each tile's own
+ * `imageUrl` override (falling back to the category's image); `limit` is
+ * ignored since the curated order and count are the admin's explicit choice.
+ * Otherwise falls back to today's behavior: the first `limit` categories.
+ */
 export async function getPopularCategoryTiles(
   limit: number = POPULAR_CATEGORY_TILES_LIMIT,
+  curatedTiles: PopularCategoryTileOverride[] = [],
 ): Promise<PopularCategoryTile[]> {
   const categories = await getCategories(false)
 
-  return Promise.all(
-    categories.slice(0, limit).map(async (category) => {
-      const slug = generateCategorySlug(category.category_name)
-      const startingPrice = await resolveStartingPrice(category.id)
+  if (curatedTiles.length > 0) {
+    const categoriesById = new Map(categories.map((category) => [category.id, category]))
 
-      return {
-        id: category.id,
-        name: category.category_name,
-        slug,
-        imageUrl: category.category_image_url || undefined,
-        startingPriceLabel: startingPrice.label,
-        startingPriceAmount: startingPrice.amount,
-        href: `/catalog/${slug}`,
-      }
-    }),
-  )
+    const tiles = await Promise.all(
+      curatedTiles.map((tile) => {
+        const category = categoriesById.get(tile.categoryId)
+        return category ? buildCategoryTile(category, tile.imageUrl) : null
+      }),
+    )
+
+    return tiles.filter((tile): tile is PopularCategoryTile => tile !== null)
+  }
+
+  return Promise.all(categories.slice(0, limit).map((category) => buildCategoryTile(category)))
 }
 
 function buildCatalogQueryParams(

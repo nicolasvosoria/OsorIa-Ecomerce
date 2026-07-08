@@ -71,3 +71,62 @@ describe("NewsletterSection structure", () => {
     expect(button.className).toContain("rounded-[var(--button-radius)]")
   })
 })
+
+describe("NewsletterSection contentAlign / layout / showLogo", () => {
+  beforeEach(() => {
+    mockUseAdmin.mockReturnValue({ componentEdits: new Map() })
+  })
+
+  it("defaults reproduce today's look: centered content, single stacked column, logo shown when set", () => {
+    mockUseComponentStyle.mockImplementation((_name: string, defaults: Record<string, unknown>) => ({
+      styles: { ...defaults, logoImage: "https://example.com/logo.png" },
+    }))
+
+    const { container } = render(<NewsletterSection />)
+
+    const contentWrapper = container.querySelector(
+      '[data-component="newsletter"] > div > div:last-child',
+    ) as HTMLElement
+    expect(contentWrapper.className).toContain("items-center")
+    expect(contentWrapper.className).toContain("text-center")
+    expect(contentWrapper.className).not.toContain("grid-cols-2")
+    expect(container.querySelector('[aria-label="Logo"]')).not.toBeNull()
+  })
+
+  it("left-aligns the content when contentAlign is 'left'", () => {
+    mockUseComponentStyle.mockImplementation((_name: string, defaults: Record<string, unknown>) => ({
+      styles: { ...defaults, contentAlign: "left" },
+    }))
+
+    const { container } = render(<NewsletterSection />)
+
+    const contentWrapper = container.querySelector(
+      '[data-component="newsletter"] > div > div:last-child',
+    ) as HTMLElement
+    expect(contentWrapper.className).toContain("items-start")
+    expect(contentWrapper.className).toContain("text-left")
+  })
+
+  it("renders the two-column split layout when layout is 'split'", () => {
+    mockUseComponentStyle.mockImplementation((_name: string, defaults: Record<string, unknown>) => ({
+      styles: { ...defaults, layout: "split" },
+    }))
+
+    const { container } = render(<NewsletterSection />)
+
+    const contentWrapper = container.querySelector(
+      '[data-component="newsletter"] > div > div:last-child',
+    ) as HTMLElement
+    expect(contentWrapper.className).toContain("md:grid-cols-2")
+  })
+
+  it("hides the logo when showLogo is off even though logoImage is set", () => {
+    mockUseComponentStyle.mockImplementation((_name: string, defaults: Record<string, unknown>) => ({
+      styles: { ...defaults, logoImage: "https://example.com/logo.png", showLogo: false },
+    }))
+
+    const { container } = render(<NewsletterSection />)
+
+    expect(container.querySelector('[aria-label="Logo"]')).toBeNull()
+  })
+})

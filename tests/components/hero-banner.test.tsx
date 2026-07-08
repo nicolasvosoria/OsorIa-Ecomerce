@@ -1447,4 +1447,100 @@ describe("HeroBanner", () => {
     const contentBlock = screen.getByTestId("hero-full-content-block");
     expect(contentBlock).toHaveClass("text-right");
   });
+
+  it("defaults sectionHeight to 'standard', reproducing today's full-image stage size byte-for-byte", () => {
+    mockUseComponentStyle.mockReturnValue({
+      styles: {
+        layoutMode: "full-image",
+        products: [
+          { title: "PREMIUM", buttonText: "Comprar ahora", backgroundImage: "/hero-bg.jpg" },
+        ],
+      },
+    });
+
+    render(<HeroBanner />);
+    const stage = screen.getByTestId("hero-full-content-container").parentElement;
+
+    expect(stage).toHaveClass("min-h-[580px]");
+    expect(stage).toHaveClass("md:aspect-[16/9]");
+    expect(stage).toHaveClass("md:min-h-[700px]");
+    expect(stage).toHaveClass("max-h-[900px]");
+  });
+
+  it("applies the 'fullscreen' sectionHeight preset to the full-image stage", () => {
+    mockUseComponentStyle.mockReturnValue({
+      styles: {
+        layoutMode: "full-image",
+        sectionHeight: "fullscreen",
+        products: [
+          { title: "PREMIUM", buttonText: "Comprar ahora", backgroundImage: "/hero-bg.jpg" },
+        ],
+      },
+    });
+
+    render(<HeroBanner />);
+    const stage = screen.getByTestId("hero-full-content-container").parentElement;
+
+    expect(stage).toHaveClass("min-h-[100svh]");
+    expect(stage).toHaveClass("md:min-h-screen");
+    expect(stage).not.toHaveClass("max-h-[900px]");
+  });
+
+  it("defaults sectionHeight to 'standard', reproducing today's split-mode product-media height byte-for-byte", () => {
+    mockUseComponentStyle.mockReturnValue({
+      styles: {
+        layoutMode: "split",
+        products: [{ title: "PREMIUM", buttonText: "Comprar ahora", image: "/premium.png" }],
+      },
+    });
+
+    render(<HeroBanner />);
+    const productMedia = screen.getByTestId("hero-product-media-0");
+
+    expect(productMedia).toHaveClass("h-[250px]");
+    expect(productMedia).toHaveClass("md:h-[400px]");
+    expect(productMedia).toHaveClass("lg:h-[500px]");
+  });
+
+  it("applies the 'compact' sectionHeight preset to split-mode product media", () => {
+    mockUseComponentStyle.mockReturnValue({
+      styles: {
+        layoutMode: "split",
+        sectionHeight: "compact",
+        products: [{ title: "PREMIUM", buttonText: "Comprar ahora", image: "/premium.png" }],
+      },
+    });
+
+    render(<HeroBanner />);
+    const productMedia = screen.getByTestId("hero-product-media-0");
+
+    expect(productMedia).toHaveClass("h-[200px]");
+  });
+
+  it("shows the bottom bar by default in split layout (today's behavior)", () => {
+    mockUseComponentStyle.mockReturnValue({
+      styles: {
+        layoutMode: "split",
+        products: [{ title: "PREMIUM", buttonText: "Comprar ahora", image: "/premium.png" }],
+      },
+    });
+
+    render(<HeroBanner />);
+
+    expect(screen.getByTestId("hero-bottom-bar")).toBeInTheDocument();
+  });
+
+  it("hides the bottom bar when showBottomBar is false", () => {
+    mockUseComponentStyle.mockReturnValue({
+      styles: {
+        layoutMode: "split",
+        showBottomBar: false,
+        products: [{ title: "PREMIUM", buttonText: "Comprar ahora", image: "/premium.png" }],
+      },
+    });
+
+    render(<HeroBanner />);
+
+    expect(screen.queryByTestId("hero-bottom-bar")).not.toBeInTheDocument();
+  });
 });

@@ -142,3 +142,74 @@ describe("SpecialOffer structure", () => {
     expect(ctaLink.className).toContain("rounded-[var(--button-radius)]")
   })
 })
+
+describe("SpecialOffer options", () => {
+  beforeEach(() => {
+    mockUseAdmin.mockReturnValue({ componentEdits: new Map(), isEditMode: false })
+    mockUseHydratedProductCard.mockReturnValue({ card: offerCard, isLoading: false })
+  })
+
+  it("defaults reproduce today's layout: image left, countdown/urgency bar/badge shown", () => {
+    mockUseComponentStyle.mockImplementation((_name: string, defaults: Record<string, unknown>) => ({
+      styles: { ...defaults, endDate: "2999-01-01T00:00:00.000Z" },
+    }))
+
+    const { container, getByText } = render(<SpecialOffer />)
+
+    const productBox = findByBackgroundColor(
+      container,
+      "var(--sec-specialOffer-product-bg, var(--muted))",
+    )
+    expect(productBox?.className).not.toContain("md:order-2")
+
+    expect(getByText("Electrónica")).toBeDefined()
+    expect(getByText("Ya reclamado")).toBeDefined()
+    expect(getByText("La oferta termina en:")).toBeDefined()
+  })
+
+  it("imageSide=right flips both columns via order classes", () => {
+    mockUseComponentStyle.mockImplementation((_name: string, defaults: Record<string, unknown>) => ({
+      styles: { ...defaults, imageSide: "right" },
+    }))
+
+    const { container } = render(<SpecialOffer />)
+
+    const productBox = findByBackgroundColor(
+      container,
+      "var(--sec-specialOffer-product-bg, var(--muted))",
+    )
+    expect(productBox?.className).toContain("md:order-2")
+
+    const detailsColumn = container.querySelector(
+      '[data-component="specialOffer"] .grid > div:last-child',
+    ) as HTMLElement
+    expect(detailsColumn.className).toContain("md:order-1")
+  })
+
+  it("hides the countdown block when showCountdown is off", () => {
+    mockUseComponentStyle.mockImplementation((_name: string, defaults: Record<string, unknown>) => ({
+      styles: { ...defaults, endDate: "2999-01-01T00:00:00.000Z", showCountdown: false },
+    }))
+
+    const { queryByText } = render(<SpecialOffer />)
+    expect(queryByText("La oferta termina en:")).toBeNull()
+  })
+
+  it("hides the urgency bar when showUrgencyBar is off", () => {
+    mockUseComponentStyle.mockImplementation((_name: string, defaults: Record<string, unknown>) => ({
+      styles: { ...defaults, showUrgencyBar: false },
+    }))
+
+    const { queryByText } = render(<SpecialOffer />)
+    expect(queryByText("Ya reclamado")).toBeNull()
+  })
+
+  it("hides the category badge when showBadge is off", () => {
+    mockUseComponentStyle.mockImplementation((_name: string, defaults: Record<string, unknown>) => ({
+      styles: { ...defaults, showBadge: false },
+    }))
+
+    const { queryByText } = render(<SpecialOffer />)
+    expect(queryByText("Electrónica")).toBeNull()
+  })
+})

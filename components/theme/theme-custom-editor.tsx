@@ -37,7 +37,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ColoresTab, COLOR_SET_LABELS } from "@/components/theme/theme-editor-colors-tab"
 import { FormaTab } from "@/components/theme/theme-editor-shape-tab"
 import { SECTION_NAME_LABELS } from "@/components/theme/theme-editor-sections-tab"
-import { SectionDesignPanel } from "@/components/theme/theme-editor-section-design-panel"
+import {
+  SectionDesignPanel,
+  SectionDesignFieldList,
+  SectionDesignResetAction,
+} from "@/components/theme/theme-editor-section-design-panel"
 import { SectionContentPanel } from "@/components/theme/theme-editor-section-content-panel"
 import { FuentesTab } from "@/components/theme/theme-editor-fonts-tab"
 import { HistorialTab } from "@/components/theme/theme-editor-history-tab"
@@ -54,6 +58,11 @@ const SIDEBAR_TABS = [
   { value: "colores", label: "Colores" },
   { value: "forma", label: "Forma" },
   { value: "fuentes", label: "Fuentes" },
+] as const
+
+const SECTION_PANEL_TABS = [
+  { value: "diseno", label: "Diseño" },
+  { value: "contenido", label: "Contenido" },
 ] as const
 
 type DefinitionUpdater = (prev: ThemeDefinition) => ThemeDefinition
@@ -694,22 +703,45 @@ function SectionPanel({
       />
 
       <div className="p-4 pt-3">
-        <SectionDesignPanel
-          sectionName={sectionName}
-          sections={sections}
-          onUpdateDefinition={onUpdateDefinition}
-          themeColors={themeColors}
-        />
+        <Tabs defaultValue={SECTION_PANEL_TABS[0].value}>
+          <TabsList className="grid w-full grid-cols-2 gap-1">
+            {SECTION_PANEL_TABS.map((tab) => (
+              <TabsTrigger key={tab.value} value={tab.value} className="text-xs">
+                {tab.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
 
-        <div className="mt-6">
-          <SectionContentPanel
-            key={sectionName}
-            sectionName={sectionName}
-            persistedContent={persistedContent}
-            stagedContent={stagedContent}
-            onFieldChange={onContentFieldChange}
-          />
-        </div>
+          <TabsContent value="diseno">
+            <SectionDesignPanel
+              sectionName={sectionName}
+              sections={sections}
+              onUpdateDefinition={onUpdateDefinition}
+              themeColors={themeColors}
+            />
+            <SectionDesignFieldList
+              sectionName={sectionName}
+              persistedContent={persistedContent}
+              stagedContent={stagedContent}
+              onContentFieldChange={onContentFieldChange}
+            />
+            <SectionDesignResetAction
+              sectionName={sectionName}
+              sections={sections}
+              onUpdateDefinition={onUpdateDefinition}
+            />
+          </TabsContent>
+
+          <TabsContent value="contenido">
+            <SectionContentPanel
+              key={sectionName}
+              sectionName={sectionName}
+              persistedContent={persistedContent}
+              stagedContent={stagedContent}
+              onFieldChange={onContentFieldChange}
+            />
+          </TabsContent>
+        </Tabs>
       </div>
     </aside>
   )

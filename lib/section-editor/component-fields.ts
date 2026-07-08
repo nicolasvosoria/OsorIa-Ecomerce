@@ -15,6 +15,36 @@ import { POPULAR_DEFAULTS } from "@/components/sections/popular-items";
 import { PRODUCTS_DEFAULTS } from "@/components/sections/products-grid";
 import { WHYUS_DEFAULTS, type WhyUsIconKey } from "@/components/sections/why-us";
 import { REPOSTERIA_GALLERY_DEFAULTS } from "@/components/sections/reposteria-gallery";
+import {
+  PRODUCTS_CARD_STYLE_OPTIONS,
+  PRODUCTS_COLUMNS_OPTIONS,
+  PRODUCTS_HOVER_EFFECT_OPTIONS,
+} from "@/lib/sections/products-variant";
+import {
+  POPULAR_COLUMNS_OPTIONS,
+  POPULAR_GRID_LAYOUT_OPTIONS,
+  POPULAR_TEXT_PLACEMENT_OPTIONS,
+  POPULAR_TILE_ASPECT_OPTIONS,
+} from "@/lib/sections/popular-variant";
+import {
+  FEATURED_IMAGE_SIDE_OPTIONS,
+  FEATURED_CONTENT_WIDTH_OPTIONS,
+  FEATURED_TEXT_ALIGN_OPTIONS,
+  FEATURED_SECTION_HEIGHT_OPTIONS,
+} from "@/lib/sections/featured-variant";
+import { HERO_SECTION_HEIGHT_OPTIONS } from "@/lib/sections/hero-variant";
+import { SPECIAL_OFFER_IMAGE_SIDE_OPTIONS } from "@/lib/sections/special-offer-variant";
+import {
+  NEWSLETTER_CONTENT_ALIGN_OPTIONS,
+  NEWSLETTER_LAYOUT_OPTIONS,
+} from "@/lib/sections/newsletter-variant";
+import {
+  WHYUS_COLUMNS_OPTIONS,
+  WHYUS_CONTENT_ALIGN_OPTIONS,
+  WHYUS_ICON_POSITION_OPTIONS,
+  WHYUS_ICON_STYLE_OPTIONS,
+  WHYUS_LAYOUT_FORMAT_OPTIONS,
+} from "@/lib/sections/whyus-variant";
 import type { SectionFieldsConfig } from "./types";
 
 const WHYUS_ICON_OPTIONS: Array<{ value: WhyUsIconKey; label: string }> = [
@@ -101,6 +131,31 @@ export const COMPONENT_FIELDS: Record<string, SectionFieldsConfig> = {
           { key: "image", label: "URL de la Imagen", type: "image" },
         ],
       },
+      {
+        key: "sectionHeight",
+        label: "Alto de sección",
+        type: "select",
+        options: [...HERO_SECTION_HEIGHT_OPTIONS],
+        group: "design",
+      },
+      {
+        key: "autoplay",
+        label: "Autoplay del carrusel",
+        type: "toggle",
+        group: "design",
+      },
+      {
+        key: "autoplayInterval",
+        label: "Intervalo (segundos)",
+        type: "number",
+        group: "design",
+      },
+      {
+        key: "showBottomBar",
+        label: "Mostrar barra inferior",
+        type: "toggle",
+        group: "design",
+      },
     ],
     styles: [
       { key: "bgColor", label: "Color de Fondo", type: "color" },
@@ -134,12 +189,60 @@ export const COMPONENT_FIELDS: Record<string, SectionFieldsConfig> = {
       barColor: "#005aa1",
       overlayColor: DEFAULT_HERO_LAYER_MODEL.overlayColor,
       overlayOpacity: String(DEFAULT_HERO_LAYER_MODEL.overlayOpacity),
+      sectionHeight: "standard",
+      autoplay: true,
+      autoplayInterval: 10,
+      showBottomBar: true,
     },
   },
   popular: {
     content: [
       { key: "title", label: "Título de la Sección", type: "text" },
       { key: "priceLabel", label: "Etiqueta de Precio (encabezado)", type: "text" },
+      {
+        key: "columns",
+        label: "Columnas",
+        type: "select",
+        options: [...POPULAR_COLUMNS_OPTIONS],
+        group: "design",
+      },
+      {
+        key: "tileAspect",
+        label: "Aspecto del tile",
+        type: "select",
+        options: [...POPULAR_TILE_ASPECT_OPTIONS],
+        group: "design",
+      },
+      {
+        key: "textPlacement",
+        label: "Posición del texto",
+        type: "select",
+        options: [...POPULAR_TEXT_PLACEMENT_OPTIONS],
+        group: "design",
+      },
+      {
+        key: "showStartingPrice",
+        label: "Mostrar etiqueta 'Desde $X'",
+        type: "toggle",
+        group: "design",
+      },
+      {
+        key: "gridLayout",
+        label: "Layout de la grilla",
+        type: "select",
+        options: [...POPULAR_GRID_LAYOUT_OPTIONS],
+        group: "design",
+      },
+      {
+        key: "categoryTiles",
+        label: "Categorías destacadas (vacío = automático, las primeras del catálogo)",
+        type: "array",
+        isArray: true,
+        arrayFields: [
+          { key: "categoryId", label: "Categoría", type: "category" },
+          { key: "imageUrl", label: "Imagen del tile (opcional)", type: "image" },
+        ],
+      },
     ],
     styles: [
       { key: "bgColor", label: "Color de Fondo", type: "color" },
@@ -164,22 +267,58 @@ export const COMPONENT_FIELDS: Record<string, SectionFieldsConfig> = {
           { value: "featured", label: "Destacados" },
         ],
       },
+      {
+        key: "itemCount",
+        label: "Cantidad de productos",
+        type: "select",
+        options: [
+          { value: "4", label: "4" },
+          { value: "6", label: "6" },
+          { value: "8", label: "8" },
+          { value: "12", label: "12" },
+        ],
+      },
+      {
+        key: "columns",
+        label: "Columnas",
+        type: "select",
+        options: [...PRODUCTS_COLUMNS_OPTIONS],
+        group: "design",
+      },
+      {
+        key: "mediaPosition",
+        label: "Posición de imagen",
+        type: "select",
+        options: [
+          { value: "top", label: "Arriba" },
+          { value: "bottom", label: "Abajo" },
+        ],
+        group: "design",
+      },
+      {
+        key: "cardStyle",
+        label: "Estilo de tarjeta",
+        type: "select",
+        options: [...PRODUCTS_CARD_STYLE_OPTIONS],
+        group: "design",
+      },
+      {
+        key: "hoverEffect",
+        label: "Efecto al pasar el mouse",
+        type: "select",
+        options: [...PRODUCTS_HOVER_EFFECT_OPTIONS],
+        group: "design",
+      },
+      { key: "showCategory", label: "Mostrar Categoría", type: "toggle", group: "design" },
+      { key: "showPrice", label: "Mostrar Precio", type: "toggle", group: "design" },
+      { key: "showDescription", label: "Mostrar descripción", type: "toggle", group: "design" },
+      { key: "showCta", label: "Mostrar botón", type: "toggle", group: "design" },
     ],
     styles: [
       { key: "bgColor", label: "Color de Fondo", type: "color" },
       { key: "textColor", label: "Color de Texto", type: "color" },
       { key: "cardBgColor", label: "Color de Fondo de la Tarjeta", type: "color" },
       { key: "priceColor", label: "Color del Precio", type: "color" },
-      {
-        key: "columns",
-        label: "Columnas",
-        type: "select",
-        options: [
-          { value: "2", label: "2" },
-          { value: "3", label: "3" },
-          { value: "4", label: "4" },
-        ],
-      },
       {
         key: "cornerRadius",
         label: "Radio de Esquina",
@@ -189,24 +328,6 @@ export const COMPONENT_FIELDS: Record<string, SectionFieldsConfig> = {
           { value: "md", label: "Mediano" },
           { value: "lg", label: "Grande" },
           { value: "xl", label: "Extra" },
-        ],
-      },
-      {
-        key: "showCategory",
-        label: "Mostrar Categoría",
-        type: "select",
-        options: [
-          { value: "si", label: "Sí" },
-          { value: "no", label: "No" },
-        ],
-      },
-      {
-        key: "showPrice",
-        label: "Mostrar Precio",
-        type: "select",
-        options: [
-          { value: "si", label: "Sí" },
-          { value: "no", label: "No" },
         ],
       },
     ],
@@ -226,6 +347,34 @@ export const COMPONENT_FIELDS: Record<string, SectionFieldsConfig> = {
         key: "productId",
         label: "Producto (elegir del catálogo)",
         type: "product",
+      },
+      {
+        key: "imageSide",
+        label: "Lado de la imagen",
+        type: "select",
+        options: [...FEATURED_IMAGE_SIDE_OPTIONS],
+        group: "design",
+      },
+      {
+        key: "contentWidth",
+        label: "Proporción imagen / contenido",
+        type: "select",
+        options: [...FEATURED_CONTENT_WIDTH_OPTIONS],
+        group: "design",
+      },
+      {
+        key: "textAlign",
+        label: "Alineación del texto",
+        type: "select",
+        options: [...FEATURED_TEXT_ALIGN_OPTIONS],
+        group: "design",
+      },
+      {
+        key: "sectionHeight",
+        label: "Alto de la sección",
+        type: "select",
+        options: [...FEATURED_SECTION_HEIGHT_OPTIONS],
+        group: "design",
       },
     ],
     styles: [
@@ -262,6 +411,31 @@ export const COMPONENT_FIELDS: Record<string, SectionFieldsConfig> = {
       { key: "claimedPercent", label: "Porcentaje Reclamado", type: "number" },
       { key: "countdownLabel", label: "Etiqueta de Cuenta Regresiva", type: "text" },
       { key: "linkText", label: "Texto del Botón", type: "text" },
+      {
+        key: "imageSide",
+        label: "Lado de la imagen",
+        type: "select",
+        options: [...SPECIAL_OFFER_IMAGE_SIDE_OPTIONS],
+        group: "design",
+      },
+      {
+        key: "showCountdown",
+        label: "Mostrar cuenta regresiva",
+        type: "toggle",
+        group: "design",
+      },
+      {
+        key: "showUrgencyBar",
+        label: "Mostrar barra de urgencia",
+        type: "toggle",
+        group: "design",
+      },
+      {
+        key: "showBadge",
+        label: "Mostrar etiqueta de categoría",
+        type: "toggle",
+        group: "design",
+      },
     ],
     styles: [
       { key: "bgColor", label: "Color de Fondo de la Tarjeta", type: "color" },
@@ -293,6 +467,26 @@ export const COMPONENT_FIELDS: Record<string, SectionFieldsConfig> = {
       { key: "buttonText", label: "Texto del Botón", type: "text" },
       { key: "backgroundImage", label: "Imagen de Fondo", type: "image" },
       { key: "logoImage", label: "Logo (opcional)", type: "image" },
+      {
+        key: "contentAlign",
+        label: "Alineación del contenido",
+        type: "select",
+        options: [...NEWSLETTER_CONTENT_ALIGN_OPTIONS],
+        group: "design",
+      },
+      {
+        key: "layout",
+        label: "Disposición",
+        type: "select",
+        options: [...NEWSLETTER_LAYOUT_OPTIONS],
+        group: "design",
+      },
+      {
+        key: "showLogo",
+        label: "Mostrar logo",
+        type: "toggle",
+        group: "design",
+      },
     ],
     styles: [
       { key: "overlayColor", label: "Color del Overlay", type: "color" },
@@ -325,6 +519,41 @@ export const COMPONENT_FIELDS: Record<string, SectionFieldsConfig> = {
             options: WHYUS_ICON_OPTIONS,
           },
         ],
+      },
+      {
+        key: "columns",
+        label: "Columnas",
+        type: "select",
+        options: [...WHYUS_COLUMNS_OPTIONS],
+        group: "design",
+      },
+      {
+        key: "iconStyle",
+        label: "Estilo del ícono",
+        type: "select",
+        options: [...WHYUS_ICON_STYLE_OPTIONS],
+        group: "design",
+      },
+      {
+        key: "contentAlign",
+        label: "Alineación del contenido",
+        type: "select",
+        options: [...WHYUS_CONTENT_ALIGN_OPTIONS],
+        group: "design",
+      },
+      {
+        key: "iconPosition",
+        label: "Posición del ícono",
+        type: "select",
+        options: [...WHYUS_ICON_POSITION_OPTIONS],
+        group: "design",
+      },
+      {
+        key: "layoutFormat",
+        label: "Formato",
+        type: "select",
+        options: [...WHYUS_LAYOUT_FORMAT_OPTIONS],
+        group: "design",
       },
     ],
     styles: [

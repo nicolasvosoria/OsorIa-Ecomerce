@@ -1,6 +1,10 @@
 import Link from "next/link"
 import type { ReactNode } from "react"
 import { VisualProductCardImage } from "@/components/products/visual-product-card-image"
+import {
+  type ProductsCardStyle,
+  type ProductsHoverEffect,
+} from "@/lib/sections/products-variant"
 import type { CommerceProductBadge, CommerceProductCard } from "@/lib/types/products"
 
 interface VisualProductCardProps {
@@ -22,7 +26,21 @@ interface VisualProductCardProps {
   imageBlendsWithCard?: boolean
   showCategory?: boolean
   showPrice?: boolean
+  /** Defaults to "shadow", the card's original look (theme shadow token, no border). */
+  cardStyle?: ProductsCardStyle
+  /** Defaults to "lift", the card's original hover behavior (translate + elevated shadow). */
+  hoverEffect?: ProductsHoverEffect
 }
+
+const CARD_STYLE_CLASS: Record<ProductsCardStyle, string> = {
+  shadow: "shadow-[var(--shadow-card,none)]",
+  bordered: "border border-border",
+  flat: "",
+}
+
+const HOVER_LIFT_CLASS = "hover:-translate-y-0.5 hover:shadow-[var(--shadow-elevated,none)]"
+const HOVER_ZOOM_MEDIA_CLASS = "overflow-hidden"
+const HOVER_ZOOM_IMAGE_CLASS = "transition-transform duration-300 group-hover/prodcard:scale-110"
 
 const badgeToneClass: Record<NonNullable<CommerceProductBadge["tone"]>, string> = {
   default: "bg-primary text-primary-foreground",
@@ -45,9 +63,15 @@ export function VisualProductCard({
   imageBlendsWithCard = false,
   showCategory = true,
   showPrice = true,
+  cardStyle = "shadow",
+  hoverEffect = "lift",
 }: VisualProductCardProps) {
   const isOverlay = variant === "overlay"
   const imageAlt = product.imageAlt || product.title
+  const cardHoverClass = hoverEffect === "lift" ? HOVER_LIFT_CLASS : ""
+  const isZoomHover = hoverEffect === "zoom"
+  const mediaZoomClass = isZoomHover ? HOVER_ZOOM_MEDIA_CLASS : ""
+  const cardGroupClass = isZoomHover ? "group group/prodcard" : "group"
 
   const media = (
     <div className="relative">
@@ -70,14 +94,25 @@ export function VisualProductCard({
         aria-label={`Ver ${product.title}`}
       >
         <div
-          className={`${isOverlay ? "aspect-[4/3]" : "aspect-square"} flex items-center justify-center p-4 ${imageBlendsWithCard ? "" : "bg-background"}`}
+          className={`${isOverlay ? "aspect-[4/3]" : "aspect-square"} flex items-center justify-center p-4 ${imageBlendsWithCard ? "" : "bg-background"} ${mediaZoomClass}`}
         >
-          <VisualProductCardImage
-            src={product.imageUrl}
-            alt={imageAlt}
-            title={product.title}
-            isOverlay={isOverlay}
-          />
+          {isZoomHover ? (
+            <div className={`h-full w-full ${HOVER_ZOOM_IMAGE_CLASS}`}>
+              <VisualProductCardImage
+                src={product.imageUrl}
+                alt={imageAlt}
+                title={product.title}
+                isOverlay={isOverlay}
+              />
+            </div>
+          ) : (
+            <VisualProductCardImage
+              src={product.imageUrl}
+              alt={imageAlt}
+              title={product.title}
+              isOverlay={isOverlay}
+            />
+          )}
         </div>
       </Link>
     </div>
@@ -85,7 +120,7 @@ export function VisualProductCard({
 
   return (
     <article
-      className={`group relative overflow-hidden ${radiusClass} shadow-[var(--shadow-card,none)] ${cardBackground ? "" : "bg-muted"} text-card-foreground transition-transform duration-300 hover:-translate-y-0.5 hover:shadow-[var(--shadow-elevated,none)] focus-within:ring-2 focus-within:ring-primary/50 ${className}`}
+      className={`${cardGroupClass} relative overflow-hidden ${radiusClass} ${CARD_STYLE_CLASS[cardStyle]} ${cardBackground ? "" : "bg-muted"} text-card-foreground transition-transform duration-300 ${cardHoverClass} focus-within:ring-2 focus-within:ring-primary/50 ${className}`}
       style={cardBackground ? { backgroundColor: cardBackground } : undefined}
     >
       {mediaPosition === "top" ? media : null}

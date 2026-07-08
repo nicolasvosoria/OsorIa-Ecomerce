@@ -1,4 +1,16 @@
 import type { ReactNode } from "react"
+import { RotateCcw } from "lucide-react"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { ColorField } from "@/components/theme/theme-editor-fields"
 import { InfoTooltip } from "@/components/theme/info-tooltip"
@@ -6,6 +18,8 @@ import {
   SECTION_COLOR_KEY_LABELS,
   humanizeCamelCase,
 } from "@/components/theme/theme-editor-sections-tab"
+import { ContentFieldList } from "@/components/theme/theme-editor-section-content-panel"
+import { COMPONENT_FIELDS } from "@/lib/section-editor/component-fields"
 import { Label } from "@/components/ui/label"
 import {
   Select,
@@ -64,10 +78,6 @@ export function SectionDesignPanel({
 }: SectionDesignPanelProps) {
   const styleKeys = SECTION_STYLE_KEYS[sectionName] ?? []
   const sectionOverrides = sections?.[sectionName] ?? {}
-  const hasOverride = styleKeys.some((styleKey) => {
-    const value = sectionOverrides[sectionDefinitionKey(styleKey)]
-    return value !== undefined && value !== ""
-  })
 
   function writeField(definitionKey: string, value: string) {
     onUpdateDefinition((prev) => ({
@@ -77,15 +87,6 @@ export function SectionDesignPanel({
         [sectionName]: { ...prev.sections?.[sectionName], [definitionKey]: value },
       },
     }))
-  }
-
-  function resetToTheme() {
-    onUpdateDefinition((prev) => {
-      if (!prev.sections?.[sectionName]) return prev
-      const nextSections = { ...prev.sections }
-      delete nextSections[sectionName]
-      return { ...prev, sections: nextSections }
-    })
   }
 
   if (styleKeys.length === 0) {
@@ -98,20 +99,6 @@ export function SectionDesignPanel({
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="text-xs font-semibold uppercase text-muted-foreground">Diseño</h3>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-auto shrink-0 p-0 text-xs font-normal"
-          disabled={!hasOverride}
-          onClick={resetToTheme}
-          title="Quita las personalizaciones de esta sección y vuelve a usar los colores del diseño general."
-        >
-          Restablecer
-        </Button>
-      </div>
-
       <p className="text-xs text-muted-foreground">
         Personaliza el diseño solo de esta sección. Cada campo usa el color del diseño general hasta que lo cambies.
       </p>
@@ -152,6 +139,119 @@ export function SectionDesignPanel({
           )
         })}
       </div>
+    </div>
+  )
+}
+
+interface SectionDesignResetActionProps {
+  sectionName: string
+  sections: ThemeDefinition["sections"]
+  onUpdateDefinition: (updater: DefinitionUpdater) => void
+}
+
+/**
+ * The "Restablecer" control for a section's theme-override design fields
+ * (the colors/corner-radius overrides in `ThemeDefinition.sections[sectionName]`
+ * that `SectionDesignPanel` above renders). Split out so the caller can place
+ * it AFTER `SectionDesignFieldList`'s layout/variant fields — the user wants
+ * Restablecer as the bottom-most control of the Diseño tab, not sandwiched
+ * between the colors block and the layout options. Resets only the theme
+ * override for this section; layout/variant content fields (design-group,
+ * staged through `onContentFieldChange`) are untouched.
+ */
+export function SectionDesignResetAction({
+  sectionName,
+  sections,
+  onUpdateDefinition,
+}: SectionDesignResetActionProps) {
+  const styleKeys = SECTION_STYLE_KEYS[sectionName] ?? []
+  if (styleKeys.length === 0) return null
+
+  const sectionOverrides = sections?.[sectionName] ?? {}
+  const hasOverride = styleKeys.some((styleKey) => {
+    const value = sectionOverrides[sectionDefinitionKey(styleKey)]
+    return value !== undefined && value !== ""
+  })
+
+  function resetToTheme() {
+    onUpdateDefinition((prev) => {
+      if (!prev.sections?.[sectionName]) return prev
+      const nextSections = { ...prev.sections }
+      delete nextSections[sectionName]
+      return { ...prev, sections: nextSections }
+    })
+  }
+
+  return (
+    <div className="mt-6 flex justify-end border-t pt-4">
+      <AlertDialog>
+        <AlertDialogTrigger asChild>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!hasOverride}
+            title="Quita las personalizaciones de esta sección y vuelve a usar los colores del diseño general."
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            Restablecer
+          </Button>
+        </AlertDialogTrigger>
+        <AlertDialogContent className="editor-chrome">
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Restablecer el diseño de esta sección?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se perderán los cambios de diseño hechos solo para esta sección y volverá a usar el diseño general.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={resetToTheme}>Restablecer</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  )
+}
+
+interface SectionDesignFieldListProps {
+  sectionName: string
+  persistedContent: Record<string, any>
+  stagedContent: Record<string, any>
+  onContentFieldChange: (key: string, value: any) => void
+}
+
+/**
+ * The layout/variant fields declared `group: "design"` in
+ * `component-fields.ts` (e.g. products' `columns`/`cardStyle`, popular's
+ * `tileAspect`) — real CONTENT fields that render in the Diseño tab instead
+ * of Contenido. Staged through the same content path as Contenido
+ * (`onContentFieldChange` -> `workingContent` -> preview -> persisted on
+ * Apply), never through `onUpdateDefinition`/`ThemeDefinition.sections`, so
+ * applying a theme never resets them. Renders nothing once a section has no
+ * design-group fields.
+ */
+export function SectionDesignFieldList({
+  sectionName,
+  persistedContent,
+  stagedContent,
+  onContentFieldChange,
+}: SectionDesignFieldListProps) {
+  const config = COMPONENT_FIELDS[sectionName]
+  const designFields = config?.content.filter((field) => field.group === "design") ?? []
+
+  if (designFields.length === 0) return null
+
+  const values = { ...config?.defaults, ...persistedContent, ...stagedContent }
+
+  return (
+    <div className="mt-6 space-y-3 border-t pt-4">
+      <p className="text-xs font-semibold uppercase text-muted-foreground">Opciones de sección</p>
+      <ContentFieldList
+        sectionName={sectionName}
+        fields={designFields}
+        values={values}
+        onFieldChange={onContentFieldChange}
+      />
     </div>
   )
 }

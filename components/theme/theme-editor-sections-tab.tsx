@@ -1,10 +1,8 @@
-export const SECTION_NAME_LABELS: Record<string, string> = {
-  featured: "Destacados",
-  specialOffer: "Oferta especial",
-  newsletter: "Newsletter",
-  hero: "Hero",
-  popular: "Populares",
-}
+import { SECTIONS } from "@/lib/section-editor/sections-registry"
+
+export const SECTION_NAME_LABELS: Record<string, string> = Object.fromEntries(
+  Object.entries(SECTIONS).map(([key, meta]) => [key, meta.label]),
+)
 
 export const SECTION_COLOR_KEY_LABELS: Record<string, string> = {
   bg: "Fondo",

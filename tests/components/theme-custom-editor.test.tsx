@@ -109,6 +109,8 @@ vi.mock("@/components/theme/theme-editor-history-tab", () => ({
 }));
 vi.mock("@/components/theme/theme-editor-section-design-panel", () => ({
   SectionDesignPanel: () => null,
+  SectionDesignFieldList: () => null,
+  SectionDesignResetAction: () => null,
 }));
 // The one panel this test cares about: expose its `onFieldChange` seam via a
 // simple button so the test can stage a content edit without depending on
@@ -145,6 +147,7 @@ describe("ThemeCustomEditor handleApply (D16 unified publish)", () => {
     render(<ThemeCustomEditor />);
 
     selectHeroSection();
+    await userEvent.click(await screen.findByRole("tab", { name: "Contenido" }));
     await userEvent.click(await screen.findByText("Editar contenido"));
 
     await userEvent.click(screen.getByRole("button", { name: /Aplicar/i }));
@@ -167,6 +170,7 @@ describe("ThemeCustomEditor handleApply (D16 unified publish)", () => {
     render(<ThemeCustomEditor />);
 
     selectHeroSection();
+    await userEvent.click(await screen.findByRole("tab", { name: "Contenido" }));
     await userEvent.click(await screen.findByText("Editar contenido"));
 
     await userEvent.click(screen.getByRole("button", { name: /Aplicar/i }));
@@ -184,6 +188,7 @@ describe("ThemeCustomEditor handleApply (D16 unified publish)", () => {
     render(<ThemeCustomEditor />);
 
     selectHeroSection();
+    await userEvent.click(await screen.findByRole("tab", { name: "Contenido" }));
     await userEvent.click(await screen.findByText("Editar contenido"));
 
     await userEvent.click(screen.getByRole("button", { name: /Aplicar/i }));

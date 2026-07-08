@@ -12,6 +12,7 @@ export interface SectionFieldOption {
 export interface SectionArrayField {
   key: string;
   label: string;
+  /** "text" | "textarea" | "select" | "image" | "product" | "category" | "datetime" | "number" | "toggle" (boolean switch). */
   type: string;
   options?: SectionFieldOption[];
 }
@@ -19,10 +20,20 @@ export interface SectionArrayField {
 export interface SectionContentField {
   key: string;
   label: string;
+  /** "text" | "textarea" | "select" | "image" | "product" | "category" | "datetime" | "number" | "array" | "toggle" (boolean switch). */
   type: string;
   isArray?: boolean;
   arrayFields?: SectionArrayField[];
   options?: SectionFieldOption[];
+  /**
+   * Which section-panel tab renders this field: `"design"` for the Diseño
+   * tab (a layout/variant choice, e.g. columns or a show/hide toggle),
+   * anything else — including unset — for the Contenido tab (real content:
+   * titles, copy, images, picked items). Storage is unaffected either way:
+   * every content field, design-routed or not, still lives in
+   * `component_styles.variables`, never in `ThemeDefinition.sections`.
+   */
+  group?: "design" | "content";
 }
 
 export interface SectionStyleField {
