@@ -3,8 +3,9 @@ import {
   type RuntimeTheme,
 } from "@/lib/theme-font/runtime-contract";
 import type { ThemeMode } from "@/lib/types/theme";
+import type { HomeSectionEntry } from "@/lib/supabase/types";
 
-const THEME_PREVIEW_QUERY_PARAM = "themePreview";
+export const THEME_PREVIEW_QUERY_PARAM = "themePreview";
 export const THEME_PREVIEW_MESSAGE_SOURCE = "osoria-theme-preview";
 
 export interface ThemePreviewMessage {
@@ -156,4 +157,39 @@ export function parseThemePreviewContentMessage(
     componentName: raw.componentName,
     edits: edits as Record<string, unknown>,
   };
+}
+
+export const THEME_PREVIEW_COMPOSITION_SOURCE = "osoria-theme-composition";
+
+export interface ThemePreviewCompositionMessage {
+  source: typeof THEME_PREVIEW_COMPOSITION_SOURCE;
+  composition: HomeSectionEntry[];
+}
+
+function isHomeSectionEntry(value: unknown): value is HomeSectionEntry {
+  if (typeof value !== "object" || value === null) return false;
+
+  const raw = value as Record<string, unknown>;
+  return typeof raw.key === "string" && typeof raw.enabled === "boolean";
+}
+
+/**
+ * The composition is re-applied as-is by `HomeComposition` (which already
+ * skips entries with no matching section node), so this only confirms the
+ * payload's shape: an array of `{ key: string; enabled: boolean }` entries.
+ */
+export function parseThemePreviewCompositionMessage(
+  data: unknown,
+): ThemePreviewCompositionMessage | null {
+  if (typeof data !== "object" || data === null) return null;
+
+  const raw = data as Record<string, unknown>;
+  if (raw.source !== THEME_PREVIEW_COMPOSITION_SOURCE) return null;
+
+  const composition = raw.composition;
+  if (!Array.isArray(composition) || !composition.every(isHomeSectionEntry)) {
+    return null;
+  }
+
+  return { source: THEME_PREVIEW_COMPOSITION_SOURCE, composition };
 }

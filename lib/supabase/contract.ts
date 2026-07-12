@@ -14,6 +14,7 @@ export const ECOMMERCE_TABLES = {
   appThemeVersions: "app_theme_versions",
   appThemes: "app_themes",
   componentStyles: "component_styles",
+  homeSectionLayout: "home_section_layout",
   itemCategories: "item_categories",
   itemImages: "item_images",
   itemMetrics: "item_metrics",

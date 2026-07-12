@@ -1,26 +1,40 @@
 import { Suspense } from "react";
-import { HeroBanner } from "@/components/sections/hero-banner";
 import { ReposteriaHero } from "@/components/sections/reposteria-hero";
 import { ReposteriaGallery } from "@/components/sections/reposteria-gallery";
 import { ReposteriaAbout } from "@/components/sections/reposteria-about";
-import { PopularItemsWrapper } from "@/components/sections/popular-items-wrapper";
 import { ProductsGridWrapper } from "@/components/sections/products-grid-wrapper";
-import { FeaturedProduct } from "@/components/sections/featured-product";
-import { NewsletterSection } from "@/components/sections/newsletter-section";
-import { SpecialOffer } from "@/components/sections/special-offer";
-import { WhyUs } from "@/components/sections/why-us";
 import { FooterNew } from "@/components/sections/footer-new";
 import { EditableWrapper } from "@/components/admin/editable-wrapper";
 import { HomeDiscountPopup } from "@/components/home-discount-popup";
+import {
+  HomeComposition,
+  type HomeCompositionSection,
+} from "@/components/sections/home-composition";
 import { getStoreFromServer } from "@/lib/supabase/store-api";
+import { getHomeComposition } from "@/lib/supabase/home-composition-api";
 import { sectionLabel } from "@/lib/section-editor/sections-registry";
+import { homeSectionRenderers } from "@/lib/sections/home-section-renderers";
+import {
+  COMPOSABLE_SECTION_KEYS,
+  type ComposableSectionKey,
+} from "@/lib/sections/home-composition";
+
+interface ConditionalHomeContentProps {
+  // True inside the `/admin/theme` preview iframe (`?themePreview=1`, read by
+  // `app/page.tsx`). Renders every composable section — not just the enabled
+  // ones — so the client-side `HomeComposition` has every node on hand to
+  // reorder/hide/add/remove live, without a reload.
+  previewMode?: boolean;
+}
 
 /**
  * Componente que muestra contenido diferente según la tienda
  * Para repostería muestra diseño inspirado en nicolukas.com
  * Server Component que obtiene el store desde el servidor
  */
-export async function ConditionalHomeContent() {
+export async function ConditionalHomeContent({
+  previewMode = false,
+}: ConditionalHomeContentProps = {}) {
   const store = await getStoreFromServer();
 
   // Si es la tienda de repostería, mostrar diseño personalizado
@@ -74,59 +88,32 @@ export async function ConditionalHomeContent() {
     );
   }
 
-  // Página normal para otras tiendas
+  // Página normal para otras tiendas: orden y visibilidad data-driven
+  const composition = await getHomeComposition();
+
+  const keys = previewMode
+    ? COMPOSABLE_SECTION_KEYS
+    : composition.filter((entry) => entry.enabled).map((entry) => entry.key);
+
+  const sections = keys
+    .map((key): HomeCompositionSection | null => {
+      const render = homeSectionRenderers[key as ComposableSectionKey];
+      if (!render) return null;
+      return {
+        key,
+        node: (
+          <EditableWrapper componentName={key} label={sectionLabel(key)}>
+            {render()}
+          </EditableWrapper>
+        ),
+      };
+    })
+    .filter((s): s is HomeCompositionSection => s !== null);
+
   return (
     <>
       <main className="flex flex-col">
-        <EditableWrapper componentName="hero" label={sectionLabel("hero")}>
-          <HeroBanner />
-        </EditableWrapper>
-        <EditableWrapper componentName="popular" label={sectionLabel("popular")}>
-          <Suspense
-            fallback={
-              <div className="py-12 text-center text-muted-foreground">
-                Cargando productos populares...
-              </div>
-            }
-          >
-            <PopularItemsWrapper />
-          </Suspense>
-        </EditableWrapper>
-        <EditableWrapper
-          componentName="products"
-          label={sectionLabel("products")}
-        >
-          <Suspense
-            fallback={
-              <div className="py-12 text-center text-muted-foreground">
-                Cargando productos...
-              </div>
-            }
-          >
-            <ProductsGridWrapper />
-          </Suspense>
-        </EditableWrapper>
-        <EditableWrapper
-          componentName="featured"
-          label={sectionLabel("featured")}
-        >
-          <FeaturedProduct />
-        </EditableWrapper>
-        <EditableWrapper
-          componentName="specialOffer"
-          label={sectionLabel("specialOffer")}
-        >
-          <SpecialOffer />
-        </EditableWrapper>
-        <EditableWrapper componentName="whyus" label={sectionLabel("whyus")}>
-          <WhyUs />
-        </EditableWrapper>
-        <EditableWrapper
-          componentName="newsletter"
-          label={sectionLabel("newsletter")}
-        >
-          <NewsletterSection />
-        </EditableWrapper>
+        <HomeComposition sections={sections} composition={composition} previewMode={previewMode} />
         <EditableWrapper componentName="footer" label={sectionLabel("footer")}>
           <FooterNew />
         </EditableWrapper>

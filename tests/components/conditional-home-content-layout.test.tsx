@@ -15,6 +15,15 @@ vi.mock("@/lib/supabase/store-api", () => ({
   getStoreFromServer: () => mockGetStoreFromServer(),
 }));
 
+vi.mock("@/lib/supabase/home-composition-api", async () => {
+  const { DEFAULT_HOME_COMPOSITION } = await import(
+    "@/lib/sections/home-composition"
+  );
+  return {
+    getHomeComposition: () => Promise.resolve(DEFAULT_HOME_COMPOSITION),
+  };
+});
+
 vi.mock("@/components/admin/editable-wrapper", () => ({
   EditableWrapper: ({
     componentName,
@@ -85,13 +94,28 @@ describe("ConditionalHomeContent layout", () => {
   it("includes reference special offer and newsletter sections on the default home path", async () => {
     mockGetStoreFromServer.mockResolvedValue({ subdomain: "default" });
 
-    render(await ConditionalHomeContent());
+    const { container } = render(await ConditionalHomeContent());
 
     expect(screen.getByTestId("hero-banner")).toBeInTheDocument();
     expect(screen.getByTestId("special-offer")).toBeInTheDocument();
     expect(screen.getByTestId("newsletter")).toBeInTheDocument();
     expect(screen.getByTestId("discount-popup")).toBeInTheDocument();
     expect(screen.queryByTestId("reposteria-hero")).not.toBeInTheDocument();
+
+    const order = Array.from(
+      container.querySelectorAll("[data-testid]"),
+    ).map((el) => el.getAttribute("data-testid"));
+    expect(order).toEqual([
+      "hero-banner",
+      "popular-items",
+      "products-grid",
+      "featured-product",
+      "special-offer",
+      "why-us",
+      "newsletter",
+      "footer",
+      "discount-popup",
+    ]);
   });
 
   it("keeps the reposteria path on its dedicated layout", async () => {

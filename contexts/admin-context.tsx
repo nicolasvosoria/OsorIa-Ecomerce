@@ -10,9 +10,11 @@ import {
 import { useAuth } from "@/contexts/auth-context";
 import { isCurrentUserAdmin } from "@/lib/supabase/permissions-api";
 import type { HeroLayerId } from "@/lib/hero/hero-layer-model";
+import type { HomeSectionEntry } from "@/lib/supabase/types";
 import {
   isThemePreviewMode,
   parseThemePreviewContentMessage,
+  parseThemePreviewCompositionMessage,
 } from "@/lib/theme-font/preview-mode";
 
 interface AdminContextType {
@@ -27,6 +29,7 @@ interface AdminContextType {
   selectedHeroHotspotId: string | null;
   setSelectedHeroHotspotId: (hotspotId: string | null) => void;
   componentEdits: Map<string, Record<string, any>>;
+  previewComposition: HomeSectionEntry[] | null;
   updateComponentEdit: (componentName: string, key: string, value: any) => void;
   scheduleComponentEdit: (
     componentName: string,
@@ -57,6 +60,9 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   const [componentEdits, setComponentEdits] = useState<
     Map<string, Record<string, any>>
   >(new Map());
+  const [previewComposition, setPreviewComposition] = useState<
+    HomeSectionEntry[] | null
+  >(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const { isAuthenticated, user } = useAuth();
   const pendingEditsRef = useState(
@@ -101,31 +107,39 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   }, [isAuthenticated, user]);
 
   // Preview mode: the theme customizer's parent window (components/theme/
-  // theme-custom-editor.tsx) pushes staged CONTENT edits over postMessage for
-  // live preview. Applied directly via `setComponentEdits`, bypassing the
-  // `isAdmin` gate below entirely — mirrors the preview-message listeners in
-  // theme-context.tsx/font-context.tsx and never runs outside the customizer
-  // iframe (`isThemePreviewMode()`), so the real storefront's admin gating is
-  // untouched.
+  // theme-custom-editor.tsx) pushes staged CONTENT edits and the staged home
+  // composition (order/visibility) over postMessage for live preview.
+  // Applied directly via `setComponentEdits`/`setPreviewComposition`,
+  // bypassing the `isAdmin` gate below entirely — mirrors the preview-message
+  // listeners in theme-context.tsx/font-context.tsx and never runs outside
+  // the customizer iframe (`isThemePreviewMode()`), so the real storefront's
+  // admin gating is untouched.
   useEffect(() => {
     if (!isThemePreviewMode()) return;
 
-    const handlePreviewContentMessage = (event: MessageEvent) => {
+    const handlePreviewMessage = (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return;
 
-      const message = parseThemePreviewContentMessage(event.data);
-      if (!message) return;
+      const contentMessage = parseThemePreviewContentMessage(event.data);
+      if (contentMessage) {
+        setComponentEdits((prev) => {
+          const newMap = new Map(prev);
+          newMap.set(contentMessage.componentName, contentMessage.edits);
+          return newMap;
+        });
+        return;
+      }
 
-      setComponentEdits((prev) => {
-        const newMap = new Map(prev);
-        newMap.set(message.componentName, message.edits);
-        return newMap;
-      });
+      const compositionMessage = parseThemePreviewCompositionMessage(
+        event.data,
+      );
+      if (compositionMessage) {
+        setPreviewComposition(compositionMessage.composition);
+      }
     };
 
-    window.addEventListener("message", handlePreviewContentMessage);
-    return () =>
-      window.removeEventListener("message", handlePreviewContentMessage);
+    window.addEventListener("message", handlePreviewMessage);
+    return () => window.removeEventListener("message", handlePreviewMessage);
   }, []);
 
   const toggleEditMode = () => {
@@ -309,6 +323,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
         selectedHeroHotspotId,
         setSelectedHeroHotspotId,
         componentEdits,
+        previewComposition,
         updateComponentEdit,
         scheduleComponentEdit,
         flushScheduledEdits,
@@ -338,6 +353,7 @@ export function useAdmin() {
       selectedHeroHotspotId: null,
       setSelectedHeroHotspotId: () => {},
       componentEdits: new Map(),
+      previewComposition: null,
       updateComponentEdit: () => {},
       scheduleComponentEdit: () => {},
       flushScheduledEdits: () => {},

@@ -336,6 +336,42 @@ export type Database = {
           },
         ]
       }
+      home_section_layout: {
+        Row: {
+          id: number
+          sections: Json
+          store_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          id?: number
+          sections: Json
+          store_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          id?: number
+          sections?: Json
+          store_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "home_section_layout_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: true
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "home_section_layout_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: true
+            referencedRelation: "stores_legacy"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventory_movements: {
         Row: {
           created_at: string | null

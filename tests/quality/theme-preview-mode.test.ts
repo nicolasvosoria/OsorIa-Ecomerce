@@ -7,11 +7,13 @@ import {
   parseThemePreviewSelectMessage,
   parseThemePreviewSelectionMessage,
   parseThemePreviewContentMessage,
+  parseThemePreviewCompositionMessage,
   THEME_PREVIEW_MESSAGE_SOURCE,
   THEME_PREVIEW_FONT_SOURCE,
   THEME_PREVIEW_SELECT_SOURCE,
   THEME_PREVIEW_SELECTION_SOURCE,
   THEME_PREVIEW_CONTENT_SOURCE,
+  THEME_PREVIEW_COMPOSITION_SOURCE,
 } from "@/lib/theme-font/preview-mode";
 import { DEFAULT_RUNTIME_THEME } from "@/lib/theme-font/runtime-contract";
 
@@ -248,5 +250,71 @@ describe("parseThemePreviewContentMessage", () => {
   it("rejects non-object payloads", () => {
     expect(parseThemePreviewContentMessage(null)).toBeNull();
     expect(parseThemePreviewContentMessage("osoria-theme-content")).toBeNull();
+  });
+});
+
+describe("parseThemePreviewCompositionMessage", () => {
+  const validPayload = {
+    source: THEME_PREVIEW_COMPOSITION_SOURCE,
+    composition: [
+      { key: "hero", enabled: true },
+      { key: "popular", enabled: false },
+    ],
+  };
+
+  it("accepts a well-formed composition message", () => {
+    const parsed = parseThemePreviewCompositionMessage(validPayload);
+    expect(parsed).not.toBeNull();
+    expect(parsed?.composition).toEqual(validPayload.composition);
+  });
+
+  it("accepts an empty composition array", () => {
+    const parsed = parseThemePreviewCompositionMessage({
+      ...validPayload,
+      composition: [],
+    });
+    expect(parsed).not.toBeNull();
+    expect(parsed?.composition).toEqual([]);
+  });
+
+  it("rejects a message with the wrong source", () => {
+    expect(
+      parseThemePreviewCompositionMessage({ ...validPayload, source: "something-else" }),
+    ).toBeNull();
+  });
+
+  it("rejects a composition that is not an array", () => {
+    expect(
+      parseThemePreviewCompositionMessage({ ...validPayload, composition: {} }),
+    ).toBeNull();
+    expect(
+      parseThemePreviewCompositionMessage({ ...validPayload, composition: null }),
+    ).toBeNull();
+  });
+
+  it("rejects a composition with a malformed entry", () => {
+    expect(
+      parseThemePreviewCompositionMessage({
+        ...validPayload,
+        composition: [{ key: "hero", enabled: "yes" }],
+      }),
+    ).toBeNull();
+    expect(
+      parseThemePreviewCompositionMessage({
+        ...validPayload,
+        composition: [{ enabled: true }],
+      }),
+    ).toBeNull();
+    expect(
+      parseThemePreviewCompositionMessage({
+        ...validPayload,
+        composition: [null],
+      }),
+    ).toBeNull();
+  });
+
+  it("rejects non-object payloads", () => {
+    expect(parseThemePreviewCompositionMessage(null)).toBeNull();
+    expect(parseThemePreviewCompositionMessage("osoria-theme-composition")).toBeNull();
   });
 });

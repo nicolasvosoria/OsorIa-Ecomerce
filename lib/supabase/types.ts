@@ -10,3 +10,8 @@ export interface StyleUpdate {
   component_name: string
   variables: Record<string, any>
 }
+
+export interface HomeSectionEntry {
+  key: string
+  enabled: boolean
+}

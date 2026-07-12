@@ -16,10 +16,19 @@ import {
   THEME_PREVIEW_FONT_SOURCE,
   THEME_PREVIEW_SELECTION_SOURCE,
   THEME_PREVIEW_CONTENT_SOURCE,
+  THEME_PREVIEW_COMPOSITION_SOURCE,
   parseThemePreviewSelectMessage,
 } from "@/lib/theme-font/preview-mode"
 import { deferStateUpdate } from "@/lib/react/defer-state-update"
 import { updateComponentStyle } from "@/lib/supabase/styles-api"
+import { getHomeComposition, updateHomeComposition } from "@/lib/supabase/home-composition-api"
+import type { HomeSectionEntry } from "@/lib/supabase/types"
+import {
+  addSectionEntry,
+  reorderSectionEntries,
+  removeSectionEntry,
+  toggleSectionEnabled,
+} from "@/lib/section-editor/home-composition-operations"
 import { Button } from "@/components/ui/button"
 import {
   Select,
@@ -43,6 +52,7 @@ import {
   SectionDesignResetAction,
 } from "@/components/theme/theme-editor-section-design-panel"
 import { SectionContentPanel } from "@/components/theme/theme-editor-section-content-panel"
+import { SectionsManager } from "@/components/theme/theme-editor-sections-manager"
 import { FuentesTab } from "@/components/theme/theme-editor-fonts-tab"
 import { HistorialTab } from "@/components/theme/theme-editor-history-tab"
 import { ThemeEditorContextBar } from "@/components/theme/theme-editor-context-bar"
@@ -58,6 +68,7 @@ const SIDEBAR_TABS = [
   { value: "colores", label: "Colores" },
   { value: "forma", label: "Forma" },
   { value: "fuentes", label: "Fuentes" },
+  { value: "sections", label: "Secciones" },
 ] as const
 
 const SECTION_PANEL_TABS = [
@@ -81,6 +92,10 @@ function pairingIdFromDefinition(fontPairingId: string | null | undefined): numb
 
 function pairingIdToDefinition(pairingId: number | null): string | null {
   return pairingId != null ? String(pairingId) : null
+}
+
+function buildPublishFailure(message: string): { ok: false; message: string } {
+  return { ok: false, message: `${message} El diseño no se publicó — puedes reintentar.` }
 }
 
 function buildPreviewRuntimeTheme(definition: ThemeDefinition): RuntimeTheme {
@@ -122,6 +137,27 @@ export function ThemeCustomEditor() {
   // handleApply below persists it (merged over current DB variables) as part
   // of the unified publish.
   const [workingContent, setWorkingContent] = useState<Record<string, Record<string, any>>>({})
+  // Home composition (order/visibility of home sections), staged separately
+  // from `workingContent` since it persists through its own endpoint
+  // (`updateHomeComposition`) rather than the component-styles table.
+  // `compositionBaseline` is what's currently saved — `handleDiscard` resets
+  // to it and a successful `handleApply` advances it to the saved value.
+  const [workingComposition, setWorkingComposition] = useState<HomeSectionEntry[]>([])
+  const [compositionBaseline, setCompositionBaseline] = useState<HomeSectionEntry[]>([])
+
+  // Load the store's saved composition once on mount so the Secciones tab
+  // starts from what's actually published, not from the composable defaults.
+  useEffect(() => {
+    let cancelled = false
+    getHomeComposition().then((composition) => {
+      if (cancelled) return
+      setWorkingComposition(composition)
+      setCompositionBaseline(composition)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   // Seed the working definition once the base list resolves: defaults to the
   // store's currently active theme, falling back to the first preset.
@@ -163,12 +199,13 @@ export function ThemeCustomEditor() {
     setWorkingDefinition(baseDefinition)
     setSelectedPairingId(pairingIdFromDefinition(baseDefinition.fontPairingId))
     setWorkingContent({})
+    setWorkingComposition(compositionBaseline)
     setDirty(false)
     // A reload clears any applied preview pairing and any staged content the
     // iframe had received; onLoad re-posts the theme (content starts empty,
     // so the preview falls back to the real saved content — no ghost edits).
     iframeRef.current?.contentWindow?.location.reload()
-  }, [activeTheme, themes])
+  }, [activeTheme, themes, compositionBaseline])
 
   const updateDefinition = useCallback((updater: DefinitionUpdater) => {
     setWorkingDefinition((prev) => (prev ? updater(prev) : prev))
@@ -264,11 +301,51 @@ export function ThemeCustomEditor() {
     }))
   }, [])
 
+  // Pushes the staged home composition (order/visibility) over its own
+  // channel (`THEME_PREVIEW_COMPOSITION_SOURCE`); the in-iframe admin-context
+  // bridge applies it onto `previewComposition`, which `HomeComposition`
+  // already overlays over the server-resolved order, so reorder/hide/add/
+  // remove all preview live with zero changes to section render code.
+  const postCompositionPreviewMessage = useCallback(() => {
+    postToPreview({ source: THEME_PREVIEW_COMPOSITION_SOURCE, composition: workingComposition })
+  }, [workingComposition, postToPreview])
+
+  // Re-post on every working-composition change (mirrors
+  // postContentPreviewMessages above); `handleIframeLoad` covers the initial
+  // load/reload.
+  useEffect(() => {
+    postCompositionPreviewMessage()
+  }, [postCompositionPreviewMessage])
+
   const handleIframeLoad = useCallback(() => {
     postPreviewMessage()
     postFontPreviewMessage()
     postContentPreviewMessages()
-  }, [postPreviewMessage, postFontPreviewMessage, postContentPreviewMessages])
+    postCompositionPreviewMessage()
+  }, [postPreviewMessage, postFontPreviewMessage, postContentPreviewMessages, postCompositionPreviewMessage])
+
+  // Secciones tab seam: reorder/hide-show/remove all stage onto
+  // `workingComposition` only — `handleApply` below is what actually
+  // persists it via `updateHomeComposition`.
+  const handleReorderSections = useCallback((activeKey: string, overKey: string) => {
+    setWorkingComposition((prev) => reorderSectionEntries(prev, activeKey, overKey))
+    setDirty(true)
+  }, [])
+
+  const handleToggleSection = useCallback((key: string) => {
+    setWorkingComposition((prev) => toggleSectionEnabled(prev, key))
+    setDirty(true)
+  }, [])
+
+  const handleRemoveSection = useCallback((key: string) => {
+    setWorkingComposition((prev) => removeSectionEntry(prev, key))
+    setDirty(true)
+  }, [])
+
+  const handleAddSection = useCallback((key: string) => {
+    setWorkingComposition((prev) => addSectionEntry(prev, key))
+    setDirty(true)
+  }, [])
 
   const postSectionSelection = useCallback((componentName: string | null) => {
     postToPreview({ source: THEME_PREVIEW_SELECTION_SOURCE, componentName })
@@ -330,10 +407,19 @@ export function ThemeCustomEditor() {
         } catch (err) {
           const sectionLabel = SECTION_NAME_LABELS[componentName] ?? componentName
           const reason = err instanceof Error ? err.message : "Error desconocido"
-          setApplyResult({
-            ok: false,
-            message: `Falló el contenido de "${sectionLabel}" (${reason}). El diseño no se publicó — puedes reintentar.`,
-          })
+          setApplyResult(buildPublishFailure(`Falló el contenido de "${sectionLabel}" (${reason}).`))
+          return
+        }
+      }
+
+      const compositionUnchanged = JSON.stringify(workingComposition) === JSON.stringify(compositionBaseline)
+      if (!compositionUnchanged) {
+        try {
+          const savedComposition = await updateHomeComposition(workingComposition)
+          setCompositionBaseline(savedComposition)
+        } catch (err) {
+          const reason = err instanceof Error ? err.message : "Error desconocido"
+          setApplyResult(buildPublishFailure(`No se pudieron guardar las secciones (${reason}).`))
           return
         }
       }
@@ -376,6 +462,8 @@ export function ThemeCustomEditor() {
     applying,
     workingContent,
     globalStyles,
+    workingComposition,
+    compositionBaseline,
     changeThemeCustom,
     selectedPairing,
     changePairing,
@@ -418,6 +506,11 @@ export function ThemeCustomEditor() {
           persistedContent={selectedSection ? globalStyles.get(selectedSection) ?? {} : {}}
           stagedContent={selectedSection ? workingContent[selectedSection] ?? {} : {}}
           onContentFieldChange={handleSectionContentChange}
+          sectionEntries={workingComposition}
+          onReorderSections={handleReorderSections}
+          onToggleSection={handleToggleSection}
+          onRemoveSection={handleRemoveSection}
+          onAddSection={handleAddSection}
         />
         <Stage
           iframeRef={iframeRef}
@@ -580,6 +673,11 @@ interface SidebarProps {
   persistedContent: Record<string, any>
   stagedContent: Record<string, any>
   onContentFieldChange: (key: string, value: any) => void
+  sectionEntries: HomeSectionEntry[]
+  onReorderSections: (activeKey: string, overKey: string) => void
+  onToggleSection: (key: string) => void
+  onRemoveSection: (key: string) => void
+  onAddSection: (key: string) => void
 }
 
 function Sidebar({
@@ -596,6 +694,11 @@ function Sidebar({
   persistedContent,
   stagedContent,
   onContentFieldChange,
+  sectionEntries,
+  onReorderSections,
+  onToggleSection,
+  onRemoveSection,
+  onAddSection,
 }: SidebarProps) {
   const activeColors = definition
     ? editingColorSet === "dark"
@@ -625,9 +728,9 @@ function Sidebar({
 
       <div className="p-4 pt-3">
         <Tabs defaultValue={SIDEBAR_TABS[0].value}>
-          <TabsList className="grid w-full grid-cols-3 gap-1">
+          <TabsList className="custom-scrollbar flex w-full flex-nowrap gap-1 overflow-x-auto">
             {SIDEBAR_TABS.map((tab) => (
-              <TabsTrigger key={tab.value} value={tab.value} className="text-xs">
+              <TabsTrigger key={tab.value} value={tab.value} className="shrink-0 text-xs">
                 {tab.label}
               </TabsTrigger>
             ))}
@@ -659,6 +762,16 @@ function Sidebar({
               pairings={pairings}
               selectedPairingId={selectedPairingId}
               onSelectPairing={onSelectPairing}
+            />
+          </TabsContent>
+
+          <TabsContent value="sections">
+            <SectionsManager
+              entries={sectionEntries}
+              onReorder={onReorderSections}
+              onToggle={onToggleSection}
+              onRemove={onRemoveSection}
+              onAdd={onAddSection}
             />
           </TabsContent>
         </Tabs>
