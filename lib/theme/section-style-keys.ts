@@ -31,6 +31,28 @@ export const SECTION_STYLE_KEYS: Record<string, string[]> = {
     "titleColor",
     "subtitleColor",
   ],
+  testimonials: [
+    "sectionBgColor",
+    "cardBgColor",
+    "titleColor",
+    "subtitleColor",
+    "quoteColor",
+    "authorColor",
+    "roleColor",
+  ],
+  logos: ["sectionBgColor", "titleColor", "subtitleColor"],
+  faq: [
+    "sectionBgColor",
+    "cardBgColor",
+    "borderColor",
+    "titleColor",
+    "subtitleColor",
+    "questionColor",
+    "answerColor",
+  ],
+  video: ["sectionBgColor", "titleColor", "subtitleColor"],
+  story: ["sectionBgColor", "titleColor", "subtitleColor", "buttonColor"],
+  instagram: ["sectionBgColor", "titleColor", "subtitleColor"],
 }
 
 // The `ThemeColors` token each section's "from theme" fallback resolves to,
@@ -81,6 +103,46 @@ export const SECTION_FIELD_THEME_TOKEN: Record<string, Record<string, keyof Them
     title: "foreground",
     subtitle: "mutedForeground",
   },
+  // Mirrors `whyus`: `quote`/`author` fall back to `var(--foreground)` (the
+  // section doesn't sit on a colored panel either), `role`/`subtitle` fall
+  // back to `var(--muted-foreground)`, same as `whyus.subtitle`.
+  testimonials: {
+    sectionBg: "muted",
+    cardBg: "card",
+    title: "foreground",
+    subtitle: "mutedForeground",
+    quote: "foreground",
+    author: "foreground",
+    role: "mutedForeground",
+  },
+  // Mirrors `whyus`'s `title`/`subtitle` mapping: `title` falls back to
+  // `var(--foreground)`, `subtitle` falls back to `var(--muted-foreground)`,
+  // in addition to the outer panel background this section already owned.
+  logos: { sectionBg: "muted", title: "foreground", subtitle: "mutedForeground" },
+  // Mirrors `testimonials`: `cardBg` falls back to `var(--card)`, `title`/
+  // `question` fall back to `var(--foreground)`, `subtitle`/`answer` fall
+  // back to `var(--muted-foreground)`. `border` IS itself a stored
+  // `ThemeColors` field (unlike `whyus`/`testimonials`, which don't expose a
+  // themeable border), so it maps directly to `border`.
+  faq: {
+    sectionBg: "muted",
+    cardBg: "card",
+    border: "border",
+    title: "foreground",
+    subtitle: "mutedForeground",
+    question: "foreground",
+    answer: "mutedForeground",
+  },
+  // Mirrors `logos`' `sectionBg`/`title`/`subtitle` mapping — same panel
+  // background and text-color fallbacks, no extra themeable field beyond those.
+  video: { sectionBg: "muted", title: "foreground", subtitle: "mutedForeground" },
+  // Mirrors `video`'s `sectionBg`/`title`/`subtitle` mapping, plus a `button`
+  // field for the CTA — falls back to `var(--sec-story-button, var(--primary))`,
+  // same as `hero`/`newsletter`'s button field.
+  story: { sectionBg: "muted", title: "foreground", subtitle: "mutedForeground", button: "primary" },
+  // Mirrors `logos`' `sectionBg`/`title`/`subtitle` mapping — same panel
+  // background and text-color fallbacks, no extra themeable field beyond those.
+  instagram: { sectionBg: "muted", title: "foreground", subtitle: "mutedForeground" },
 }
 
 // The `cornerRadius` design key's closed set of presets, shared by

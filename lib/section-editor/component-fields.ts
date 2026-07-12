@@ -14,6 +14,12 @@ import { FEATURED_DEFAULTS } from "@/components/sections/featured-product";
 import { POPULAR_DEFAULTS } from "@/components/sections/popular-items";
 import { PRODUCTS_DEFAULTS } from "@/components/sections/products-grid";
 import { WHYUS_DEFAULTS, type WhyUsIconKey } from "@/components/sections/why-us";
+import { TESTIMONIALS_DEFAULTS } from "@/components/sections/testimonials";
+import { LOGOS_DEFAULTS } from "@/components/sections/logos";
+import { FAQ_DEFAULTS } from "@/components/sections/faq";
+import { VIDEO_DEFAULTS } from "@/components/sections/video";
+import { STORY_DEFAULTS } from "@/components/sections/story";
+import { INSTAGRAM_DEFAULTS } from "@/components/sections/instagram";
 import { REPOSTERIA_GALLERY_DEFAULTS } from "@/components/sections/reposteria-gallery";
 import {
   PRODUCTS_CARD_STYLE_OPTIONS,
@@ -31,6 +37,9 @@ import {
   FEATURED_CONTENT_WIDTH_OPTIONS,
   FEATURED_TEXT_ALIGN_OPTIONS,
   FEATURED_SECTION_HEIGHT_OPTIONS,
+  FEATURED_BACKGROUND_MODE_OPTIONS,
+  FEATURED_CONTENT_ALIGN_OPTIONS,
+  FEATURED_CTA_STYLE_OPTIONS,
 } from "@/lib/sections/featured-variant";
 import { HERO_SECTION_HEIGHT_OPTIONS } from "@/lib/sections/hero-variant";
 import { SPECIAL_OFFER_IMAGE_SIDE_OPTIONS } from "@/lib/sections/special-offer-variant";
@@ -45,6 +54,29 @@ import {
   WHYUS_ICON_STYLE_OPTIONS,
   WHYUS_LAYOUT_FORMAT_OPTIONS,
 } from "@/lib/sections/whyus-variant";
+import {
+  TESTIMONIALS_CARD_STYLE_OPTIONS,
+  TESTIMONIALS_COLUMNS_OPTIONS,
+  TESTIMONIALS_CONTENT_ALIGN_OPTIONS,
+} from "@/lib/sections/testimonials-variant";
+import {
+  LOGOS_ALIGN_OPTIONS,
+  LOGOS_COLUMNS_OPTIONS,
+  LOGOS_SIZE_OPTIONS,
+} from "@/lib/sections/logos-variant";
+import {
+  FAQ_COLUMNS_OPTIONS,
+  FAQ_ITEM_STYLE_OPTIONS,
+} from "@/lib/sections/faq-variant";
+import { VIDEO_ASPECT_RATIO_OPTIONS } from "@/lib/sections/video-variant";
+import {
+  STORY_CONTENT_ALIGN_OPTIONS,
+  STORY_IMAGE_POSITION_OPTIONS,
+} from "@/lib/sections/story-variant";
+import {
+  INSTAGRAM_COLUMNS_OPTIONS,
+  INSTAGRAM_GAP_OPTIONS,
+} from "@/lib/sections/instagram-variant";
 import type { SectionFieldsConfig } from "./types";
 
 const WHYUS_ICON_OPTIONS: Array<{ value: WhyUsIconKey; label: string }> = [
@@ -376,6 +408,27 @@ export const COMPONENT_FIELDS: Record<string, SectionFieldsConfig> = {
         options: [...FEATURED_SECTION_HEIGHT_OPTIONS],
         group: "design",
       },
+      {
+        key: "backgroundMode",
+        label: "Modo de fondo",
+        type: "select",
+        options: [...FEATURED_BACKGROUND_MODE_OPTIONS],
+        group: "design",
+      },
+      {
+        key: "contentAlign",
+        label: "Posición del contenido (modo color / imagen de fondo)",
+        type: "select",
+        options: [...FEATURED_CONTENT_ALIGN_OPTIONS],
+        group: "design",
+      },
+      {
+        key: "ctaStyle",
+        label: "Estilo del botón",
+        type: "select",
+        options: [...FEATURED_CTA_STYLE_OPTIONS],
+        group: "design",
+      },
     ],
     styles: [
       { key: "bgColor", label: "Color de Fondo", type: "color" },
@@ -385,6 +438,12 @@ export const COMPONENT_FIELDS: Record<string, SectionFieldsConfig> = {
         key: "productBgColor",
         label: "Color de Fondo del Producto (Cuadro pequeño)",
         type: "color",
+      },
+      { key: "overlayColor", label: "Color de Superposición (imagen de fondo)", type: "color" },
+      {
+        key: "overlayOpacity",
+        label: "Opacidad de Superposición (0-1)",
+        type: "number",
       },
     ],
     defaults: FEATURED_DEFAULTS,
@@ -512,6 +571,7 @@ export const COMPONENT_FIELDS: Record<string, SectionFieldsConfig> = {
         arrayFields: [
           { key: "title", label: "Título", type: "text" },
           { key: "description", label: "Descripción", type: "text" },
+          { key: "link", label: "Link (opcional)", type: "text" },
           {
             key: "icon",
             label: "Ícono",
@@ -751,11 +811,72 @@ export const COMPONENT_FIELDS: Record<string, SectionFieldsConfig> = {
       { key: "title", label: "Título", type: "textarea" },
       { key: "description", label: "Descripción", type: "textarea" },
       { key: "buttonText", label: "Texto del Botón", type: "text" },
+      { key: "buttonLink", label: "Link del Botón", type: "text" },
+      { key: "image", label: "Imagen", type: "image" },
+      {
+        key: "imagePosition",
+        label: "Posición de la imagen",
+        type: "select",
+        options: [...STORY_IMAGE_POSITION_OPTIONS],
+        group: "design",
+      },
+      {
+        key: "contentAlign",
+        label: "Alineación del contenido",
+        type: "select",
+        options: [...STORY_CONTENT_ALIGN_OPTIONS],
+        group: "design",
+      },
     ],
     styles: [
-      { key: "bgColor", label: "Color de Fondo", type: "color" },
-      { key: "textColor", label: "Color de Texto", type: "color" },
+      { key: "sectionBgColor", label: "Fondo de la sección", type: "color" },
+      { key: "titleColor", label: "Color del título", type: "color" },
+      { key: "subtitleColor", label: "Color de la descripción", type: "color" },
+      { key: "buttonColor", label: "Color del botón", type: "color" },
+      { key: "buttonTextColor", label: "Color del texto del botón", type: "color" },
     ],
+    defaults: STORY_DEFAULTS,
+  },
+  instagram: {
+    content: [
+      { key: "title", label: "Título de la Sección", type: "text" },
+      {
+        key: "description",
+        label: "Descripción de la Sección",
+        type: "textarea",
+      },
+      { key: "handle", label: "Usuario de Instagram (opcional)", type: "text" },
+      {
+        key: "posts",
+        label: "Publicaciones",
+        type: "array",
+        isArray: true,
+        arrayFields: [
+          { key: "image", label: "Imagen", type: "image" },
+          { key: "link", label: "Link (opcional)", type: "text" },
+        ],
+      },
+      {
+        key: "columns",
+        label: "Columnas",
+        type: "select",
+        options: [...INSTAGRAM_COLUMNS_OPTIONS],
+        group: "design",
+      },
+      {
+        key: "gap",
+        label: "Espaciado",
+        type: "select",
+        options: [...INSTAGRAM_GAP_OPTIONS],
+        group: "design",
+      },
+    ],
+    styles: [
+      { key: "sectionBgColor", label: "Fondo de la sección", type: "color" },
+      { key: "titleColor", label: "Color del título", type: "color" },
+      { key: "subtitleColor", label: "Color del subtítulo", type: "color" },
+    ],
+    defaults: INSTAGRAM_DEFAULTS,
   },
   value: {
     content: [
@@ -791,11 +912,157 @@ export const COMPONENT_FIELDS: Record<string, SectionFieldsConfig> = {
           { key: "image", label: "URL Imagen", type: "image" },
         ],
       },
+      {
+        key: "columns",
+        label: "Columnas",
+        type: "select",
+        options: [...TESTIMONIALS_COLUMNS_OPTIONS],
+        group: "design",
+      },
+      {
+        key: "cardStyle",
+        label: "Estilo de tarjeta",
+        type: "select",
+        options: [...TESTIMONIALS_CARD_STYLE_OPTIONS],
+        group: "design",
+      },
+      {
+        key: "contentAlign",
+        label: "Alineación del contenido",
+        type: "select",
+        options: [...TESTIMONIALS_CONTENT_ALIGN_OPTIONS],
+        group: "design",
+      },
     ],
     styles: [
-      { key: "bgColor", label: "Color de Fondo", type: "color" },
-      { key: "textColor", label: "Color de Texto", type: "color" },
+      { key: "sectionBgColor", label: "Fondo de la sección", type: "color" },
+      { key: "cardBgColor", label: "Fondo de la tarjeta", type: "color" },
+      { key: "titleColor", label: "Color del título", type: "color" },
+      { key: "subtitleColor", label: "Color del subtítulo", type: "color" },
+      { key: "quoteColor", label: "Color del testimonio", type: "color" },
+      { key: "authorColor", label: "Color del autor", type: "color" },
+      { key: "roleColor", label: "Color del cargo", type: "color" },
     ],
+    defaults: TESTIMONIALS_DEFAULTS,
+  },
+  logos: {
+    content: [
+      { key: "title", label: "Título de la Sección", type: "text" },
+      {
+        key: "description",
+        label: "Descripción de la Sección",
+        type: "textarea",
+      },
+      {
+        key: "logos",
+        label: "Logos",
+        type: "array",
+        isArray: true,
+        arrayFields: [
+          { key: "image", label: "Logo", type: "image" },
+          { key: "link", label: "Link (opcional)", type: "text" },
+        ],
+      },
+      {
+        key: "columns",
+        label: "Columnas",
+        type: "select",
+        options: [...LOGOS_COLUMNS_OPTIONS],
+        group: "design",
+      },
+      {
+        key: "size",
+        label: "Tamaño",
+        type: "select",
+        options: [...LOGOS_SIZE_OPTIONS],
+        group: "design",
+      },
+      {
+        key: "align",
+        label: "Alineación",
+        type: "select",
+        options: [...LOGOS_ALIGN_OPTIONS],
+        group: "design",
+      },
+      { key: "grayscale", label: "Blanco y negro", type: "toggle", group: "design" },
+    ],
+    styles: [
+      { key: "sectionBgColor", label: "Fondo de la sección", type: "color" },
+      { key: "titleColor", label: "Color del título", type: "color" },
+      { key: "subtitleColor", label: "Color del subtítulo", type: "color" },
+    ],
+    defaults: LOGOS_DEFAULTS,
+  },
+  faq: {
+    content: [
+      { key: "title", label: "Título de la Sección", type: "text" },
+      {
+        key: "description",
+        label: "Descripción de la Sección",
+        type: "textarea",
+      },
+      {
+        key: "items",
+        label: "Preguntas frecuentes",
+        type: "array",
+        isArray: true,
+        arrayFields: [
+          { key: "question", label: "Pregunta", type: "text" },
+          { key: "answer", label: "Respuesta", type: "textarea" },
+        ],
+      },
+      {
+        key: "columns",
+        label: "Columnas",
+        type: "select",
+        options: [...FAQ_COLUMNS_OPTIONS],
+        group: "design",
+      },
+      {
+        key: "itemStyle",
+        label: "Estilo de los items",
+        type: "select",
+        options: [...FAQ_ITEM_STYLE_OPTIONS],
+        group: "design",
+      },
+      { key: "singleOpen", label: "Abrir de a uno", type: "toggle", group: "design" },
+    ],
+    styles: [
+      { key: "sectionBgColor", label: "Fondo de la sección", type: "color" },
+      { key: "cardBgColor", label: "Fondo de la tarjeta", type: "color" },
+      { key: "borderColor", label: "Color del borde/divisor", type: "color" },
+      { key: "titleColor", label: "Color del título", type: "color" },
+      { key: "subtitleColor", label: "Color del subtítulo", type: "color" },
+      { key: "questionColor", label: "Color de la pregunta", type: "color" },
+      { key: "answerColor", label: "Color de la respuesta", type: "color" },
+    ],
+    defaults: FAQ_DEFAULTS,
+  },
+  video: {
+    content: [
+      { key: "title", label: "Título de la Sección", type: "text" },
+      {
+        key: "description",
+        label: "Descripción de la Sección",
+        type: "textarea",
+      },
+      { key: "url", label: "URL del video (YouTube, Vimeo o MP4)", type: "text" },
+      { key: "poster", label: "Imagen de portada (opcional)", type: "image" },
+      {
+        key: "aspectRatio",
+        label: "Relación de aspecto",
+        type: "select",
+        options: [...VIDEO_ASPECT_RATIO_OPTIONS],
+        group: "design",
+      },
+      { key: "autoplay", label: "Autoplay (silenciado)", type: "toggle", group: "design" },
+    ],
+    styles: [
+      { key: "sectionBgColor", label: "Fondo de la sección", type: "color" },
+      { key: "titleColor", label: "Color del título", type: "color" },
+      { key: "subtitleColor", label: "Color del subtítulo", type: "color" },
+    ],
+    defaults: VIDEO_DEFAULTS,
   },
   trending: {
     content: [

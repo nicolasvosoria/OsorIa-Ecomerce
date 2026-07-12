@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import {
+  WHYUS_BAR_CONTENT_ALIGN_CLASS,
   WHYUS_COLUMNS_CLASS,
   WHYUS_ICON_STYLE_CLASS,
   WHYUS_ICON_STYLE_HAS_BG,
@@ -80,6 +81,16 @@ describe("resolveIconPosition", () => {
   it("falls back to 'top' (today's default) for an invalid or missing value", () => {
     expect(resolveIconPosition(undefined)).toBe("top")
     expect(resolveIconPosition("bottom")).toBe("top")
+  })
+})
+
+describe("WHYUS_BAR_CONTENT_ALIGN_CLASS", () => {
+  it("reproduces today's hardcoded `md:justify-between` byte-for-byte at the default ('left')", () => {
+    expect(WHYUS_BAR_CONTENT_ALIGN_CLASS.left).toBe("md:justify-between")
+  })
+
+  it("only 'center' changes the bar's justification", () => {
+    expect(WHYUS_BAR_CONTENT_ALIGN_CLASS.center).toBe("md:justify-center")
   })
 })
 

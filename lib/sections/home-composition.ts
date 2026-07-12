@@ -11,11 +11,35 @@ export const COMPOSABLE_SECTION_KEYS = [
   "specialOffer",
   "whyus",
   "newsletter",
+  "testimonials",
+  "logos",
+  "faq",
+  "video",
+  "story",
+  "instagram",
 ] as const
 
 export type ComposableSectionKey = (typeof COMPOSABLE_SECTION_KEYS)[number]
 
-export const DEFAULT_HOME_COMPOSITION: HomeSectionEntry[] = COMPOSABLE_SECTION_KEYS.map((key) => ({
+// Composable sections that ship with no content by default (their editable
+// list starts empty, so the section itself stays hidden on the published
+// site until an admin fills it in — see `resolveEmptySectionState`). They're
+// still full members of `COMPOSABLE_SECTION_KEYS` — offered by the "Agregar
+// sección" palette, previewable, addable — just excluded from
+// `DEFAULT_HOME_COMPOSITION` so new stores don't launch with placeholder
+// content on their live home.
+const NON_DEFAULT_SECTION_KEYS: readonly ComposableSectionKey[] = [
+  "testimonials",
+  "logos",
+  "faq",
+  "video",
+  "story",
+  "instagram",
+]
+
+export const DEFAULT_HOME_COMPOSITION: HomeSectionEntry[] = COMPOSABLE_SECTION_KEYS.filter(
+  (key) => !NON_DEFAULT_SECTION_KEYS.includes(key),
+).map((key) => ({
   key,
   enabled: true,
 }))

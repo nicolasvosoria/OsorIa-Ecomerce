@@ -1,5 +1,33 @@
 import { describe, expect, it } from "vitest"
-import { DEFAULT_HOME_COMPOSITION, resolveHomeComposition } from "@/lib/sections/home-composition"
+import {
+  COMPOSABLE_SECTION_KEYS,
+  DEFAULT_HOME_COMPOSITION,
+  resolveHomeComposition,
+} from "@/lib/sections/home-composition"
+
+const NON_DEFAULT_SECTION_KEYS = ["testimonials", "logos", "faq", "video", "story", "instagram"]
+const DEFAULT_SECTION_KEYS_IN_ORDER = [
+  "hero",
+  "popular",
+  "products",
+  "featured",
+  "specialOffer",
+  "whyus",
+  "newsletter",
+]
+
+describe("COMPOSABLE_SECTION_KEYS / DEFAULT_HOME_COMPOSITION", () => {
+  it("offers every non-default section as composable but keeps it out of the default composition", () => {
+    for (const key of NON_DEFAULT_SECTION_KEYS) {
+      expect(COMPOSABLE_SECTION_KEYS).toContain(key)
+      expect(DEFAULT_HOME_COMPOSITION.some((entry) => entry.key === key)).toBe(false)
+    }
+  })
+
+  it("keeps the 7 original sections in the default composition, in their original order", () => {
+    expect(DEFAULT_HOME_COMPOSITION.map((entry) => entry.key)).toEqual(DEFAULT_SECTION_KEYS_IN_ORDER)
+  })
+})
 
 describe("resolveHomeComposition", () => {
   it("returns the default composition (today's home order) for null, undefined, or a non-array value — no saved row means no customization", () => {

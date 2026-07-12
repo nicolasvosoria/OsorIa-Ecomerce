@@ -1,5 +1,7 @@
 "use client"
 
+import type { CSSProperties, ReactNode } from "react"
+import Link from "next/link"
 import {
   Headphones,
   Truck,
@@ -21,7 +23,9 @@ import {
 } from "lucide-react"
 import { useComponentStyle } from "@/contexts/styles-context"
 import { useAdmin } from "@/contexts/admin-context"
+import { isExternalLink } from "@/lib/sections/external-link"
 import {
+  WHYUS_BAR_CONTENT_ALIGN_CLASS,
   WHYUS_COLUMNS_CLASS,
   WHYUS_CONTENT_ALIGN_CARD_CLASS,
   WHYUS_ICON_POSITION_DIRECTION_CLASS,
@@ -58,6 +62,7 @@ type WhyUsItem = {
   title: string
   description: string
   icon: WhyUsIconKey
+  link?: string
 }
 
 export const WHYUS_DEFAULTS = {
@@ -79,21 +84,25 @@ export const WHYUS_DEFAULTS = {
       icon: "support",
       title: "Soporte 24/7",
       description: "Y 24/6 (festivos)",
+      link: "",
     },
     {
       icon: "shipping",
       title: "Envío Gratis",
       description: "Entrega en 10 Días",
+      link: "",
     },
     {
       icon: "payment",
       title: "Pago Fácil",
       description: "Crédito, Débito, QR",
+      link: "",
     },
     {
       icon: "discount",
       title: "Grandes Descuentos",
       description: "Gran Stock Disponible",
+      link: "",
     },
   ] satisfies WhyUsItem[],
 }
@@ -121,6 +130,38 @@ const DEFAULT_WHYUS_ICON: LucideIcon = WHYUS_ICON_BY_KEY.support
 
 function resolveWhyUsIcon(icon: string): LucideIcon {
   return WHYUS_ICON_BY_KEY[icon as WhyUsIconKey] ?? DEFAULT_WHYUS_ICON
+}
+
+function WhyUsItemLink({
+  link,
+  className,
+  style,
+  children,
+}: {
+  link?: string
+  className: string
+  style?: CSSProperties
+  children: ReactNode
+}) {
+  if (!link) {
+    return (
+      <div className={className} style={style}>
+        {children}
+      </div>
+    )
+  }
+
+  const isExternal = isExternalLink(link)
+
+  return isExternal ? (
+    <a href={link} target="_blank" rel="noopener noreferrer" className={className} style={style}>
+      {children}
+    </a>
+  ) : (
+    <Link href={link} className={className} style={style}>
+      {children}
+    </Link>
+  )
 }
 
 export function WhyUs() {
@@ -165,6 +206,7 @@ export function WhyUs() {
   const iconStyleClass = WHYUS_ICON_STYLE_CLASS[iconStyle]
   const iconHasBg = WHYUS_ICON_STYLE_HAS_BG[iconStyle]
   const contentAlignCardClass = WHYUS_CONTENT_ALIGN_CARD_CLASS[contentAlign]
+  const barContentAlignClass = WHYUS_BAR_CONTENT_ALIGN_CLASS[contentAlign]
   const iconPositionDirectionClass = WHYUS_ICON_POSITION_DIRECTION_CLASS[iconPosition]
   const iconPositionTextWrapperClass = WHYUS_ICON_POSITION_TEXT_WRAPPER_CLASS[iconPosition]
   const iconPositionIconExtraClass = WHYUS_ICON_POSITION_ICON_EXTRA_CLASS[iconPosition]
@@ -188,23 +230,31 @@ export function WhyUs() {
         {layoutFormat === "bar" ? (
           <div
             data-testid="whyus-bar"
-            className="flex flex-wrap items-center justify-center gap-x-8 gap-y-4 md:justify-between"
+            className={`flex flex-wrap items-center justify-center gap-x-8 gap-y-4 ${barContentAlignClass}`}
           >
             {items.map((item, index) => {
               const ItemIcon = resolveWhyUsIcon(item.icon)
               return (
-                <div
+                <WhyUsItemLink
                   key={`${item.icon}-${item.title}-${index}`}
+                  link={item.link}
                   className="flex items-center gap-2"
                 >
                   <ItemIcon className="h-5 w-5 shrink-0" style={{ color: iconColor }} />
-                  <span
-                    className="text-sm font-medium md:text-base"
-                    style={{ color: titleColor }}
-                  >
-                    {item.title}
-                  </span>
-                </div>
+                  <div className="flex flex-col">
+                    <span
+                      className="text-sm font-medium md:text-base"
+                      style={{ color: titleColor }}
+                    >
+                      {item.title}
+                    </span>
+                    {item.description ? (
+                      <span className="text-xs" style={{ color: subtitleColor }}>
+                        {item.description}
+                      </span>
+                    ) : null}
+                  </div>
+                </WhyUsItemLink>
               )
             })}
           </div>
@@ -213,8 +263,9 @@ export function WhyUs() {
             {items.map((item, index) => {
               const ItemIcon = resolveWhyUsIcon(item.icon)
               return (
-                <div
+                <WhyUsItemLink
                   key={`${item.icon}-${item.title}-${index}`}
+                  link={item.link}
                   className={`flex min-h-[220px] ${iconPositionDirectionClass} ${contentAlignCardClass} rounded-card border border-[var(--border)] p-6 shadow-[var(--shadow-card,none)] md:min-h-[260px] md:p-8`}
                   style={{
                     backgroundColor: cardBgColor,
@@ -243,7 +294,7 @@ export function WhyUs() {
                       {item.description}
                     </p>
                   </div>
-                </div>
+                </WhyUsItemLink>
               )
             })}
           </div>

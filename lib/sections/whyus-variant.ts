@@ -72,6 +72,13 @@ export const WHYUS_CONTENT_ALIGN_CARD_CLASS: Record<WhyUsContentAlign, string> =
   center: "items-center text-center",
 }
 
+// `left` reproduces today's hardcoded `md:justify-between` byte-for-byte; only
+// `center` changes the bar's justification, matching "centro"'s meaning.
+export const WHYUS_BAR_CONTENT_ALIGN_CLASS: Record<WhyUsContentAlign, string> = {
+  left: "md:justify-between",
+  center: "md:justify-center",
+}
+
 export const WHYUS_ICON_POSITION_OPTIONS = [
   { value: "top", label: "Arriba" },
   { value: "side", label: "Al lado" },

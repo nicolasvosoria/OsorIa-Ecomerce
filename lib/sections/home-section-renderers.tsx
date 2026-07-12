@@ -6,6 +6,12 @@ import { FeaturedProduct } from "@/components/sections/featured-product"
 import { SpecialOffer } from "@/components/sections/special-offer"
 import { WhyUs } from "@/components/sections/why-us"
 import { NewsletterSection } from "@/components/sections/newsletter-section"
+import { Testimonials } from "@/components/sections/testimonials"
+import { Logos } from "@/components/sections/logos"
+import { Faq } from "@/components/sections/faq"
+import { Video } from "@/components/sections/video"
+import { Story } from "@/components/sections/story"
+import { Instagram } from "@/components/sections/instagram"
 import type { ComposableSectionKey } from "@/lib/sections/home-composition"
 
 // Renders the inner content of each composable home section — the
@@ -39,4 +45,10 @@ export const homeSectionRenderers: Record<ComposableSectionKey, () => ReactNode>
   specialOffer: () => <SpecialOffer />,
   whyus: () => <WhyUs />,
   newsletter: () => <NewsletterSection />,
+  testimonials: () => <Testimonials />,
+  logos: () => <Logos />,
+  faq: () => <Faq />,
+  video: () => <Video />,
+  story: () => <Story />,
+  instagram: () => <Instagram />,
 }

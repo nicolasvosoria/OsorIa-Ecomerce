@@ -185,4 +185,101 @@ describe("WhyUs design options", () => {
     expect(container.querySelector('[data-testid="whyus-bar"]')).not.toBeNull()
     expect(container.querySelector('[data-component="whyus"] .grid')).toBeNull()
   })
+
+  it("bar respects contentAlign=center by changing the justification (not the default md:justify-between)", () => {
+    mockUseAdmin.mockReturnValue({ componentEdits: new Map() })
+    mockUseComponentStyle.mockImplementation((_name: string, defaults: Record<string, unknown>) => ({
+      styles: { ...defaults, layoutFormat: "bar", contentAlign: "center" },
+    }))
+
+    const { container } = render(<WhyUs />)
+    const bar = container.querySelector('[data-testid="whyus-bar"]') as HTMLElement
+    expect(bar.className).toContain("md:justify-center")
+    expect(bar.className).not.toContain("md:justify-between")
+  })
+
+  it("bar shows the item description with subtitleColor", () => {
+    mockUseAdmin.mockReturnValue({ componentEdits: new Map() })
+    mockUseComponentStyle.mockImplementation((_name: string, defaults: Record<string, unknown>) => ({
+      styles: { ...defaults, layoutFormat: "bar", subtitleColor: "#654321" },
+    }))
+
+    const { container } = render(<WhyUs />)
+    const bar = container.querySelector('[data-testid="whyus-bar"]') as HTMLElement
+    const description = bar.querySelector("span:nth-of-type(2)") as HTMLElement
+    expect(description.textContent).toBe(WHYUS_DEFAULTS.items[0].description)
+    expect(description.style.color).toBe("rgb(101, 67, 33)")
+  })
+})
+
+describe("WhyUs item link", () => {
+  it("renders a card item without a link as a plain div (no regression)", () => {
+    mockUseAdmin.mockReturnValue({ componentEdits: new Map() })
+    mockUseComponentStyle.mockImplementation((_name: string, defaults: Record<string, unknown>) => ({
+      styles: defaults,
+    }))
+
+    const { container } = render(<WhyUs />)
+    const card = container.querySelector('[data-component="whyus"] .grid > div') as HTMLElement
+    expect(card).not.toBeNull()
+    expect(container.querySelector('[data-component="whyus"] .grid a')).toBeNull()
+  })
+
+  it("wraps a card item in an <a> with target/rel set for an external link", () => {
+    mockUseAdmin.mockReturnValue({ componentEdits: new Map() })
+    mockUseComponentStyle.mockImplementation((_name: string, defaults: Record<string, unknown>) => ({
+      styles: {
+        ...defaults,
+        items: [{ ...WHYUS_DEFAULTS.items[0], link: "https://example.com" }],
+      },
+    }))
+
+    const { container } = render(<WhyUs />)
+    const link = container.querySelector('[data-component="whyus"] .grid > a') as HTMLElement
+
+    expect(link).not.toBeNull()
+    expect(link).toHaveAttribute("href", "https://example.com")
+    expect(link).toHaveAttribute("target", "_blank")
+    expect(link).toHaveAttribute("rel", "noopener noreferrer")
+  })
+
+  it("wraps a card item in a Next Link (no target/rel) for an internal link", () => {
+    mockUseAdmin.mockReturnValue({ componentEdits: new Map() })
+    mockUseComponentStyle.mockImplementation((_name: string, defaults: Record<string, unknown>) => ({
+      styles: {
+        ...defaults,
+        items: [{ ...WHYUS_DEFAULTS.items[0], link: "/nosotros" }],
+      },
+    }))
+
+    const { container } = render(<WhyUs />)
+    const link = container.querySelector('[data-component="whyus"] .grid > a') as HTMLElement
+
+    expect(link).not.toBeNull()
+    expect(link).toHaveAttribute("href", "/nosotros")
+    expect(link).not.toHaveAttribute("target")
+    expect(link).not.toHaveAttribute("rel")
+  })
+
+  it("renders a bar item without a link as a plain div, and with a link as an <a>", () => {
+    mockUseAdmin.mockReturnValue({ componentEdits: new Map() })
+    mockUseComponentStyle.mockImplementation((_name: string, defaults: Record<string, unknown>) => ({
+      styles: {
+        ...defaults,
+        layoutFormat: "bar",
+        items: [
+          WHYUS_DEFAULTS.items[0],
+          { ...WHYUS_DEFAULTS.items[1], link: "https://example.com" },
+        ],
+      },
+    }))
+
+    const { container } = render(<WhyUs />)
+    const bar = container.querySelector('[data-testid="whyus-bar"]') as HTMLElement
+
+    expect(bar.querySelectorAll(":scope > div").length).toBe(1)
+    const link = bar.querySelector(":scope > a") as HTMLElement
+    expect(link).not.toBeNull()
+    expect(link).toHaveAttribute("target", "_blank")
+  })
 })

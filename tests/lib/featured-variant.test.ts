@@ -10,6 +10,9 @@ import {
   resolveFeaturedImageSide,
   resolveFeaturedSectionHeight,
   resolveTextAlign,
+  resolveFeaturedBackgroundMode,
+  resolveFeaturedContentAlign,
+  resolveFeaturedCtaStyle,
 } from "@/lib/sections/featured-variant"
 
 describe("resolveFeaturedImageSide", () => {
@@ -59,6 +62,45 @@ describe("resolveFeaturedSectionHeight", () => {
   it("falls back to 'standard' (today's min-heights) for an invalid or missing value", () => {
     expect(resolveFeaturedSectionHeight(undefined)).toBe("standard")
     expect(resolveFeaturedSectionHeight("huge")).toBe("standard")
+  })
+})
+
+describe("resolveFeaturedBackgroundMode", () => {
+  it("accepts every declared option", () => {
+    expect(resolveFeaturedBackgroundMode("image")).toBe("image")
+    expect(resolveFeaturedBackgroundMode("color")).toBe("color")
+    expect(resolveFeaturedBackgroundMode("fullImage")).toBe("fullImage")
+  })
+
+  it("falls back to 'image' (today's only layout) for an invalid or missing value", () => {
+    expect(resolveFeaturedBackgroundMode(undefined)).toBe("image")
+    expect(resolveFeaturedBackgroundMode("video")).toBe("image")
+  })
+})
+
+describe("resolveFeaturedContentAlign", () => {
+  it("accepts every declared option", () => {
+    expect(resolveFeaturedContentAlign("left")).toBe("left")
+    expect(resolveFeaturedContentAlign("center")).toBe("center")
+    expect(resolveFeaturedContentAlign("right")).toBe("right")
+  })
+
+  it("falls back to 'left' for an invalid or missing value", () => {
+    expect(resolveFeaturedContentAlign(undefined)).toBe("left")
+    expect(resolveFeaturedContentAlign("top")).toBe("left")
+  })
+})
+
+describe("resolveFeaturedCtaStyle", () => {
+  it("accepts every declared option", () => {
+    expect(resolveFeaturedCtaStyle("link")).toBe("link")
+    expect(resolveFeaturedCtaStyle("solid")).toBe("solid")
+    expect(resolveFeaturedCtaStyle("outline")).toBe("outline")
+  })
+
+  it("falls back to 'link' (today's text-link CTA) for an invalid or missing value", () => {
+    expect(resolveFeaturedCtaStyle(undefined)).toBe("link")
+    expect(resolveFeaturedCtaStyle("ghost")).toBe("link")
   })
 })
 

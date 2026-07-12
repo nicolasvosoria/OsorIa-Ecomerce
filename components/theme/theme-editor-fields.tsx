@@ -1,10 +1,11 @@
-import { useCallback, useSyncExternalStore, type ReactNode } from "react"
+import { useCallback, type ReactNode } from "react"
 import { Pipette } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { useHasHydrated } from "@/lib/hooks/use-has-hydrated"
 
 const EYE_DROPPER_UNSUPPORTED_MESSAGE =
   "Disponible solo en navegadores basados en Chromium (Chrome/Edge)."
@@ -52,20 +53,12 @@ declare global {
 }
 
 // `window.EyeDropper` is unavailable during SSR, and only Chromium browsers
-// support it on the client. Gating the check behind a post-hydration flag
-// (mirrors `route-aware-chrome.tsx`/`editable-wrapper.tsx`) keeps the first
-// client render identical to the server render, so React never reports a
-// hydration mismatch. The pipette button itself always renders — on
+// support it on the client. Gating the check behind `useHasHydrated` keeps
+// the first client render identical to the server render, so React never
+// reports a hydration mismatch. The pipette button itself always renders — on
 // unsupported browsers (Firefox/Safari) it's disabled with a tooltip
 // explaining why, instead of silently disappearing; the native color input
 // remains the fallback there.
-const subscribeToHydrationStore = () => () => undefined
-const clientHydrationSnapshot = () => true
-const serverHydrationSnapshot = () => false
-
-function useHasHydrated() {
-  return useSyncExternalStore(subscribeToHydrationStore, clientHydrationSnapshot, serverHydrationSnapshot)
-}
 
 interface EyeDropperButtonProps {
   disabled?: boolean

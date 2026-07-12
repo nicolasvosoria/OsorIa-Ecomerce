@@ -1,7 +1,8 @@
 "use client"
 
 import { useAdmin } from "@/contexts/admin-context"
-import { type ReactNode, useCallback, useSyncExternalStore } from "react"
+import { type ReactNode, useCallback } from "react"
+import { useHasHydrated } from "@/lib/hooks/use-has-hydrated"
 import { isThemePreviewMode, THEME_PREVIEW_SELECT_SOURCE } from "@/lib/theme-font/preview-mode"
 import { usePreviewSelection } from "@/lib/theme-font/preview-selection"
 
@@ -11,21 +12,9 @@ interface EditableWrapperProps {
   label: string
 }
 
-// `isThemePreviewMode()` reads `window.location.search`, which is unavailable
-// during SSR. Gating it behind a post-hydration flag (mirrors
-// `route-aware-chrome.tsx`) keeps the first client render identical to the
-// server render, so React never reports a hydration mismatch.
-const subscribeToHydrationStore = () => () => undefined
-const clientHydrationSnapshot = () => true
-const serverHydrationSnapshot = () => false
-
 export function EditableWrapper({ componentName, children, label }: EditableWrapperProps) {
   const { isEditMode, selectedComponent, selectComponent } = useAdmin()
-  const hasHydrated = useSyncExternalStore(
-    subscribeToHydrationStore,
-    clientHydrationSnapshot,
-    serverHydrationSnapshot,
-  )
+  const hasHydrated = useHasHydrated()
   const isPreviewMode = hasHydrated && isThemePreviewMode()
   const previewSelectedComponent = usePreviewSelection()
 

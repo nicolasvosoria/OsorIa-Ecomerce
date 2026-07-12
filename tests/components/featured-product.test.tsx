@@ -199,3 +199,62 @@ describe("FeaturedProduct layout options", () => {
     expect(section.className).toContain("lg:min-h-[720px]")
   })
 })
+
+describe("FeaturedProduct backgroundMode", () => {
+  beforeEach(() => {
+    mockUseAdmin.mockReturnValue({ componentEdits: new Map(), isEditMode: false })
+    mockUseHydratedProductCard.mockReturnValue({ card: featuredCard, isLoading: false })
+  })
+
+  function renderWithStyles(overrides: Record<string, unknown> = {}) {
+    mockUseComponentStyle.mockImplementation((_name: string, defaults: Record<string, unknown>) => ({
+      styles: { ...defaults, ...overrides },
+    }))
+
+    return render(<FeaturedProduct />)
+  }
+
+  it("defaults to 'image' mode: no regression from today's side-anchored banner", () => {
+    const { container } = renderWithStyles()
+
+    const section = container.querySelector('[data-component="featured"]') as HTMLElement
+    expect(section.style.backgroundImage).toContain("woman-wearing-headphones-smiling.jpg")
+    expect(section.style.backgroundSize).toBe("contain")
+    expect(section.style.backgroundPosition).toBe("15% bottom")
+    expect(container.querySelector(".absolute.inset-0")).toBeNull()
+  })
+
+  it("'color' mode drops the lateral image for a full-bleed solid panel", () => {
+    const { container } = renderWithStyles({ backgroundMode: "color" })
+
+    const section = container.querySelector('[data-component="featured"]') as HTMLElement
+    expect(section.style.backgroundImage).toBe("")
+    expect(section.style.backgroundColor).toBe("var(--sec-featured-bg, var(--secondary))")
+
+    const contentColumn = section.querySelector(".container > div") as HTMLElement
+    expect(contentColumn.className).toContain("max-w-2xl")
+
+    expect(container.textContent).toContain(featuredCard.title)
+  })
+
+  it("'fullImage' mode renders the image as a full background with content on top", () => {
+    const { container } = renderWithStyles({ backgroundMode: "fullImage" })
+
+    const section = container.querySelector('[data-component="featured"]') as HTMLElement
+    expect(section.style.backgroundImage).toContain("woman-wearing-headphones-smiling.jpg")
+    expect(section.style.backgroundSize).toBe("cover")
+    expect(section.style.backgroundPosition).toBe("center")
+
+    const overlay = container.querySelector(".absolute.inset-0") as HTMLElement
+    expect(overlay).not.toBeNull()
+    expect(overlay.style.backgroundColor).toBe("rgb(15, 23, 42)")
+    expect(overlay.style.opacity).toBe("0.45")
+  })
+
+  it("falls back to 'image' mode for an invalid backgroundMode", () => {
+    const { container } = renderWithStyles({ backgroundMode: "video" })
+
+    const section = container.querySelector('[data-component="featured"]') as HTMLElement
+    expect(section.style.backgroundSize).toBe("contain")
+  })
+})
