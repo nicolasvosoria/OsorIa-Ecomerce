@@ -1,5 +1,5 @@
 import { getSupabaseEcommerce } from "./client";
-import { ECOMMERCE_TABLES } from "./contract";
+import { ECOMMERCE_FUNCTIONS, ECOMMERCE_TABLES } from "./contract";
 import { getStoreId } from "@/lib/utils/store";
 import { buildComboOrderSnapshotById } from "./combos-api";
 import type { ComboOrderSnapshot } from "@/lib/combos/types";
@@ -203,6 +203,29 @@ export interface InventoryValidationResult {
     available_quantity: number;
     message: string;
   }>;
+}
+
+// Item plano que espera la RPC ecommerce.decrement_inventory (autoridad
+// sobre el stock, ver decrementInventoryAtomically más abajo).
+interface InventoryDecrementItem {
+  variant_id: string | null;
+  product_id: string | null;
+  quantity: number;
+}
+
+// Mismo item, pero con datos de presentación (nombre/título) para poder
+// construir mensajes de error legibles si la RPC reporta un faltante.
+interface InventoryDecrementContext extends InventoryDecrementItem {
+  product_name: string;
+  variant_title?: string | null;
+}
+
+// Item sin stock suficiente, tal como lo devuelve ecommerce.decrement_inventory.
+interface InventoryShortage {
+  variant_id: string | null;
+  product_id: string | null;
+  requested: number;
+  available: number;
 }
 
 // Helper para manejar timeouts
@@ -497,57 +520,92 @@ async function hydrateOrderGraph(
   };
 }
 
+// Resuelve el store_id de nuestro catálogo a partir de un product_id y/o
+// variant_id. Se usa tanto para items normales (nivel superior) como para
+// los componentes de un combo (ver resolveOrderStoreId).
+async function resolveStoreIdFromCatalogRef(
+  supabase: any,
+  ref: { productId?: string | null; variantId?: string | null },
+): Promise<string | null> {
+  if (ref.productId) {
+    const productStoreResult = (await withTimeout(
+      supabase
+        .from(ECOMMERCE_TABLES.storeItems)
+        .select("store_id")
+        .eq("id", ref.productId)
+        .single(),
+      10000,
+      "resolveStoreFromProduct",
+    )) as { data: { store_id?: string | null } | null; error: any };
+
+    if (!productStoreResult.error && productStoreResult.data?.store_id) {
+      return productStoreResult.data.store_id;
+    }
+  }
+
+  if (ref.variantId) {
+    const variantStoreItemResult = (await withTimeout(
+      supabase
+        .from(ECOMMERCE_TABLES.itemVariants)
+        .select("store_item_id")
+        .eq("id", ref.variantId)
+        .single(),
+      10000,
+      "resolveStoreItemFromVariant",
+    )) as { data: { store_item_id?: string | null } | null; error: any };
+
+    if (
+      !variantStoreItemResult.error &&
+      variantStoreItemResult.data?.store_item_id
+    ) {
+      const storeByVariantResult = (await withTimeout(
+        supabase
+          .from(ECOMMERCE_TABLES.storeItems)
+          .select("store_id")
+          .eq("id", variantStoreItemResult.data.store_item_id)
+          .single(),
+        10000,
+        "resolveStoreFromVariant",
+      )) as { data: { store_id?: string | null } | null; error: any };
+
+      if (
+        !storeByVariantResult.error &&
+        storeByVariantResult.data?.store_id
+      ) {
+        return storeByVariantResult.data.store_id;
+      }
+    }
+  }
+
+  return null;
+}
+
 async function resolveOrderStoreId(
   supabase: any,
   items: CreateOrderData["items"],
 ): Promise<string | null> {
   for (const item of items) {
-    if (item.product_id) {
-      const productStoreResult = (await withTimeout(
-        supabase
-          .from(ECOMMERCE_TABLES.storeItems)
-          .select("store_id")
-          .eq("id", item.product_id)
-          .single(),
-        10000,
-        "resolveStoreFromProduct",
-      )) as { data: { store_id?: string | null } | null; error: any };
-
-      if (!productStoreResult.error && productStoreResult.data?.store_id) {
-        return productStoreResult.data.store_id;
-      }
+    const catalogStoreId = await resolveStoreIdFromCatalogRef(supabase, {
+      productId: item.product_id,
+      variantId: item.variant_id,
+    });
+    if (catalogStoreId) {
+      return catalogStoreId;
     }
 
-    if (item.variant_id) {
-      const variantStoreItemResult = (await withTimeout(
-        supabase
-          .from(ECOMMERCE_TABLES.itemVariants)
-          .select("store_item_id")
-          .eq("id", item.variant_id)
-          .single(),
-        10000,
-        "resolveStoreItemFromVariant",
-      )) as { data: { store_item_id?: string | null } | null; error: any };
-
-      if (
-        !variantStoreItemResult.error &&
-        variantStoreItemResult.data?.store_item_id
-      ) {
-        const storeByVariantResult = (await withTimeout(
-          supabase
-            .from(ECOMMERCE_TABLES.storeItems)
-            .select("store_id")
-            .eq("id", variantStoreItemResult.data.store_item_id)
-            .single(),
-          10000,
-          "resolveStoreFromVariant",
-        )) as { data: { store_id?: string | null } | null; error: any };
-
-        if (
-          !storeByVariantResult.error &&
-          storeByVariantResult.data?.store_id
-        ) {
-          return storeByVariantResult.data.store_id;
+    // Los items combo llegan con product_id/variant_id en null
+    // (prepareComboOrderItems los limpia): el store hay que resolverlo desde
+    // el primer componente del snapshot del combo que sí referencie nuestro
+    // catálogo.
+    const comboSnapshot = getComboSnapshotFromMetadata(item);
+    if (comboSnapshot) {
+      for (const component of comboSnapshot.components) {
+        const comboStoreId = await resolveStoreIdFromCatalogRef(supabase, {
+          productId: component.productId,
+          variantId: component.variantId,
+        });
+        if (comboStoreId) {
+          return comboStoreId;
         }
       }
     }
@@ -558,8 +616,18 @@ async function resolveOrderStoreId(
     return contextStoreId;
   }
 
+  // Fallback determinista: `stores` no tiene columna `is_default` en el
+  // esquema actual, así que se toma la tienda activa más antigua (orden
+  // estable por created_at). Multi-tenant no está activo hoy: cuando lo
+  // esté (Plan E) esta resolución "a ciegas" deberá revisarse, porque no
+  // debe adivinar tienda en un entorno con varias tiendas reales.
   const defaultStoreResult = (await withTimeout(
-    supabase.from(ECOMMERCE_TABLES.stores).select("id").eq("is_default", true).limit(1),
+    supabase
+      .from(ECOMMERCE_TABLES.stores)
+      .select("id")
+      .eq("is_active", true)
+      .order("created_at", { ascending: true })
+      .limit(1),
     10000,
     "resolveDefaultStore",
   )) as { data: Array<{ id: string }> | null; error: any };
@@ -665,9 +733,154 @@ async function prepareComboOrderItems(
   return preparedItems;
 }
 
+async function fetchAuthoritativeVariantPrices(
+  supabase: any,
+  variantIds: string[],
+): Promise<Map<string, { price: number | null; itemId: string }>> {
+  if (variantIds.length === 0) return new Map();
+
+  const result = (await withTimeout(
+    supabase
+      .from(ECOMMERCE_TABLES.itemVariants)
+      .select("id, price, item_id")
+      .in("id", variantIds),
+    15000,
+    "fetchAuthoritativeVariantPrices",
+  )) as {
+    data: Array<{ id: string; price: number | null; item_id: string }> | null;
+    error: any;
+  };
+
+  if (result.error) {
+    throw new Error(
+      `No se pudieron validar las variantes del pedido: ${result.error.message || result.error}`,
+    );
+  }
+
+  return new Map(
+    (result.data || []).map((variant) => [
+      variant.id,
+      { price: variant.price, itemId: variant.item_id },
+    ]),
+  );
+}
+
+async function fetchAuthoritativeStoreItemPrices(
+  supabase: any,
+  productIds: string[],
+): Promise<Map<string, { basePrice: number; currencyCode: string }>> {
+  if (productIds.length === 0) return new Map();
+
+  const result = (await withTimeout(
+    supabase
+      .from(ECOMMERCE_TABLES.storeItems)
+      .select("id, base_price, currency_code")
+      .in("id", productIds),
+    15000,
+    "fetchAuthoritativeStoreItemPrices",
+  )) as {
+    data: Array<{ id: string; base_price: number; currency_code: string }> | null;
+    error: any;
+  };
+
+  if (result.error) {
+    throw new Error(
+      `No se pudieron validar los productos del pedido: ${result.error.message || result.error}`,
+    );
+  }
+
+  return new Map(
+    (result.data || []).map((product) => [
+      product.id,
+      { basePrice: product.base_price, currencyCode: product.currency_code },
+    ]),
+  );
+}
+
 /**
- * Validar inventario antes de crear una orden
- * Verifica que todos los productos tengan suficiente stock disponible
+ * Recalcula unit_price/total_price/currency_code desde la DB para cada item que
+ * referencia nuestro catálogo, ignorando lo que envíe el cliente. Los combos ya
+ * llegan con precio autoritativo (prepareComboOrderItems) y se dejan intactos.
+ *
+ * Si un product_id/variant_id no resuelve en la DB, el item se trata como
+ * externo (p. ej. Shopify) y conserva el precio del cliente para ese item, igual
+ * que ya hacen validateInventoryBeforeOrder/resolveOrderStoreId. Esto es
+ * transitorio: cuando se retire el remanente de Shopify, todo item deberá
+ * resolver en el catálogo y esta rama externa queda sin uso.
+ */
+async function applyAuthoritativePricing(
+  items: CreateOrderData["items"],
+  supabase: any,
+): Promise<CreateOrderData["items"]> {
+  const pricableItems = items.filter((item) => !getComboIdFromOrderItem(item));
+
+  const variantIds = [
+    ...new Set(
+      pricableItems
+        .map((item) => item.variant_id)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  const variantById = await fetchAuthoritativeVariantPrices(supabase, variantIds);
+
+  const directProductIds = pricableItems
+    .filter((item) => !item.variant_id)
+    .map((item) => item.product_id)
+    .filter((id): id is string => Boolean(id));
+  const variantProductIds = [...variantById.values()].map((variant) => variant.itemId);
+  const productIds = [...new Set([...directProductIds, ...variantProductIds])];
+  const productById = await fetchAuthoritativeStoreItemPrices(supabase, productIds);
+
+  return items.map((item) => {
+    if (getComboIdFromOrderItem(item)) {
+      return item;
+    }
+
+    if (item.variant_id) {
+      const variant = variantById.get(item.variant_id);
+      if (!variant) {
+        return item;
+      }
+
+      const product = productById.get(variant.itemId);
+      const unitPrice = Number(variant.price ?? product?.basePrice ?? 0);
+      return {
+        ...item,
+        unit_price: unitPrice,
+        total_price: unitPrice * item.quantity,
+        currency_code: product?.currencyCode || item.currency_code || "COP",
+      };
+    }
+
+    if (item.product_id) {
+      const product = productById.get(item.product_id);
+      if (!product) {
+        return item;
+      }
+
+      const unitPrice = Number(product.basePrice ?? 0);
+      return {
+        ...item,
+        unit_price: unitPrice,
+        total_price: unitPrice * item.quantity,
+        currency_code: product.currencyCode || "COP",
+      };
+    }
+
+    return item;
+  });
+}
+
+/**
+ * Validar inventario antes de crear una orden.
+ * Verifica que todos los productos tengan suficiente stock disponible en el
+ * momento de la validación, pero es solo un pre-chequeo best-effort para UX
+ * (evita llegar hasta el descuento cuando ya se sabe que no hay stock):
+ * existe una ventana de carrera entre esta validación y la creación real de
+ * la orden. La AUTORIDAD sobre el stock es la RPC atómica
+ * ecommerce.decrement_inventory (ver decrementInventoryAtomically más abajo),
+ * que es quien realmente decide si hay stock suficiente al momento de
+ * descontar y puede hacer que la orden se elimine si no lo hay.
  */
 async function validateInventoryBeforeOrder(
   items: CreateOrderData["items"],
@@ -833,192 +1046,148 @@ async function validateInventoryBeforeOrder(
 }
 
 /**
- * Actualizar el inventario después de crear una orden
- * Resta las cantidades vendidas del stock disponible
+ * Aplana los items de una orden ya persistida a la lista de decrementos que
+ * espera ecommerce.decrement_inventory, expandiendo combos a sus componentes
+ * -- misma expansión que antes hacía updateInventoryAfterOrder a mano, item
+ * por item, con lecturas intermedias.
  */
-async function updateInventoryAfterOrder(
+function buildInventoryDecrementPlan(
   items: OrderItem[],
-  supabaseOverride?: any,
-): Promise<void> {
-  try {
-    const supabase = supabaseOverride ?? getSupabaseEcommerce();
-    if (!supabase) {
-      console.error(
-        "[Orders] Supabase no configurado para actualizar inventario",
-      );
-      return;
-    }
+): InventoryDecrementContext[] {
+  const plan: InventoryDecrementContext[] = [];
 
-    // Procesar cada item de la orden
-    for (const item of items) {
-      try {
-        const comboSnapshot = getComboSnapshotFromMetadata(item);
-        if (comboSnapshot) {
-          for (const component of comboSnapshot.components) {
-            const deductedQuantity = component.quantity * item.quantity;
+  for (const item of items) {
+    const comboSnapshot = getComboSnapshotFromMetadata(item);
+    if (comboSnapshot) {
+      for (const component of comboSnapshot.components) {
+        const quantity = component.quantity * item.quantity;
 
-            if (component.variantId) {
-              const variantResult = (await withTimeout(
-                supabase
-                  .from(ECOMMERCE_TABLES.itemVariants)
-                  .select("track_inventory, inventory_quantity")
-                  .eq("id", component.variantId)
-                  .single(),
-                10000,
-                "getComboVariantForInventory",
-              )) as { data: any; error: any };
-
-              if (!variantResult.error && variantResult.data?.track_inventory) {
-                const currentQuantity = variantResult.data.inventory_quantity || 0;
-                await withTimeout(
-                  supabase
-                    .from(ECOMMERCE_TABLES.itemVariants)
-                    .update({
-                      inventory_quantity: Math.max(0, currentQuantity - deductedQuantity),
-                    })
-                    .eq("id", component.variantId),
-                  10000,
-                  "updateComboVariantInventory",
-                );
-              }
-              continue;
-            }
-
-            const productResult = (await withTimeout(
-              supabase
-                .from(ECOMMERCE_TABLES.storeItems)
-                .select("track_inventory, inventory_quantity")
-                .eq("id", component.productId)
-                .single(),
-              10000,
-              "getComboProductForInventory",
-            )) as { data: any; error: any };
-
-            if (!productResult.error && productResult.data?.track_inventory) {
-              const currentQuantity = productResult.data.inventory_quantity || 0;
-              await withTimeout(
-                supabase
-                  .from(ECOMMERCE_TABLES.storeItems)
-                  .update({
-                    inventory_quantity: Math.max(0, currentQuantity - deductedQuantity),
-                  })
-                  .eq("id", component.productId),
-                10000,
-                "updateComboProductInventory",
-              );
-            }
-          }
-          continue;
+        if (component.variantId) {
+          plan.push({
+            variant_id: component.variantId,
+            product_id: component.productId ?? null,
+            quantity,
+            product_name: component.productName,
+            variant_title: component.variantTitle,
+          });
+        } else if (component.productId) {
+          plan.push({
+            variant_id: null,
+            product_id: component.productId,
+            quantity,
+            product_name: component.productName,
+          });
         }
-
-        // Si hay variant_id, actualizar inventario de la variante
-        if (item.variant_id) {
-          // Obtener la variante actual
-          const variantResult = (await withTimeout(
-            supabase
-              .from(ECOMMERCE_TABLES.itemVariants)
-              .select("track_inventory, inventory_quantity")
-              .eq("id", item.variant_id)
-              .single(),
-            10000,
-            "getVariantForInventory",
-          )) as { data: any; error: any };
-
-          if (variantResult.error || !variantResult.data) {
-            console.warn(
-              `[Orders] No se pudo obtener variante ${item.variant_id} para actualizar inventario`,
-            );
-            continue;
-          }
-
-          const variant = variantResult.data;
-
-          // Solo actualizar si track_inventory es true
-          if (variant.track_inventory) {
-            const currentQuantity = variant.inventory_quantity || 0;
-            const newQuantity = Math.max(0, currentQuantity - item.quantity);
-
-            const updateResult = (await withTimeout(
-              supabase
-                .from(ECOMMERCE_TABLES.itemVariants)
-                .update({ inventory_quantity: newQuantity })
-                .eq("id", item.variant_id),
-              10000,
-              "updateVariantInventory",
-            )) as { error: any };
-
-            if (updateResult.error) {
-              console.error(
-                `[Orders] Error al actualizar inventario de variante ${item.variant_id}:`,
-                updateResult.error,
-              );
-            } else {
-              console.log(
-                `[Orders] Inventario de variante ${item.variant_id} actualizado: ${currentQuantity} -> ${newQuantity}`,
-              );
-            }
-          }
-        }
-        // Si hay product_id pero no variant_id, actualizar inventario del producto
-        else if (item.product_id) {
-          // Obtener el producto actual
-          const productResult = (await withTimeout(
-            supabase
-              .from(ECOMMERCE_TABLES.storeItems)
-              .select("track_inventory, inventory_quantity")
-              .eq("id", item.product_id)
-              .single(),
-            10000,
-            "getProductForInventory",
-          )) as { data: any; error: any };
-
-          if (productResult.error || !productResult.data) {
-            console.warn(
-              `[Orders] No se pudo obtener producto ${item.product_id} para actualizar inventario`,
-            );
-            continue;
-          }
-
-          const product = productResult.data;
-
-          // Solo actualizar si track_inventory es true
-          if (product.track_inventory) {
-            const currentQuantity = product.inventory_quantity || 0;
-            const newQuantity = Math.max(0, currentQuantity - item.quantity);
-
-            const updateResult = (await withTimeout(
-              supabase
-                .from(ECOMMERCE_TABLES.storeItems)
-                .update({ inventory_quantity: newQuantity })
-                .eq("id", item.product_id),
-              10000,
-              "updateProductInventory",
-            )) as { error: any };
-
-            if (updateResult.error) {
-              console.error(
-                `[Orders] Error al actualizar inventario de producto ${item.product_id}:`,
-                updateResult.error,
-              );
-            } else {
-              console.log(
-                `[Orders] Inventario de producto ${item.product_id} actualizado: ${currentQuantity} -> ${newQuantity}`,
-              );
-            }
-          }
-        }
-      } catch (error: any) {
-        // Continuar con el siguiente item si hay un error
-        console.error(
-          `[Orders] Error al procesar inventario para item ${item.id}:`,
-          error,
-        );
       }
+      continue;
     }
-  } catch (error: any) {
-    // No lanzar error, solo registrar para no interrumpir el flujo de creación de orden
-    console.error("[Orders] Error inesperado al actualizar inventario:", error);
+
+    if (item.variant_id) {
+      plan.push({
+        variant_id: item.variant_id,
+        product_id: item.product_id ?? null,
+        quantity: item.quantity,
+        product_name: item.product_name,
+        variant_title: item.variant_title,
+      });
+    } else if (item.product_id) {
+      plan.push({
+        variant_id: null,
+        product_id: item.product_id,
+        quantity: item.quantity,
+        product_name: item.product_name,
+      });
+    }
   }
+
+  return plan;
+}
+
+/**
+ * Descuenta inventario de forma ATÓMICA vía la RPC
+ * ecommerce.decrement_inventory (ver migración
+ * supabase/migrations/20260713000100_ecommerce_atomic_inventory.sql). La
+ * función valida y descuenta en una única sentencia UPDATE condicional por
+ * item, dentro de la transacción implícita de la función: elimina la
+ * ventana de carrera del viejo read-then-write (dos compras concurrentes del
+ * último stock ya no pueden leer el mismo valor y descontar ambas).
+ *
+ * Esta llamada es la AUTORIDAD sobre el stock. Un resultado con `shortages`
+ * no vacío significa que la orden ya creada no tiene respaldo real de stock
+ * y debe tratarse como si la validación hubiera fallado (ver createOrder).
+ */
+async function decrementInventoryAtomically(
+  supabase: any,
+  orderId: string,
+  storeId: string | null,
+  orderItems: OrderItem[],
+): Promise<{ shortages: InventoryShortage[] }> {
+  const plan = buildInventoryDecrementPlan(orderItems);
+  if (plan.length === 0) {
+    return { shortages: [] };
+  }
+
+  const items: InventoryDecrementItem[] = plan.map(
+    ({ variant_id, product_id, quantity }) => ({ variant_id, product_id, quantity }),
+  );
+
+  const result = (await withTimeout(
+    supabase.rpc(ECOMMERCE_FUNCTIONS.decrementInventory, {
+      p_order_id: orderId,
+      p_store_id: storeId,
+      p_items: items,
+    }),
+    15000,
+    "decrementInventory",
+  )) as { data: InventoryShortage[] | null; error: any };
+
+  if (result.error) {
+    // Error de infraestructura (timeout, RPC no disponible, etc.), NO un
+    // faltante de stock: se propaga tal cual para que el llamador decida
+    // (comportamiento best-effort, no borra la orden).
+    throw result.error;
+  }
+
+  return { shortages: result.data || [] };
+}
+
+/**
+ * Arma un InventoryValidationResult (mismo formato que
+ * validateInventoryBeforeOrder) a partir de los faltantes reportados por
+ * decrementInventoryAtomically, recuperando nombre/título de los items
+ * originales para mensajes legibles.
+ */
+function buildShortageValidationResult(
+  shortages: InventoryShortage[],
+  orderItems: OrderItem[],
+): InventoryValidationResult {
+  const contexts = buildInventoryDecrementPlan(orderItems);
+
+  const errors = shortages.map((shortage) => {
+    const context = contexts.find((candidate) =>
+      shortage.variant_id
+        ? candidate.variant_id === shortage.variant_id
+        : candidate.product_id === shortage.product_id,
+    );
+    const label = `${context?.product_name || "Producto"}${
+      context?.variant_title ? ` - ${context.variant_title}` : ""
+    }`;
+
+    return {
+      product_name: context?.product_name || "Producto",
+      product_id: shortage.product_id || undefined,
+      variant_id: shortage.variant_id || undefined,
+      variant_title: context?.variant_title || undefined,
+      requested_quantity: shortage.requested,
+      available_quantity: shortage.available,
+      message:
+        shortage.available === 0
+          ? `${label} está agotado`
+          : `Solo hay ${shortage.available} unidad${shortage.available !== 1 ? "es" : ""} disponible${shortage.available !== 1 ? "s" : ""} de ${label}. Solicitaste ${shortage.requested}`,
+    };
+  });
+
+  return { isValid: false, errors };
 }
 
 /**
@@ -1038,23 +1207,30 @@ export async function createOrder(
 
     const sanitizedItems = orderData.items.map(stripUntrustedComboSnapshotMetadata);
     const preparedItems = await prepareComboOrderItems(sanitizedItems, supabase);
-    const recalculatedSubtotal = preparedItems.reduce(
+    const pricedItems = await applyAuthoritativePricing(preparedItems, supabase);
+
+    const recalculatedSubtotal = pricedItems.reduce(
       (sum, item) => sum + Number(item.total_price || 0),
       0,
     );
-    const hasComboItems = preparedItems.some((item) => getComboIdFromOrderItem(item));
-    const normalizedOrderData: CreateOrderData = hasComboItems
-      ? {
-          ...orderData,
-          items: preparedItems,
-          subtotal: recalculatedSubtotal,
-          total_amount:
-            recalculatedSubtotal +
-            (orderData.shipping_cost || 0) +
-            (orderData.tax_amount || 0) -
-            (orderData.discount_amount || 0),
-        }
-      : { ...orderData, items: preparedItems };
+    // Envío e impuestos no tienen cálculo real todavía (fuera de alcance, otro
+    // plan); se fuerzan a 0 en vez de confiar en lo que envíe el cliente.
+    const shippingCost = 0;
+    const taxAmount = 0;
+    const discountAmount = Math.min(
+      Math.max(Number(orderData.discount_amount || 0), 0),
+      recalculatedSubtotal,
+    );
+
+    const normalizedOrderData: CreateOrderData = {
+      ...orderData,
+      items: pricedItems,
+      subtotal: recalculatedSubtotal,
+      shipping_cost: shippingCost,
+      tax_amount: taxAmount,
+      discount_amount: discountAmount,
+      total_amount: recalculatedSubtotal + shippingCost + taxAmount - discountAmount,
+    };
 
     // Validar inventario antes de crear la orden
     const validationResult = await validateInventoryBeforeOrder(
@@ -1214,19 +1390,58 @@ export async function createOrder(
 
     await maybeInsertPaymentTransaction(supabase, order, normalizedOrderData.metadata);
 
-    // Actualizar inventario después de crear la orden exitosamente
-    // Ejecutamos de forma síncrona para asegurar consistencia de datos
+    // Descontar inventario de forma ATÓMICA después de crear la orden.
+    // Esta RPC es la autoridad sobre el stock (ver decrementInventoryAtomically):
+    // si reporta faltantes, la orden recién creada no tiene respaldo real y
+    // se elimina para no dejarla huérfana ni sobrevender.
     try {
-      await updateInventoryAfterOrder(orderItems, supabase);
+      const { shortages } = await decrementInventoryAtomically(
+        supabase,
+        order.id,
+        resolvedStoreId,
+        orderItems,
+      );
+
+      if (shortages.length > 0) {
+        await withTimeout(
+          supabase.from(ECOMMERCE_TABLES.orders).delete().eq("id", order.id),
+          15000,
+          "deleteOrderAfterInventoryShortage",
+        ).catch((deleteError) => {
+          console.error(
+            "[Orders] No se pudo eliminar la orden tras detectar faltante de stock:",
+            deleteError,
+          );
+        });
+
+        const validationResult = buildShortageValidationResult(
+          shortages,
+          orderItems,
+        );
+        const error = new Error(
+          `No hay suficiente stock disponible:\n${validationResult.errors
+            .map((err) => err.message)
+            .join("\n")}`,
+        );
+        (error as any).validationResult = validationResult;
+        throw error;
+      }
     } catch (error: any) {
-      // Si falla la actualización del inventario, registramos el error pero no fallamos la orden
-      // Esto permite que la orden se cree exitosamente y se pueda corregir el inventario manualmente después
+      if (error?.validationResult) {
+        // Faltante real de stock: se relanza para que el catch externo de
+        // createOrder lo propague (la API responde 409).
+        throw error;
+      }
+
+      // Error de infraestructura al llamar la RPC (timeout, red, etc.), no
+      // un faltante de stock. Comportamiento best-effort: registramos y NO
+      // borramos la orden, se puede corregir el inventario manualmente.
       console.error(
-        "[Orders] Error al actualizar inventario después de crear orden:",
+        "[Orders] Error al descontar inventario después de crear orden:",
         error,
       );
       console.warn(
-        "[Orders] ⚠️ La orden fue creada exitosamente, pero el inventario no se actualizó. Revisar manualmente.",
+        "[Orders] ⚠️ La orden fue creada exitosamente, pero el inventario no se pudo descontar de forma confiable. Revisar manualmente.",
       );
     }
 

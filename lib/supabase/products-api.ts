@@ -17,6 +17,7 @@ import {
   listCombos,
 } from './combos-api'
 import { buildProductImageRows } from './product-image-rows'
+import { sanitizeIlikeSearchTerm } from '@/lib/security/postgrest-search'
 
 const MAX_PRODUCT_IMAGES = 5
 const MAX_ADDITIONAL_PRODUCT_IMAGES = MAX_PRODUCT_IMAGES - 1
@@ -306,8 +307,9 @@ export async function getItems(params: GetItemsParams = {}): Promise<GetItemsRes
         query = query.eq('is_featured', is_featured)
       }
 
-      if (search) {
-        query = query.or(`item_name.ilike.%${search}%,item_description.ilike.%${search}%,item_code.ilike.%${search}%`)
+      const sanitizedSearch = sanitizeIlikeSearchTerm(search)
+      if (sanitizedSearch) {
+        query = query.or(`item_name.ilike.%${sanitizedSearch}%,item_description.ilike.%${sanitizedSearch}%,item_code.ilike.%${sanitizedSearch}%`)
       }
 
       if (tags && tags.length > 0) {

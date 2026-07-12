@@ -47,6 +47,7 @@ export const ECOMMERCE_VIEWS = {
 } as const satisfies Record<string, EcommerceViewName>;
 
 export const ECOMMERCE_FUNCTIONS = {
+  decrementInventory: "decrement_inventory",
   incrementItemViews: "increment_item_views",
   isComponentStylesAdmin: "is_component_styles_admin",
   isStorageAdmin: "is_storage_admin",

@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { ECOMMERCE_SCHEMA, ECOMMERCE_TABLES } from "@/lib/supabase/contract"
+import { getOrderById } from "@/lib/supabase/orders-api"
+import {
+  generateInvoiceEmailHTML,
+  sendEmail,
+} from "@/lib/orders/order-confirmation-email"
 
 /**
  * GET /api/orders/test-confirmation-email?to=email@ejemplo.com
@@ -30,7 +35,7 @@ export async function GET(request: NextRequest) {
     const supabase = createClient(supabaseUrl, supabaseKey).schema(ECOMMERCE_SCHEMA)
     const { data: orders, error: orderError } = await supabase
       .from(ECOMMERCE_TABLES.orders)
-      .select("id, order_number, customer_email, customer_first_name, customer_last_name")
+      .select("id")
       .order("created_at", { ascending: false })
       .limit(1)
 
@@ -44,52 +49,37 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const last = orders[0]
-    const orderId = last.id
-    const orderNumber = last.order_number
-    const customerEmail = request.nextUrl.searchParams.get("to") || last.customer_email
-    const customerName =
-      last.customer_first_name && last.customer_last_name
-        ? `${last.customer_first_name} ${last.customer_last_name}`
-        : undefined
-
-    const base =
-      process.env.NEXT_PUBLIC_APP_URL ||
-      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
-      `http://${request.headers.get("host") || "localhost:3000"}`
-
-    const res = await fetch(`${base}/api/orders/send-confirmation-email`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        orderId,
-        orderNumber,
-        customerEmail,
-        customerName,
-      }),
-    })
-
-    const data = await res.json()
-
-    if (!res.ok) {
+    const order = await getOrderById(orders[0].id)
+    if (!order) {
       return NextResponse.json(
-        {
-          ok: false,
-          message: "Error al enviar el correo",
-          detail: data,
-        },
+        { ok: false, message: "No se pudo cargar el pedido." },
         { status: 200 }
       )
     }
 
-    return NextResponse.json({
-      ok: data.success,
-      message: data.success
-        ? `Correo de confirmación enviado a ${customerEmail} (pedido #${orderNumber})`
-        : data.warning || data.message,
-      orderNumber,
+    const customerEmail = request.nextUrl.searchParams.get("to") || order.customer_email
+    const customerName =
+      [order.customer_first_name, order.customer_last_name].filter(Boolean).join(" ") ||
+      undefined
+
+    const host = request.headers.get("host")
+    const protocol = request.headers.get("x-forwarded-proto") || "http"
+    const baseUrl = host ? `${protocol}://${host}` : ""
+    const emailHtml = generateInvoiceEmailHTML(order, customerName, baseUrl)
+
+    const emailSent = await sendEmail({
       to: customerEmail,
-      error: data.error,
+      subject: `Confirmación de Pedido #${order.order_number}`,
+      html: emailHtml,
+    })
+
+    return NextResponse.json({
+      ok: emailSent.success,
+      message: emailSent.success
+        ? `Correo de confirmación enviado a ${customerEmail} (pedido #${order.order_number})`
+        : emailSent.error,
+      orderNumber: order.order_number,
+      to: customerEmail,
     })
   } catch (err: any) {
     console.error("Error en test-confirmation-email:", err)

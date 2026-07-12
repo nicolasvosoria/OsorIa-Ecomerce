@@ -276,30 +276,6 @@ export default function CheckoutPage() {
     localStorage.setItem("last_order_number", order.order_number)
     localStorage.setItem("last_order_id", order.id)
 
-    // Enviar correo de confirmación con factura
-    try {
-      const response = await fetch("/api/orders/send-confirmation-email", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          orderId: order.id,
-          orderNumber: order.order_number,
-          customerEmail: data.email,
-          customerName: `${data.firstName} ${data.lastName}`,
-        }),
-      })
-
-      if (!response.ok) {
-        console.error("Error al enviar correo de confirmación")
-        // No fallar el proceso si el correo falla
-      }
-    } catch (emailError) {
-      console.error("Error al enviar correo:", emailError)
-      // No fallar el proceso si el correo falla
-    }
-
     toast.success(`Pedido creado: ${order.order_number}`)
 
     // Si hay un checkoutUrl de Shopify y estamos usando ese carrito, redirigir allí

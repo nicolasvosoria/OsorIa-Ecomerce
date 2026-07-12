@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { NextRequest } from "next/server";
 
 import {
   createOrder,
@@ -9,24 +10,51 @@ import {
   type CreateOrderData,
 } from "@/lib/supabase/orders-api";
 import { loadSuccessPageFallbackOrder } from "@/app/checkout/success/fallback-order";
+import { POST as postOrder } from "@/app/api/orders/route";
 
-const { getSupabaseEcommerceMock, getStoreIdMock } = vi.hoisted(() => ({
+const {
+  getSupabaseEcommerceMock,
+  getStoreIdMock,
+  getServiceEcommerceClientMock,
+  sendEmailMock,
+} = vi.hoisted(() => ({
   getSupabaseEcommerceMock: vi.fn(),
   getStoreIdMock: vi.fn(),
+  getServiceEcommerceClientMock: vi.fn(),
+  sendEmailMock: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase/client", () => ({
   getSupabaseEcommerce: getSupabaseEcommerceMock,
 }));
 
+vi.mock("@/lib/orders/order-confirmation-email", () => ({
+  generateInvoiceEmailHTML: vi.fn().mockReturnValue("<html></html>"),
+  sendEmail: sendEmailMock,
+}));
+
 vi.mock("@/lib/utils/store", () => ({
   getStoreId: getStoreIdMock,
+}));
+
+vi.mock("@/lib/supabase/service-client", () => ({
+  getServiceEcommerceClient: getServiceEcommerceClientMock,
+}));
+
+vi.mock("next/headers", () => ({
+  cookies: async () => ({ get: () => undefined }),
+}));
+
+vi.mock("@supabase/ssr", () => ({
+  createServerClient: () => ({
+    auth: { getUser: async () => ({ data: { user: null }, error: null }) },
+  }),
 }));
 
 type ScriptedResponse = { data?: any; error?: any; count?: number };
 
 class QueryBuilder {
-  private mode: "select" | "insert" | "update" = "select";
+  private mode: "select" | "insert" | "update" | "delete" = "select";
 
   constructor(
     private readonly state: MockSupabaseState,
@@ -54,7 +82,16 @@ class QueryBuilder {
     return this;
   }
 
-  eq(): this {
+  delete(): this {
+    this.mode = "delete";
+    return this;
+  }
+
+  eq(column?: string, value?: any): this {
+    if (this.mode === "delete") {
+      this.state.deletes[this.table] = this.state.deletes[this.table] || [];
+      this.state.deletes[this.table].push({ column, value });
+    }
     return this;
   }
 
@@ -99,6 +136,8 @@ class MockSupabaseState {
   public readonly fromCalls: string[] = [];
   public readonly inserts: Record<string, any[]> = {};
   public readonly updates: Record<string, any[]> = {};
+  public readonly deletes: Record<string, Array<{ column?: string; value?: any }>> = {};
+  public readonly rpcCalls: Array<{ fn: string; params: any }> = [];
 
   constructor(private readonly script: Record<string, ScriptedResponse[]>) {}
 
@@ -107,11 +146,27 @@ class MockSupabaseState {
     return new QueryBuilder(this, table);
   };
 
-  next(table: string, mode: "select" | "insert" | "update"): ScriptedResponse {
+  // Mock de supabase.rpc(...) usado por ecommerce.decrement_inventory. Por
+  // defecto responde "sin faltantes" (data: []) para no romper los flujos
+  // felices existentes; los tests que necesiten otro resultado lo scriptean
+  // bajo la clave `rpc:<nombre_funcion>`.
+  rpc = (fn: string, params: any): Promise<ScriptedResponse> => {
+    this.rpcCalls.push({ fn, params });
+    const queue = this.script[`rpc:${fn}`];
+    if (!queue || queue.length === 0) {
+      return Promise.resolve({ data: [], error: null });
+    }
+    return Promise.resolve(queue.shift()!);
+  };
+
+  next(
+    table: string,
+    mode: "select" | "insert" | "update" | "delete",
+  ): ScriptedResponse {
     const key = `${table}:${mode}`;
     const queue = this.script[key];
     if (!queue || queue.length === 0) {
-      if (mode === "update") {
+      if (mode === "update" || mode === "delete") {
         return { error: null };
       }
       if (mode === "insert") {
@@ -153,11 +208,18 @@ describe("orders-api live order contract", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getStoreIdMock.mockResolvedValue(null);
+    sendEmailMock.mockResolvedValue({ success: true });
   });
 
   it("creates live order graph with store_id, explicit item UUIDs, and shipping address row", async () => {
     const state = new MockSupabaseState({
       "store_items:select": [
+        {
+          data: [
+            { id: "store-item-1", base_price: 100000, currency_code: "COP" },
+          ],
+          error: null,
+        },
         {
           data: { track_inventory: false, inventory_quantity: 10 },
           error: null,
@@ -210,10 +272,9 @@ describe("orders-api live order contract", () => {
         },
       ],
       "order_addresses:insert": [{ data: [{ id: "addr-1" }], error: null }],
-      "store_items:update": [{ error: null }],
     });
 
-    getSupabaseEcommerceMock.mockReturnValue({ from: state.from });
+    getSupabaseEcommerceMock.mockReturnValue({ from: state.from, rpc: state.rpc });
 
     const created = await createOrder(baseOrderData);
 
@@ -245,6 +306,12 @@ describe("orders-api live order contract", () => {
     const state = new MockSupabaseState({
       "item_variants:select": [
         {
+          data: [
+            { id: "variant-1", price: 100000, item_id: "store-item-2" },
+          ],
+          error: null,
+        },
+        {
           data: {
             track_inventory: false,
             inventory_quantity: 5,
@@ -255,6 +322,12 @@ describe("orders-api live order contract", () => {
         { data: { store_item_id: "store-item-2" }, error: null },
       ],
       "store_items:select": [
+        {
+          data: [
+            { id: "store-item-2", base_price: 100000, currency_code: "COP" },
+          ],
+          error: null,
+        },
         { data: { store_id: "store-uuid-2" }, error: null },
       ],
       "orders:insert": [
@@ -276,7 +349,7 @@ describe("orders-api live order contract", () => {
       "order_addresses:insert": [{ data: [{ id: "addr-2" }], error: null }],
     });
 
-    getSupabaseEcommerceMock.mockReturnValue({ from: state.from });
+    getSupabaseEcommerceMock.mockReturnValue({ from: state.from, rpc: state.rpc });
 
     await createOrder({
       ...baseOrderData,
@@ -457,11 +530,9 @@ describe("orders-api live order contract", () => {
       ],
       "order_combo_snapshots:insert": [{ data: [{ id: "snapshot-1" }], error: null }],
       "order_addresses:insert": [{ data: [{ id: "addr-combo" }], error: null }],
-      "store_items:update": [{ error: null }],
-      "item_variants:update": [{ error: null }],
     });
 
-    getSupabaseEcommerceMock.mockReturnValue({ from: state.from });
+    getSupabaseEcommerceMock.mockReturnValue({ from: state.from, rpc: state.rpc });
 
     const created = await createOrder({
       ...baseOrderData,
@@ -495,8 +566,157 @@ describe("orders-api live order contract", () => {
       charged_unit_price: 72000,
       charged_line_total: 144000,
     });
-    expect(state.updates.store_items?.[0]).toEqual({ inventory_quantity: 6 });
-    expect(state.updates.item_variants?.[0]).toEqual({ inventory_quantity: 2 });
+    // El descuento ya no es un update() directo: es una única llamada
+    // atómica a la RPC ecommerce.decrement_inventory con los componentes del
+    // combo ya expandidos (café 2x2=4, mug variante 1x2=2).
+    expect(state.rpcCalls).toHaveLength(1);
+    expect(state.rpcCalls[0].fn).toBe("decrement_inventory");
+    expect(state.rpcCalls[0].params).toMatchObject({
+      p_order_id: "order-combo-1",
+      p_store_id: "store-uuid-1",
+    });
+    expect(state.rpcCalls[0].params.p_items).toEqual([
+      { variant_id: null, product_id: "store-item-1", quantity: 4 },
+      { variant_id: "variant-2", product_id: "store-item-2", quantity: 2 },
+    ]);
+  });
+
+  it("resolves store_id from combo components for a solo-combo cart (no stores fallback mocked)", async () => {
+    // Carrito SOLO-COMBO: el único item es un combo, así que product_id y
+    // variant_id de nivel superior llegan en null (prepareComboOrderItems los
+    // limpia). No se scriptea "stores:select" a propósito: si
+    // resolveOrderStoreId no resolviera el store_id desde los componentes del
+    // combo, el único camino restante sería el fallback de tienda activa, que
+    // aquí fallaría por falta de mock (simulando que no hay contexto de
+    // tienda ni tienda activa fácil de adivinar).
+    const state = new MockSupabaseState({
+      "product_combos:select": [
+        {
+          data: [
+            {
+              id: "combo-solo-1",
+              name: "Combo Solo",
+              slug: "combo-solo",
+              description: "Item A + Item B",
+              image_url: "/combo-solo.jpg",
+              is_active: true,
+              discount_type: "fixed_cop",
+              discount_value: 0,
+              currency_code: "COP",
+            },
+          ],
+          error: null,
+        },
+      ],
+      "product_combo_components:select": [
+        {
+          data: [
+            {
+              combo_id: "combo-solo-1",
+              product_id: "solo-item-a",
+              variant_id: null,
+              quantity: 1,
+            },
+            {
+              combo_id: "combo-solo-1",
+              product_id: "solo-item-b",
+              variant_id: null,
+              quantity: 1,
+            },
+          ],
+          error: null,
+        },
+      ],
+      "store_items:select": [
+        {
+          data: [
+            {
+              id: "solo-item-a",
+              item_name: "Item A",
+              base_price: 20000,
+              currency_code: "COP",
+              track_inventory: false,
+              inventory_quantity: 0,
+              is_active: true,
+              is_available_for_sale: true,
+            },
+            {
+              id: "solo-item-b",
+              item_name: "Item B",
+              base_price: 10000,
+              currency_code: "COP",
+              track_inventory: false,
+              inventory_quantity: 0,
+              is_active: true,
+              is_available_for_sale: true,
+            },
+          ],
+          error: null,
+        },
+        // Consumida por resolveOrderStoreId al resolver store_id desde el
+        // primer componente del combo (solo-item-a) vía store_items.
+        { data: { store_id: "solo-store-uuid" }, error: null },
+      ],
+      "orders:insert": [
+        {
+          data: {
+            id: "order-solo-1",
+            order_number: "A-SOLO",
+            payment_method: "cash_on_delivery",
+            payment_status: "pending",
+            payment_reference: null,
+            created_at: "2026-01-01T00:00:00.000Z",
+            updated_at: "2026-01-01T00:00:00.000Z",
+            ...baseOrderData,
+          },
+          error: null,
+        },
+      ],
+      "order_items:insert": [
+        {
+          data: [
+            {
+              id: "combo-order-item-solo-1",
+              order_id: "order-solo-1",
+              product_id: null,
+              product_name: "Combo Solo",
+              quantity: 1,
+              unit_price: 30000,
+              total_price: 30000,
+              currency_code: "COP",
+            },
+          ],
+          error: null,
+        },
+      ],
+      "order_addresses:insert": [{ data: [{ id: "addr-solo-1" }], error: null }],
+    });
+
+    getSupabaseEcommerceMock.mockReturnValue({ from: state.from, rpc: state.rpc });
+
+    const created = await createOrder({
+      ...baseOrderData,
+      subtotal: 0,
+      total_amount: 0,
+      items: [
+        {
+          product_name: "Combo Solo",
+          unit_price: 0,
+          quantity: 1,
+          total_price: 0,
+          metadata: {
+            item_kind: "combo",
+            combo_id: "combo-solo-1",
+          },
+        },
+      ],
+    });
+
+    expect(created?.id).toBe("order-solo-1");
+
+    const insertedOrder = state.inserts.orders?.[0];
+    expect(insertedOrder.store_id).toBe("solo-store-uuid");
+    expect(state.fromCalls).not.toContain("stores");
   });
 
   it("does not trust client-supplied combo snapshots to skip normal inventory validation", async () => {
@@ -514,7 +734,7 @@ describe("orders-api live order contract", () => {
       ],
     });
 
-    getSupabaseEcommerceMock.mockReturnValue({ from: state.from });
+    getSupabaseEcommerceMock.mockReturnValue({ from: state.from, rpc: state.rpc });
 
     await expect(
       createOrder({
@@ -611,7 +831,7 @@ describe("orders-api live order contract", () => {
       ],
     });
 
-    getSupabaseEcommerceMock.mockReturnValue({ from: state.from });
+    getSupabaseEcommerceMock.mockReturnValue({ from: state.from, rpc: state.rpc });
 
     await expect(
       createOrder({
@@ -637,6 +857,12 @@ describe("orders-api live order contract", () => {
   it("decrements product and variant inventory on writable base tables", async () => {
     const state = new MockSupabaseState({
       "store_items:select": [
+        {
+          data: [
+            { id: "store-item-1", base_price: 100000, currency_code: "COP" },
+          ],
+          error: null,
+        },
         {
           data: {
             track_inventory: true,
@@ -665,6 +891,12 @@ describe("orders-api live order contract", () => {
         },
       ],
       "item_variants:select": [
+        {
+          data: [
+            { id: "variant-1", price: 90000, item_id: "store-item-1" },
+          ],
+          error: null,
+        },
         {
           data: {
             track_inventory: true,
@@ -729,11 +961,9 @@ describe("orders-api live order contract", () => {
         },
       ],
       "order_addresses:insert": [{ data: [{ id: "addr-3" }], error: null }],
-      "store_items:update": [{ error: null }],
-      "item_variants:update": [{ error: null }],
     });
 
-    getSupabaseEcommerceMock.mockReturnValue({ from: state.from });
+    getSupabaseEcommerceMock.mockReturnValue({ from: state.from, rpc: state.rpc });
 
     await createOrder({
       ...baseOrderData,
@@ -757,14 +987,155 @@ describe("orders-api live order contract", () => {
       total_amount: 470000,
     });
 
-    expect(state.updates.store_items?.[0].inventory_quantity).toBe(3);
-    expect(state.updates.item_variants?.[0].inventory_quantity).toBe(5);
+    // El descuento pasa por la RPC atómica ecommerce.decrement_inventory en
+    // lugar de un update() directo por item; se verifica que reciba la
+    // cantidad correcta para el producto y para la variante.
+    expect(state.rpcCalls).toHaveLength(1);
+    expect(state.rpcCalls[0].fn).toBe("decrement_inventory");
+    expect(state.rpcCalls[0].params).toMatchObject({ p_store_id: "store-uuid-1" });
+    expect(state.rpcCalls[0].params.p_items).toEqual([
+      { variant_id: null, product_id: "store-item-1", quantity: 2 },
+      { variant_id: "variant-1", product_id: null, quantity: 3 },
+    ]);
     expect(state.fromCalls).not.toContain("store_items_legacy");
+  });
+
+  it("deletes the newly created order and reports a 409-style validationResult when the atomic inventory RPC reports a shortage", async () => {
+    // La atomicidad real del descuento (evitar sobreventa entre compras
+    // concurrentes) es una garantía de la sentencia UPDATE condicional en
+    // ecommerce.decrement_inventory (ver migración
+    // 20260713000100_ecommerce_atomic_inventory.sql) y no es testeable con
+    // este mock de supabase.rpc(). Este test verifica el WIRING de la
+    // aplicación: cuando la RPC reporta faltantes, createOrder borra la
+    // orden recién creada y lanza un error con el mismo formato 409 que
+    // validateInventoryBeforeOrder.
+    const state = new MockSupabaseState({
+      "store_items:select": [
+        {
+          data: [
+            { id: "store-item-shortage", base_price: 100000, currency_code: "COP" },
+          ],
+          error: null,
+        },
+        {
+          data: {
+            track_inventory: true,
+            inventory_quantity: 5,
+            is_available_for_sale: true,
+            is_active: true,
+          },
+          error: null,
+        },
+        {
+          data: {
+            store_id: "store-uuid-shortage",
+            track_inventory: true,
+            inventory_quantity: 5,
+          },
+          error: null,
+        },
+      ],
+      "orders:insert": [
+        {
+          data: {
+            id: "order-shortage-1",
+            order_number: "A-SHORTAGE",
+            payment_method: "cash_on_delivery",
+            payment_status: "pending",
+            payment_reference: null,
+            created_at: "2026-01-01T00:00:00.000Z",
+            updated_at: "2026-01-01T00:00:00.000Z",
+            ...baseOrderData,
+          },
+          error: null,
+        },
+      ],
+      "order_items:insert": [
+        {
+          data: [
+            {
+              id: "item-shortage-1",
+              order_id: "order-shortage-1",
+              product_id: "store-item-shortage",
+              product_name: "Campera",
+              quantity: 5,
+              unit_price: 100000,
+              total_price: 500000,
+              currency_code: "COP",
+              created_at: "2026-01-01T00:00:00.000Z",
+              updated_at: "2026-01-01T00:00:00.000Z",
+            },
+          ],
+          error: null,
+        },
+      ],
+      "order_addresses:insert": [{ data: [{ id: "addr-shortage-1" }], error: null }],
+      "orders:delete": [{ error: null }],
+      "rpc:decrement_inventory": [
+        {
+          data: [
+            {
+              variant_id: null,
+              product_id: "store-item-shortage",
+              requested: 5,
+              available: 2,
+            },
+          ],
+          error: null,
+        },
+      ],
+    });
+
+    getSupabaseEcommerceMock.mockReturnValue({ from: state.from, rpc: state.rpc });
+
+    let caughtError: any;
+    try {
+      await createOrder({
+        ...baseOrderData,
+        subtotal: 500000,
+        total_amount: 500000,
+        items: [
+          {
+            product_id: "store-item-shortage",
+            product_name: "Campera",
+            unit_price: 100000,
+            quantity: 5,
+            total_price: 500000,
+          },
+        ],
+      });
+      throw new Error("createOrder debía lanzar por faltante de stock");
+    } catch (error) {
+      caughtError = error;
+    }
+
+    expect(caughtError.message).toContain("No hay suficiente stock disponible");
+    expect(caughtError.validationResult).toEqual({
+      isValid: false,
+      errors: [
+        {
+          product_name: "Campera",
+          product_id: "store-item-shortage",
+          requested_quantity: 5,
+          available_quantity: 2,
+          message: "Solo hay 2 unidades disponibles de Campera. Solicitaste 5",
+        },
+      ],
+    });
+
+    expect(state.deletes.orders).toEqual([{ column: "id", value: "order-shortage-1" }]);
+    expect(state.rpcCalls[0].fn).toBe("decrement_inventory");
   });
 
   it("persists provider payment transaction payload when present on checkout metadata", async () => {
     const state = new MockSupabaseState({
       "store_items:select": [
+        {
+          data: [
+            { id: "store-item-1", base_price: 100000, currency_code: "COP" },
+          ],
+          error: null,
+        },
         {
           data: {
             track_inventory: false,
@@ -813,11 +1184,10 @@ describe("orders-api live order contract", () => {
       "order_addresses:insert": [
         { data: [{ id: "addr-provider-1" }], error: null },
       ],
-      "store_items:update": [{ error: null }],
       "payment_transactions:insert": [{ data: [{ id: "txn-1" }], error: null }],
     });
 
-    getSupabaseEcommerceMock.mockReturnValue({ from: state.from });
+    getSupabaseEcommerceMock.mockReturnValue({ from: state.from, rpc: state.rpc });
 
     await createOrder({
       ...baseOrderData,
@@ -843,6 +1213,378 @@ describe("orders-api live order contract", () => {
     expect(insertedTransaction.provider_transaction_id).toBe(
       "mp_tx_checkout_1",
     );
+  });
+
+  it("recalculates authoritative totals from the database and ignores client-sent price/discount tampering", async () => {
+    const state = new MockSupabaseState({
+      "store_items:select": [
+        {
+          data: [
+            { id: "store-item-trusted", base_price: 40000, currency_code: "COP" },
+          ],
+          error: null,
+        },
+        {
+          data: { track_inventory: false, inventory_quantity: 10 },
+          error: null,
+        },
+        {
+          data: { store_id: "store-uuid-trusted", track_inventory: false, inventory_quantity: 10 },
+          error: null,
+        },
+        {
+          data: { track_inventory: false, inventory_quantity: 10 },
+          error: null,
+        },
+      ],
+      "orders:insert": [
+        {
+          data: {
+            id: "order-trusted-1",
+            order_number: "A-TRUSTED",
+            created_at: "2026-01-01T00:00:00.000Z",
+            updated_at: "2026-01-01T00:00:00.000Z",
+          },
+          error: null,
+        },
+      ],
+      "order_items:insert": [
+        {
+          data: [
+            {
+              id: "item-trusted-1",
+              order_id: "order-trusted-1",
+              product_id: "store-item-trusted",
+              product_name: "Reloj",
+              quantity: 2,
+              unit_price: 40000,
+              total_price: 80000,
+              currency_code: "COP",
+            },
+          ],
+          error: null,
+        },
+      ],
+      "order_addresses:insert": [{ data: [{ id: "addr-trusted-1" }], error: null }],
+    });
+
+    getSupabaseEcommerceMock.mockReturnValue({ from: state.from, rpc: state.rpc });
+
+    const created = await createOrder({
+      ...baseOrderData,
+      subtotal: 999999,
+      total_amount: 999999,
+      shipping_cost: 30000,
+      tax_amount: 20000,
+      discount_amount: -50000,
+      items: [
+        {
+          product_id: "store-item-trusted",
+          product_name: "Reloj",
+          unit_price: 999999,
+          quantity: 2,
+          total_price: 999999,
+        },
+      ],
+    });
+
+    expect(state.inserts.orders?.[0]).toMatchObject({
+      subtotal: 80000,
+      shipping_cost: 0,
+      tax_amount: 0,
+      discount_amount: 0,
+      total_amount: 80000,
+    });
+
+    const insertedItems = state.inserts.order_items?.[0] as Array<
+      Record<string, any>
+    >;
+    expect(insertedItems[0].unit_price).toBe(40000);
+    expect(insertedItems[0].total_price).toBe(80000);
+    expect(created?.items[0].total_price).toBe(80000);
+  });
+
+  it("POST /api/orders forces payment_status=pending and a whitelisted payment_method even when the client sends inflated totals and payment_status=paid", async () => {
+    const state = new MockSupabaseState({
+      "store_items:select": [
+        {
+          data: [
+            { id: "store-item-trust-1", base_price: 45000, currency_code: "COP" },
+          ],
+          error: null,
+        },
+        {
+          data: {
+            track_inventory: false,
+            inventory_quantity: 10,
+            is_available_for_sale: true,
+            is_active: true,
+          },
+          error: null,
+        },
+        {
+          data: { store_id: "store-uuid-trust-1", track_inventory: false, inventory_quantity: 10 },
+          error: null,
+        },
+        {
+          data: {
+            track_inventory: false,
+            inventory_quantity: 10,
+            is_available_for_sale: true,
+            is_active: true,
+          },
+          error: null,
+        },
+      ],
+      "orders:insert": [
+        {
+          data: {
+            id: "order-trust-1",
+            order_number: "A-TRUST-1",
+            payment_method: "cash_on_delivery",
+            payment_status: "pending",
+            payment_reference: null,
+            created_at: "2026-01-01T00:00:00.000Z",
+            updated_at: "2026-01-01T00:00:00.000Z",
+          },
+          error: null,
+        },
+      ],
+      "order_items:insert": [
+        {
+          data: [
+            {
+              id: "item-trust-1",
+              order_id: "order-trust-1",
+              product_id: "store-item-trust-1",
+              product_name: "Reloj",
+              quantity: 1,
+              unit_price: 45000,
+              total_price: 45000,
+              currency_code: "COP",
+            },
+          ],
+          error: null,
+        },
+      ],
+      "order_addresses:insert": [{ data: [{ id: "addr-trust-1" }], error: null }],
+    });
+
+    getServiceEcommerceClientMock.mockReturnValue({ from: state.from, rpc: state.rpc });
+
+    const request = new NextRequest("http://localhost/api/orders", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        customer_type: "guest",
+        customer_email: "buyer@example.com",
+        customer_first_name: "Ada",
+        customer_last_name: "Lovelace",
+        shipping_address: "Calle 123",
+        shipping_city: "Bogotá",
+        shipping_postal_code: "110111",
+        payment_status: "paid",
+        payment_method: "credit_card",
+        payment_reference: "fake-ref",
+        subtotal: 999999,
+        total_amount: 999999,
+        items: [
+          {
+            product_id: "store-item-trust-1",
+            product_name: "Reloj",
+            unit_price: 999999,
+            quantity: 1,
+            total_price: 999999,
+          },
+        ],
+      }),
+    });
+
+    const response = await postOrder(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.order).toBeTruthy();
+    expect(state.inserts.orders?.[0]).toMatchObject({
+      payment_status: "pending",
+      payment_method: "cash_on_delivery",
+      payment_reference: null,
+      subtotal: 45000,
+      total_amount: 45000,
+    });
+  });
+
+  it("sends the order confirmation email after creating the order successfully", async () => {
+    const state = new MockSupabaseState({
+      "store_items:select": [
+        {
+          data: [
+            { id: "store-item-email-1", base_price: 45000, currency_code: "COP" },
+          ],
+          error: null,
+        },
+        {
+          data: {
+            track_inventory: false,
+            inventory_quantity: 10,
+            is_available_for_sale: true,
+            is_active: true,
+          },
+          error: null,
+        },
+        {
+          data: { store_id: "store-uuid-email-1", track_inventory: false, inventory_quantity: 10 },
+          error: null,
+        },
+        {
+          data: {
+            track_inventory: false,
+            inventory_quantity: 10,
+            is_available_for_sale: true,
+            is_active: true,
+          },
+          error: null,
+        },
+      ],
+      "orders:insert": [
+        {
+          data: {
+            id: "order-email-flow-1",
+            order_number: "A-EMAIL-1",
+            payment_method: "cash_on_delivery",
+            payment_status: "pending",
+            payment_reference: null,
+            customer_email: "buyer@example.com",
+            customer_first_name: "Ada",
+            customer_last_name: "Lovelace",
+            created_at: "2026-01-01T00:00:00.000Z",
+            updated_at: "2026-01-01T00:00:00.000Z",
+          },
+          error: null,
+        },
+      ],
+      "order_items:insert": [
+        { data: [{ id: "item-email-flow-1" }], error: null },
+      ],
+      "order_addresses:insert": [{ data: [{ id: "addr-email-flow-1" }], error: null }],
+    });
+
+    getServiceEcommerceClientMock.mockReturnValue({ from: state.from, rpc: state.rpc });
+
+    const request = new NextRequest("http://localhost/api/orders", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        ...baseOrderData,
+        items: [
+          {
+            product_id: "store-item-email-1",
+            product_name: "Reloj",
+            unit_price: 45000,
+            quantity: 1,
+            total_price: 45000,
+          },
+        ],
+        subtotal: 45000,
+        total_amount: 45000,
+      }),
+    });
+
+    const response = await postOrder(request);
+
+    expect(response.status).toBe(200);
+    expect(sendEmailMock).toHaveBeenCalledTimes(1);
+    expect(sendEmailMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: "buyer@example.com",
+        subject: expect.stringContaining("A-EMAIL-1"),
+      }),
+    );
+  });
+
+  it("does not fail order creation when the confirmation email fails to send", async () => {
+    sendEmailMock.mockRejectedValue(new Error("SMTP no disponible"));
+
+    const state = new MockSupabaseState({
+      "store_items:select": [
+        {
+          data: [
+            { id: "store-item-email-2", base_price: 45000, currency_code: "COP" },
+          ],
+          error: null,
+        },
+        {
+          data: {
+            track_inventory: false,
+            inventory_quantity: 10,
+            is_available_for_sale: true,
+            is_active: true,
+          },
+          error: null,
+        },
+        {
+          data: { store_id: "store-uuid-email-2", track_inventory: false, inventory_quantity: 10 },
+          error: null,
+        },
+        {
+          data: {
+            track_inventory: false,
+            inventory_quantity: 10,
+            is_available_for_sale: true,
+            is_active: true,
+          },
+          error: null,
+        },
+      ],
+      "orders:insert": [
+        {
+          data: {
+            id: "order-email-flow-2",
+            order_number: "A-EMAIL-2",
+            payment_method: "cash_on_delivery",
+            payment_status: "pending",
+            payment_reference: null,
+            customer_email: "buyer@example.com",
+            customer_first_name: "Ada",
+            customer_last_name: "Lovelace",
+            created_at: "2026-01-01T00:00:00.000Z",
+            updated_at: "2026-01-01T00:00:00.000Z",
+          },
+          error: null,
+        },
+      ],
+      "order_items:insert": [
+        { data: [{ id: "item-email-flow-2" }], error: null },
+      ],
+      "order_addresses:insert": [{ data: [{ id: "addr-email-flow-2" }], error: null }],
+    });
+
+    getServiceEcommerceClientMock.mockReturnValue({ from: state.from, rpc: state.rpc });
+
+    const request = new NextRequest("http://localhost/api/orders", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        ...baseOrderData,
+        items: [
+          {
+            product_id: "store-item-email-2",
+            product_name: "Reloj",
+            unit_price: 45000,
+            quantity: 1,
+            total_price: 45000,
+          },
+        ],
+        subtotal: 45000,
+        total_amount: 45000,
+      }),
+    });
+
+    const response = await postOrder(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.order?.id).toBe("order-email-flow-2");
   });
 
   it("reads live orders table for id/number/admin paths with payment compatibility fallback", async () => {
@@ -968,7 +1710,7 @@ describe("orders-api live order contract", () => {
       ],
     });
 
-    getSupabaseEcommerceMock.mockReturnValue({ from: state.from });
+    getSupabaseEcommerceMock.mockReturnValue({ from: state.from, rpc: state.rpc });
 
     const byId = await getOrderById("order-live-1");
     const byNumber = await getOrderByNumber("A-2001");
@@ -1061,7 +1803,7 @@ describe("orders-api live order contract", () => {
       ],
     });
 
-    getSupabaseEcommerceMock.mockReturnValue({ from: state.from });
+    getSupabaseEcommerceMock.mockReturnValue({ from: state.from, rpc: state.rpc });
 
     const adminList = await getOrders({ limit: 20 });
     const emailOrders = await getOrdersByEmail("aligned@example.com");
@@ -1124,7 +1866,7 @@ describe("orders-api live order contract", () => {
       "order_addresses:select": [{ data: [], error: null }],
     });
 
-    getSupabaseEcommerceMock.mockReturnValue({ from: state.from });
+    getSupabaseEcommerceMock.mockReturnValue({ from: state.from, rpc: state.rpc });
 
     const fallback = await loadSuccessPageFallbackOrder("A-3001");
 
@@ -1185,7 +1927,7 @@ describe("orders-api live order contract", () => {
       "order_addresses:select": [{ data: [], error: null }],
     });
 
-    getSupabaseEcommerceMock.mockReturnValue({ from: state.from });
+    getSupabaseEcommerceMock.mockReturnValue({ from: state.from, rpc: state.rpc });
 
     const order = await getOrderById("order-provider-1");
 
@@ -1227,7 +1969,7 @@ describe("orders-api live order contract", () => {
       "order_addresses:select": [{ data: [], error: null }],
     });
 
-    getSupabaseEcommerceMock.mockReturnValue({ from: state.from });
+    getSupabaseEcommerceMock.mockReturnValue({ from: state.from, rpc: state.rpc });
 
     const orders = await getOrdersByEmail("email@example.com");
 

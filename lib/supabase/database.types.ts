@@ -2339,6 +2339,10 @@ export type Database = {
     }
     Functions: {
       can_manage_store: { Args: { p_store_id: string }; Returns: boolean }
+      decrement_inventory: {
+        Args: { p_items: Json; p_order_id: string; p_store_id: string }
+        Returns: Json
+      }
       generate_order_number: {
         Args: { p_order_date?: string; p_store_id: string }
         Returns: string
