@@ -1,6 +1,10 @@
 import { createServerClient } from "@supabase/ssr"
 import { cookies, headers } from "next/headers"
 import { ECOMMERCE_SCHEMA, ECOMMERCE_VIEWS } from "./contract"
+import {
+  projectPublicHomeDiscountPopupConfig,
+  type PublicHomeDiscountPopupConfig,
+} from "@/lib/home-discount-popup"
 
 /**
  * Obtiene el cliente de Supabase para el servidor
@@ -72,7 +76,7 @@ async function getStoreIdFromServer(): Promise<string | null> {
 /**
  * Obtiene información de una tienda desde el servidor
  */
-export async function getStoreFromServer(): Promise<{ id: string; subdomain: string; store_name: string; primary_color?: string; secondary_color?: string } | null> {
+export async function getStoreFromServer(): Promise<{ id: string; subdomain: string; store_name: string; primary_color?: string; secondary_color?: string; metadata?: Record<string, unknown> } | null> {
   try {
     const supabase = await getSupabaseServerClient()
     if (!supabase) {
@@ -85,10 +89,12 @@ export async function getStoreFromServer(): Promise<{ id: string; subdomain: str
       return null
     }
 
-    // Vista legacy: stores_legacy ya incluye primary_color, secondary_color
+    // Vista legacy: stores_legacy ya incluye primary_color, secondary_color y
+    // metadata (join con store_integrations), así que la reutilizamos para
+    // resolver también la config del popup de descuento sin query extra.
     let query = supabase
       .from(ECOMMERCE_VIEWS.storesLegacy)
-      .select('id, subdomain, store_name, primary_color, secondary_color')
+      .select('id, subdomain, store_name, primary_color, secondary_color, metadata')
       .eq('is_active', true)
       .is('deleted_at', null)
 
@@ -187,5 +193,23 @@ export async function getStoreFromServer(): Promise<{ id: string; subdomain: str
       error,
     })
     return null
+  }
+}
+
+/**
+ * Proyecta la config pública del popup de descuento a partir de una tienda
+ * ya resuelta en el servidor (evita una query adicional cuando el caller ya
+ * tiene el resultado de getStoreFromServer).
+ */
+export function projectHomeDiscountPopupFromStore(
+  store: Awaited<ReturnType<typeof getStoreFromServer>>,
+): { storeId: string | null; config: PublicHomeDiscountPopupConfig | null } {
+  if (!store) {
+    return { storeId: null, config: null }
+  }
+
+  return {
+    storeId: store.id,
+    config: projectPublicHomeDiscountPopupConfig(store.metadata?.homeDiscountPopup),
   }
 }

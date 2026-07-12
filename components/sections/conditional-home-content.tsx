@@ -10,7 +10,10 @@ import {
   HomeComposition,
   type HomeCompositionSection,
 } from "@/components/sections/home-composition";
-import { getStoreFromServer } from "@/lib/supabase/store-api";
+import {
+  getStoreFromServer,
+  projectHomeDiscountPopupFromStore,
+} from "@/lib/supabase/store-api";
 import { getHomeComposition } from "@/lib/supabase/home-composition-api";
 import { sectionLabel } from "@/lib/section-editor/sections-registry";
 import { homeSectionRenderers } from "@/lib/sections/home-section-renderers";
@@ -36,6 +39,8 @@ export async function ConditionalHomeContent({
   previewMode = false,
 }: ConditionalHomeContentProps = {}) {
   const store = await getStoreFromServer();
+  const { storeId, config: homeDiscountPopupConfig } =
+    projectHomeDiscountPopupFromStore(store);
 
   // Si es la tienda de repostería, mostrar diseño personalizado
   if (store?.subdomain === "reposteria") {
@@ -83,7 +88,7 @@ export async function ConditionalHomeContent({
             <FooterNew />
           </EditableWrapper>
         </main>
-        <HomeDiscountPopup />
+        <HomeDiscountPopup config={homeDiscountPopupConfig} storeId={storeId} />
       </>
     );
   }
@@ -118,7 +123,7 @@ export async function ConditionalHomeContent({
           <FooterNew />
         </EditableWrapper>
       </main>
-      <HomeDiscountPopup />
+      <HomeDiscountPopup config={homeDiscountPopupConfig} storeId={storeId} />
     </>
   );
 }

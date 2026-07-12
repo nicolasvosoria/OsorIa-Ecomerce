@@ -4,14 +4,9 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { HomeDiscountPopup } from "@/components/home-discount-popup";
 import type { PublicHomeDiscountPopupConfig } from "@/lib/home-discount-popup";
 
-const mockUseStore = vi.fn();
 const mockUsePathname = vi.fn();
 const mockToastSuccess = vi.fn();
 const mockClipboardWriteText = vi.fn();
-
-vi.mock("@/contexts/store-context", () => ({
-  useStore: () => mockUseStore(),
-}));
 
 vi.mock("next/navigation", async () => {
   const actual =
@@ -46,6 +41,8 @@ const baseConfig: PublicHomeDiscountPopupConfig = {
   fingerprint: "fingerprint-abc",
 };
 
+const baseStoreId = "store-123";
+
 function createMemoryStorage(): Storage {
   const entries = new Map<string, string>();
 
@@ -76,13 +73,6 @@ describe("HomeDiscountPopup", () => {
       value: createMemoryStorage(),
     });
     window.localStorage.clear();
-    mockUseStore.mockReturnValue({
-      store: {
-        id: "store-123",
-        store_name: "Osoria",
-        homeDiscountPopup: baseConfig,
-      },
-    });
     mockUsePathname.mockReturnValue("/");
     mockClipboardWriteText.mockResolvedValue(undefined);
     Object.defineProperty(globalThis.navigator, "clipboard", {
@@ -100,8 +90,40 @@ describe("HomeDiscountPopup", () => {
     vi.useRealTimers();
   });
 
+  it("renders after delaySeconds when config and storeId are valid props", () => {
+    render(<HomeDiscountPopup config={baseConfig} storeId={baseStoreId} />);
+
+    expect(screen.queryByText(baseConfig.title)).not.toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+
+    expect(screen.getByText(baseConfig.title)).toBeInTheDocument();
+  });
+
+  it("does not render when config is null", () => {
+    render(<HomeDiscountPopup config={null} storeId={baseStoreId} />);
+
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+
+    expect(screen.queryByText(baseConfig.title)).not.toBeInTheDocument();
+  });
+
+  it("does not render when storeId is null", () => {
+    render(<HomeDiscountPopup config={baseConfig} storeId={null} />);
+
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+
+    expect(screen.queryByText(baseConfig.title)).not.toBeInTheDocument();
+  });
+
   it("shows after the configured delay and dismisses until the frequency elapses", () => {
-    render(<HomeDiscountPopup />);
+    render(<HomeDiscountPopup config={baseConfig} storeId={baseStoreId} />);
 
     expect(screen.queryByText(baseConfig.title)).not.toBeInTheDocument();
 
@@ -115,7 +137,7 @@ describe("HomeDiscountPopup", () => {
 
     expect(screen.queryByText(baseConfig.title)).not.toBeInTheDocument();
 
-    render(<HomeDiscountPopup />);
+    render(<HomeDiscountPopup config={baseConfig} storeId={baseStoreId} />);
 
     act(() => {
       vi.advanceTimersByTime(3000);
@@ -125,7 +147,7 @@ describe("HomeDiscountPopup", () => {
   });
 
   it("copies the coupon when CTA mode is copy_coupon", async () => {
-    render(<HomeDiscountPopup />);
+    render(<HomeDiscountPopup config={baseConfig} storeId={baseStoreId} />);
 
     act(() => {
       vi.advanceTimersByTime(3000);
@@ -143,7 +165,7 @@ describe("HomeDiscountPopup", () => {
   it("does not render on non-home routes even when the popup is active", () => {
     mockUsePathname.mockReturnValue("/products/cafetera");
 
-    render(<HomeDiscountPopup />);
+    render(<HomeDiscountPopup config={baseConfig} storeId={baseStoreId} />);
 
     act(() => {
       vi.advanceTimersByTime(3000);
@@ -160,19 +182,15 @@ describe("HomeDiscountPopup", () => {
       JSON.stringify({ dismissedAt: "2026-04-23T11:59:00.000Z" }),
     );
 
-    mockUseStore.mockReturnValue({
-      store: {
-        id: "store-123",
-        store_name: "Osoria",
-        homeDiscountPopup: {
-          ...baseConfig,
-          title: "Nueva campaña",
-          fingerprint: "new-fingerprint",
-        },
-      },
-    });
+    const newCampaignConfig: PublicHomeDiscountPopupConfig = {
+      ...baseConfig,
+      title: "Nueva campaña",
+      fingerprint: "new-fingerprint",
+    };
 
-    render(<HomeDiscountPopup />);
+    render(
+      <HomeDiscountPopup config={newCampaignConfig} storeId={baseStoreId} />,
+    );
 
     act(() => {
       vi.advanceTimersByTime(3000);
@@ -182,19 +200,15 @@ describe("HomeDiscountPopup", () => {
   });
 
   it("does not render active popup data when its CTA is invalid", () => {
-    mockUseStore.mockReturnValue({
-      store: {
-        id: "store-123",
-        store_name: "Osoria",
-        homeDiscountPopup: {
-          ...baseConfig,
-          ctaMode: "redirect",
-          ctaUrl: null,
-        },
-      },
-    });
+    const invalidCtaConfig: PublicHomeDiscountPopupConfig = {
+      ...baseConfig,
+      ctaMode: "redirect",
+      ctaUrl: null,
+    };
 
-    render(<HomeDiscountPopup />);
+    render(
+      <HomeDiscountPopup config={invalidCtaConfig} storeId={baseStoreId} />,
+    );
 
     act(() => {
       vi.advanceTimersByTime(3000);

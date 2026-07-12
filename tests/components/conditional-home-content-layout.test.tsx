@@ -11,9 +11,17 @@ function MockSection({ testId }: { testId: string }) {
   return <div data-testid={testId} />;
 }
 
-vi.mock("@/lib/supabase/store-api", () => ({
-  getStoreFromServer: () => mockGetStoreFromServer(),
-}));
+vi.mock("@/lib/supabase/store-api", async () => {
+  const actual =
+    await vi.importActual<typeof import("@/lib/supabase/store-api")>(
+      "@/lib/supabase/store-api",
+    );
+
+  return {
+    ...actual,
+    getStoreFromServer: () => mockGetStoreFromServer(),
+  };
+});
 
 vi.mock("@/lib/supabase/home-composition-api", async () => {
   const { DEFAULT_HOME_COMPOSITION } = await import(
@@ -71,7 +79,9 @@ vi.mock("@/components/sections/footer-new", () => ({
 }));
 
 vi.mock("@/components/home-discount-popup", () => ({
-  HomeDiscountPopup: () => <MockSection testId="discount-popup" />,
+  HomeDiscountPopup: (props: { config: unknown; storeId: string | null }) => (
+    <MockSection testId="discount-popup" {...props} />
+  ),
 }));
 
 vi.mock("@/components/sections/reposteria-hero", () => ({

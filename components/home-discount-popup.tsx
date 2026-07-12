@@ -6,7 +6,6 @@ import { X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { useStore } from "@/contexts/store-context";
 import {
   getHomeDiscountPopupStorageKey,
   isHomeDiscountPopupEligible,
@@ -166,15 +165,19 @@ export function HomeDiscountPopupPreview({
   );
 }
 
-export function HomeDiscountPopup() {
+export function HomeDiscountPopup({
+  config,
+  storeId,
+}: {
+  config: PublicHomeDiscountPopupConfig | null;
+  storeId: string | null;
+}) {
   const pathname = usePathname();
-  const { store } = useStore();
   const [isVisible, setIsVisible] = useState(false);
 
-  const config = store?.homeDiscountPopup ?? null;
   const storageKey =
-    store?.id && config?.fingerprint
-      ? getHomeDiscountPopupStorageKey(store.id, config.fingerprint)
+    storeId && config?.fingerprint
+      ? getHomeDiscountPopupStorageKey(storeId, config.fingerprint)
       : null;
 
   useEffect(() => {
