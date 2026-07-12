@@ -20,7 +20,7 @@ import { formatPrice } from '@/lib/shopify/utils';
 import { Suspense } from 'react';
 import { cn } from '@/lib/utils';
 import { PageLayout } from '@/components/layout/page-layout';
-import { VariantSelectorSlots } from './components/variant-selector-slots';
+import { VariantSelectorSlots } from '@/components/products/variant-selector-slots';
 import { MobileGallerySlider } from './components/mobile-gallery-slider';
 import { DesktopGallery } from './components/desktop-gallery';
 

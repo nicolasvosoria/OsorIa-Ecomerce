@@ -17,11 +17,18 @@ export default function WishlistPage() {
 
   const handleAddToCart = (item: typeof items[0]) => {
     // Agregar al carrito local
+    const parsedAmount = Number(item.price)
     addToCart({
       id: item.id,
       name: item.title,
       price: item.price || "0",
       image: item.image || "/placeholder.svg",
+      // Monto numérico exacto: evita que getItemSubtotal caiga en parsePriceString
+      // (que interpreta el punto decimal como separador de miles y multiplica el precio ~100x)
+      unitPriceAmount: Number.isNaN(parsedAmount) ? 0 : parsedAmount,
+      currencyCode: item.currencyCode,
+      productId: item.id,
+      productSlug: item.handle,
     }, 1)
 
     toast.success(t.wishlist.addedToCart)

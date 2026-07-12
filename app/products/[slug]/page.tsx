@@ -17,7 +17,7 @@ import { Check, AlertCircle, PackageCheck } from 'lucide-react';
 import { AddToCart } from '@/components/cart/add-to-cart';
 import { WishlistButton } from '@/components/wishlist/wishlist-button';
 import { adaptSupabaseProduct } from '@/lib/products/adapter';
-import { cn } from '@/lib/utils';
+import { VariantSelectorSlots } from '@/components/products/variant-selector-slots';
 import { ProductImageGallery } from './components/product-image-gallery';
 import { RelatedProductsCarousel } from './components/related-products-carousel';
 import { PublicProductMetadata } from '@/components/products/public-product-metadata';
@@ -279,54 +279,11 @@ async function ProductContent({ slug }: { slug: string }) {
             )}
 
             {/* Variantes y opciones */}
-            {!isCombo && hasVariants && product.variants && (
+            {!isCombo && hasVariants && (
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Variantes disponibles</h3>
-                <div className="grid grid-cols-2 gap-2">
-                  {product.variants.map((variant) => (
-                    <div
-                      key={variant.id}
-                      className={cn(
-                        "p-3 border rounded-lg cursor-pointer transition-colors",
-                        variant.is_available
-                          ? "border-border hover:border-primary"
-                          : "border-muted opacity-50 cursor-not-allowed"
-                      )}
-                    >
-                      <div className="flex justify-between items-center">
-                        <span className="font-medium">{variant.variant_code || 'Variante'}</span>
-                        <span className="text-sm font-semibold">
-                          {formatPrice((variant.price || product.base_price).toString(), product.currency_code)}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Opciones del producto */}
-            {product.options && product.options.length > 0 && (
-              <div className="space-y-4">
-                {product.options.map((option) => (
-                  <div key={option.id}>
-                    <label className="block text-sm font-medium mb-2">
-                      {option.option_name}
-                      {option.is_required && <span className="text-red-500 ml-1">*</span>}
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      {option.option_values.map((value, index) => (
-                        <Button
-                          key={index}
-                          variant="outline"
-                          className="capitalize"
-                        >
-                          {value}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-                ))}
+                <Suspense fallback={<VariantSelectorSlots product={adaptedProduct} fallback />}>
+                  <VariantSelectorSlots product={adaptedProduct} />
+                </Suspense>
               </div>
             )}
 

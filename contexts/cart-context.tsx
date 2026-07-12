@@ -1,6 +1,7 @@
 "use client"
 
-import { createContext, useContext, useState, ReactNode } from "react"
+import { createContext, useContext, useState, useEffect, ReactNode } from "react"
+import { deferStateUpdate } from "@/lib/react/defer-state-update"
 
 export interface CartItem {
   id: string | number
@@ -23,6 +24,7 @@ export interface CartItem {
 
 interface CartContextType {
   items: CartItem[]
+  hasHydrated: boolean
   addToCart: (item: Omit<CartItem, "quantity">, quantity?: number) => void
   removeFromCart: (id: string | number) => void
   updateQuantity: (id: string | number, quantity: number) => void
@@ -34,8 +36,40 @@ interface CartContextType {
 
 const CartContext = createContext<CartContextType | undefined>(undefined)
 
+const CART_STORAGE_KEY = 'osoria-cart'
+
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([])
+  const [hasHydrated, setHasHydrated] = useState(false)
+
+  // Cargar carrito desde localStorage al montar
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(CART_STORAGE_KEY)
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        // items y hasHydrated se actualizan juntos para que no haya un instante
+        // donde el carrito ya esté "hidratado" pero sin los items todavía cargados
+        deferStateUpdate(() => {
+          setItems(parsed)
+          setHasHydrated(true)
+        })
+        return
+      }
+    } catch (error) {
+      console.error('Error loading cart from localStorage:', error)
+    }
+    deferStateUpdate(() => setHasHydrated(true))
+  }, [])
+
+  // Guardar carrito en localStorage cuando cambie
+  useEffect(() => {
+    try {
+      localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items))
+    } catch (error) {
+      console.error('Error saving cart to localStorage:', error)
+    }
+  }, [items])
 
   const addToCart = (item: Omit<CartItem, "quantity">, quantity: number = 1) => {
     setItems((prevItems) => {
@@ -119,6 +153,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     <CartContext.Provider
       value={{
         items,
+        hasHydrated,
         addToCart,
         removeFromCart,
         updateQuantity,

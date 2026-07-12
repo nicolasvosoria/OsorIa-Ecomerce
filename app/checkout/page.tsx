@@ -2,13 +2,12 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { useCart as useShopifyCart } from "@/components/cart/cart-context"
 import { useCart as useLocalCart } from "@/contexts/cart-context"
 import { GuestCheckoutForm, GuestCustomerData } from "@/components/checkout/guest-checkout-form"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, ShoppingBag } from "lucide-react"
-import { buildLocalCartSummary, buildShopifyCartSummary } from "@/lib/cart/cart-summary"
+import { buildLocalCartSummary } from "@/lib/cart/cart-summary"
 import { useLanguage } from "@/contexts/language-context"
 import { toast } from "sonner"
 import Link from "next/link"
@@ -17,7 +16,6 @@ import { AuthenticatedCheckoutForm } from "@/components/checkout/authenticated-c
 
 export default function CheckoutPage() {
   const router = useRouter()
-  const shopifyCart = useShopifyCart()
   const localCart = useLocalCart()
   const { user, isAuthenticated, isLoading: authLoading } = useAuth()
   const { language, t } = useLanguage()
@@ -33,28 +31,21 @@ export default function CheckoutPage() {
     localStorage.removeItem("guest_customer_data")
   }, [])
 
-  // Determinar qué carrito usar (preferir Shopify, luego local)
-  const cart = shopifyCart.cart
-  const isPending = shopifyCart.isPending
-  const hasShopifyItems = cart && cart.lines.length > 0
   const hasLocalItems = localCart.items.length > 0
-  const hasAnyItems = hasShopifyItems || hasLocalItems
-  const shopifySummary = hasShopifyItems && cart ? buildShopifyCartSummary(cart, language) : null
   const localSummary = buildLocalCartSummary({
     items: localCart.items,
     getItemSubtotal: localCart.getItemSubtotal,
     total: localCart.getTotal(),
     language,
   })
-  const checkoutSummary = shopifySummary || localSummary
 
   useEffect(() => {
-    // Redirigir si ambos carritos están vacíos (solo después de que se haya cargado)
-    if (!isPending && cart !== undefined && !hasAnyItems) {
+    // Redirigir si el carrito está vacío, solo una vez hidratado desde localStorage
+    if (localCart.hasHydrated && !hasLocalItems) {
       toast.error("Tu carrito está vacío")
       router.push("/shop")
     }
-  }, [cart, isPending, hasAnyItems, router])
+  }, [localCart.hasHydrated, hasLocalItems, router])
 
   // Para usuarios autenticados, intentar procesar directamente
   // Si faltan datos (dirección/teléfono), mostrar formulario simplificado
@@ -62,7 +53,7 @@ export default function CheckoutPage() {
 
   // Función para procesar checkout de usuario autenticado
   const handleAuthenticatedCheckoutComplete = async (data: { phone: string; address: string }) => {
-    if (!user || !hasAnyItems) return
+    if (!user || !hasLocalItems) return
 
     setIsProcessing(true)
 
@@ -98,103 +89,60 @@ export default function CheckoutPage() {
 
   // Función compartida para procesar el pedido
   const processOrder = async (data: GuestCustomerData, userId?: string | null) => {
-    if (!hasAnyItems) {
+    if (!hasLocalItems) {
       throw new Error("El carrito está vacío")
     }
 
-    // Preparar los items del pedido según el tipo de carrito
-    let orderItems: any[] = []
-    let subtotal = 0
-    let total = 0
-    let currencyCode = "COP"
-
-    if (hasShopifyItems && cart) {
-      // Procesar items del carrito de Shopify
-      orderItems = cart.lines.map((line) => {
-      const product = line.merchandise.product
-      // Obtener la primera imagen disponible
-      const firstImage = product.images && product.images.length > 0 
-        ? product.images[0] 
-        : product.featuredImage
-      
-      // El product.id puede ser el título en algunos casos, así que lo tratamos como opcional
-      const productId = product.id && product.id !== product.title ? product.id : undefined
-      
-      return {
-        product_id: productId,
-        product_name: product.title,
-        product_sku: undefined, // Se puede obtener del producto si está disponible
-        variant_id: line.merchandise.id || undefined,
-        variant_title: line.merchandise.title || undefined,
-        unit_price: parseFloat(line.cost.totalAmount.amount) / line.quantity,
-        quantity: line.quantity,
-        total_price: parseFloat(line.cost.totalAmount.amount),
-        currency_code: line.cost.totalAmount.currencyCode,
-        product_image_url: firstImage?.url || undefined,
-        product_slug: product.handle || undefined,
-        selected_options: Array.isArray(line.merchandise.selectedOptions) 
-          ? line.merchandise.selectedOptions.reduce((acc: Record<string, string>, opt: { name: string; value: string }) => {
-              acc[opt.name] = opt.value
-              return acc
-            }, {})
-          : {},
-      }
-      })
-      subtotal = parseFloat(cart.cost.subtotalAmount.amount)
-      total = parseFloat(cart.cost.totalAmount.amount)
-      currencyCode = cart.cost.totalAmount.currencyCode
-    } else if (hasLocalItems) {
-      // Procesar items del carrito local
-      orderItems = await Promise.all(localCart.items.map(async (item) => {
-        if (item.itemKind === "combo" && item.comboId) {
-          const { buildComboOrderSnapshotById } = await import("@/lib/supabase/combos-api")
-          const snapshot = await buildComboOrderSnapshotById(item.comboId, item.quantity)
-          if (!snapshot || !snapshot.availability.isAvailable) {
-            throw new Error(`No hay suficiente stock disponible para el combo ${item.name}`)
-          }
-
-          return {
-            product_id: undefined,
-            product_name: item.name,
-            product_sku: undefined,
-            variant_id: undefined,
-            variant_title: "Combo",
-            unit_price: snapshot.chargedUnitPrice,
-            quantity: item.quantity,
-            total_price: snapshot.chargedLineTotal,
-            currency_code: snapshot.pricing.currencyCode,
-            product_image_url: item.image || undefined,
-            product_slug: item.productSlug,
-            selected_options: {},
-            metadata: {
-              item_kind: "combo",
-              combo_id: item.comboId,
-              combo_snapshot: snapshot,
-            },
-          }
+    // Preparar los items del pedido desde el carrito local
+    const orderItems = await Promise.all(localCart.items.map(async (item) => {
+      if (item.itemKind === "combo" && item.comboId) {
+        const { buildComboOrderSnapshotById } = await import("@/lib/supabase/combos-api")
+        const snapshot = await buildComboOrderSnapshotById(item.comboId, item.quantity)
+        if (!snapshot || !snapshot.availability.isAvailable) {
+          throw new Error(`No hay suficiente stock disponible para el combo ${item.name}`)
         }
 
-        const itemSubtotal = localCart.getItemSubtotal(item)
-        const unitPrice = item.quantity > 0 ? itemSubtotal / item.quantity : 0
         return {
-          product_id: item.productId || (typeof item.id === "string" ? item.id : undefined),
+          product_id: undefined,
           product_name: item.name,
           product_sku: undefined,
-          variant_id: item.variantId,
-          variant_title: undefined,
-          unit_price: unitPrice,
+          variant_id: undefined,
+          variant_title: "Combo",
+          unit_price: snapshot.chargedUnitPrice,
           quantity: item.quantity,
-          total_price: itemSubtotal,
-          currency_code: item.currencyCode || "COP",
+          total_price: snapshot.chargedLineTotal,
+          currency_code: snapshot.pricing.currencyCode,
           product_image_url: item.image || undefined,
           product_slug: item.productSlug,
           selected_options: {},
+          metadata: {
+            item_kind: "combo",
+            combo_id: item.comboId,
+            combo_snapshot: snapshot,
+          },
         }
-      }))
-      subtotal = orderItems.reduce((sum, item) => sum + item.total_price, 0)
-      total = subtotal
-      currencyCode = orderItems[0]?.currency_code || "COP"
-    }
+      }
+
+      const itemSubtotal = localCart.getItemSubtotal(item)
+      const unitPrice = item.quantity > 0 ? itemSubtotal / item.quantity : 0
+      return {
+        product_id: item.productId || (typeof item.id === "string" ? item.id : undefined),
+        product_name: item.name,
+        product_sku: undefined,
+        variant_id: item.variantId,
+        variant_title: undefined,
+        unit_price: unitPrice,
+        quantity: item.quantity,
+        total_price: itemSubtotal,
+        currency_code: item.currencyCode || "COP",
+        product_image_url: item.image || undefined,
+        product_slug: item.productSlug,
+        selected_options: {},
+      }
+    }))
+    const subtotal = orderItems.reduce((sum, item) => sum + item.total_price, 0)
+    const total = subtotal
+    const currencyCode = orderItems[0]?.currency_code || "COP"
 
     // Crear el pedido
     let order
@@ -278,15 +226,8 @@ export default function CheckoutPage() {
 
     toast.success(`Pedido creado: ${order.order_number}`)
 
-    // Si hay un checkoutUrl de Shopify y estamos usando ese carrito, redirigir allí
-    if (hasShopifyItems && cart?.checkoutUrl) {
-      setTimeout(() => {
-        window.location.href = cart.checkoutUrl
-      }, 1000)
-    } else {
-      // Redirigir a la página de éxito
-      router.push(`/checkout/success?order=${order.order_number}`)
-    }
+    // Redirigir a la página de éxito
+    router.push(`/checkout/success?order=${order.order_number}`)
   }
 
   const handleGuestCheckoutComplete = async (data: GuestCustomerData) => {
@@ -317,7 +258,7 @@ export default function CheckoutPage() {
   }
 
   // Mostrar loading solo mientras se carga la autenticación o el carrito
-  if (authLoading || (cart === undefined && !isPending && !hasLocalItems)) {
+  if (authLoading || !localCart.hasHydrated) {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="flex items-center justify-center min-h-[400px]">
@@ -332,8 +273,8 @@ export default function CheckoutPage() {
     )
   }
 
-  // Si ambos carritos están vacíos, no mostrar nada (el useEffect redirigirá)
-  if (!hasAnyItems) {
+  // Si el carrito está vacío, no mostrar nada (el useEffect redirigirá)
+  if (!hasLocalItems) {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="flex items-center justify-center min-h-[400px]">
@@ -432,58 +373,37 @@ export default function CheckoutPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-3">
-                {hasShopifyItems && cart && shopifySummary ? (
-                  cart.lines.map((item, index) => (
-                    <div
-                      key={item.merchandise.id}
-                      className="flex justify-between items-start pb-3 border-b"
-                    >
-                      <div className="flex-1">
-                        <p className="font-medium text-sm">
-                          {item.merchandise.product.title}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {t.cart.quantityLabel}: {item.quantity}
-                        </p>
-                      </div>
-                      <p className="text-sm font-semibold ml-4">
-                        {shopifySummary.lines[index]?.formattedLineTotal}
+                {localCart.items.map((item, index) => (
+                  <div
+                    key={item.id}
+                    className="flex justify-between items-start pb-3 border-b"
+                  >
+                    <div className="flex-1">
+                      <p className="font-medium text-sm">{item.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {t.cart.quantityLabel}: {item.quantity}
                       </p>
+                      {item.itemKind === "combo" && item.comboDetails && (
+                        <ul className="mt-1 text-[11px] text-muted-foreground">
+                          {item.comboDetails.components.map((component) => (
+                            <li key={`${component.productId}-${component.variantId || "base"}`}>
+                              {component.quantity}× {component.productName}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                     </div>
-                  ))
-                ) : (
-                  localCart.items.map((item, index) => (
-                    <div
-                      key={item.id}
-                      className="flex justify-between items-start pb-3 border-b"
-                    >
-                      <div className="flex-1">
-                        <p className="font-medium text-sm">{item.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {t.cart.quantityLabel}: {item.quantity}
-                        </p>
-                        {item.itemKind === "combo" && item.comboDetails && (
-                          <ul className="mt-1 text-[11px] text-muted-foreground">
-                            {item.comboDetails.components.map((component) => (
-                              <li key={`${component.productId}-${component.variantId || "base"}`}>
-                                {component.quantity}× {component.productName}
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                      <p className="text-sm font-semibold ml-4">
-                        {localSummary.lines[index]?.formattedLineTotal}
-                      </p>
-                    </div>
-                  ))
-                )}
+                    <p className="text-sm font-semibold ml-4">
+                      {localSummary.lines[index]?.formattedLineTotal}
+                    </p>
+                  </div>
+                ))}
               </div>
 
               <div className="space-y-2 pt-4 border-t">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">{t.cart.subtotal}</span>
-                  <span>{checkoutSummary.formattedSubtotal}</span>
+                  <span>{localSummary.formattedSubtotal}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">{t.cart.shipping}</span>
@@ -499,7 +419,7 @@ export default function CheckoutPage() {
                 </div>
                 <div className="flex justify-between text-lg font-bold pt-2 border-t">
                   <span>{t.cart.total}</span>
-                  <span>{checkoutSummary.formattedTotal}</span>
+                  <span>{localSummary.formattedTotal}</span>
                 </div>
               </div>
 
