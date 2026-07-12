@@ -13,7 +13,9 @@ const { uploadImageMock, deleteImageMock, toastErrorMock, toastSuccessMock } = v
 }));
 
 vi.mock("next/image", () => ({
-  default: ({ alt, src }: { alt: string; src: string }) => <img alt={alt} src={src} />,
+  default: ({ alt, src, onError }: { alt: string; src: string; onError?: () => void }) => (
+    <img alt={alt} src={src} onError={onError} />
+  ),
 }));
 
 vi.mock("@/lib/supabase/storage-api", () => ({
@@ -113,5 +115,30 @@ describe("MultiImageUpload", () => {
     expect(toastErrorMock).toHaveBeenCalledWith(expect.stringContaining("notes.txt"));
     expect(toastErrorMock).toHaveBeenCalledWith(expect.stringContaining("huge.webp"), expect.anything());
     expect(toastErrorMock).toHaveBeenCalledWith(expect.stringContaining("extra.webp"));
+  });
+
+  it("shows a broken-image fallback on load failure without deleting from storage or the form", async () => {
+    const onChange = vi.fn();
+    render(
+      <MultiImageUpload
+        images={["https://project.supabase.co/storage/v1/object/public/products/uno.webp"]}
+        onChange={onChange}
+        label="Imágenes"
+      />,
+    );
+
+    const brokenImage = screen.getByAltText("Imagen 1");
+    fireEvent.error(brokenImage);
+
+    expect(await screen.findByText(/no se pudo cargar/i)).toBeInTheDocument();
+    expect(deleteImageMock).not.toHaveBeenCalled();
+    expect(onChange).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: /eliminar imagen 1/i }));
+
+    await waitFor(() => expect(deleteImageMock).toHaveBeenCalledWith(
+      "https://project.supabase.co/storage/v1/object/public/products/uno.webp",
+    ));
+    expect(onChange).toHaveBeenCalledWith([]);
   });
 });

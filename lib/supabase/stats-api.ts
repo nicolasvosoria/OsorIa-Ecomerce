@@ -1,5 +1,6 @@
 import { getSupabaseEcommerce } from './client'
 import { ECOMMERCE_TABLES } from './contract'
+import { getBusinessDayStartUtc, getBusinessMonthStartUtc, toBusinessDayKey } from '@/lib/date/business-day'
 
 // Helper para manejar timeouts
 async function withTimeout<T>(
@@ -68,6 +69,10 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       }
     }
 
+    const now = new Date()
+    const businessDayStart = getBusinessDayStartUtc(now)
+    const businessMonthStart = getBusinessMonthStartUtc(now)
+
     const [productsResult, ordersTodayResult, usersResult, monthlySalesResult] = await Promise.all([
       withTimeout(
         supabase
@@ -81,7 +86,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
         supabase
           .from(ECOMMERCE_TABLES.orders)
           .select('id', { count: 'exact', head: true })
-          .gte('created_at', new Date().toISOString().split('T')[0] + 'T00:00:00.000Z'),
+          .gte('created_at', businessDayStart.toISOString()),
         10000,
         'getOrdersTodayCount'
       ) as Promise<{ count: number | null; error: any }>,
@@ -96,7 +101,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
         supabase
           .from(ECOMMERCE_TABLES.orders)
           .select('total_amount, currency_code')
-          .gte('created_at', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString())
+          .gte('created_at', businessMonthStart.toISOString())
           .in('status', ['confirmed', 'processing', 'shipped', 'delivered'])
           .in('payment_status', ['paid']),
         10000,
@@ -196,7 +201,7 @@ export async function getDetailedStats(days: number = 30): Promise<DetailedStats
     const salesByDayMap = new Map<string, { sales: number; orders: number }>()
     if (salesByDayResult.data) {
       salesByDayResult.data.forEach((order) => {
-        const date = new Date(order.created_at).toISOString().split('T')[0]
+        const date = toBusinessDayKey(new Date(order.created_at))
         const existing = salesByDayMap.get(date) || { sales: 0, orders: 0 }
         // Convertir total_amount a número (viene como string desde Supabase)
         // Usar parseFloat para manejar decimales correctamente
@@ -213,7 +218,7 @@ export async function getDetailedStats(days: number = 30): Promise<DetailedStats
     for (let i = days - 1; i >= 0; i--) {
       const date = new Date()
       date.setDate(date.getDate() - i)
-      const dateStr = date.toISOString().split('T')[0]
+      const dateStr = toBusinessDayKey(date)
       const data = salesByDayMap.get(dateStr) || { sales: 0, orders: 0 }
       // Asegurar que sales y orders sean números
       salesByDay.push({

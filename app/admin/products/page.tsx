@@ -5,18 +5,18 @@ import { useRouter } from "next/navigation"
 import { useAdminPermissions } from "@/contexts/admin-permissions-context"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { 
-  Loader2, 
-  ShieldAlert, 
-  Package, 
+import {
+  Loader2,
+  ShieldAlert,
+  Package,
   Plus,
   Edit,
-  Trash2,
   Eye,
   ArrowLeft,
 } from "lucide-react"
 import Link from "next/link"
 import { getItems } from "@/lib/supabase/products-api"
+import { ADMIN_LIST_FETCH_LIMIT } from "@/lib/admin/constants"
 import type { StoreItemWithDetails } from "@/lib/types/products"
 import { formatPrice } from "@/lib/shopify/utils"
 import Image from "next/image"
@@ -52,7 +52,7 @@ export default function AdminProductsPage() {
       setLoadingProducts(true)
       try {
         const result = await getItems({
-          limit: 100,
+          limit: ADMIN_LIST_FETCH_LIMIT,
           order_by: 'created_at',
           order_direction: 'desc',
         })
@@ -297,9 +297,6 @@ export default function AdminProductsPage() {
                               <Link href={product.item_kind === 'combo' ? `/admin/products/combos` : `/admin/products/${product.id}/edit`}>
                                 <Edit className="h-4 w-4" />
                               </Link>
-                            </Button>
-                            <Button variant="ghost" size="icon">
-                              <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
                           </div>
                         </TableCell>

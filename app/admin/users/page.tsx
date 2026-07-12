@@ -5,18 +5,17 @@ import { useRouter } from "next/navigation"
 import { useAdminPermissions } from "@/contexts/admin-permissions-context"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { 
-  Loader2, 
-  ShieldAlert, 
-  Users, 
-  Edit,
-  Trash2,
+import {
+  Loader2,
+  ShieldAlert,
+  Users,
   ArrowLeft,
   Mail,
   User,
 } from "lucide-react"
 import Link from "next/link"
 import { getUsers } from "@/lib/supabase/users-api"
+import { ADMIN_LIST_FETCH_LIMIT } from "@/lib/admin/constants"
 import type { UserProfile } from "@/lib/types/user"
 import {
   Table,
@@ -48,7 +47,7 @@ export default function AdminUsersPage() {
       setLoadingUsers(true)
       try {
         const result = await getUsers({
-          limit: 100,
+          limit: ADMIN_LIST_FETCH_LIMIT,
           order_by: 'created_at',
           order_direction: 'desc',
         })
@@ -182,7 +181,6 @@ export default function AdminUsersPage() {
                       <TableHead>Email</TableHead>
                       <TableHead>Rol</TableHead>
                       <TableHead>Fecha de Registro</TableHead>
-                      <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -232,18 +230,6 @@ export default function AdminUsersPage() {
                           ) : (
                             <span className="text-muted-foreground">-</span>
                           )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <Button variant="ghost" size="icon" asChild>
-                              <Link href={`/admin/users/${user.id}/edit`}>
-                                <Edit className="h-4 w-4" />
-                              </Link>
-                            </Button>
-                            <Button variant="ghost" size="icon">
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </div>
                         </TableCell>
                       </TableRow>
                     ))}

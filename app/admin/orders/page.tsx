@@ -5,16 +5,17 @@ import { useRouter } from "next/navigation"
 import { useAdminPermissions } from "@/contexts/admin-permissions-context"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { 
-  Loader2, 
-  ShieldAlert, 
-  ShoppingCart, 
-  Eye,
+import {
+  Loader2,
+  ShieldAlert,
+  ShoppingCart,
   ArrowLeft,
   Download,
 } from "lucide-react"
 import Link from "next/link"
+import { toast } from "sonner"
 import { getOrders, getOrderById, updateOrderStatus, type Order, type OrderWithItems } from "@/lib/supabase/orders-api"
+import { ADMIN_LIST_FETCH_LIMIT } from "@/lib/admin/constants"
 import { formatPrice } from "@/lib/shopify/utils"
 import {
   Table,
@@ -56,7 +57,7 @@ export default function AdminOrdersPage() {
       setLoadingOrders(true)
       try {
         const result = await getOrders({
-          limit: 100,
+          limit: ADMIN_LIST_FETCH_LIMIT,
           order_by: 'created_at',
           order_direction: 'desc',
         })
@@ -107,6 +108,9 @@ export default function AdminOrdersPage() {
       const ok = await updateOrderStatus(orderId, newStatus)
       if (ok) {
         setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o)))
+        toast.success("Estado del pedido actualizado")
+      } else {
+        toast.error("No se pudo actualizar el estado del pedido")
       }
     } finally {
       setUpdatingOrderId(null)
@@ -421,7 +425,6 @@ export default function AdminOrdersPage() {
                       <TableHead>Total</TableHead>
                       <TableHead>Estado</TableHead>
                       <TableHead>Pago</TableHead>
-                      <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -492,13 +495,6 @@ export default function AdminOrdersPage() {
                         </TableCell>
                         <TableCell>
                           {getPaymentStatusBadge(order.payment_status)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="ghost" size="icon" asChild>
-                            <Link href={`/admin/orders/${order.id}`}>
-                              <Eye className="h-4 w-4" />
-                            </Link>
-                          </Button>
                         </TableCell>
                       </TableRow>
                     ))}

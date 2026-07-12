@@ -123,7 +123,7 @@ describe("stats-api contract", () => {
     ]);
     expect(state.filters.orders).toEqual(
       expect.arrayContaining([
-        { op: "gte", column: "created_at", value: "2026-04-26T00:00:00.000Z" },
+        { op: "gte", column: "created_at", value: "2026-04-26T05:00:00.000Z" },
         {
           op: "in",
           column: "payment_status",

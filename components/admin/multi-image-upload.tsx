@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react"
 import Image from "next/image"
-import { Loader2, Upload, X } from "lucide-react"
+import { ImageOff, Loader2, Upload, X } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -78,10 +78,17 @@ export function MultiImageUpload({
   const fileInputRef = useRef<HTMLInputElement>(null)
   const resetTokenRef = useRef(resetToken)
   const [uploading, setUploading] = useState<number | null>(null)
+  const [failedIndexes, setFailedIndexes] = useState<Set<number>>(new Set())
+  const [previousImages, setPreviousImages] = useState(images)
 
   useEffect(() => {
     resetTokenRef.current = resetToken
   }, [resetToken])
+
+  if (images !== previousImages) {
+    setPreviousImages(images)
+    setFailedIndexes(new Set())
+  }
 
   const uploadFiles = async (files: File[], replaceIndex?: number) => {
     if (files.length === 0) return
@@ -215,15 +222,22 @@ export function MultiImageUpload({
             >
               {imageUrl ? (
                 <>
-                  <Image
-                    src={imageUrl}
-                    alt={`Imagen ${index + 1}`}
-                    fill
-                    className="object-cover"
-                    onError={() => {
-                      handleRemove(index)
-                    }}
-                  />
+                  {failedIndexes.has(index) ? (
+                    <div className="flex flex-col items-center justify-center h-full p-2 text-muted-foreground">
+                      <ImageOff className="h-8 w-8 mb-2" />
+                      <span className="text-xs text-center">No se pudo cargar</span>
+                    </div>
+                  ) : (
+                    <Image
+                      src={imageUrl}
+                      alt={`Imagen ${index + 1}`}
+                      fill
+                      className="object-cover"
+                      onError={() => {
+                        setFailedIndexes((previous) => new Set(previous).add(index))
+                      }}
+                    />
+                  )}
                   <Button
                     type="button"
                     variant="destructive"
