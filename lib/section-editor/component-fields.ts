@@ -20,7 +20,6 @@ import { FAQ_DEFAULTS } from "@/components/sections/faq";
 import { VIDEO_DEFAULTS } from "@/components/sections/video";
 import { STORY_DEFAULTS } from "@/components/sections/story";
 import { INSTAGRAM_DEFAULTS } from "@/components/sections/instagram";
-import { REPOSTERIA_GALLERY_DEFAULTS } from "@/components/sections/reposteria-gallery";
 import {
   PRODUCTS_CARD_STYLE_OPTIONS,
   PRODUCTS_COLUMNS_OPTIONS,
@@ -780,31 +779,8 @@ export const COMPONENT_FIELDS: Record<string, SectionFieldsConfig> = {
     defaults: {
       title: "Sobre Nosotros",
       description:
-        "Somos una pastelería artesanal dedicada a crear los más deliciosos pasteles, postres y dulces. Cada producto está hecho con ingredientes de la más alta calidad y mucho amor, para que puedas disfrutar de momentos especiales con cada bocado.",
+        "Contamos con productos de la más alta calidad, pensados para que disfrutes de la mejor experiencia de compra.",
     },
-  },
-  gallery: {
-    content: [
-      { key: "title", label: "Título de la Galería", type: "text" },
-      { key: "description", label: "Descripción", type: "textarea" },
-      {
-        key: "images",
-        label: "Imágenes de la Galería",
-        type: "array",
-        isArray: true,
-        arrayFields: [
-          { key: "src", label: "URL de la Imagen", type: "image" },
-          { key: "alt", label: "Texto Alternativo (Alt)", type: "text" },
-          { key: "title", label: "Título de la Imagen", type: "text" },
-          { key: "category", label: "Categoría", type: "text" },
-        ],
-      },
-    ],
-    styles: [
-      { key: "bgColor", label: "Color de Fondo", type: "color" },
-      { key: "textColor", label: "Color de Texto", type: "color" },
-    ],
-    defaults: REPOSTERIA_GALLERY_DEFAULTS,
   },
   story: {
     content: [

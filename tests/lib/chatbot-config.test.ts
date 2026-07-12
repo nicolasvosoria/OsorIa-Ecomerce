@@ -172,7 +172,7 @@ describe("chatbot per-store persistence", () => {
     const client = createFakeClient({
       stores: [
         { id: "store-a", subdomain: "default", domain: "osoria.test" },
-        { id: "store-b", subdomain: "reposteria", domain: "cakes.test" },
+        { id: "store-b", subdomain: "tienda2", domain: "tienda2.test" },
       ],
       integrations: [
         {
@@ -212,19 +212,19 @@ describe("chatbot per-store persistence", () => {
     const client = createFakeClient({
       stores: [
         { id: "store-a", subdomain: "default", domain: "osoria.test" },
-        { id: "store-b", subdomain: "reposteria", domain: "cakes.test" },
+        { id: "store-b", subdomain: "tienda2", domain: "tienda2.test" },
       ],
       integrations: [
         {
           store_id: "store-b",
-          metadata: { chatbot: { assistantGuide: "Guía de repostería" } },
+          metadata: { chatbot: { assistantGuide: "Guía de tienda 2" } },
         },
       ],
     })
 
     const lookups = buildChatbotStoreLookups({
       storeId: "store-a",
-      host: "reposteria.example.com",
+      host: "tienda2.example.com",
     })
 
     const result = await loadChatbotConfigForStore(
@@ -233,6 +233,6 @@ describe("chatbot per-store persistence", () => {
     )
 
     expect(result.storeId).toBe("store-b")
-    expect(result.config.assistantGuide).toBe("Guía de repostería")
+    expect(result.config.assistantGuide).toBe("Guía de tienda 2")
   })
 })

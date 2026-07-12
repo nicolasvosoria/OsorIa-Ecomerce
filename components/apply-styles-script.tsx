@@ -266,7 +266,7 @@ ${SECTION_STYLE_APPLIER_SOURCE}
       if (hostname.includes('localhost') || hostname.includes('127.0.0.1')) {
         const parts = hostname.split('.');
         if (parts.length > 1 && parts[0] !== 'localhost' && parts[0] !== '127') {
-          // Es un subdominio localhost (ej: reposteria.localhost)
+          // Es un subdominio localhost (ej: tienda2.localhost)
           // No podemos obtener el UUID real aquí, pero podemos usar el subdominio como referencia
           return null; // Retornar null para que se cargue desde Supabase después
         }
@@ -278,11 +278,11 @@ ${SECTION_STYLE_APPLIER_SOURCE}
     function getSubdomainFromHostname() {
       const hostname = window.location.hostname;
       
-      // En desarrollo local, detectar subdominios como reposteria.localhost
+      // En desarrollo local, detectar subdominios como tienda2.localhost
       if (hostname.includes('localhost') || hostname.includes('127.0.0.1')) {
         const parts = hostname.split('.');
         if (parts.length > 1 && parts[0] !== 'localhost' && parts[0] !== '127') {
-          return parts[0]; // Retornar el subdominio (ej: 'reposteria')
+          return parts[0]; // Retornar el subdominio (ej: 'tienda2')
         }
         return 'default';
       }
@@ -337,7 +337,6 @@ ${SECTION_STYLE_APPLIER_SOURCE}
       
       // Mapeo de títulos personalizados por subdominio
       const SUBDOMAIN_TITLES = {
-        reposteria: 'Tienda de Postres',
         // Agrega más subdominios aquí si es necesario
       };
       

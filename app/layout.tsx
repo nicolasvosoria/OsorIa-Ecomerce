@@ -30,7 +30,6 @@ import { ApplyStylesScript } from "@/components/apply-styles-script"
 import { StylesLoader } from "@/components/styles-loader"
 import { SiteBackground } from "@/components/site-background"
 import { StoreProvider } from "@/contexts/store-context"
-import { ReposteriaLayout } from "./reposteria-layout"
 import { AdminRedirect } from "@/components/admin/admin-redirect"
 import { DynamicTitle } from "@/components/dynamic-title"
 import { DynamicFavicon } from "@/components/dynamic-favicon"
@@ -172,41 +171,39 @@ export default async function RootLayout({
               <DynamicLang />
               <DynamicTitle />
               <DynamicFavicon />
-              <ReposteriaLayout>
-                <StylesProvider>
-                  <AuthProvider>
-                <AdminPermissionsProvider>
-                  <ThemeProvider>
-                  <ModeProvider>
-                  <SiteBackground />
-                  <FontProvider>
-                    <ShopifyCartProvider>
-                      <CartProvider>
-                        <WishlistProvider>
-                          <AdminProvider>
-                          <NuqsAdapter>
-                            <Suspense fallback={null}>
-                              <StylesLoader>
-                                <Suspense fallback={null}>
-                                  <AdminRedirect />
-                                </Suspense>
-                                <RouteAwareChrome>{children}</RouteAwareChrome>
-                                {isDevelopment && <DebugGrid />}
-                                <Toaster closeButton position="top-left" />
-                              </StylesLoader>
-                            </Suspense>
-                            </NuqsAdapter>
-                          </AdminProvider>
-                        </WishlistProvider>
-                      </CartProvider>
-                    </ShopifyCartProvider>
-                    </FontProvider>
-                  </ModeProvider>
-                  </ThemeProvider>
-                </AdminPermissionsProvider>
-              </AuthProvider>
-            </StylesProvider>
-              </ReposteriaLayout>
+              <StylesProvider>
+                <AuthProvider>
+              <AdminPermissionsProvider>
+                <ThemeProvider>
+                <ModeProvider>
+                <SiteBackground />
+                <FontProvider>
+                  <ShopifyCartProvider>
+                    <CartProvider>
+                      <WishlistProvider>
+                        <AdminProvider>
+                        <NuqsAdapter>
+                          <Suspense fallback={null}>
+                            <StylesLoader>
+                              <Suspense fallback={null}>
+                                <AdminRedirect />
+                              </Suspense>
+                              <RouteAwareChrome>{children}</RouteAwareChrome>
+                              {isDevelopment && <DebugGrid />}
+                              <Toaster closeButton position="top-left" />
+                            </StylesLoader>
+                          </Suspense>
+                          </NuqsAdapter>
+                        </AdminProvider>
+                      </WishlistProvider>
+                    </CartProvider>
+                  </ShopifyCartProvider>
+                  </FontProvider>
+                </ModeProvider>
+                </ThemeProvider>
+              </AdminPermissionsProvider>
+            </AuthProvider>
+          </StylesProvider>
             </StoreProvider>
           </LanguageProvider>
           {isV0 && <V0Setup />}

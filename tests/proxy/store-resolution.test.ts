@@ -18,11 +18,11 @@ const defaultStore = {
   is_public: true,
 };
 
-const reposteriaStore = {
+const tienda2Store = {
   id: "6bb5151b-9b9a-4794-a7b1-fb44df9f6aaa",
-  subdomain: "reposteria",
-  store_name: "Tienda de Repostería",
-  domain: "reposteria.example.com",
+  subdomain: "tienda2",
+  store_name: "Tienda Secundaria",
+  domain: "tienda2.example.com",
   is_active: true,
   is_public: true,
 };
@@ -42,8 +42,8 @@ function mockStoreFetch() {
     const body =
       subdomain === "default"
         ? [defaultStore]
-        : subdomain === "reposteria"
-          ? [reposteriaStore]
+        : subdomain === "tienda2"
+          ? [tienda2Store]
           : [];
 
     return new Response(JSON.stringify(body), { status: 200 });
@@ -89,17 +89,17 @@ describe("proxy store resolution", () => {
   });
 
   it.each([
-    ["reposteria.localhost:3000"],
-    ["reposteria.example.com"],
+    ["tienda2.localhost:3000"],
+    ["tienda2.example.com"],
   ])("loads the resolved subdomain store for host %s", async (host) => {
     const { proxy } = await import("@/proxy");
 
     const response = await proxy(makeRequest(host));
 
     const requestedUrl = new URL(fetchMock.mock.calls[0][0].toString());
-    expect(requestedUrl.searchParams.get("subdomain")).toBe("eq.reposteria");
-    expect(response.headers.get("x-store-subdomain")).toBe("reposteria");
-    expect(response.headers.get("x-store-name")).toBe("Tienda de Repostería");
+    expect(requestedUrl.searchParams.get("subdomain")).toBe("eq.tienda2");
+    expect(response.headers.get("x-store-subdomain")).toBe("tienda2");
+    expect(response.headers.get("x-store-name")).toBe("Tienda Secundaria");
     expect(response.headers.get("x-middleware-rewrite")).toBeNull();
   });
 });

@@ -1136,27 +1136,24 @@ export function Header() {
             {/* Botones de tema y tipografía - Solo visibles para administradores */}
             {user?.role === 'admin' && (
               <div className="flex-shrink-0 border-t p-6" style={{ borderColor: "var(--border)" }}>
-                {/* Botón de tema - Oculto para subdominio reposteria */}
-                {store?.subdomain !== 'reposteria' && (
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start gap-2"
-                    style={{ color: "var(--foreground)" }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = "var(--muted)"
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = "transparent"
-                    }}
-                    onClick={() => {
-                      setMenuOpen(false)
-                      setThemeModalOpen(true)
-                    }}
-                  >
-                    <Palette className="h-4 w-4" />
-                    {t.admin.changeTheme}
-                  </Button>
-                )}
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start gap-2"
+                  style={{ color: "var(--foreground)" }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = "var(--muted)"
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = "transparent"
+                  }}
+                  onClick={() => {
+                    setMenuOpen(false)
+                    setThemeModalOpen(true)
+                  }}
+                >
+                  <Palette className="h-4 w-4" />
+                  {t.admin.changeTheme}
+                </Button>
                 <Button
                   variant="ghost"
                   className="w-full justify-start gap-2 mt-2"

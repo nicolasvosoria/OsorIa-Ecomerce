@@ -1,8 +1,3 @@
-import { Suspense } from "react";
-import { ReposteriaHero } from "@/components/sections/reposteria-hero";
-import { ReposteriaGallery } from "@/components/sections/reposteria-gallery";
-import { ReposteriaAbout } from "@/components/sections/reposteria-about";
-import { ProductsGridWrapper } from "@/components/sections/products-grid-wrapper";
 import { FooterNew } from "@/components/sections/footer-new";
 import { EditableWrapper } from "@/components/admin/editable-wrapper";
 import { HomeDiscountPopup } from "@/components/home-discount-popup";
@@ -31,9 +26,8 @@ interface ConditionalHomeContentProps {
 }
 
 /**
- * Componente que muestra contenido diferente según la tienda
- * Para repostería muestra diseño inspirado en nicolukas.com
- * Server Component que obtiene el store desde el servidor
+ * Server Component que obtiene el store desde el servidor y renderiza el
+ * home data-driven según la composición configurada (orden y visibilidad).
  */
 export async function ConditionalHomeContent({
   previewMode = false,
@@ -42,58 +36,6 @@ export async function ConditionalHomeContent({
   const { storeId, config: homeDiscountPopupConfig } =
     projectHomeDiscountPopupFromStore(store);
 
-  // Si es la tienda de repostería, mostrar diseño personalizado
-  if (store?.subdomain === "reposteria") {
-    return (
-      <>
-        <main className="flex flex-col reposteria-main">
-          <EditableWrapper componentName="hero" label={sectionLabel("hero")}>
-            <ReposteriaHero />
-          </EditableWrapper>
-
-          <EditableWrapper
-            componentName="products"
-            label={sectionLabel("products")}
-          >
-            <section className="py-20 px-4 bg-muted/30">
-              <div className="container mx-auto">
-                <h2 className="section-title text-4xl md:text-5xl font-serif mb-12 text-center">
-                  Explora Nuestro Catálogo
-                </h2>
-                <Suspense
-                  fallback={
-                    <div className="py-12 text-center text-muted-foreground">
-                      Cargando productos...
-                    </div>
-                  }
-                >
-                  <ProductsGridWrapper />
-                </Suspense>
-              </div>
-            </section>
-          </EditableWrapper>
-
-          <EditableWrapper
-            componentName="gallery"
-            label={sectionLabel("gallery")}
-          >
-            <ReposteriaGallery />
-          </EditableWrapper>
-
-          <EditableWrapper componentName="about" label={sectionLabel("about")}>
-            <ReposteriaAbout />
-          </EditableWrapper>
-
-          <EditableWrapper componentName="footer" label={sectionLabel("footer")}>
-            <FooterNew />
-          </EditableWrapper>
-        </main>
-        <HomeDiscountPopup config={homeDiscountPopupConfig} storeId={storeId} />
-      </>
-    );
-  }
-
-  // Página normal para otras tiendas: orden y visibilidad data-driven
   const composition = await getHomeComposition();
 
   const keys = previewMode

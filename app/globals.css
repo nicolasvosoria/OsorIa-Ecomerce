@@ -1,6 +1,5 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-@import "./globals-reposteria.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -239,28 +238,6 @@
     background-color: var(--background);
     color: var(--foreground);
     font-family: var(--font-family-sans, var(--font-geist-sans), sans-serif);
-  }
-}
-
-/* Aíslan superficies admin de estilos storefront por tienda */
-@layer components {
-  .reposteria-store [data-admin-neutral="true"] {
-    font-family: var(--font-family-sans, var(--font-geist-sans), sans-serif);
-    color: var(--foreground);
-    letter-spacing: normal;
-  }
-
-  .reposteria-store [data-admin-neutral="true"] :is(h1, h2, h3, h4, h5, h6) {
-    font-family: inherit;
-    color: inherit;
-    letter-spacing: normal;
-  }
-
-  .reposteria-store
-    [data-admin-neutral="true"]
-    :is(button, input, textarea, select) {
-    font-family: inherit;
-    letter-spacing: normal;
   }
 }
 

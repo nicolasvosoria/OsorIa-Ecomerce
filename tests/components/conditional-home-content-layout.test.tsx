@@ -84,18 +84,6 @@ vi.mock("@/components/home-discount-popup", () => ({
   ),
 }));
 
-vi.mock("@/components/sections/reposteria-hero", () => ({
-  ReposteriaHero: () => <MockSection testId="reposteria-hero" />,
-}));
-
-vi.mock("@/components/sections/reposteria-gallery", () => ({
-  ReposteriaGallery: () => <MockSection testId="reposteria-gallery" />,
-}));
-
-vi.mock("@/components/sections/reposteria-about", () => ({
-  ReposteriaAbout: () => <MockSection testId="reposteria-about" />,
-}));
-
 describe("ConditionalHomeContent layout", () => {
   beforeEach(() => {
     mockGetStoreFromServer.mockReset();
@@ -110,7 +98,6 @@ describe("ConditionalHomeContent layout", () => {
     expect(screen.getByTestId("special-offer")).toBeInTheDocument();
     expect(screen.getByTestId("newsletter")).toBeInTheDocument();
     expect(screen.getByTestId("discount-popup")).toBeInTheDocument();
-    expect(screen.queryByTestId("reposteria-hero")).not.toBeInTheDocument();
 
     const order = Array.from(
       container.querySelectorAll("[data-testid]"),
@@ -126,16 +113,5 @@ describe("ConditionalHomeContent layout", () => {
       "footer",
       "discount-popup",
     ]);
-  });
-
-  it("keeps the reposteria path on its dedicated layout", async () => {
-    mockGetStoreFromServer.mockResolvedValue({ subdomain: "reposteria" });
-
-    render(await ConditionalHomeContent());
-
-    expect(screen.getByTestId("reposteria-hero")).toBeInTheDocument();
-    expect(screen.getByTestId("reposteria-gallery")).toBeInTheDocument();
-    expect(screen.queryByTestId("special-offer")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("newsletter")).not.toBeInTheDocument();
   });
 });

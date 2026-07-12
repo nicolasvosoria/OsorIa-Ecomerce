@@ -3,7 +3,6 @@
 import { Suspense, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { AdminPermissionsProvider, useAdminPermissions } from "@/contexts/admin-permissions-context"
-import { useStore } from "@/contexts/store-context"
 import { ThemeCustomEditor } from "@/components/theme/theme-custom-editor"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -12,13 +11,9 @@ import Link from "next/link"
 
 function AdminThemePageContent() {
   const { isAdmin, loading, hasChecked } = useAdminPermissions()
-  const { store } = useStore()
   const router = useRouter()
 
-  // Mismo gate de subdominio que ThemeSelectorModal (D4): en esta tienda los
-  // temas solo se administran desde el panel de administración central.
-  const isReposteria = store?.subdomain === "reposteria"
-  const hasAccess = isAdmin && !isReposteria
+  const hasAccess = isAdmin
 
   useEffect(() => {
     if (hasChecked && !loading && !hasAccess) {

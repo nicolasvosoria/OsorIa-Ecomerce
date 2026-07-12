@@ -3,7 +3,6 @@
 import { Fragment, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useTheme } from "@/contexts/theme-context"
-import { useStore } from "@/contexts/store-context"
 import {
   Dialog,
   DialogContent,
@@ -30,25 +29,16 @@ interface ThemeSelectorModalProps {
   onOpenChange: (open: boolean) => void
 }
 
-// Stores whose theme is locked to their bespoke design; the theme switcher is hidden for them.
-const THEME_LOCKED_SUBDOMAINS = ["reposteria"] as const
-
 export function ThemeSelectorModal({ open, onOpenChange }: ThemeSelectorModalProps) {
   const { themes, activeTheme, loading, changeTheme } = useTheme()
-  const { store } = useStore()
   const router = useRouter()
   const [changing, setChanging] = useState<string | null>(null)
   const [publicationMessage, setPublicationMessage] = useState<string | null>(null)
   const [publicationError, setPublicationError] = useState<string | null>(null)
   const [pendingThemeName, setPendingThemeName] = useState<string | null>(null)
 
-  const isThemeChangeDisabled = (THEME_LOCKED_SUBDOMAINS as readonly string[]).includes(
-    store?.subdomain ?? "",
-  )
-
   const handleThemeChange = async (themeName: string) => {
     if (changing) return
-    if (isThemeChangeDisabled) return // No permitir cambios si está deshabilitado
 
     setPublicationMessage(null)
     setPublicationError(null)
@@ -70,7 +60,6 @@ export function ThemeSelectorModal({ open, onOpenChange }: ThemeSelectorModalPro
   // llamar a changeTheme.
   const requestThemeChange = (themeName: string) => {
     if (changing) return
-    if (isThemeChangeDisabled) return
 
     setPendingThemeName(themeName)
   }
@@ -90,9 +79,7 @@ export function ThemeSelectorModal({ open, onOpenChange }: ThemeSelectorModalPro
           <DialogHeader>
             <DialogTitle className="text-lg md:text-xl">Seleccionar Tema</DialogTitle>
             <DialogDescription className="text-sm">
-              {isThemeChangeDisabled
-                ? "Los temas solo pueden ser modificados desde el panel de administración"
-                : "Elige un tema para personalizar los colores de la página"}
+              Elige un tema para personalizar los colores de la página
             </DialogDescription>
           </DialogHeader>
 
@@ -105,14 +92,6 @@ export function ThemeSelectorModal({ open, onOpenChange }: ThemeSelectorModalPro
           {publicationError && (
             <Alert className="mb-4" variant="destructive">
               <AlertDescription className="text-sm">{publicationError}</AlertDescription>
-            </Alert>
-          )}
-
-          {isThemeChangeDisabled && (
-            <Alert className="mb-4">
-              <AlertDescription className="text-sm">
-                En esta tienda, los temas solo pueden ser modificados desde el panel de administración.
-              </AlertDescription>
             </Alert>
           )}
 
@@ -136,7 +115,7 @@ export function ThemeSelectorModal({ open, onOpenChange }: ThemeSelectorModalPro
                     variant={isActive ? "default" : "outline"}
                     className="w-full justify-start h-auto p-3 md:p-4 text-sm md:text-base"
                     onClick={() => requestThemeChange(theme.theme_name)}
-                    disabled={isChanging || isActive || isThemeChangeDisabled}
+                    disabled={isChanging || isActive}
                   >
                     <div className="flex items-center gap-2 md:gap-3 w-full">
                       <div
@@ -163,7 +142,6 @@ export function ThemeSelectorModal({ open, onOpenChange }: ThemeSelectorModalPro
             variant="outline"
             className="w-full justify-center gap-2"
             onClick={() => router.push("/admin/theme")}
-            disabled={isThemeChangeDisabled}
           >
             <Palette className="h-4 w-4" />
             Theme Custom

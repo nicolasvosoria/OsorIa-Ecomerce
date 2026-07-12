@@ -73,10 +73,112 @@ async function getStoreIdFromServer(): Promise<string | null> {
   return 'default'
 }
 
+type StoreRecord = {
+  id: string
+  subdomain: string
+  store_name: string
+  primary_color?: string
+  secondary_color?: string
+  metadata?: Record<string, unknown>
+}
+
+type SupabaseServerClient = NonNullable<Awaited<ReturnType<typeof getSupabaseServerClient>>>
+
+// Ejecuta la query de `stores_legacy` por `id` o `subdomain` y clasifica el
+// resultado: `notFound` distingue "la tienda no existe" (recuperable con un
+// fallback) de un error real de Supabase (no recuperable, se loguea y corta).
+async function queryStoreRow(
+  supabase: SupabaseServerClient,
+  match: { column: 'id' | 'subdomain'; value: string },
+): Promise<{ row: StoreRecord | null; notFound: boolean }> {
+  // Vista legacy: stores_legacy ya incluye primary_color, secondary_color y
+  // metadata (join con store_integrations), así que la reutilizamos para
+  // resolver también la config del popup de descuento sin query extra.
+  const { data, error } = await supabase
+    .from(ECOMMERCE_VIEWS.storesLegacy)
+    .select('id, subdomain, store_name, primary_color, secondary_color, metadata')
+    .eq('is_active', true)
+    .is('deleted_at', null)
+    .eq(match.column, match.value)
+    .single()
+
+  if (!error) {
+    return { row: data as StoreRecord, notFound: false }
+  }
+
+  // Intentar obtener información del error de forma segura
+  let errorCode: string | undefined
+  let errorMessage: string | undefined
+  let errorDetails: any
+  let errorHint: string | undefined
+
+  if (error && typeof error === 'object') {
+    try {
+      errorCode = 'code' in error ? String((error as any).code) : undefined
+      errorMessage = 'message' in error ? String((error as any).message) : undefined
+      errorDetails = 'details' in error ? (error as any).details : undefined
+      errorHint = 'hint' in error ? String((error as any).hint) : undefined
+    } catch {
+      // Si falla al acceder a las propiedades, usar valores por defecto
+      errorMessage = String(error)
+    }
+  } else {
+    errorMessage = String(error)
+  }
+
+  // Si el error es que no se encontró la tienda (PGRST116), no es crítico
+  if (
+    errorCode === 'PGRST116' ||
+    errorMessage?.includes('No rows') ||
+    errorMessage?.includes('not found') ||
+    errorMessage?.includes('No rows returned') ||
+    errorMessage?.includes('The result contains 0 rows')
+  ) {
+    console.log(`[Store API] Tienda no encontrada (${match.column}: ${match.value})`)
+    return { row: null, notFound: true }
+  }
+
+  // Para otros errores, loguear más información de forma segura
+  const errorInfo: Record<string, any> = {
+    match,
+    errorType: typeof error,
+  }
+
+  if (errorMessage) errorInfo.message = errorMessage
+  if (errorCode) errorInfo.code = errorCode
+  if (errorDetails) errorInfo.details = errorDetails
+  if (errorHint) errorInfo.hint = errorHint
+
+  // Intentar serializar el error completo de forma segura
+  try {
+    errorInfo.fullError = JSON.stringify(error, (key, value) => {
+      // Evitar errores de circular reference
+      if (typeof value === 'object' && value !== null) {
+        try {
+          return value
+        } catch {
+          return '[Circular]'
+        }
+      }
+      return value
+    }, 2)
+  } catch {
+    errorInfo.fullError = String(error)
+  }
+
+  console.error('[Store API] Error al obtener tienda:', errorInfo)
+  return { row: null, notFound: false }
+}
+
 /**
- * Obtiene información de una tienda desde el servidor
+ * Obtiene información de una tienda desde el servidor.
+ *
+ * Cuando el store_id se resuelve por `id` (header/cookie) y esa tienda ya no
+ * existe (p. ej. una cookie desactualizada apuntando a una tienda eliminada),
+ * hace fallback a la tienda `default` en vez de dejar el storefront sin
+ * tienda.
  */
-export async function getStoreFromServer(): Promise<{ id: string; subdomain: string; store_name: string; primary_color?: string; secondary_color?: string; metadata?: Record<string, unknown> } | null> {
+export async function getStoreFromServer(): Promise<StoreRecord | null> {
   try {
     const supabase = await getSupabaseServerClient()
     if (!supabase) {
@@ -89,99 +191,23 @@ export async function getStoreFromServer(): Promise<{ id: string; subdomain: str
       return null
     }
 
-    // Vista legacy: stores_legacy ya incluye primary_color, secondary_color y
-    // metadata (join con store_integrations), así que la reutilizamos para
-    // resolver también la config del popup de descuento sin query extra.
-    let query = supabase
-      .from(ECOMMERCE_VIEWS.storesLegacy)
-      .select('id, subdomain, store_name, primary_color, secondary_color, metadata')
-      .eq('is_active', true)
-      .is('deleted_at', null)
+    const match = storeId === 'default'
+      ? { column: 'subdomain' as const, value: 'default' }
+      : { column: 'id' as const, value: storeId }
 
-    if (storeId === 'default') {
-      query = query.eq('subdomain', 'default')
-      console.log('[Store API] Buscando tienda por subdomain: default')
-    } else {
-      query = query.eq('id', storeId)
-      console.log('[Store API] Buscando tienda por ID:', storeId)
+    console.log(`[Store API] Buscando tienda por ${match.column}:`, match.value)
+    const result = await queryStoreRow(supabase, match)
+    if (result.row) {
+      return result.row
     }
 
-    const { data, error } = await query.single()
-
-    // Si hay error, verificar qué tipo de error es
-    if (error) {
-      // Intentar obtener información del error de forma segura
-      let errorCode: string | undefined
-      let errorMessage: string | undefined
-      let errorDetails: any
-      let errorHint: string | undefined
-
-      // Verificar si el error tiene propiedades
-      if (error && typeof error === 'object') {
-        try {
-          errorCode = 'code' in error ? String((error as any).code) : undefined
-          errorMessage = 'message' in error ? String((error as any).message) : undefined
-          errorDetails = 'details' in error ? (error as any).details : undefined
-          errorHint = 'hint' in error ? String((error as any).hint) : undefined
-        } catch {
-          // Si falla al acceder a las propiedades, usar valores por defecto
-          errorMessage = String(error)
-        }
-      } else {
-        errorMessage = String(error)
-      }
-
-      // Si el error es que no se encontró la tienda (PGRST116), no es crítico
-      if (
-        errorCode === 'PGRST116' || 
-        errorMessage?.includes('No rows') || 
-        errorMessage?.includes('not found') ||
-        errorMessage?.includes('No rows returned') ||
-        errorMessage?.includes('The result contains 0 rows')
-      ) {
-        console.log(`[Store API] Tienda no encontrada (storeId: ${storeId}), usando configuración por defecto`)
-        return null
-      }
-      
-      // Para otros errores, loguear más información de forma segura
-      const errorInfo: Record<string, any> = {
-        storeId,
-        errorType: typeof error,
-      }
-
-      if (errorMessage) errorInfo.message = errorMessage
-      if (errorCode) errorInfo.code = errorCode
-      if (errorDetails) errorInfo.details = errorDetails
-      if (errorHint) errorInfo.hint = errorHint
-
-      // Intentar serializar el error completo de forma segura
-      try {
-        errorInfo.fullError = JSON.stringify(error, (key, value) => {
-          // Evitar errores de circular reference
-          if (typeof value === 'object' && value !== null) {
-            try {
-              return value
-            } catch {
-              return '[Circular]'
-            }
-          }
-          return value
-        }, 2)
-      } catch {
-        errorInfo.fullError = String(error)
-      }
-
-      console.error('[Store API] Error al obtener tienda:', errorInfo)
-      return null
+    if (match.column === 'id' && result.notFound) {
+      console.log('[Store API] La tienda del storeId no existe, fallback a la tienda default')
+      const fallback = await queryStoreRow(supabase, { column: 'subdomain', value: 'default' })
+      return fallback.row
     }
 
-    // Si no hay datos, retornar null
-    if (!data) {
-      console.log(`[Store API] No se encontró tienda con storeId: ${storeId}`)
-      return null
-    }
-
-    return data
+    return null
   } catch (error: any) {
     if (error?.message?.includes('prerender') || error?.message?.includes('During prerendering')) {
       // Durante el prerenderizado, retornar null y usar default

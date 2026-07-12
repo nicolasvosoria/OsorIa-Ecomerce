@@ -17,27 +17,27 @@ describe("store host resolution", () => {
   });
 
   it("resolves an explicit localhost subdomain", () => {
-    expect(resolveStoreSubdomain("reposteria.localhost:3000")).toBe(
-      "reposteria",
+    expect(resolveStoreSubdomain("tienda2.localhost:3000")).toBe(
+      "tienda2",
     );
-    expect(resolveStoreLookupSubdomain("reposteria.localhost:3000")).toBe(
-      "reposteria",
+    expect(resolveStoreLookupSubdomain("tienda2.localhost:3000")).toBe(
+      "tienda2",
     );
   });
 
   it("resolves a production-style subdomain", () => {
-    expect(resolveStoreSubdomain("reposteria.example.com")).toBe(
-      "reposteria",
+    expect(resolveStoreSubdomain("tienda2.example.com")).toBe(
+      "tienda2",
     );
-    expect(resolveStoreLookupSubdomain("reposteria.example.com")).toBe(
-      "reposteria",
+    expect(resolveStoreLookupSubdomain("tienda2.example.com")).toBe(
+      "tienda2",
     );
   });
 
   it("preserves Vercel project and subdomain behavior", () => {
     expect(resolveStoreSubdomain("osoria.vercel.app")).toBeNull();
-    expect(resolveStoreSubdomain("reposteria.osoria.vercel.app")).toBe(
-      "reposteria",
+    expect(resolveStoreSubdomain("tienda2.osoria.vercel.app")).toBe(
+      "tienda2",
     );
   });
 });

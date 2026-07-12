@@ -1,8 +1,7 @@
 import type { HomeSectionEntry } from "@/lib/supabase/types"
 
 // The composable home sections, in their default order. `footer` is fixed
-// chrome and `gallery`/`about` are reposteria-only — none of the three are
-// part of the composition.
+// chrome and is not part of the composition.
 export const COMPOSABLE_SECTION_KEYS = [
   "hero",
   "popular",

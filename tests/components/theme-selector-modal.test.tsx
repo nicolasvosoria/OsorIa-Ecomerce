@@ -8,7 +8,6 @@ import { ThemeSelectorModal } from "@/components/theme/theme-selector-modal";
 
 const changeTheme = vi.fn();
 const routerPush = vi.fn();
-let storeSubdomain = "default";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: routerPush }),
@@ -34,10 +33,6 @@ vi.mock("@/contexts/theme-context", () => ({
   }),
 }));
 
-vi.mock("@/contexts/store-context", () => ({
-  useStore: () => ({ store: { subdomain: storeSubdomain } }),
-}));
-
 async function confirmPendingThemeApply() {
   await userEvent.click(
     screen.getByRole("button", { name: /Continuar/i }),
@@ -47,7 +42,6 @@ async function confirmPendingThemeApply() {
 describe("ThemeSelectorModal confirmation before reset", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    storeSubdomain = "default";
   });
 
   it("opens a confirmation dialog instead of applying the theme immediately", async () => {
@@ -100,34 +94,12 @@ describe("ThemeSelectorModal confirmation before reset", () => {
     ).toBeInTheDocument();
   });
 
-  it("keeps theme changes disabled for the reposteria subdomain and never opens the confirmation", async () => {
-    storeSubdomain = "reposteria";
-
-    render(<ThemeSelectorModal open onOpenChange={vi.fn()} />);
-
-    const oceanoButton = screen.getByRole("button", { name: /Océano/i });
-    expect(oceanoButton).toBeDisabled();
-
-    await userEvent.click(oceanoButton);
-
-    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
-    expect(changeTheme).not.toHaveBeenCalled();
-  });
-
   it("navigates to the theme customizer when 'Theme Custom' is clicked", async () => {
     render(<ThemeSelectorModal open onOpenChange={vi.fn()} />);
 
     await userEvent.click(screen.getByRole("button", { name: /Theme Custom/i }));
 
     expect(routerPush).toHaveBeenCalledWith("/admin/theme");
-  });
-
-  it("disables the 'Theme Custom' entry for the reposteria subdomain", async () => {
-    storeSubdomain = "reposteria";
-
-    render(<ThemeSelectorModal open onOpenChange={vi.fn()} />);
-
-    expect(screen.getByRole("button", { name: /Theme Custom/i })).toBeDisabled();
   });
 
   it("keeps activation failure visible without closing as published", async () => {

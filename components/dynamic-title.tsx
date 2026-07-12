@@ -8,7 +8,6 @@ import { useStore } from "@/contexts/store-context"
  * Puedes agregar más subdominios aquí con sus títulos correspondientes
  */
 const SUBDOMAIN_TITLES: Record<string, string> = {
-  reposteria: "Tienda de Postres",
   // Agrega más subdominios aquí:
   // electronica: "Tienda de Electrónica",
   // ropa: "Tienda de Ropa",
@@ -22,11 +21,11 @@ function getSubdomainFromHostname(): string {
   
   const hostname = window.location.hostname
   
-  // En desarrollo local, detectar subdominios como reposteria.localhost
+  // En desarrollo local, detectar subdominios como tienda2.localhost
   if (hostname.includes('localhost') || hostname.includes('127.0.0.1')) {
     const parts = hostname.split('.')
     if (parts.length > 1 && parts[0] !== 'localhost' && parts[0] !== '127') {
-      return parts[0] // Retornar el subdominio (ej: 'reposteria')
+      return parts[0] // Retornar el subdominio (ej: 'tienda2')
     }
     return 'default'
   }

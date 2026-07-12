@@ -11,11 +11,11 @@ function getSubdomainFromHostname(): string {
   
   const hostname = window.location.hostname
   
-  // En desarrollo local, detectar subdominios como reposteria.localhost
+  // En desarrollo local, detectar subdominios como tienda2.localhost
   if (hostname.includes('localhost') || hostname.includes('127.0.0.1')) {
     const parts = hostname.split('.')
     if (parts.length > 1 && parts[0] !== 'localhost' && parts[0] !== '127') {
-      return parts[0] // Retornar el subdominio (ej: 'reposteria')
+      return parts[0] // Retornar el subdominio (ej: 'tienda2')
     }
     return 'default'
   }
@@ -87,7 +87,7 @@ function updateFavicon(subdomain: string) {
  * Componente que actualiza dinámicamente el favicon según el subdominio/tienda activa
  * 
  * Funciona buscando favicons con el formato:
- * - /favicon-{subdomain}.ico (ej: /favicon-reposteria.ico)
+ * - /favicon-{subdomain}.ico (ej: /favicon-tienda2.ico)
  * - Si no existe, usa el favicon por defecto (/favicon.ico)
  * 
  * Estrategia:
