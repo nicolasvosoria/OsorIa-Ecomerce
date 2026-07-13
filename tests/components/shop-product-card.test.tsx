@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ProductCard } from '@/app/shop/components/product-card';
-import type { Product } from '@/lib/shopify/types';
+import type { Product } from '@/lib/commerce/types';
 
 vi.mock('next/link', () => ({
   default: ({ href, children, prefetch: _prefetch, ...props }: { href: string; children: React.ReactNode; prefetch?: boolean }) => (

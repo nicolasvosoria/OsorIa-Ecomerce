@@ -9,7 +9,7 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from "@/components/ui/carousel"
-import { formatPrice } from "@/lib/shopify/utils"
+import { formatPrice } from "@/lib/commerce/utils"
 import type { RelatedProductCard } from "@/lib/products/public-product-payload"
 
 export function RelatedProductsCarousel({ products }: { products: RelatedProductCard[] }) {

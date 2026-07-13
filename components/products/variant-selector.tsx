@@ -1,14 +1,14 @@
 'use client';
 
 import { cva, type VariantProps } from 'class-variance-authority';
-import { CartProduct, Product, ProductOption, ProductVariant, SelectedOptions } from '@/lib/shopify/types';
+import { CartProduct, Product, ProductOption, ProductVariant, SelectedOptions } from '@/lib/commerce/types';
 import { startTransition, useMemo } from 'react';
 import { useQueryState, parseAsString } from 'nuqs';
 import { useParams, useSearchParams } from 'next/navigation';
 import { ColorSwatch } from '@/components/ui/color-picker';
 import { Button } from '@/components/ui/button';
 import { getColorHex } from '@/lib/utils';
-import { getShopifyProductId } from '@/lib/shopify/utils';
+import { getProductId } from '@/lib/commerce/utils';
 
 type Combination = {
   id: string;
@@ -142,13 +142,13 @@ export function VariantOptionSelector({ option, variant, product }: VariantOptio
   const selectedOptions = useSelectedOptions(product);
 
   const isProductPage = pathname.handle === product.handle;
-  const isTargetingProduct = isProductPage || activeProductId === getShopifyProductId(product.id);
+  const isTargetingProduct = isProductPage || activeProductId === getProductId(product.id);
 
   const handleSelect = (valueName: string) => {
     startTransition(() => {
       setSelectedValue(valueName);
       if (!isProductPage) {
-        setActiveProductId(getShopifyProductId(product.id));
+        setActiveProductId(getProductId(product.id));
       }
     });
   };
@@ -214,7 +214,7 @@ export const useProductImages = (product: Product | CartProduct, selectedOptions
   }, [selectedOptions]);
 
   // Try to match images by alt text with selected variant values
-  // This enables Shopify products to show different images when variants are selected
+  // This enables products to show different images when variants are selected
   // by matching the image alt text with variant names (e.g., "Red Shirt" shows when Red is selected)
   const variantImagesByAlt = useMemo(() => {
     if (!optionsObject || Object.keys(optionsObject).length === 0) return [];
@@ -250,7 +250,7 @@ export const useProductImages = (product: Product | CartProduct, selectedOptions
     return variantImages;
   }
 
-  // Then try images matched by alt text (for Shopify products with 2+ variants)
+  // Then try images matched by alt text (for products with 2+ variants)
   if (variantImagesByAlt.length > 0) {
     return variantImagesByAlt;
   }

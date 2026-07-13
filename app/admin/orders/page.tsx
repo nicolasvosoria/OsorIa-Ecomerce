@@ -17,7 +17,7 @@ import { toast } from "sonner"
 import type { Order, OrderWithItems } from "@/lib/supabase/orders-api"
 import { getAdminRequestHeaders } from "@/lib/supabase/admin-request-headers"
 import { ADMIN_LIST_FETCH_LIMIT } from "@/lib/admin/constants"
-import { formatPrice } from "@/lib/shopify/utils"
+import { formatPrice } from "@/lib/commerce/utils"
 import {
   Table,
   TableBody,

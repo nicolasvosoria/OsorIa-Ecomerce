@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 // getDashboardStats se importa dinámicamente para evitar problemas con Turbopack
-import { formatPrice } from "@/lib/shopify/utils";
+import { formatPrice } from "@/lib/commerce/utils";
 // Importación dinámica de getDashboardStats para evitar problemas con Turbopack
 
 function DashboardContent() {

@@ -1,4 +1,3 @@
-import type { Cart, CartItem as ShopifyCartItem } from '@/lib/shopify/types';
 import type { CartItem as LocalCartItem } from '@/contexts/cart-context';
 import type { Language } from '@/lib/i18n/translations';
 
@@ -41,22 +40,6 @@ export function formatCartMoney(amount: string | number, currencyCode: string | 
   }).format(safeAmount);
 }
 
-export function buildShopifyCartSummary(cart: Cart, language: Language): CartSummary {
-  const currencyCode = cart.cost.totalAmount.currencyCode || cart.cost.subtotalAmount.currencyCode || 'COP';
-  const lines = cart.lines.map(line => buildShopifyLine(line, language));
-  const subtotal = parseMoneyAmount(cart.cost.subtotalAmount.amount);
-  const total = parseMoneyAmount(cart.cost.totalAmount.amount);
-
-  return {
-    lines,
-    subtotal,
-    total,
-    currencyCode,
-    formattedSubtotal: formatCartMoney(subtotal, currencyCode, language),
-    formattedTotal: formatCartMoney(total, currencyCode, language),
-  };
-}
-
 export function buildLocalCartSummary(args: {
   items: LocalCartItem[];
   getItemSubtotal: (item: LocalCartItem) => number;
@@ -88,23 +71,4 @@ export function buildLocalCartSummary(args: {
     formattedSubtotal: formatCartMoney(args.total, currencyCode, args.language),
     formattedTotal: formatCartMoney(args.total, currencyCode, args.language),
   };
-}
-
-function buildShopifyLine(line: ShopifyCartItem, language: Language): CartSummaryLine {
-  const amount = parseMoneyAmount(line.cost.totalAmount.amount);
-  const currencyCode = line.cost.totalAmount.currencyCode || 'COP';
-
-  return {
-    id: line.id,
-    name: line.merchandise.product.title,
-    quantity: line.quantity,
-    currencyCode,
-    amount,
-    formattedLineTotal: formatCartMoney(amount, currencyCode, language),
-  };
-}
-
-function parseMoneyAmount(amount: string | number): number {
-  const parsed = typeof amount === 'number' ? amount : Number(amount);
-  return Number.isFinite(parsed) ? parsed : 0;
 }

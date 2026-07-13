@@ -11,7 +11,7 @@ import type {
   ItemCategory,
   ItemOption,
 } from '@/lib/types/products';
-import type { Product, Collection, ProductVariant, ProductOption, Money, Image } from '@/lib/shopify/types';
+import type { Product, Collection, ProductVariant, ProductOption, Money, Image } from '@/lib/commerce/types';
 import { resolveCommercePrice } from '@/lib/products/pricing';
 
 // Helper para convertir precio a formato Money

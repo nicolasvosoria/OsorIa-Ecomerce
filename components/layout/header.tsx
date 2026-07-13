@@ -1049,20 +1049,6 @@ export function Header() {
               >
                 {t.nav.home}
               </Link>
-              <Link
-                href="/sale"
-                className="text-base font-inter font-medium py-3 px-4 rounded-lg transition-colors"
-                style={{ color: "var(--foreground)" }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = "var(--muted)"
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "transparent"
-                }}
-                onClick={() => setMenuOpen(false)}
-              >
-                {t.header.offers}
-              </Link>
               {/* Categorías dinámicas desde la BD */}
               {categories.length > 0 ? (
                 categories.map((category) => {

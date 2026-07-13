@@ -1,5 +1,5 @@
 import type { OrderWithItems } from "@/lib/supabase/orders-api";
-import { formatPrice } from "@/lib/shopify/utils";
+import { formatPrice } from "@/lib/commerce/utils";
 import {
   escapeHtml,
   sanitizePublicUrl,

@@ -4,7 +4,3 @@ export const sortOptions = [
   { label: 'Newest', value: 'newest' },
   { label: 'Oldest', value: 'oldest' },
 ];
-
-export const DEFAULT_PAGE_SIZE = 24;
-
-export const DEFAULT_SORT_KEY = 'RELEVANCE';

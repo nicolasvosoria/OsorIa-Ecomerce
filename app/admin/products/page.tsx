@@ -18,7 +18,7 @@ import Link from "next/link"
 import { getItems } from "@/lib/supabase/products-api"
 import { ADMIN_LIST_FETCH_LIMIT } from "@/lib/admin/constants"
 import type { StoreItemWithDetails } from "@/lib/types/products"
-import { formatPrice } from "@/lib/shopify/utils"
+import { formatPrice } from "@/lib/commerce/utils"
 import Image from "next/image"
 import {
   Table,

@@ -3,7 +3,7 @@
 import { Heart } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useWishlist } from "@/contexts/wishlist-context"
-import { Product } from "@/lib/shopify/types"
+import { Product } from "@/lib/commerce/types"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { useLanguage } from "@/contexts/language-context"

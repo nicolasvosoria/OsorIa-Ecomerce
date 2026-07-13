@@ -9,14 +9,10 @@ import { GeistMono } from "geist/font/mono"
 import "./globals.css"
 import { Toaster } from "sonner"
 import { NuqsAdapter } from "nuqs/adapters/next/app"
-import { CartProvider as ShopifyCartProvider } from "@/components/cart/cart-context"
 import { CartProvider } from "@/contexts/cart-context"
 import { WishlistProvider } from "@/contexts/wishlist-context"
 import { DebugGrid } from "@/components/debug-grid"
 import { isDevelopment } from "@/lib/constants"
-import { getCollections } from "@/lib/shopify"
-import dynamic from "next/dynamic"
-import { V0Provider } from "../lib/context"
 import { cn } from "../lib/utils"
 import { StylesProvider } from "@/contexts/styles-context"
 import { ThemeProvider } from "@/contexts/theme-context"
@@ -44,16 +40,11 @@ import {
 } from "@/lib/theme-font/bootstrap"
 import { normalizePairingRecord } from "@/lib/theme-font/runtime-contract"
 
-const V0Setup = dynamic(() => import("@/components/v0-setup"))
-
-const isV0 = process.env["VERCEL_URL"]?.includes("vusercontent.net") ?? false
-
 export const metadata: Metadata = {
   metadataBase: metadataBaseFromEnvironment(),
   title: "Ecommerce",
   description:
     "Ecommerce parametrizable.",
-  generator: "v0.app",
 }
 
 export { viewport }
@@ -117,14 +108,6 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  // Intentar obtener colecciones de Shopify, pero no fallar si no está configurado
-  try {
-    await getCollections();
-  } catch (error) {
-    console.warn('[Layout] ⚠️ No se pudieron obtener colecciones de Shopify:', error);
-    // Continuar sin colecciones si Shopify no está configurado
-  }
-
   // Resolver la hoja de estilos de la combinación de fuentes activa en el
   // servidor; nunca debe hacer fallar el layout si Supabase no está disponible.
   let fontPairingLinks: FontPairingHeadLink[] = []
@@ -161,53 +144,48 @@ export default async function RootLayout({
         ))}
       </head>
       <body
-        className={cn("antialiased min-h-screen", { "is-v0": isV0 })}
+        className={cn("antialiased min-h-screen")}
         suppressHydrationWarning
       >
         <ApplyStylesScript />
-        <V0Provider isV0={isV0}>
-          <LanguageProvider>
-            <StoreProvider>
-              <DynamicLang />
-              <DynamicTitle />
-              <DynamicFavicon />
-              <StylesProvider>
-                <AuthProvider>
-              <AdminPermissionsProvider>
-                <ThemeProvider>
-                <ModeProvider>
-                <SiteBackground />
-                <FontProvider>
-                  <ShopifyCartProvider>
-                    <CartProvider>
-                      <WishlistProvider>
-                        <AdminProvider>
-                        <NuqsAdapter>
-                          <Suspense fallback={null}>
-                            <StylesLoader>
-                              <Suspense fallback={null}>
-                                <AdminRedirect />
-                              </Suspense>
-                              <RouteAwareChrome>{children}</RouteAwareChrome>
-                              {isDevelopment && <DebugGrid />}
-                              <Toaster closeButton position="top-left" />
-                            </StylesLoader>
-                          </Suspense>
-                          </NuqsAdapter>
-                        </AdminProvider>
-                      </WishlistProvider>
-                    </CartProvider>
-                  </ShopifyCartProvider>
-                  </FontProvider>
-                </ModeProvider>
-                </ThemeProvider>
-              </AdminPermissionsProvider>
-            </AuthProvider>
-          </StylesProvider>
-            </StoreProvider>
-          </LanguageProvider>
-          {isV0 && <V0Setup />}
-        </V0Provider>
+        <LanguageProvider>
+          <StoreProvider>
+            <DynamicLang />
+            <DynamicTitle />
+            <DynamicFavicon />
+            <StylesProvider>
+              <AuthProvider>
+                <AdminPermissionsProvider>
+                  <ThemeProvider>
+                    <ModeProvider>
+                      <SiteBackground />
+                      <FontProvider>
+                        <CartProvider>
+                          <WishlistProvider>
+                            <AdminProvider>
+                              <NuqsAdapter>
+                                <Suspense fallback={null}>
+                                  <StylesLoader>
+                                    <Suspense fallback={null}>
+                                      <AdminRedirect />
+                                    </Suspense>
+                                    <RouteAwareChrome>{children}</RouteAwareChrome>
+                                    {isDevelopment && <DebugGrid />}
+                                    <Toaster closeButton position="top-left" />
+                                  </StylesLoader>
+                                </Suspense>
+                              </NuqsAdapter>
+                            </AdminProvider>
+                          </WishlistProvider>
+                        </CartProvider>
+                      </FontProvider>
+                    </ModeProvider>
+                  </ThemeProvider>
+                </AdminPermissionsProvider>
+              </AuthProvider>
+            </StylesProvider>
+          </StoreProvider>
+        </LanguageProvider>
       </body>
     </html>
   )

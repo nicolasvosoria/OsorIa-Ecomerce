@@ -3,7 +3,7 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Collection } from '@/lib/shopify/types';
+import { Collection } from '@/lib/commerce/types';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer';
 import { CategoryFilter } from './category-filter';
 import { ColorFilter } from './color-filter';

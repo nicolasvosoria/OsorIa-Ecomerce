@@ -3,7 +3,7 @@
 import React, { Suspense } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Collection } from '@/lib/shopify/types';
+import { Collection } from '@/lib/commerce/types';
 import Link from 'next/link';
 import { SidebarLinks } from '@/components/layout/sidebar/product-sidebar-links';
 import { CategoryFilter } from './category-filter';

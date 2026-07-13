@@ -803,9 +803,9 @@ async function fetchAuthoritativeStoreItemPrices(
  * llegan con precio autoritativo (prepareComboOrderItems) y se dejan intactos.
  *
  * Si un product_id/variant_id no resuelve en la DB, el item se trata como
- * externo (p. ej. Shopify) y conserva el precio del cliente para ese item, igual
+ * externo (p. ej. de un catálogo legado) y conserva el precio del cliente para ese item, igual
  * que ya hacen validateInventoryBeforeOrder/resolveOrderStoreId. Esto es
- * transitorio: cuando se retire el remanente de Shopify, todo item deberá
+ * transitorio: cuando se retire el remanente de datos legados, todo item deberá
  * resolver en el catálogo y esta rama externa queda sin uso.
  */
 async function applyAuthoritativePricing(
@@ -894,7 +894,7 @@ async function validateInventoryBeforeOrder(
   try {
     const supabase = supabaseOverride ?? getSupabaseEcommerce();
     if (!supabase) {
-      // Si no hay supabase, permitir la orden (para productos externos como Shopify)
+      // Si no hay supabase, permitir la orden (para productos de catálogos externos)
       return result;
     }
 

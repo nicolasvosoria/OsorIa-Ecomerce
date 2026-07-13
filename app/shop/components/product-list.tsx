@@ -1,8 +1,7 @@
-// Usar productos de Supabase en lugar de Shopify
 import { getCollectionProducts, getCollections, getProducts } from '@/lib/products';
-import type { Product, ProductCollectionSortKey, ProductSortKey } from '@/lib/shopify/types';
+import type { Product, ProductCollectionSortKey, ProductSortKey } from '@/lib/commerce/types';
 import { ProductListContent } from './product-list-content';
-import { mapSortKeys } from '@/lib/shopify/utils';
+import { mapSortKeys } from '@/lib/commerce/utils';
 
 interface ProductListProps {
   collection: string;

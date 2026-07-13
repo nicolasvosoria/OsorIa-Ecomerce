@@ -1,8 +1,8 @@
 import React, { Suspense } from 'react';
 import Link from 'next/link';
-import { Product } from '@/lib/shopify/types';
+import { Product } from '@/lib/commerce/types';
 import { AddToCart, AddToCartButton } from '@/components/cart/add-to-cart';
-import { resolveProductPricing } from '@/lib/shopify/utils';
+import { resolveProductPricing } from '@/lib/commerce/utils';
 import { VariantSelector } from '../variant-selector';
 import { ProductImage } from './product-image';
 import { Button } from '@/components/ui/button';

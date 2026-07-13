@@ -1,7 +1,7 @@
 'use client';
 
 import { useQueryState, parseAsArrayOf, parseAsString } from 'nuqs';
-import { Product } from '@/lib/shopify/types';
+import { Product } from '@/lib/commerce/types';
 import { Color } from '@/components/ui/color-picker';
 import { COLOR_MAP } from '@/lib/constants';
 import { useEffect, useMemo } from 'react';
@@ -66,10 +66,10 @@ export function useAvailableColors(products: Product[]) {
 
       if (colorOption) {
         colorOption.values.forEach((value: any) => {
-          // Handle both formats: SFCC reshaped format {id, name} and raw Shopify format (string)
+          // Handle both formats: SFCC reshaped format {id, name} and raw string format
           let colorName: string;
           if (typeof value === 'string') {
-            // Raw Shopify format
+            // Raw string format
             colorName = value.toLowerCase();
           } else if (value && typeof value === 'object' && 'name' in value && typeof value.name === 'string') {
             // SFCC reshaped format

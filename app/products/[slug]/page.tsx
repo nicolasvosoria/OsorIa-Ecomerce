@@ -3,7 +3,7 @@ import { Suspense } from 'react';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { getItemBySlug, getRelatedItems } from '@/lib/supabase/products-api';
-import { formatPrice } from '@/lib/shopify/utils';
+import { formatPrice } from '@/lib/commerce/utils';
 import {
   Breadcrumb,
   BreadcrumbItem,

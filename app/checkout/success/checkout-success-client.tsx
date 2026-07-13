@@ -15,7 +15,6 @@ import {
 } from "@/components/ui/card";
 import type { GuestCustomerData } from "@/components/checkout/guest-checkout-form";
 import { useCart as useLocalCart } from "@/contexts/cart-context";
-import { useCart as useShopifyCart } from "@/components/cart/cart-context";
 import { deferStateUpdate } from "@/lib/react/defer-state-update";
 
 interface CheckoutSuccessClientProps {
@@ -29,7 +28,6 @@ export function CheckoutSuccessClient({
 }: CheckoutSuccessClientProps) {
   const searchParams = useSearchParams();
   const localCart = useLocalCart();
-  const shopifyCart = useShopifyCart();
   const [customerData, setCustomerData] = useState<GuestCustomerData | null>(
     initialCustomerData,
   );
@@ -38,12 +36,10 @@ export function CheckoutSuccessClient({
   );
   const clearedOrdersRef = useRef<Set<string>>(new Set());
   const localCartRef = useRef(localCart);
-  const shopifyCartRef = useRef(shopifyCart);
 
   useEffect(() => {
     localCartRef.current = localCart;
-    shopifyCartRef.current = shopifyCart;
-  }, [localCart, shopifyCart]);
+  }, [localCart]);
 
   useEffect(() => {
     const orderFromUrl = searchParams.get("order");
@@ -79,85 +75,14 @@ export function CheckoutSuccessClient({
 
     clearedOrdersRef.current.add(currentOrderNumber);
 
-    const clearCarts = async () => {
+    const clearCarts = () => {
       console.log(
-        "[Checkout Success] Limpiando carritos para pedido:",
+        "[Checkout Success] Limpiando carrito para pedido:",
         currentOrderNumber,
       );
 
-      const currentLocalCart = localCartRef.current;
-      const currentShopifyCart = shopifyCartRef.current;
-
-      currentLocalCart.clearCart();
+      localCartRef.current.clearCart();
       console.log("[Checkout Success] Carrito local limpiado");
-
-      try {
-        const response = await fetch("/api/cart/clear", {
-          method: "POST",
-          cache: "no-store",
-          headers: {
-            "Cache-Control": "no-cache",
-            Pragma: "no-cache",
-          },
-        });
-
-        if (!response.ok) {
-          throw new Error(`Failed to clear cart: ${response.status}`);
-        }
-
-        const result = await response.json();
-        console.log("[Checkout Success] Respuesta de API clear:", result);
-
-        await new Promise((resolve) => setTimeout(resolve, 500));
-
-        if (typeof window !== "undefined") {
-          window.dispatchEvent(new CustomEvent("cart-cleared"));
-        }
-
-        await new Promise((resolve) => setTimeout(resolve, 500));
-
-        const currentCart = currentShopifyCart.cart;
-        if (currentCart && currentCart.lines.length > 0) {
-          console.log(
-            `[Checkout Success] Limpiando ${currentCart.lines.length} items restantes manualmente`,
-          );
-          const linesToDelete = [...currentCart.lines];
-          for (const line of linesToDelete) {
-            try {
-              await currentShopifyCart.updateItem(
-                line.id,
-                line.merchandise.id,
-                0,
-                "delete",
-              );
-              await new Promise((resolve) => setTimeout(resolve, 200));
-            } catch (err) {
-              console.warn("[Checkout Success] Error deleting cart line:", err);
-            }
-          }
-        }
-      } catch (error) {
-        console.error(
-          "[Checkout Success] Error clearing Shopify cart via API:",
-          error,
-        );
-
-        const currentCart = currentShopifyCart.cart;
-        if (currentCart && currentCart.lines.length > 0) {
-          console.log("[Checkout Success] Intentando limpiar manualmente...");
-          const linesToDelete = [...currentCart.lines];
-          for (const line of linesToDelete) {
-            currentShopifyCart
-              .updateItem(line.id, line.merchandise.id, 0, "delete")
-              .catch((err) => {
-                console.warn(
-                  "[Checkout Success] Error en limpieza manual:",
-                  err,
-                );
-              });
-          }
-        }
-      }
 
       localStorage.removeItem("guest_customer_data");
       localStorage.removeItem("last_order_id");

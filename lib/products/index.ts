@@ -5,19 +5,15 @@
 
 import {
   getItems,
-  getItemBySlug,
   getCategories,
-  getFeaturedItems,
-  searchItems,
   type GetItemsParams,
 } from '@/lib/supabase/products-api';
 import {
-  adaptSupabaseProduct,
   adaptSupabaseProducts,
   adaptSupabaseCategory,
   adaptSupabaseCategories,
 } from './adapter';
-import type { Product, Collection, ProductSortKey, ProductCollectionSortKey } from '@/lib/shopify/types';
+import type { Product, Collection, ProductSortKey, ProductCollectionSortKey } from '@/lib/commerce/types';
 
 // Mapeo de ProductSortKey a campos de la base de datos
 function mapSortKeyToOrderBy(sortKey?: ProductSortKey): {
@@ -69,23 +65,6 @@ export async function getCollection(handle: string): Promise<Collection | null> 
     return category ? adaptSupabaseCategory(category) : null;
   } catch (error) {
     console.error('Error fetching collection from Supabase:', error);
-    return null;
-  }
-}
-
-/**
- * Obtener un producto por handle (slug)
- */
-export async function getProduct(handle: string): Promise<Product | null> {
-  // Removido 'use cache' para evitar problemas con headers() en getStoreId()
-  // El cache se manejará a nivel de Next.js con revalidateTag si es necesario
-  try {
-    // Pasar null como storeId para que getItemBySlug obtenga la tienda por defecto
-    const item = await getItemBySlug(handle, null);
-    if (!item) return null;
-    return adaptSupabaseProduct(item);
-  } catch (error) {
-    console.error('Error fetching product from Supabase:', error);
     return null;
   }
 }
@@ -164,36 +143,6 @@ export async function getCollectionProducts(params: {
     return adaptSupabaseProducts(result.items);
   } catch (error) {
     console.error('Error fetching collection products from Supabase:', error);
-    return [];
-  }
-}
-
-/**
- * Obtener productos destacados
- */
-export async function getFeaturedProducts(limit: number = 10): Promise<Product[]> {
-  // Removido 'use cache' para evitar problemas con headers() en getStoreId()
-  // El cache se manejará a nivel de Next.js con revalidateTag si es necesario
-  try {
-    const items = await getFeaturedItems(limit);
-    return adaptSupabaseProducts(items);
-  } catch (error) {
-    console.error('Error fetching featured products from Supabase:', error);
-    return [];
-  }
-}
-
-/**
- * Buscar productos
- */
-export async function searchProducts(searchTerm: string, limit: number = 20): Promise<Product[]> {
-  // Removido 'use cache' para evitar problemas con headers() en getStoreId()
-  // El cache se manejará a nivel de Next.js con revalidateTag si es necesario
-  try {
-    const items = await searchItems(searchTerm, limit);
-    return adaptSupabaseProducts(items);
-  } catch (error) {
-    console.error('Error searching products from Supabase:', error);
     return [];
   }
 }

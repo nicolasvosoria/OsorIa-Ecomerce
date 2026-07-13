@@ -1656,22 +1656,16 @@ export type Database = {
       store_integrations: {
         Row: {
           metadata: Json | null
-          shopify_access_token: string | null
-          shopify_store_domain: string | null
           store_id: string
           updated_at: string | null
         }
         Insert: {
           metadata?: Json | null
-          shopify_access_token?: string | null
-          shopify_store_domain?: string | null
           store_id: string
           updated_at?: string | null
         }
         Update: {
           metadata?: Json | null
-          shopify_access_token?: string | null
-          shopify_store_domain?: string | null
           store_id?: string
           updated_at?: string | null
         }
@@ -2328,7 +2322,6 @@ export type Database = {
           seo_keywords: string[] | null
           seo_title: string | null
           shipping_enabled: boolean | null
-          shopify_store_domain: string | null
           store_name: string | null
           subdomain: string | null
           tax_rate: number | null

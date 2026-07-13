@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo } from 'react';
-import { Product, Collection } from '@/lib/shopify/types';
+import { Product, Collection } from '@/lib/commerce/types';
 import { ProductCard } from './product-card';
 import ResultsControls from './results-controls';
 import { useProducts } from '../providers/products-provider';
@@ -22,7 +22,6 @@ function filterProductsByColors(products: Product[], colors: string[]): Product[
 
   const filteredProducts = products.filter(product => {
     // Check if product has any variants with the selected colors
-    // Note: variants is now a simple array after adaptShopifyProduct transformation
     const hasMatchingColor = product.variants?.some((variant: any) => {
       if (!variant.selectedOptions) return false;
 

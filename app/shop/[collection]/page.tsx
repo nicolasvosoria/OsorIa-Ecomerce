@@ -1,5 +1,5 @@
 import { Metadata } from 'next';
-import { getCollection, getCollections } from '@/lib/shopify';
+import { getCollection, getCollections } from '@/lib/products';
 import { notFound } from 'next/navigation';
 import ProductList from '../components/product-list';
 

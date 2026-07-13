@@ -1,5 +1,5 @@
 import { VariantOptionSelector, VariantOptionSelectorComponent } from '@/components/products/variant-selector';
-import { Product } from '@/lib/shopify/types';
+import { Product } from '@/lib/commerce/types';
 
 export function VariantSelectorSlots({ product, fallback = false }: { product: Product; fallback?: boolean }) {
   const { options } = product;

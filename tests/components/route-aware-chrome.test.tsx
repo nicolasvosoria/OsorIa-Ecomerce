@@ -78,7 +78,7 @@ describe("isAdminChromeRoute", () => {
     "/shop",
     "/catalog",
     "/products/alfajor-artesanal",
-    "/product/torta-de-chocolate",
+    "/products/torta-de-chocolate",
     "/admin-preview",
     "/dashboarding",
     null,

@@ -1,5 +1,5 @@
 import { VariantOptionSelector } from '@/components/products/variant-selector';
-import { Product } from '@/lib/shopify/types';
+import { Product } from '@/lib/commerce/types';
 
 export const VariantSelector = ({ product }: { product: Product }) => {
   const { options } = product;
