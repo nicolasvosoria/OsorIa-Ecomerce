@@ -129,35 +129,6 @@ export async function getCategories(includeInactive: boolean = false, storeId?: 
 }
 
 /**
- * Obtener una categoría por ID
- */
-export async function getCategoryById(categoryId: string): Promise<ItemCategory | null> {
-  try {
-    const supabase = getSupabaseEcommerce()
-    if (!supabase) {
-      return null
-    }
-
-    const result = await withTimeout(
-      supabase.from(ECOMMERCE_TABLES.itemCategories).select('*').eq('id', categoryId).single(),
-      15000,
-      'getCategoryById'
-    ) as { data: any; error: any }
-    const { data, error } = result
-
-    if (error) {
-      console.error('[Products] Error al obtener categoría:', error)
-      return null
-    }
-
-    return (data as ItemCategory) || null
-  } catch (error: any) {
-    console.error('[Products] Error inesperado:', error)
-    return null
-  }
-}
-
-/**
  * Obtener productos con filtros y paginación
  */
 export async function getItems(params: GetItemsParams = {}): Promise<GetItemsResult> {
@@ -1149,12 +1120,13 @@ export async function updateItem(
     if (data.primary_image_alt !== undefined) updateData.primary_image_alt = data.primary_image_alt || null
     if (data.display_order !== undefined) updateData.display_order = data.display_order
 
-    // Actualizar el producto
+    // Actualizar el producto (acotado a su tienda, defensa en profundidad)
     const result = await withTimeout(
       supabase
         .from(ECOMMERCE_TABLES.storeItems)
         .update(updateData)
         .eq('id', itemId)
+        .eq('store_id', currentItem.store_id)
         .select('*, item_categories(*)')
         .single(),
       20000,

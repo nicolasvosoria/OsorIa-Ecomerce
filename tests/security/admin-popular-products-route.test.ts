@@ -1,13 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
-import { GET } from "@/app/api/admin/theme-versions/route";
+import { GET } from "@/app/api/admin/popular-products/route";
 
-const { createServerClient, createClient, cookies } = vi.hoisted(() => ({
-  createServerClient: vi.fn(),
-  createClient: vi.fn(),
-  cookies: vi.fn(),
-}));
+const { createServerClient, createClient, cookies, getPopularProductCards } =
+  vi.hoisted(() => ({
+    createServerClient: vi.fn(),
+    createClient: vi.fn(),
+    cookies: vi.fn(),
+    getPopularProductCards: vi.fn(),
+  }));
 
 vi.mock("@supabase/ssr", () => ({
   createServerClient,
@@ -19,6 +21,10 @@ vi.mock("@supabase/supabase-js", () => ({
 
 vi.mock("next/headers", () => ({
   cookies,
+}));
+
+vi.mock("@/lib/products/popular-sections", () => ({
+  getPopularProductCards,
 }));
 
 function makeCookieStore(storeId = "store-1") {
@@ -54,14 +60,14 @@ function makeCanManageStoreRpc(canManage: boolean) {
   });
 }
 
-function makeRequest(headers: Record<string, string> = {}) {
-  return new NextRequest("http://localhost/api/admin/theme-versions", {
+function makeRequest() {
+  return new NextRequest("http://localhost/api/admin/popular-products", {
     method: "GET",
-    headers: { "content-type": "application/json", ...headers },
+    headers: { "content-type": "application/json" },
   });
 }
 
-describe("theme versions admin route", () => {
+describe("popular products admin route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
@@ -77,7 +83,7 @@ describe("theme versions admin route", () => {
     });
   });
 
-  it("rejects non-admin users before reading any version", async () => {
+  it("rejects a user without membership before reading any product", async () => {
     const serviceSchema = {
       rpc: makeCanManageStoreRpc(false),
       from: vi.fn((table: string) => {
@@ -93,45 +99,14 @@ describe("theme versions admin route", () => {
     const response = await GET(makeRequest());
 
     expect(response.status).toBe(403);
-    expect(serviceSchema.from).not.toHaveBeenCalledWith("app_theme_versions");
+    expect(getPopularProductCards).not.toHaveBeenCalled();
   });
 
-  it("returns this store's versions newest-first, labeled with their base theme name, without exposing variables/fonts", async () => {
-    const versionRows = [
-      {
-        id: "version-2",
-        theme_id: "theme-tech",
-        is_current: true,
-        is_custom: true,
-        created_at: "2026-02-01T00:00:00Z",
-      },
-      {
-        id: "version-1",
-        theme_id: "theme-tech",
-        is_current: false,
-        is_custom: false,
-        created_at: "2026-01-01T00:00:00Z",
-      },
-    ];
-    const themeVersionsTable = {
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      order: vi.fn().mockResolvedValue({ data: versionRows, error: null }),
-    };
-    const appThemesTable = {
-      select: vi.fn().mockReturnThis(),
-      in: vi.fn().mockResolvedValue({
-        data: [{ id: "theme-tech", theme_name: "Tech" }],
-        error: null,
-      }),
-    };
-
+  it("serves products to a store admin who can manage the trusted store", async () => {
     const serviceSchema = {
       rpc: makeCanManageStoreRpc(true),
       from: vi.fn((table: string) => {
         if (table === "stores_legacy") return makeStoresLegacyQuery("store-1");
-        if (table === "app_theme_versions") return themeVersionsTable;
-        if (table === "app_themes") return appThemesTable;
         throw new Error(`unexpected table ${table}`);
       }),
     };
@@ -139,31 +114,13 @@ describe("theme versions admin route", () => {
     createClient.mockReturnValue({
       schema: vi.fn().mockReturnValue(serviceSchema),
     });
+    getPopularProductCards.mockResolvedValue([{ id: "p-1" }]);
 
     const response = await GET(makeRequest());
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
-      versions: [
-        {
-          id: "version-2",
-          isCurrent: true,
-          isCustom: true,
-          createdAt: "2026-02-01T00:00:00Z",
-          baseThemeName: "Tech",
-        },
-        {
-          id: "version-1",
-          isCurrent: false,
-          isCustom: false,
-          createdAt: "2026-01-01T00:00:00Z",
-          baseThemeName: "Tech",
-        },
-      ],
-    });
-    expect(themeVersionsTable.eq).toHaveBeenCalledWith("store_id", "store-1");
-    expect(themeVersionsTable.order).toHaveBeenCalledWith("created_at", {
-      ascending: false,
+      products: [{ id: "p-1" }],
     });
   });
 });

@@ -3,13 +3,13 @@ import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
 import { ECOMMERCE_TABLES } from "./contract";
 
-type AdminRouteAuthResult =
-  | { userId: string }
-  | {
-      error: string;
-      status: 401 | 403 | 500;
-      diagnostics?: AdminAuthDiagnostics;
-    };
+export type AdminAuthDenial = {
+  error: string;
+  status: 401 | 403 | 500;
+  diagnostics?: AdminAuthDiagnostics;
+};
+
+type AdminRouteAuthResult = { userId: string } | AdminAuthDenial;
 
 type AdminAuthDiagnostics = {
   bearerPresent: boolean;
@@ -35,6 +35,16 @@ type AuthResolution = {
   bearerPresent: boolean;
   cookieAuthUserExists: boolean;
 };
+
+type PermissionError = {
+  code?: string;
+  message?: string;
+  hint?: string;
+};
+
+type CandidateAuthorization =
+  | { authorized: boolean }
+  | { error: PermissionError };
 
 async function getSupabaseAuthClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -140,9 +150,21 @@ async function getAuthenticatedUsers(
   };
 }
 
-export async function requireAdminUser(
+function deniedResult(
+  status: 401 | 403,
+  authResolution: AuthResolution,
+  debugEnabled: boolean,
+): AdminRouteAuthResult {
+  return {
+    error: "Acceso denegado",
+    status,
+    ...(debugEnabled ? { diagnostics: buildDiagnostics(authResolution) } : {}),
+  };
+}
+
+async function authorizeAnyCandidate(
   request: NextRequest,
-  serviceSupabase: any,
+  authorizeCandidate: (userId: string) => Promise<CandidateAuthorization>,
 ): Promise<AdminRouteAuthResult> {
   const debugEnabled = isAdminDebugEnabled(request);
   const authSupabase = await getSupabaseAuthClient();
@@ -152,46 +174,80 @@ export async function requireAdminUser(
 
   const authResolution = await getAuthenticatedUsers(request, authSupabase);
   if (authResolution.users.length === 0) {
-    return {
-      error: "Acceso denegado",
-      status: 401,
-      ...(debugEnabled
-        ? { diagnostics: buildDiagnostics(authResolution) }
-        : {}),
-    };
+    return deniedResult(401, authResolution, debugEnabled);
   }
 
   for (const user of authResolution.users) {
-    const { data: profile, error: profileError } = await serviceSupabase
-      .from(ECOMMERCE_TABLES.userProfiles)
-      .select("role")
-      .eq("id", user.id)
-      .single();
+    const result = await authorizeCandidate(user.id);
 
-    if (profile?.role === "admin") {
-      return { userId: user.id };
-    }
-
-    if (profileError && profileError.code !== "PGRST116") {
+    if ("error" in result) {
       return {
         error: "Error verificando permisos",
         status: 500,
         ...(debugEnabled
-          ? {
-              diagnostics: buildDiagnostics(authResolution, {
-                code: profileError.code,
-                message: profileError.message,
-                hint: profileError.hint,
-              }),
-            }
+          ? { diagnostics: buildDiagnostics(authResolution, result.error) }
           : {}),
       };
     }
+
+    if (result.authorized) {
+      return { userId: user.id };
+    }
   }
 
-  return {
-    error: "Acceso denegado",
-    status: 403,
-    ...(debugEnabled ? { diagnostics: buildDiagnostics(authResolution) } : {}),
-  };
+  return deniedResult(403, authResolution, debugEnabled);
+}
+
+function isSuperAdminRole(role: unknown): boolean {
+  return typeof role === "string" && role.toLowerCase() === "super_admin";
+}
+
+// Per-store admin gate: authorizes if any authenticated identity (cookie or
+// preview bearer) can manage the trusted target store. The store id comes from
+// the request host, never the mutable `store_id` cookie.
+export function requireAdminUser(
+  request: NextRequest,
+  serviceSupabase: any,
+  targetStoreId: string,
+): Promise<AdminRouteAuthResult> {
+  return authorizeAnyCandidate(request, async (userId) => {
+    const { data, error } = await serviceSupabase.rpc(
+      "can_user_manage_store",
+      { p_user_id: userId, p_store_id: targetStoreId },
+    );
+
+    if (error) {
+      return {
+        error: { code: error.code, message: error.message, hint: error.hint },
+      };
+    }
+
+    return { authorized: data === true };
+  });
+}
+
+// Global gate for cross-store routes: only super_admin, never store-scoped roles.
+export function requireSuperAdmin(
+  request: NextRequest,
+  serviceSupabase: any,
+): Promise<AdminRouteAuthResult> {
+  return authorizeAnyCandidate(request, async (userId) => {
+    const { data: profile, error: profileError } = await serviceSupabase
+      .from(ECOMMERCE_TABLES.userProfiles)
+      .select("role")
+      .eq("id", userId)
+      .single();
+
+    if (profileError && profileError.code !== "PGRST116") {
+      return {
+        error: {
+          code: profileError.code,
+          message: profileError.message,
+          hint: profileError.hint,
+        },
+      };
+    }
+
+    return { authorized: isSuperAdminRole(profile?.role) };
+  });
 }

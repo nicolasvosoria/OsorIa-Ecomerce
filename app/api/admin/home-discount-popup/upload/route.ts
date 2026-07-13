@@ -1,16 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import {
-  getHomeDiscountPopupServiceClients,
-  getHomeDiscountPopupStoreLookup,
-  resolveHomeDiscountPopupStoreId,
-} from "@/lib/home-discount-popup-admin";
+import { getHomeDiscountPopupServiceClients } from "@/lib/home-discount-popup-admin";
 import {
   buildHomeDiscountPopupUploadPath,
   HOME_DISCOUNT_POPUP_UPLOAD_BUCKET,
   validateHomeDiscountPopupUpload,
 } from "@/lib/home-discount-popup-upload";
-import { requireAdminUser } from "@/lib/supabase/admin-route-auth";
+import { authorizeStoreAdmin } from "@/lib/supabase/admin-route-guard";
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,13 +18,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const adminCheck = await requireAdminUser(request, clients.ecommerceClient);
-    if ("error" in adminCheck) {
+    const auth = await authorizeStoreAdmin(request, clients.ecommerceClient);
+    if ("error" in auth) {
       return NextResponse.json(
-        { error: adminCheck.error },
-        { status: adminCheck.status },
+        { error: auth.error },
+        { status: auth.status },
       );
     }
+    const storeId = auth.storeId;
 
     const formData = await request.formData();
     const file = formData.get("file");
@@ -47,10 +44,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
-    const storeId = await resolveHomeDiscountPopupStoreId(
-      clients.ecommerceClient as any,
-      await getHomeDiscountPopupStoreLookup(),
-    );
     const objectPath = buildHomeDiscountPopupUploadPath(storeId, file.name);
 
     const { error: uploadError } = await clients.serviceClient.storage
@@ -83,10 +76,6 @@ export async function POST(request: NextRequest) {
       path: objectPath,
     });
   } catch (error) {
-    if (error instanceof Error && error.message === "Tienda no encontrada") {
-      return NextResponse.json({ error: error.message }, { status: 404 });
-    }
-
     console.error("[Home Discount Popup Upload] Error interno:", error);
     return NextResponse.json(
       { error: "Error interno del servidor" },

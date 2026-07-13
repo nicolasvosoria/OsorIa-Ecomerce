@@ -80,7 +80,7 @@ export function generateInvoiceEmailHTML(
       (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : ""),
   );
   const verPedidoUrl = baseUrl
-    ? `${baseUrl}/checkout/success?order=${encodeURIComponent(String(order.order_number ?? ""))}`
+    ? `${baseUrl}/checkout/success?order=${encodeURIComponent(String(order.order_number ?? ""))}&email=${encodeURIComponent(order.customer_email ?? "")}`
     : "#";
   const safeOrderNumber = escapeHtml(order.order_number || order.id);
   const logoUrl = baseUrl ? `${baseUrl}/logo-negro.png` : "";

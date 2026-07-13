@@ -114,7 +114,7 @@ describe("font pairing activation admin route", () => {
       },
     });
 
-    const userProfilesQuery = makeUserProfilesQuery("admin");
+    const userProfilesQuery = makeUserProfilesQuery("super_admin");
     const findPairingQuery = {
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
@@ -162,7 +162,7 @@ describe("font pairing activation admin route", () => {
       },
     });
 
-    const userProfilesQuery = makeUserProfilesQuery("admin");
+    const userProfilesQuery = makeUserProfilesQuery("super_admin");
     const findPairingQuery = {
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),

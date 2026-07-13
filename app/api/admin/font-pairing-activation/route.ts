@@ -1,18 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { ECOMMERCE_SCHEMA, ECOMMERCE_TABLES } from "@/lib/supabase/contract";
-import { requireAdminUser } from "@/lib/supabase/admin-route-auth";
-
-function getSupabaseServiceClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceKey) {
-    return null;
-  }
-
-  return createClient(supabaseUrl, serviceKey).schema(ECOMMERCE_SCHEMA) as any;
-}
+import { ECOMMERCE_TABLES } from "@/lib/supabase/contract";
+import { requireSuperAdmin } from "@/lib/supabase/admin-route-auth";
+import { adminErrorResponse } from "@/lib/supabase/admin-route-guard";
+import { getSupabaseServiceClient } from "@/lib/supabase/admin-store";
 
 export async function POST(request: NextRequest) {
   try {
@@ -32,14 +22,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const adminCheck = await requireAdminUser(request, supabase);
-    if ("error" in adminCheck) {
-      const responseBody = adminCheck.diagnostics
-        ? { error: adminCheck.error, diagnostics: adminCheck.diagnostics }
-        : { error: adminCheck.error };
-
-      return NextResponse.json(responseBody, { status: adminCheck.status });
-    }
+    const adminCheck = await requireSuperAdmin(request, supabase);
+    if ("error" in adminCheck) return adminErrorResponse(adminCheck);
 
     const { data: targetPairing, error: targetPairingError } = await supabase
       .from(ECOMMERCE_TABLES.appFontPairings)

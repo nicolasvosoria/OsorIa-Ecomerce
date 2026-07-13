@@ -1,5 +1,6 @@
 import { CheckoutSuccessClient } from "./checkout-success-client";
 import { loadSuccessPageFallbackOrder } from "./fallback-order";
+import { getStoreIdServer } from "@/lib/utils/store-server";
 
 interface CheckoutSuccessPageProps {
   searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
@@ -11,8 +12,12 @@ export default async function CheckoutSuccessPage(
   const resolvedSearchParams = await props.searchParams;
   const orderParam = resolvedSearchParams?.order;
   const orderNumber = Array.isArray(orderParam) ? orderParam[0] : orderParam;
+  const emailParam = resolvedSearchParams?.email;
+  const email = Array.isArray(emailParam) ? emailParam[0] : emailParam;
 
-  const fallback = await loadSuccessPageFallbackOrder(orderNumber);
+  const storeId = await getStoreIdServer();
+  const auth = storeId && email ? { storeId, email } : null;
+  const fallback = await loadSuccessPageFallbackOrder(orderNumber, auth);
 
   return (
     <CheckoutSuccessClient

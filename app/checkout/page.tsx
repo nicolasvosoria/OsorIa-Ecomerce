@@ -227,7 +227,9 @@ export default function CheckoutPage() {
     toast.success(`Pedido creado: ${order.order_number}`)
 
     // Redirigir a la página de éxito
-    router.push(`/checkout/success?order=${order.order_number}`)
+    router.push(
+      `/checkout/success?order=${encodeURIComponent(order.order_number)}&email=${encodeURIComponent(data.email)}`,
+    )
   }
 
   const handleGuestCheckoutComplete = async (data: GuestCustomerData) => {

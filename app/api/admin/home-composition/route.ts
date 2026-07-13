@@ -1,24 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ECOMMERCE_TABLES } from "@/lib/supabase/contract";
-import { requireAdminUser } from "@/lib/supabase/admin-route-auth";
 import {
-  getSupabaseServiceClient,
-  resolveTargetStoreId,
-} from "@/lib/supabase/admin-store";
+  adminErrorResponse,
+  authorizeStoreAdmin,
+} from "@/lib/supabase/admin-route-guard";
 import { resolveHomeComposition } from "@/lib/sections/home-composition";
-
-function adminErrorResponse(
-  adminCheck: Extract<
-    Awaited<ReturnType<typeof requireAdminUser>>,
-    { error: string }
-  >,
-) {
-  const responseBody = adminCheck.diagnostics
-    ? { error: adminCheck.error, diagnostics: adminCheck.diagnostics }
-    : { error: adminCheck.error };
-
-  return NextResponse.json(responseBody, { status: adminCheck.status });
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,18 +15,10 @@ export async function POST(request: NextRequest) {
 
     const sections = resolveHomeComposition(body.sections);
 
-    const supabase = getSupabaseServiceClient();
-    if (!supabase) {
-      return NextResponse.json(
-        { error: "Supabase no configurado" },
-        { status: 500 },
-      );
-    }
+    const auth = await authorizeStoreAdmin(request);
+    if ("error" in auth) return adminErrorResponse(auth);
+    const { supabase, storeId } = auth;
 
-    const adminCheck = await requireAdminUser(request, supabase);
-    if ("error" in adminCheck) return adminErrorResponse(adminCheck);
-
-    const storeId = await resolveTargetStoreId(supabase);
     const timestamp = new Date().toISOString();
     const { data: existing, error: checkError } = await supabase
       .from(ECOMMERCE_TABLES.homeSectionLayout)

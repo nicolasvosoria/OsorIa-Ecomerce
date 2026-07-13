@@ -34,17 +34,24 @@ function makeCookieStore(storeId = "store-1") {
   };
 }
 
-function makeUserProfilesQuery(role: string | null) {
+function makeStoresLegacyQuery(storeId: string) {
   const chain: any = {
     select: vi.fn(() => chain),
     eq: vi.fn(() => chain),
-    single: vi.fn().mockResolvedValue({
-      data: role ? { role } : null,
-      error: null,
-    }),
+    single: vi.fn().mockResolvedValue({ data: { id: storeId }, error: null }),
   };
 
   return chain;
+}
+
+function makeCanManageStoreRpc(canManage: boolean) {
+  return vi.fn(async (fnName: string) => {
+    if (fnName !== "can_user_manage_store") {
+      throw new Error(`unexpected rpc ${fnName}`);
+    }
+
+    return { data: canManage, error: null };
+  });
 }
 
 function makeThemeQuery() {
@@ -134,7 +141,7 @@ describe("theme activation route: reset + backup (D3)", () => {
   });
 
   it("backs up component_styles into variables.backup_component_styles, then strips only the products style keys (content preserved, rows never deleted)", async () => {
-    const userProfilesQuery = makeUserProfilesQuery("admin");
+    const canManageRpc = makeCanManageStoreRpc(true);
     const themeQuery = makeThemeQuery();
     const themeVersionsTable = makeThemeVersionsTable();
     const backupRows = [
@@ -159,8 +166,9 @@ describe("theme activation route: reset + backup (D3)", () => {
     const componentStylesTable = makeComponentStylesTable({ rows: backupRows });
 
     const serviceSchema = {
+      rpc: canManageRpc,
       from: vi.fn((table: string) => {
-        if (table === "user_profiles") return userProfilesQuery;
+        if (table === "stores_legacy") return makeStoresLegacyQuery("store-1");
         if (table === "app_themes") return themeQuery;
         if (table === "app_theme_versions") return themeVersionsTable;
         if (table === "component_styles") return componentStylesTable;
@@ -218,12 +226,13 @@ describe("theme activation route: reset + backup (D3)", () => {
   });
 
   it("stays admin-guarded: non-admin requests never reach the backup or reset step", async () => {
-    const userProfilesQuery = makeUserProfilesQuery("user");
+    const canManageRpc = makeCanManageStoreRpc(false);
     const componentStylesTable = makeComponentStylesTable({ rows: [] });
 
     const serviceSchema = {
+      rpc: canManageRpc,
       from: vi.fn((table: string) => {
-        if (table === "user_profiles") return userProfilesQuery;
+        if (table === "stores_legacy") return makeStoresLegacyQuery("store-1");
         if (table === "component_styles") return componentStylesTable;
         throw new Error(`unexpected table ${table}`);
       }),
@@ -244,7 +253,7 @@ describe("theme activation route: reset + backup (D3)", () => {
   });
 
   it("does NOT modify component_styles when the backup read fails (fail safe)", async () => {
-    const userProfilesQuery = makeUserProfilesQuery("admin");
+    const canManageRpc = makeCanManageStoreRpc(true);
     const themeQuery = makeThemeQuery();
     const themeVersionsTable = makeThemeVersionsTable();
     const componentStylesTable = makeComponentStylesTable({
@@ -252,8 +261,9 @@ describe("theme activation route: reset + backup (D3)", () => {
     });
 
     const serviceSchema = {
+      rpc: canManageRpc,
       from: vi.fn((table: string) => {
-        if (table === "user_profiles") return userProfilesQuery;
+        if (table === "stores_legacy") return makeStoresLegacyQuery("store-1");
         if (table === "app_themes") return themeQuery;
         if (table === "app_theme_versions") return themeVersionsTable;
         if (table === "component_styles") return componentStylesTable;

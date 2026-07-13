@@ -7,10 +7,9 @@ import {
 import {
   asMetadataRecord,
   getHomeDiscountPopupServiceClients,
-  getHomeDiscountPopupStoreLookup,
   resolveHomeDiscountPopupStoreId,
 } from "@/lib/home-discount-popup-admin";
-import { requireAdminUser } from "@/lib/supabase/admin-route-auth";
+import { authorizeStoreAdmin } from "@/lib/supabase/admin-route-guard";
 import { ECOMMERCE_TABLES } from "@/lib/supabase/contract";
 
 type PopupQuery = {
@@ -102,10 +101,10 @@ export async function saveHomeDiscountPopupConfig(
   return { storeId, config };
 }
 
-async function getAuthorizedClient(
+async function getAuthorizedContext(
   request: NextRequest,
 ): Promise<
-  | { ecommerceClient: PopupPersistenceClient }
+  | { ecommerceClient: PopupPersistenceClient; storeId: string }
   | { error: string; status: 401 | 403 | 500 }
 > {
   const clients = getHomeDiscountPopupServiceClients();
@@ -113,21 +112,14 @@ async function getAuthorizedClient(
     return { error: "Supabase no configurado", status: 500 as const };
   }
 
-  const adminCheck = await requireAdminUser(
-    request,
-    clients.ecommerceClient as unknown as PopupPersistenceClient,
-  );
-  if ("error" in adminCheck) {
-    return {
-      error: adminCheck.error as string,
-      status: adminCheck.status as 401 | 403,
-    };
+  const ecommerceClient =
+    clients.ecommerceClient as unknown as PopupPersistenceClient;
+  const auth = await authorizeStoreAdmin(request, ecommerceClient);
+  if ("error" in auth) {
+    return { error: auth.error, status: auth.status };
   }
 
-  return {
-    ecommerceClient:
-      clients.ecommerceClient as unknown as PopupPersistenceClient,
-  };
+  return { ecommerceClient, storeId: auth.storeId };
 }
 
 function asNotFoundResponse(error: unknown) {
@@ -140,7 +132,7 @@ function asNotFoundResponse(error: unknown) {
 
 export async function GET(request: NextRequest) {
   try {
-    const authorized = await getAuthorizedClient(request);
+    const authorized = await getAuthorizedContext(request);
     if (!("ecommerceClient" in authorized)) {
       return NextResponse.json(
         { error: authorized.error },
@@ -150,7 +142,7 @@ export async function GET(request: NextRequest) {
 
     const { config } = await loadHomeDiscountPopupConfig(
       authorized.ecommerceClient,
-      await getHomeDiscountPopupStoreLookup(),
+      authorized.storeId,
     );
 
     return NextResponse.json({ config });
@@ -173,7 +165,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const authorized = await getAuthorizedClient(request);
+    const authorized = await getAuthorizedContext(request);
     if (!("ecommerceClient" in authorized)) {
       return NextResponse.json(
         { error: authorized.error },
@@ -184,7 +176,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { config } = await saveHomeDiscountPopupConfig(
       authorized.ecommerceClient,
-      await getHomeDiscountPopupStoreLookup(),
+      authorized.storeId,
       body?.config,
     );
 

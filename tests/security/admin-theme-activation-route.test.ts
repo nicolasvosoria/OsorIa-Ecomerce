@@ -34,35 +34,24 @@ function makeCookieStore(storeId = "store-1") {
   };
 }
 
-function makeUserProfilesQuery(
-  role: string | null | Record<string, string | null>,
-) {
-  let currentId: string | null = null;
+function makeStoresLegacyQuery(storeId: string) {
   const chain: any = {
     select: vi.fn(() => chain),
-    eq: vi.fn((column: string, value: string) => {
-      if (column === "id") {
-        currentId = value;
-      }
-
-      return chain;
-    }),
-    single: vi.fn().mockImplementation(async () => {
-      const resolvedRole =
-        typeof role === "string" || role === null
-          ? role
-          : currentId
-            ? (role[currentId] ?? null)
-            : null;
-
-      return {
-        data: resolvedRole ? { role: resolvedRole } : null,
-        error: null,
-      };
-    }),
+    eq: vi.fn(() => chain),
+    single: vi.fn().mockResolvedValue({ data: { id: storeId }, error: null }),
   };
 
   return chain;
+}
+
+function makeCanManageStoreRpc(decide: (userId: string) => boolean) {
+  return vi.fn(async (fnName: string, params: { p_user_id: string }) => {
+    if (fnName !== "can_user_manage_store") {
+      throw new Error(`unexpected rpc ${fnName}`);
+    }
+
+    return { data: decide(params.p_user_id), error: null };
+  });
 }
 
 describe("theme activation admin route", () => {
@@ -83,10 +72,10 @@ describe("theme activation admin route", () => {
       },
     });
 
-    const userProfilesQuery = makeUserProfilesQuery("user");
     const serviceSchema = {
+      rpc: makeCanManageStoreRpc(() => false),
       from: vi.fn((table: string) => {
-        if (table === "user_profiles") return userProfilesQuery;
+        if (table === "stores_legacy") return makeStoresLegacyQuery("store-1");
         throw new Error(`unexpected table ${table}`);
       }),
     };
@@ -109,7 +98,10 @@ describe("theme activation admin route", () => {
     await expect(response.json()).resolves.toEqual({
       error: "Acceso denegado",
     });
-    expect(serviceSchema.from).toHaveBeenCalledWith("user_profiles");
+    expect(serviceSchema.rpc).toHaveBeenCalledWith("can_user_manage_store", {
+      p_user_id: "user-1",
+      p_store_id: "store-1",
+    });
     expect(serviceSchema.from).not.toHaveBeenCalledWith("app_theme_versions");
   });
 
@@ -130,17 +122,13 @@ describe("theme activation admin route", () => {
 
     const profileError = {
       code: "42501",
-      message: 'permission denied for table "user_profiles"',
+      message: "permission denied for function can_user_manage_store",
       hint: "Check RLS policy",
     };
-    const userProfilesQuery = {
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      single: vi.fn().mockResolvedValue({ data: null, error: profileError }),
-    };
     const serviceSchema = {
+      rpc: vi.fn().mockResolvedValue({ data: null, error: profileError }),
       from: vi.fn((table: string) => {
-        if (table === "user_profiles") return userProfilesQuery;
+        if (table === "stores_legacy") return makeStoresLegacyQuery("store-1");
         throw new Error(`unexpected table ${table}`);
       }),
     };
@@ -177,7 +165,10 @@ describe("theme activation admin route", () => {
         profileError,
       },
     });
-    expect(serviceSchema.from).toHaveBeenCalledWith("user_profiles");
+    expect(serviceSchema.rpc).toHaveBeenCalledWith("can_user_manage_store", {
+      p_user_id: "bearer-user",
+      p_store_id: "store-1",
+    });
     expect(serviceSchema.from).not.toHaveBeenCalledWith("app_themes");
   });
 
@@ -192,7 +183,7 @@ describe("theme activation admin route", () => {
       },
     });
 
-    const userProfilesQuery = makeUserProfilesQuery("admin");
+    const canManageRpc = makeCanManageStoreRpc(() => true);
     const themeQuery = {
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
@@ -231,8 +222,9 @@ describe("theme activation admin route", () => {
     };
 
     const serviceSchema = {
+      rpc: canManageRpc,
       from: vi.fn((table: string) => {
-        if (table === "user_profiles") return userProfilesQuery;
+        if (table === "stores_legacy") return makeStoresLegacyQuery("store-1");
         if (table === "app_themes") return themeQuery;
         if (table === "app_theme_versions") return themeVersionsTable;
         throw new Error(`unexpected table ${table}`);
@@ -305,7 +297,7 @@ describe("theme activation admin route", () => {
       },
     });
 
-    const userProfilesQuery = makeUserProfilesQuery("admin");
+    const canManageRpc = makeCanManageStoreRpc(() => true);
     const themeQuery = {
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
@@ -326,8 +318,9 @@ describe("theme activation admin route", () => {
       select: vi.fn().mockReturnValue(currentVersionQuery),
     };
     const serviceSchema = {
+      rpc: canManageRpc,
       from: vi.fn((table: string) => {
-        if (table === "user_profiles") return userProfilesQuery;
+        if (table === "stores_legacy") return makeStoresLegacyQuery("store-1");
         if (table === "app_themes") return themeQuery;
         if (table === "app_theme_versions") return themeVersionsTable;
         throw new Error(`unexpected table ${table}`);
@@ -367,10 +360,9 @@ describe("theme activation admin route", () => {
       },
     });
 
-    const userProfilesQuery = makeUserProfilesQuery({
-      "stale-user": "user",
-      "cookie-admin": "admin",
-    });
+    const canManageRpc = makeCanManageStoreRpc(
+      (userId) => userId === "cookie-admin",
+    );
     const themeQuery = {
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
@@ -391,8 +383,9 @@ describe("theme activation admin route", () => {
       select: vi.fn().mockReturnValue(currentVersionQuery),
     };
     const serviceSchema = {
+      rpc: canManageRpc,
       from: vi.fn((table: string) => {
-        if (table === "user_profiles") return userProfilesQuery;
+        if (table === "stores_legacy") return makeStoresLegacyQuery("store-1");
         if (table === "app_themes") return themeQuery;
         if (table === "app_theme_versions") return themeVersionsTable;
         throw new Error(`unexpected table ${table}`);
@@ -431,7 +424,7 @@ describe("theme activation admin route", () => {
       },
     });
 
-    const userProfilesQuery = makeUserProfilesQuery("admin");
+    const canManageRpc = makeCanManageStoreRpc(() => true);
     const themeQuery = {
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
@@ -452,8 +445,9 @@ describe("theme activation admin route", () => {
       select: vi.fn().mockReturnValue(currentVersionQuery),
     };
     const serviceSchema = {
+      rpc: canManageRpc,
       from: vi.fn((table: string) => {
-        if (table === "user_profiles") return userProfilesQuery;
+        if (table === "stores_legacy") return makeStoresLegacyQuery("store-1");
         if (table === "app_themes") return themeQuery;
         if (table === "app_theme_versions") return themeVersionsTable;
         throw new Error(`unexpected table ${table}`);

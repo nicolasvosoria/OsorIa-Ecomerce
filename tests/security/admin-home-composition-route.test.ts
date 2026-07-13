@@ -34,17 +34,24 @@ function makeCookieStore(storeId = "store-1") {
   };
 }
 
-function makeUserProfilesQuery(role: string | null) {
+function makeStoresLegacyQuery(storeId: string) {
   const chain: any = {
     select: vi.fn(() => chain),
     eq: vi.fn(() => chain),
-    single: vi.fn().mockResolvedValue({
-      data: role ? { role } : null,
-      error: null,
-    }),
+    single: vi.fn().mockResolvedValue({ data: { id: storeId }, error: null }),
   };
 
   return chain;
+}
+
+function makeCanManageStoreRpc(canManage: boolean) {
+  return vi.fn(async (fnName: string) => {
+    if (fnName !== "can_user_manage_store") {
+      throw new Error(`unexpected rpc ${fnName}`);
+    }
+
+    return { data: canManage, error: null };
+  });
 }
 
 function makeExistingLayoutQuery(existingId?: string) {
@@ -90,10 +97,10 @@ describe("home composition admin route", () => {
   });
 
   it("rejects non-admin users before writing the composition", async () => {
-    const userProfilesQuery = makeUserProfilesQuery("user");
     const serviceSchema = {
+      rpc: makeCanManageStoreRpc(false),
       from: vi.fn((table: string) => {
-        if (table === "user_profiles") return userProfilesQuery;
+        if (table === "stores_legacy") return makeStoresLegacyQuery("store-1");
         throw new Error(`unexpected table ${table}`);
       }),
     };
@@ -111,7 +118,6 @@ describe("home composition admin route", () => {
   });
 
   it("normalizes and upserts the composition for authenticated admins", async () => {
-    const userProfilesQuery = makeUserProfilesQuery("admin");
     const existingLayoutQuery = makeExistingLayoutQuery("layout-1");
     const updatedRow = {
       id: "layout-1",
@@ -129,8 +135,9 @@ describe("home composition admin route", () => {
       update: vi.fn().mockReturnValue(updateChain),
     };
     const serviceSchema = {
+      rpc: makeCanManageStoreRpc(true),
       from: vi.fn((table: string) => {
-        if (table === "user_profiles") return userProfilesQuery;
+        if (table === "stores_legacy") return makeStoresLegacyQuery("store-1");
         if (table === "home_section_layout") return layoutTable;
         throw new Error(`unexpected table ${table}`);
       }),

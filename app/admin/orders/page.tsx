@@ -14,7 +14,8 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
-import { getOrders, getOrderById, updateOrderStatus, type Order, type OrderWithItems } from "@/lib/supabase/orders-api"
+import type { Order, OrderWithItems } from "@/lib/supabase/orders-api"
+import { getAdminRequestHeaders } from "@/lib/supabase/admin-request-headers"
 import { ADMIN_LIST_FETCH_LIMIT } from "@/lib/admin/constants"
 import { formatPrice } from "@/lib/shopify/utils"
 import {
@@ -34,6 +35,25 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import * as XLSX from "xlsx"
+
+const EXCEL_EXPORT_FETCH_LIMIT = 10000
+
+async function fetchAdminOrders(
+  limit: number,
+): Promise<{ orders: OrderWithItems[]; total: number }> {
+  const params = new URLSearchParams({
+    limit: String(limit),
+    order_by: "created_at",
+    order_direction: "desc",
+  })
+  const response = await fetch(`/api/admin/orders?${params.toString()}`, {
+    headers: await getAdminRequestHeaders(),
+  })
+  if (!response.ok) {
+    throw new Error("No se pudieron cargar los pedidos")
+  }
+  return response.json()
+}
 
 export default function AdminOrdersPage() {
   const { isAdmin, loading } = useAdminPermissions()
@@ -56,11 +76,7 @@ export default function AdminOrdersPage() {
       
       setLoadingOrders(true)
       try {
-        const result = await getOrders({
-          limit: ADMIN_LIST_FETCH_LIMIT,
-          order_by: 'created_at',
-          order_direction: 'desc',
-        })
+        const result = await fetchAdminOrders(ADMIN_LIST_FETCH_LIMIT)
         setOrders(result.orders)
         setTotalOrders(result.total)
       } catch (error) {
@@ -105,13 +121,20 @@ export default function AdminOrdersPage() {
   const handleStatusChange = async (orderId: string, newStatus: Order['status']) => {
     setUpdatingOrderId(orderId)
     try {
-      const ok = await updateOrderStatus(orderId, newStatus)
-      if (ok) {
+      const response = await fetch("/api/admin/orders", {
+        method: "PATCH",
+        headers: await getAdminRequestHeaders(),
+        body: JSON.stringify({ orderId, status: newStatus }),
+      })
+      if (response.ok) {
         setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o)))
         toast.success("Estado del pedido actualizado")
       } else {
         toast.error("No se pudo actualizar el estado del pedido")
       }
+    } catch (error) {
+      console.error("[Admin Orders] Error al actualizar estado:", error)
+      toast.error("No se pudo actualizar el estado del pedido")
     } finally {
       setUpdatingOrderId(null)
     }
@@ -134,20 +157,9 @@ export default function AdminOrdersPage() {
 
     setDownloadingExcel(true)
     try {
-      // Obtener todos los pedidos (sin límite)
-      const result = await getOrders({
-        limit: 10000, // Límite alto para obtener todos
-        order_by: 'created_at',
-        order_direction: 'desc',
-      })
-
-      // Obtener los items de cada pedido
-      const ordersWithItems: Array<OrderWithItems> = await Promise.all(
-        result.orders.map(async (order) => {
-          const orderWithItems = await getOrderById(order.id)
-          return orderWithItems || { ...order, items: [] }
-        })
-      )
+      // Obtener todos los pedidos con sus items (la lista ya llega hidratada)
+      const result = await fetchAdminOrders(EXCEL_EXPORT_FETCH_LIMIT)
+      const ordersWithItems: Array<OrderWithItems> = result.orders
 
       // Preparar datos para Excel - Hoja 1: Resumen de Pedidos
       const ordersData = ordersWithItems.map((order) => ({

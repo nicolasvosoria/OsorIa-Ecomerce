@@ -1713,7 +1713,10 @@ describe("orders-api live order contract", () => {
     getSupabaseEcommerceMock.mockReturnValue({ from: state.from, rpc: state.rpc });
 
     const byId = await getOrderById("order-live-1");
-    const byNumber = await getOrderByNumber("A-2001");
+    const byNumber = await getOrderByNumber("A-2001", {
+      storeId: "store-live-1",
+      email: "buyer@example.com",
+    });
     const adminList = await getOrders({ limit: 20 });
 
     expect(byId?.payment_method).toBe("cash_on_delivery");
@@ -1868,7 +1871,10 @@ describe("orders-api live order contract", () => {
 
     getSupabaseEcommerceMock.mockReturnValue({ from: state.from, rpc: state.rpc });
 
-    const fallback = await loadSuccessPageFallbackOrder("A-3001");
+    const fallback = await loadSuccessPageFallbackOrder("A-3001", {
+      storeId: "store-success-1",
+      email: "fallback@example.com",
+    });
 
     expect(fallback.orderNumber).toBe("A-3001");
     expect(fallback.customerData?.firstName).toBe("Grace");

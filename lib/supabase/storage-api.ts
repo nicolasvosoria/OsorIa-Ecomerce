@@ -1,3 +1,4 @@
+import { getRuntimeStoreIdSync } from "@/lib/utils/store";
 import { getSupabaseBrowserClient } from "./client";
 import { ECOMMERCE_STORAGE_BUCKETS } from "./contract";
 import { isCurrentUserAdmin } from "./permissions-api";
@@ -97,8 +98,14 @@ export async function uploadImage(
       : "image";
 
     // Generar nombre: {contexto}-{timestamp}-{random}.{ext}
-    const fileName =
+    const objectName =
       path || `${cleanContext}-${timestamp}-${randomString}.${fileExtension}`;
+
+    // Namespacing por tienda: las subidas nuevas viven bajo {store_id}/ para que
+    // la RLS per-tienda (can_manage_store) aísle el storage entre tiendas. Sin
+    // tienda resoluble, se mantiene el path plano (queda bajo gestión super_admin).
+    const storeId = getRuntimeStoreIdSync();
+    const fileName = storeId ? `${storeId}/${objectName}` : objectName;
 
     // Convertir File a ArrayBuffer
     const arrayBuffer = await file.arrayBuffer();
@@ -201,30 +208,4 @@ export async function deleteImage(
       error: "Error desconocido al eliminar la imagen",
     };
   }
-}
-
-/**
- * Obtiene la URL pública de una imagen
- * @param path - Ruta del archivo
- * @returns URL pública de la imagen
- */
-export function getImageUrl(path: string): string {
-  const supabase = getSupabaseBrowserClient();
-  if (!supabase) {
-    return path; // Retornar la ruta original si Supabase no está configurado
-  }
-
-  // Si ya es una URL completa, retornarla
-  if (path.startsWith("http://") || path.startsWith("https://")) {
-    return path;
-  }
-
-  // Extraer el nombre del archivo si es una URL de Supabase
-  const fileName = getStoragePath(path);
-
-  const {
-    data: { publicUrl },
-  } = supabase.storage.from(BUCKET_NAME).getPublicUrl(fileName);
-
-  return publicUrl;
 }

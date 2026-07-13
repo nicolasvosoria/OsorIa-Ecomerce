@@ -34,17 +34,24 @@ function makeCookieStore(storeId = "store-1") {
   };
 }
 
-function makeUserProfilesQuery(role: string | null) {
+function makeStoresLegacyQuery(storeId: string) {
   const chain: any = {
     select: vi.fn(() => chain),
     eq: vi.fn(() => chain),
-    single: vi.fn().mockResolvedValue({
-      data: role ? { role } : null,
-      error: null,
-    }),
+    single: vi.fn().mockResolvedValue({ data: { id: storeId }, error: null }),
   };
 
   return chain;
+}
+
+function makeCanManageStoreRpc(canManage: boolean) {
+  return vi.fn(async (fnName: string) => {
+    if (fnName !== "can_user_manage_store") {
+      throw new Error(`unexpected rpc ${fnName}`);
+    }
+
+    return { data: canManage, error: null };
+  });
 }
 
 // Mocks the two distinct `select(...).eq(...).maybeSingle()` shapes the route
@@ -145,14 +152,15 @@ describe("theme activation route: revert (D3, Option A)", () => {
   });
 
   it("flips is_current onto the target version instead of inserting a new row", async () => {
-    const userProfilesQuery = makeUserProfilesQuery("admin");
+    const canManageRpc = makeCanManageStoreRpc(true);
     const themeVersionsTable = makeThemeVersionsTable();
     const themeQuery = makeThemeQuery();
     const insert = vi.fn();
 
     const serviceSchema = {
+      rpc: canManageRpc,
       from: vi.fn((table: string) => {
-        if (table === "user_profiles") return userProfilesQuery;
+        if (table === "stores_legacy") return makeStoresLegacyQuery("store-1");
         if (table === "app_themes") return themeQuery;
         if (table === "app_theme_versions")
           return { ...themeVersionsTable, insert };
@@ -194,12 +202,13 @@ describe("theme activation route: revert (D3, Option A)", () => {
   });
 
   it("returns 404 for a foreign or absent versionId and never writes", async () => {
-    const userProfilesQuery = makeUserProfilesQuery("admin");
+    const canManageRpc = makeCanManageStoreRpc(true);
     const themeVersionsTable = makeThemeVersionsTable({ existingVersion: null });
 
     const serviceSchema = {
+      rpc: canManageRpc,
       from: vi.fn((table: string) => {
-        if (table === "user_profiles") return userProfilesQuery;
+        if (table === "stores_legacy") return makeStoresLegacyQuery("store-1");
         if (table === "app_theme_versions") return themeVersionsTable;
         throw new Error(`unexpected table ${table}`);
       }),
@@ -229,7 +238,7 @@ describe("theme activation route: revert (D3, Option A)", () => {
   });
 
   it("never touches component_styles during a revert", async () => {
-    const userProfilesQuery = makeUserProfilesQuery("admin");
+    const canManageRpc = makeCanManageStoreRpc(true);
     const themeVersionsTable = makeThemeVersionsTable();
     const themeQuery = makeThemeQuery();
     const componentStylesTable = {
@@ -242,8 +251,9 @@ describe("theme activation route: revert (D3, Option A)", () => {
     };
 
     const serviceSchema = {
+      rpc: canManageRpc,
       from: vi.fn((table: string) => {
-        if (table === "user_profiles") return userProfilesQuery;
+        if (table === "stores_legacy") return makeStoresLegacyQuery("store-1");
         if (table === "app_themes") return themeQuery;
         if (table === "app_theme_versions") return themeVersionsTable;
         if (table === "component_styles") return componentStylesTable;
@@ -271,10 +281,11 @@ describe("theme activation route: revert (D3, Option A)", () => {
       },
     });
 
-    const userProfilesQuery = makeUserProfilesQuery("user");
+    const canManageRpc = makeCanManageStoreRpc(false);
     const serviceSchema = {
+      rpc: canManageRpc,
       from: vi.fn((table: string) => {
-        if (table === "user_profiles") return userProfilesQuery;
+        if (table === "stores_legacy") return makeStoresLegacyQuery("store-1");
         throw new Error(`unexpected table ${table}`);
       }),
     };
@@ -290,13 +301,14 @@ describe("theme activation route: revert (D3, Option A)", () => {
   });
 
   it("skips the apply-payload validation when versionId is present", async () => {
-    const userProfilesQuery = makeUserProfilesQuery("admin");
+    const canManageRpc = makeCanManageStoreRpc(true);
     const themeVersionsTable = makeThemeVersionsTable();
     const themeQuery = makeThemeQuery();
 
     const serviceSchema = {
+      rpc: canManageRpc,
       from: vi.fn((table: string) => {
-        if (table === "user_profiles") return userProfilesQuery;
+        if (table === "stores_legacy") return makeStoresLegacyQuery("store-1");
         if (table === "app_themes") return themeQuery;
         if (table === "app_theme_versions") return themeVersionsTable;
         throw new Error(`unexpected table ${table}`);

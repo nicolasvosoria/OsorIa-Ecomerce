@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 
 import { POST } from "@/app/api/home-discount-popup-config/route";
 import { requireAdminUser } from "@/lib/supabase/admin-route-auth";
+import { resolveTrustedStoreId } from "@/lib/supabase/admin-store";
 
 const { createClient, cookies } = vi.hoisted(() => ({
   createClient: vi.fn(),
@@ -21,7 +22,12 @@ vi.mock("@/lib/supabase/admin-route-auth", () => ({
   requireAdminUser: vi.fn(),
 }));
 
+vi.mock("@/lib/supabase/admin-store", () => ({
+  resolveTrustedStoreId: vi.fn(),
+}));
+
 const mockedRequireAdminUser = vi.mocked(requireAdminUser);
+const mockedResolveTrustedStoreId = vi.mocked(resolveTrustedStoreId);
 
 function makeCookieStore(storeId = "store-123") {
   return {
@@ -56,6 +62,7 @@ describe("home discount popup config route", () => {
     process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
     process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role-key";
     cookies.mockResolvedValue(makeCookieStore());
+    mockedResolveTrustedStoreId.mockResolvedValue("store-123");
   });
 
   it("rejects non-admin requests before touching popup persistence", async () => {

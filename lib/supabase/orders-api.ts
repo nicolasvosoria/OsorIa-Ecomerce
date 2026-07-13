@@ -192,7 +192,7 @@ export interface OrderWithItems extends Order {
 }
 
 // Resultado de validación de inventario
-export interface InventoryValidationResult {
+interface InventoryValidationResult {
   isValid: boolean;
   errors: Array<{
     product_name: string;
@@ -1463,6 +1463,7 @@ export async function createOrder(
  */
 export async function getOrderById(
   orderId: string,
+  storeId?: string,
 ): Promise<OrderWithItems | null> {
   try {
     const supabase = getSupabaseEcommerce();
@@ -1471,8 +1472,16 @@ export async function getOrderById(
       return null;
     }
 
+    let query = supabase
+      .from(ECOMMERCE_TABLES.orders)
+      .select("*")
+      .eq("id", orderId);
+    if (storeId) {
+      query = query.eq("store_id", storeId);
+    }
+
     const orderResult = (await withTimeout(
-      supabase.from(ECOMMERCE_TABLES.orders).select("*").eq("id", orderId).single(),
+      query.single(),
       15000,
       "getOrderById",
     )) as { data: any; error: any };
@@ -1489,11 +1498,21 @@ export async function getOrderById(
   }
 }
 
+export interface OrderByNumberAuth {
+  // Tienda resuelta server-side (host); nunca un valor provisto por el cliente.
+  storeId: string;
+  // Prueba de propiedad: order_number es secuencial y adivinable, así que
+  // exigimos que coincida con el email del comprador antes de exponer PII.
+  email: string;
+}
+
 /**
- * Obtener un pedido por número de pedido
+ * Obtener un pedido por número de pedido, restringido a la tienda actual y
+ * al comprador (order_number por sí solo no autoriza el acceso).
  */
 export async function getOrderByNumber(
   orderNumber: string,
+  auth: OrderByNumberAuth,
 ): Promise<OrderWithItems | null> {
   try {
     const supabase = getSupabaseEcommerce();
@@ -1507,6 +1526,8 @@ export async function getOrderByNumber(
         .from(ECOMMERCE_TABLES.orders)
         .select("*")
         .eq("order_number", orderNumber)
+        .eq("store_id", auth.storeId)
+        .eq("customer_email", auth.email)
         .single(),
       15000,
       "getOrderByNumber",
@@ -1534,6 +1555,7 @@ export interface GetOrdersParams {
   order_direction?: "asc" | "desc";
   status?: Order["status"];
   payment_status?: Order["payment_status"];
+  storeId?: string;
 }
 
 export interface GetOrdersResult {
@@ -1543,9 +1565,10 @@ export interface GetOrdersResult {
 
 export async function getOrders(
   params: GetOrdersParams = {},
+  supabaseOverride?: any,
 ): Promise<GetOrdersResult> {
   try {
-    const supabase = getSupabaseEcommerce();
+    const supabase = supabaseOverride ?? getSupabaseEcommerce();
     if (!supabase) {
       console.error("[Orders] Supabase no configurado");
       return { orders: [], total: 0 };
@@ -1558,9 +1581,15 @@ export async function getOrders(
       order_direction = "desc",
       status,
       payment_status,
+      storeId,
     } = params;
 
     let query = supabase.from(ECOMMERCE_TABLES.orders).select("*", { count: "exact" });
+
+    // Acotar a la tienda confiable (defensa en profundidad server-side)
+    if (storeId) {
+      query = query.eq("store_id", storeId);
+    }
 
     // Filtrar por estado si se especifica
     if (status) {
@@ -1612,6 +1641,7 @@ export async function getOrders(
 export async function getOrdersByEmail(
   email: string,
   limit: number = 50,
+  storeId?: string,
 ): Promise<OrderWithItems[]> {
   try {
     const supabase = getSupabaseEcommerce();
@@ -1620,13 +1650,16 @@ export async function getOrdersByEmail(
       return [];
     }
 
+    let query = supabase
+      .from(ECOMMERCE_TABLES.orders)
+      .select("*")
+      .eq("customer_email", email);
+    if (storeId) {
+      query = query.eq("store_id", storeId);
+    }
+
     const ordersResult = (await withTimeout(
-      supabase
-        .from(ECOMMERCE_TABLES.orders)
-        .select("*")
-        .eq("customer_email", email)
-        .order("order_date", { ascending: false })
-        .limit(limit),
+      query.order("order_date", { ascending: false }).limit(limit),
       15000,
       "getOrdersByEmail",
     )) as { data: any; error: any };
@@ -1657,6 +1690,8 @@ export async function getOrdersByEmail(
 export async function updateOrderStatus(
   orderId: string,
   status: Order["status"],
+  storeId?: string,
+  supabaseOverride?: any,
   additionalData?: {
     payment_status?: Order["payment_status"];
     shipped_at?: string;
@@ -1665,7 +1700,7 @@ export async function updateOrderStatus(
   },
 ): Promise<boolean> {
   try {
-    const supabase = getSupabaseEcommerce();
+    const supabase = supabaseOverride ?? getSupabaseEcommerce();
     if (!supabase) {
       console.error("[Orders] Supabase no configurado");
       return false;
@@ -1693,8 +1728,16 @@ export async function updateOrderStatus(
       updateData.payment_status = additionalData.payment_status;
     }
 
+    let updateQuery = supabase
+      .from(ECOMMERCE_TABLES.orders)
+      .update(updateData)
+      .eq("id", orderId);
+    if (storeId) {
+      updateQuery = updateQuery.eq("store_id", storeId);
+    }
+
     const result = (await withTimeout(
-      supabase.from(ECOMMERCE_TABLES.orders).update(updateData).eq("id", orderId),
+      updateQuery,
       10000,
       "updateOrderStatus",
     )) as { error: any };

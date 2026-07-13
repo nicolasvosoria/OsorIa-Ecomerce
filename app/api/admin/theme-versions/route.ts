@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ECOMMERCE_TABLES } from "@/lib/supabase/contract";
-import { requireAdminUser } from "@/lib/supabase/admin-route-auth";
 import {
-  getSupabaseServiceClient,
-  resolveTargetStoreId,
-} from "@/lib/supabase/admin-store";
+  adminErrorResponse,
+  authorizeStoreAdmin,
+} from "@/lib/supabase/admin-route-guard";
 
 // Newest-first history for this store, labeled with its base theme's name.
 // `variables`/`fonts` stay server-side: only the summary fields the history
@@ -50,24 +49,10 @@ async function listThemeVersions(supabase: any, storeId: string) {
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = getSupabaseServiceClient();
-    if (!supabase) {
-      return NextResponse.json(
-        { error: "Supabase no configurado" },
-        { status: 500 },
-      );
-    }
+    const auth = await authorizeStoreAdmin(request);
+    if ("error" in auth) return adminErrorResponse(auth);
+    const { supabase, storeId } = auth;
 
-    const adminCheck = await requireAdminUser(request, supabase);
-    if ("error" in adminCheck) {
-      const responseBody = adminCheck.diagnostics
-        ? { error: adminCheck.error, diagnostics: adminCheck.diagnostics }
-        : { error: adminCheck.error };
-
-      return NextResponse.json(responseBody, { status: adminCheck.status });
-    }
-
-    const storeId = await resolveTargetStoreId(supabase);
     const versions = await listThemeVersions(supabase, storeId);
 
     return NextResponse.json({ versions });

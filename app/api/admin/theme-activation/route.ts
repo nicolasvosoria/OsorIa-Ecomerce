@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ECOMMERCE_TABLES } from "@/lib/supabase/contract";
-import { requireAdminUser } from "@/lib/supabase/admin-route-auth";
 import {
-  getSupabaseServiceClient,
-  resolveTargetStoreId,
-} from "@/lib/supabase/admin-store";
+  adminErrorResponse,
+  authorizeStoreAdmin,
+} from "@/lib/supabase/admin-route-guard";
 import {
   normalizeThemeDefinition,
   normalizeThemeRecord,
@@ -113,24 +112,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const supabase = getSupabaseServiceClient();
-    if (!supabase) {
-      return NextResponse.json(
-        { error: "Supabase no configurado" },
-        { status: 500 },
-      );
-    }
-
-    const adminCheck = await requireAdminUser(request, supabase);
-    if ("error" in adminCheck) {
-      const responseBody = adminCheck.diagnostics
-        ? { error: adminCheck.error, diagnostics: adminCheck.diagnostics }
-        : { error: adminCheck.error };
-
-      return NextResponse.json(responseBody, { status: adminCheck.status });
-    }
-
-    const storeId = await resolveTargetStoreId(supabase);
+    const auth = await authorizeStoreAdmin(request);
+    if ("error" in auth) return adminErrorResponse(auth);
+    const { supabase, storeId } = auth;
 
     if (versionId) {
       return await revertThemeVersion(supabase, storeId, versionId);

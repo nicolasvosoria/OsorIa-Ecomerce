@@ -1,20 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { ECOMMERCE_SCHEMA } from "@/lib/supabase/contract";
-import { requireAdminUser } from "@/lib/supabase/admin-route-auth";
+import {
+  adminErrorResponse,
+  authorizeStoreAdmin,
+} from "@/lib/supabase/admin-route-guard";
 import { getPopularCategoryTiles } from "@/lib/products/popular-sections";
 import { resolveCategoryTilesOverride } from "@/lib/sections/popular-variant";
-
-function getSupabaseServiceClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceKey) {
-    return null;
-  }
-
-  return createClient(supabaseUrl, serviceKey).schema(ECOMMERCE_SCHEMA) as any;
-}
 
 function parseCategoryTiles(value: string | null): unknown {
   if (!value) return [];
@@ -37,22 +27,8 @@ function parseCategoryTiles(value: string | null): unknown {
  */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = getSupabaseServiceClient();
-    if (!supabase) {
-      return NextResponse.json(
-        { error: "Supabase no configurado" },
-        { status: 500 },
-      );
-    }
-
-    const adminCheck = await requireAdminUser(request, supabase);
-    if ("error" in adminCheck) {
-      const responseBody = adminCheck.diagnostics
-        ? { error: adminCheck.error, diagnostics: adminCheck.diagnostics }
-        : { error: adminCheck.error };
-
-      return NextResponse.json(responseBody, { status: adminCheck.status });
-    }
+    const auth = await authorizeStoreAdmin(request);
+    if ("error" in auth) return adminErrorResponse(auth);
 
     const { searchParams } = request.nextUrl;
     const rawCategoryTiles = parseCategoryTiles(searchParams.get("categoryTiles"));

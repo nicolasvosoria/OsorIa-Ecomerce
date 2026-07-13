@@ -1,5 +1,5 @@
 import type { GuestCustomerData } from "@/components/checkout/guest-checkout-form";
-import { getOrderByNumber } from "@/lib/supabase/orders-api";
+import { getOrderByNumber, type OrderByNumberAuth } from "@/lib/supabase/orders-api";
 
 export interface SuccessPageFallbackOrder {
   orderNumber: string | null;
@@ -28,6 +28,7 @@ function mapOrderToGuestCustomerData(
 
 export async function loadSuccessPageFallbackOrder(
   orderNumber: string | null | undefined,
+  auth: OrderByNumberAuth | null,
 ): Promise<SuccessPageFallbackOrder> {
   if (!orderNumber) {
     return {
@@ -36,7 +37,14 @@ export async function loadSuccessPageFallbackOrder(
     };
   }
 
-  const order = await getOrderByNumber(orderNumber);
+  if (!auth) {
+    return {
+      orderNumber,
+      customerData: null,
+    };
+  }
+
+  const order = await getOrderByNumber(orderNumber, auth);
 
   return {
     orderNumber: order?.order_number || orderNumber,

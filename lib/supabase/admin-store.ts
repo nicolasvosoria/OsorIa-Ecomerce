@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
-import { cookies } from "next/headers";
+import type { NextRequest } from "next/server";
+import { resolveStoreLookupSubdomain } from "@/lib/utils/store-host";
 import { ECOMMERCE_SCHEMA, ECOMMERCE_VIEWS } from "./contract";
 
 export function getSupabaseServiceClient() {
@@ -11,17 +12,6 @@ export function getSupabaseServiceClient() {
   }
 
   return createClient(supabaseUrl, serviceKey).schema(ECOMMERCE_SCHEMA) as any;
-}
-
-async function getRuntimeStoreId() {
-  const disableMultiTenant =
-    process.env.DISABLE_SUBDOMAIN_MULTI_TENANT === "true";
-  if (disableMultiTenant) {
-    return process.env.DEFAULT_STORE_ID || "default";
-  }
-
-  const cookieStore = await cookies();
-  return cookieStore.get("store_id")?.value ?? null;
 }
 
 async function resolveDefaultStoreId(supabase: any) {
@@ -38,11 +28,36 @@ async function resolveDefaultStoreId(supabase: any) {
   return defaultStore.id as string;
 }
 
-export async function resolveTargetStoreId(supabase: any) {
-  const storeId = await getRuntimeStoreId();
-  if (storeId && storeId !== "default") {
-    return storeId;
+async function resolveStoreIdBySubdomain(supabase: any, subdomain: string) {
+  const { data, error } = await supabase
+    .from(ECOMMERCE_VIEWS.storesLegacy)
+    .select("id")
+    .eq("subdomain", subdomain)
+    .single();
+
+  if (error || !data?.id) {
+    return null;
   }
 
-  return resolveDefaultStoreId(supabase);
+  return data.id as string;
+}
+
+// Trusted target store for admin writes: derived from the request host, never
+// from the mutable `store_id` cookie. A stale/unknown subdomain falls back to
+// the default store, mirroring getStoreFromServer.
+export async function resolveTrustedStoreId(
+  request: NextRequest,
+  supabase: any,
+): Promise<string> {
+  if (process.env.DISABLE_SUBDOMAIN_MULTI_TENANT === "true") {
+    const configuredStoreId = process.env.DEFAULT_STORE_ID || "default";
+    return configuredStoreId === "default"
+      ? resolveDefaultStoreId(supabase)
+      : configuredStoreId;
+  }
+
+  const subdomain = resolveStoreLookupSubdomain(request.headers.get("host"));
+  const storeId = await resolveStoreIdBySubdomain(supabase, subdomain);
+
+  return storeId ?? resolveDefaultStoreId(supabase);
 }

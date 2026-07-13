@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
-import { cookies } from "next/headers"
 
 import {
-  buildChatbotStoreLookups,
   loadChatbotConfigForStore,
   saveChatbotConfigForStore,
   type ChatbotPersistenceClient,
 } from "@/lib/supabase/chatbot-api"
-import { requireAdminUser } from "@/lib/supabase/admin-route-auth"
+import { authorizeStoreAdmin } from "@/lib/supabase/admin-route-guard"
 import { ECOMMERCE_SCHEMA } from "@/lib/supabase/contract"
 
 function getChatbotServiceClient(): ChatbotPersistenceClient | null {
@@ -24,27 +22,10 @@ function getChatbotServiceClient(): ChatbotPersistenceClient | null {
   }).schema(ECOMMERCE_SCHEMA) as unknown as ChatbotPersistenceClient
 }
 
-async function getRequestStoreLookups(request: NextRequest) {
-  if (process.env.DISABLE_SUBDOMAIN_MULTI_TENANT === "true") {
-    return buildChatbotStoreLookups({
-      storeId: process.env.DEFAULT_STORE_ID || "default",
-      host: request.headers.get("host"),
-    })
-  }
-
-  const cookieStore = await cookies()
-
-  return buildChatbotStoreLookups({
-    forwardedStoreId: request.headers.get("x-store-id"),
-    storeId: cookieStore.get("store_id")?.value ?? null,
-    host: request.headers.get("host"),
-  })
-}
-
-async function getAuthorizedClient(
+async function getAuthorizedContext(
   request: NextRequest,
 ): Promise<
-  | { ecommerceClient: ChatbotPersistenceClient }
+  | { ecommerceClient: ChatbotPersistenceClient; storeId: string }
   | { error: string; status: 401 | 403 | 500 }
 > {
   const ecommerceClient = getChatbotServiceClient()
@@ -52,15 +33,12 @@ async function getAuthorizedClient(
     return { error: "Supabase no configurado", status: 500 }
   }
 
-  const adminCheck = await requireAdminUser(request, ecommerceClient)
-  if ("error" in adminCheck) {
-    return {
-      error: adminCheck.error,
-      status: adminCheck.status,
-    }
+  const auth = await authorizeStoreAdmin(request, ecommerceClient)
+  if ("error" in auth) {
+    return { error: auth.error, status: auth.status }
   }
 
-  return { ecommerceClient }
+  return { ecommerceClient, storeId: auth.storeId }
 }
 
 function asNotFoundResponse(error: unknown) {
@@ -74,7 +52,7 @@ function asNotFoundResponse(error: unknown) {
 // GET - Obtener configuración del chatbot para la tienda actual
 export async function GET(request: NextRequest) {
   try {
-    const authorized = await getAuthorizedClient(request)
+    const authorized = await getAuthorizedContext(request)
     if (!("ecommerceClient" in authorized)) {
       return NextResponse.json(
         { error: authorized.error },
@@ -84,7 +62,7 @@ export async function GET(request: NextRequest) {
 
     const { storeId, config } = await loadChatbotConfigForStore(
       authorized.ecommerceClient,
-      await getRequestStoreLookups(request),
+      { kind: "id", value: authorized.storeId },
     )
 
     return NextResponse.json({ config, storeId })
@@ -103,7 +81,7 @@ export async function GET(request: NextRequest) {
 // POST - Guardar configuración del chatbot para la tienda actual
 export async function POST(request: NextRequest) {
   try {
-    const authorized = await getAuthorizedClient(request)
+    const authorized = await getAuthorizedContext(request)
     if (!("ecommerceClient" in authorized)) {
       return NextResponse.json(
         { error: authorized.error },
@@ -114,7 +92,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { storeId, config } = await saveChatbotConfigForStore(
       authorized.ecommerceClient,
-      await getRequestStoreLookups(request),
+      { kind: "id", value: authorized.storeId },
       body?.config,
     )
 
