@@ -13,10 +13,15 @@ alter table ecommerce.item_categories
   add column if not exists seo_title varchar,
   add column if not exists seo_description text;
 
--- Replicates generateCategorySlug (lib/utils/category-slug.ts) step for step:
--- lower, NFD, drop combining marks, non-alphanumerics to dashes, trim dashes.
--- Any divergence here moves a live URL, which is exactly what this migration exists
--- to prevent, so the two must stay identical.
+-- Mirrors generateCategorySlug (lib/utils/category-slug.ts) step for step: lower,
+-- NFD, drop combining marks, non-alphanumerics to dashes, trim dashes. The two mark
+-- classes are not equivalent in general: generateCategorySlug uses \p{Diacritic},
+-- which also spans marks outside the range used here ([\u0300-\u036f], Combining
+-- Diacritical Marks). They do agree on every mark an NFD-decomposed Spanish name
+-- yields -- the five accents, the tilde of n-tilde, and the diaeresis of u-umlaut
+-- (pinguino, verguenza, bilingue) -- which is what the stored slugs are made of.
+-- Divergence on that range moves a live URL, which is exactly what this migration
+-- exists to prevent.
 update ecommerce.item_categories
 set slug = trim(both '-' from regexp_replace(
       regexp_replace(normalize(lower(category_name), NFD), '[\u0300-\u036f]', '', 'g'),
@@ -40,11 +45,13 @@ begin
     raise exception 'Categories whose name yields no slug: %', array_to_string(v_empty, ', ');
   end if;
 
-  select array_agg(format('%s (store %s)', slug, store_id) order by slug)
-    into v_duplicated
-  from ecommerce.item_categories
-  group by store_id, slug
-  having count(*) > 1;
+  select array_agg(entry order by entry) into v_duplicated
+  from (
+    select format('%s (store %s)', slug, store_id) as entry
+    from ecommerce.item_categories
+    group by store_id, slug
+    having count(*) > 1
+  ) duplicates;
 
   if v_duplicated is not null then
     raise exception 'Categories sharing a slug within a store: %', array_to_string(v_duplicated, ', ');

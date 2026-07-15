@@ -26,7 +26,6 @@ async function resolveStoreId(): Promise<string | null> {
   return (await getStoreId()) ?? (await getStoreIdServer())
 }
 
-// Generar metadata para SEO
 export async function generateMetadata(props: {
   params: Promise<{ category: string }>
 }): Promise<Metadata> {

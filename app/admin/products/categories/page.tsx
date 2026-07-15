@@ -21,7 +21,7 @@ export default async function AdminCategoriesPage() {
   const list = await loadCategories(authorization.supabase, authorization.storeId)
 
   return (
-    <AdminPageContainer maxWidth="4xl">
+    <AdminPageContainer>
       <AdminPageHeader
         title="Categorías de productos"
         subtitle="Organiza el catálogo y controla la URL pública de cada categoría."

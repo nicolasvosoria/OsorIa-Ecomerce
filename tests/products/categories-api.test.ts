@@ -28,6 +28,11 @@ function createSupabase(options: {
   const reads: Read[] = []
   const writeResult = options.writeResult ?? { data: { id: "cat-1" }, error: null }
 
+  const firstRow = (table: string) => ({
+    data: (options.selectRows?.[table] ?? [])[0] ?? null,
+    error: null,
+  })
+
   const supabase = {
     from(table: string) {
       const filters: Filter[] = []
@@ -38,6 +43,7 @@ function createSupabase(options: {
         select: () => builder,
         order: () => builder,
         not: () => builder,
+        is: () => builder,
         eq: (column: string, value: unknown) => {
           filters.push({ column, value })
           return builder
@@ -58,8 +64,8 @@ function createSupabase(options: {
           return builder
         },
         maybeSingle: () =>
-          Promise.resolve(pendingWrite ? writeResult : { data: (options.selectRows?.[table] ?? [])[0] ?? null, error: null }),
-        single: () => Promise.resolve(writeResult),
+          Promise.resolve(pendingWrite ? writeResult : firstRow(table)),
+        single: () => Promise.resolve(pendingWrite ? writeResult : firstRow(table)),
         then: (onfulfilled?: any) =>
           Promise.resolve({ data: options.selectRows?.[table] ?? [], error: null }).then(onfulfilled),
       }
@@ -213,6 +219,24 @@ describe("getCategoryBySlug", () => {
         { column: "is_active", value: true },
       ]),
     )
+  })
+
+  // Con DISABLE_SUBDOMAIN_MULTI_TENANT=true, getStoreId() devuelve el alias 'default'
+  // y el catálogo lo pasa tal cual. store_id es uuid: filtrar por el alias es un 22P02,
+  // y la categoría 404ea. getItems, dos líneas más abajo en la misma página, sí lo
+  // resuelve; las dos llamadas tienen que coincidir en qué tienda leen.
+  it("resolves the 'default' alias to the store uuid instead of filtering by the alias", async () => {
+    const stored = { id: "cat-1", category_name: "Bocinas", slug: "speakers" }
+    const { supabase, reads } = createSupabase({
+      selectRows: { stores_legacy: [{ id: "store-uuid" }], item_categories: [stored] },
+    })
+
+    const category = await getCategoryBySlug("speakers", "default", supabase)
+
+    expect(category).toEqual(stored)
+    const categoryRead = reads.find((read) => read.table === "item_categories")
+    expect(categoryRead?.filters).toContainEqual({ column: "store_id", value: "store-uuid" })
+    expect(categoryRead?.filters).not.toContainEqual({ column: "store_id", value: "default" })
   })
 
   it("serves an inactive category only when the caller asks for it", async () => {

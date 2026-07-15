@@ -2,19 +2,19 @@
 
 import { useRef, useState, type ComponentProps } from "react"
 import Link from "next/link"
-import { Controller, useForm, useWatch, type Control, type UseFormReturn } from "react-hook-form"
+import { Controller, useForm, useWatch, type UseFormReturn } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Loader2, Save } from "lucide-react"
 import { toast } from "sonner"
 
+import { CheckboxField } from "@/components/admin/checkbox-field"
 import { ImageUpload } from "@/components/admin/image-upload"
+import { SeoCard } from "@/components/admin/seo-card"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Checkbox } from "@/components/ui/checkbox"
 import { FieldError } from "@/components/ui/field-error"
 import { FormField } from "@/components/ui/form-field"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import {
   Select,
   SelectContent,
@@ -101,7 +101,7 @@ export function ProductForm({ categories, defaultValues, submitActions }: Produc
       <PricingCard form={form} compareAtPriceNotice={compareAtPriceNotice} />
       <InventoryCard form={form} />
       <StatusCard form={form} />
-      <SeoCard form={form} />
+      <ProductSeoCard form={form} />
       <SubmitActions actions={submitActions} isSubmitting={form.formState.isSubmitting} />
     </form>
   )
@@ -340,47 +340,21 @@ function InventoryCard({ form }: { form: UseFormReturn<ProductFormValues> }) {
   )
 }
 
-function SeoCard({ form }: { form: UseFormReturn<ProductFormValues> }) {
+function ProductSeoCard({ form }: { form: UseFormReturn<ProductFormValues> }) {
   const { register } = form
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>SEO</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <FormField id="seo_title" label="Título SEO">
-          {(fieldProps) => (
-            <Input
-              {...fieldProps}
-              placeholder="Título para motores de búsqueda"
-              {...register("seo_title")}
-            />
-          )}
-        </FormField>
-
-        <FormField id="seo_description" label="Descripción SEO">
-          {(fieldProps) => (
-            <Textarea
-              {...fieldProps}
-              placeholder="Descripción para motores de búsqueda"
-              rows={3}
-              {...register("seo_description")}
-            />
-          )}
-        </FormField>
-
-        <FormField id="tags" label="Etiquetas (separadas por comas)">
-          {(fieldProps) => (
-            <Input
-              {...fieldProps}
-              placeholder="etiqueta1, etiqueta2, etiqueta3"
-              {...register("tags")}
-            />
-          )}
-        </FormField>
-      </CardContent>
-    </Card>
+    <SeoCard register={register}>
+      <FormField id="tags" label="Etiquetas (separadas por comas)">
+        {(fieldProps) => (
+          <Input
+            {...fieldProps}
+            placeholder="etiqueta1, etiqueta2, etiqueta3"
+            {...register("tags")}
+          />
+        )}
+      </FormField>
+    </SeoCard>
   )
 }
 
@@ -449,37 +423,6 @@ function StatusCard({ form }: { form: UseFormReturn<ProductFormValues> }) {
         </FormField>
       </CardContent>
     </Card>
-  )
-}
-
-type ProductFlagName = "is_active" | "is_featured" | "is_available_for_sale" | "track_inventory"
-
-function CheckboxField({
-  control,
-  name,
-  label,
-}: {
-  control: Control<ProductFormValues>
-  name: ProductFlagName
-  label: string
-}) {
-  return (
-    <div className="flex items-center space-x-2">
-      <Controller
-        control={control}
-        name={name}
-        render={({ field }) => (
-          <Checkbox
-            id={name}
-            checked={field.value}
-            onCheckedChange={(checked) => field.onChange(checked === true)}
-          />
-        )}
-      />
-      <Label htmlFor={name} className="cursor-pointer">
-        {label}
-      </Label>
-    </div>
   )
 }
 

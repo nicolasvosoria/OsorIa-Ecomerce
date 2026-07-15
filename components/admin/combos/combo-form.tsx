@@ -3,22 +3,16 @@
 import { useMemo, useState, useTransition } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import {
-  Controller,
-  useFieldArray,
-  useForm,
-  useWatch,
-  type Control,
-  type UseFormRegister,
-} from "react-hook-form"
+import { Controller, useFieldArray, useForm, useWatch, type Control } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Loader2, Save } from "lucide-react"
 import { toast } from "sonner"
 
+import { CheckboxField } from "@/components/admin/checkbox-field"
 import { ImageUpload } from "@/components/admin/image-upload"
+import { SeoCard } from "@/components/admin/seo-card"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Checkbox } from "@/components/ui/checkbox"
 import { FieldError } from "@/components/ui/field-error"
 import { FormField } from "@/components/ui/form-field"
 import { Input } from "@/components/ui/input"
@@ -205,24 +199,15 @@ export function ComboForm({
             </FormField>
           </div>
 
-          <label className="flex items-center gap-2 text-sm">
-            <Controller
-              control={control}
-              name="is_active"
-              render={({ field }) => (
-                <Checkbox
-                  checked={field.value}
-                  onCheckedChange={(checked) => field.onChange(checked === true)}
-                />
-              )}
-            />
-            Activo para venta
-          </label>
+          <CheckboxField control={control} name="is_active" label="Activo para venta" />
 
           <ComboComponentsField control={control} products={products} setValue={setValue} />
           <FieldError message={errors.components?.message} />
 
-          <ComboSeoCard register={register} />
+          <SeoCard
+            register={register}
+            description="Si lo dejas vacío se usa el nombre y la descripción del combo."
+          />
 
           <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-end">
             <Button type="button" variant="outline" asChild>
@@ -243,39 +228,6 @@ export function ComboForm({
             </Button>
           </div>
         </form>
-      </CardContent>
-    </Card>
-  )
-}
-
-function ComboSeoCard({ register }: { register: UseFormRegister<ComboFormValues> }) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>SEO</CardTitle>
-        <CardDescription>Si lo dejas vacío se usa el nombre y la descripción del combo.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <FormField id="seo_title" label="Título SEO">
-          {(fieldProps) => (
-            <Input
-              {...fieldProps}
-              placeholder="Título para motores de búsqueda"
-              {...register("seo_title")}
-            />
-          )}
-        </FormField>
-
-        <FormField id="seo_description" label="Descripción SEO">
-          {(fieldProps) => (
-            <Textarea
-              {...fieldProps}
-              placeholder="Descripción para motores de búsqueda"
-              rows={3}
-              {...register("seo_description")}
-            />
-          )}
-        </FormField>
       </CardContent>
     </Card>
   )

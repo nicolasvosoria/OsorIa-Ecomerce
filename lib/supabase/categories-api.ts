@@ -1,5 +1,6 @@
 import { getSupabaseEcommerce } from './client'
 import { ECOMMERCE_TABLES } from './contract'
+import { isDefaultStoreAlias, resolveDefaultStoreId } from './store-alias'
 import { generateCategorySlug } from '@/lib/utils/category-slug'
 import type { ItemCategory } from '@/lib/types/products'
 
@@ -82,10 +83,15 @@ export async function getCategoryBySlug(
   const supabase = getClient(supabaseOverride)
   if (!supabase) return null
 
+  const resolvedStoreId = isDefaultStoreAlias(storeId)
+    ? await resolveDefaultStoreId(supabase, 'getCategoryBySlug')
+    : storeId
+  if (!resolvedStoreId) return null
+
   let query = supabase
     .from(ECOMMERCE_TABLES.itemCategories)
     .select('*')
-    .eq('store_id', storeId)
+    .eq('store_id', resolvedStoreId)
     .eq('slug', slug)
 
   if (!includeInactive) {
@@ -132,7 +138,7 @@ export async function getCategoryById(
   return result.data
 }
 
-export async function countProductsByCategory(
+async function countProductsByCategory(
   storeId: string,
   supabaseOverride?: any,
 ): Promise<Map<string, number>> {

@@ -3,15 +3,16 @@
 import { useState, useTransition } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Controller, useForm, useWatch, type UseFormRegister } from "react-hook-form"
+import { useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Loader2, Save } from "lucide-react"
 import { toast } from "sonner"
 
+import { CheckboxField } from "@/components/admin/checkbox-field"
 import { ImageUpload } from "@/components/admin/image-upload"
+import { SeoCard } from "@/components/admin/seo-card"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Checkbox } from "@/components/ui/checkbox"
 import { FormField } from "@/components/ui/form-field"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -147,21 +148,12 @@ export function CategoryForm({
             )}
           </FormField>
 
-          <label className="flex items-center gap-2 text-sm">
-            <Controller
-              control={control}
-              name="is_active"
-              render={({ field }) => (
-                <Checkbox
-                  checked={field.value}
-                  onCheckedChange={(checked) => field.onChange(checked === true)}
-                />
-              )}
-            />
-            Activa en la tienda
-          </label>
+          <CheckboxField control={control} name="is_active" label="Activa en la tienda" />
 
-          <CategorySeoCard register={register} />
+          <SeoCard
+            register={register}
+            description="Si lo dejas vacío se usa el nombre y la descripción de la categoría."
+          />
 
           <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-end">
             <Button type="button" variant="outline" asChild>
@@ -182,41 +174,6 @@ export function CategoryForm({
             </Button>
           </div>
         </form>
-      </CardContent>
-    </Card>
-  )
-}
-
-function CategorySeoCard({ register }: { register: UseFormRegister<CategoryFormValues> }) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>SEO</CardTitle>
-        <CardDescription>
-          Si lo dejas vacío se usa el nombre y la descripción de la categoría.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <FormField id="seo_title" label="Título SEO">
-          {(fieldProps) => (
-            <Input
-              {...fieldProps}
-              placeholder="Título para motores de búsqueda"
-              {...register("seo_title")}
-            />
-          )}
-        </FormField>
-
-        <FormField id="seo_description" label="Descripción SEO">
-          {(fieldProps) => (
-            <Textarea
-              {...fieldProps}
-              placeholder="Descripción para motores de búsqueda"
-              rows={3}
-              {...register("seo_description")}
-            />
-          )}
-        </FormField>
       </CardContent>
     </Card>
   )
