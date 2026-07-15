@@ -1,3 +1,4 @@
+import { PRODUCT_IMAGES_UPLOAD_CONTEXT } from '@/lib/products/images'
 import type { UploadImageResult } from '@/lib/supabase/storage-api'
 
 export type DeferredImageUploadFn = (file: File, context: string) => Promise<UploadImageResult>
@@ -18,7 +19,7 @@ export interface ResolveDeferredImageResult {
 export async function resolveDeferredImageUpload({
   file,
   imageUrl,
-  context = 'product-images',
+  context = PRODUCT_IMAGES_UPLOAD_CONTEXT,
   uploadImage,
 }: ResolveDeferredImageInput): Promise<ResolveDeferredImageResult> {
   if (!file) {

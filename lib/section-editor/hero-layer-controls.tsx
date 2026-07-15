@@ -129,8 +129,7 @@ function HeroBackgroundLayerControls({
         }
         label="Imagen de fondo"
         context="hero-background-image"
-        recommendedWidth={1920}
-        recommendedHeight={1080}
+        recommendedSize={{ width: 1920, height: 1080 }}
       />
       <div className="space-y-2">
         <Label htmlFor="hero-background-mode">Cobertura del fondo</Label>

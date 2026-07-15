@@ -28,12 +28,12 @@ vi.mock("@/lib/supabase/client", () => ({
 
 const STORE_ID = "9b1b807c-de03-438f-a92a-349b9aa64c11";
 
-function imageFile(name = "photo.webp"): File {
-  const bytes = new Uint8Array(16);
+function imageFile(name = "photo.webp", sizeInBytes = 16): File {
+  const bytes = new Uint8Array(sizeInBytes);
   return {
     name,
     type: "image/webp",
-    size: bytes.byteLength,
+    size: sizeInBytes,
     arrayBuffer: async () => bytes.buffer,
   } as unknown as File;
 }
@@ -66,5 +66,66 @@ describe("uploadImage store namespacing", () => {
 
     const [objectPath] = uploadMock.mock.calls[0];
     expect(objectPath).not.toContain("/");
+  });
+});
+
+describe("uploadImage size limit", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getStoreIdMock.mockReturnValue(STORE_ID);
+    uploadMock.mockImplementation(async (objectPath: string) => ({
+      data: { path: objectPath },
+      error: null,
+    }));
+  });
+
+  // El límite lo declara quien llama: nombrar el contexto "product-images" ya no
+  // baja el máximo a 1MB por sí solo.
+  it("enforces the limit the caller passes, not the name of the context", async () => {
+    const { uploadImage } = await import("@/lib/supabase/storage-api");
+    const twoMegabyteImage = imageFile("grande.webp", 2 * 1024 * 1024);
+
+    const rejected = await uploadImage(twoMegabyteImage, "product-images", 1);
+    expect(rejected.success).toBe(false);
+    expect(rejected.error).toContain("máximo de 1MB");
+    expect(uploadMock).not.toHaveBeenCalled();
+
+    const accepted = await uploadImage(twoMegabyteImage, "product-images", 5);
+    expect(accepted.success).toBe(true);
+  });
+
+  it("defaults to 5MB when the caller states no limit", async () => {
+    const { uploadImage } = await import("@/lib/supabase/storage-api");
+
+    const accepted = await uploadImage(imageFile("mediana.webp", 4 * 1024 * 1024), "hero-banner");
+    expect(accepted.success).toBe(true);
+
+    const rejected = await uploadImage(imageFile("enorme.webp", 6 * 1024 * 1024), "hero-banner");
+    expect(rejected.success).toBe(false);
+    expect(rejected.error).toContain("máximo de 5MB");
+  });
+});
+
+describe("isStoredImageUrl", () => {
+  // La heurística anterior buscaba "supabase.co/storage" y fallaba con dominios
+  // propios; el marcador de objeto público no depende del host.
+  it("recognises a stored object behind a custom domain", async () => {
+    const { isStoredImageUrl } = await import("@/lib/supabase/storage-api");
+
+    expect(
+      isStoredImageUrl("https://cdn.osoria.tech/storage/v1/object/public/products/foto.webp"),
+    ).toBe(true);
+    expect(
+      isStoredImageUrl("https://project.supabase.co/storage/v1/object/public/products/foto.webp"),
+    ).toBe(true);
+  });
+
+  it("ignores URLs outside the products bucket", async () => {
+    const { isStoredImageUrl } = await import("@/lib/supabase/storage-api");
+
+    expect(isStoredImageUrl("https://cdn.example.com/foto.webp")).toBe(false);
+    expect(
+      isStoredImageUrl("https://project.supabase.co/storage/v1/object/public/avatars/foto.webp"),
+    ).toBe(false);
   });
 });

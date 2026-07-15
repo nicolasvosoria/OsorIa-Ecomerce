@@ -82,18 +82,18 @@ vi.mock("@/components/ui/checkbox", () => ({
     }),
 }));
 
-vi.mock("@/components/admin/multi-image-upload", () => ({
-  MultiImageUpload: ({
-    images,
+vi.mock("@/components/admin/image-upload", () => ({
+  ImageUpload: ({
+    values,
     onChange,
   }: {
-    images: string[];
+    values: string[];
     onChange: (images: string[]) => void;
   }) =>
     createElement(
       "section",
       { "aria-label": "mock-image-upload" },
-      createElement("output", { "data-testid": "selected-images" }, images.join("|")),
+      createElement("output", { "data-testid": "selected-images" }, values.join("|")),
       createElement(
         "button",
         {
@@ -176,17 +176,14 @@ describe("admin product create form reset", () => {
     );
   });
 
-  it("requires valid native form fields before Guardar y crear otro creates a product", async () => {
+  it("requires valid form fields before Guardar y crear otro creates a product", async () => {
     renderCreateForm();
 
     fireEvent.change(screen.getByLabelText(/nombre del producto/i), {
-      target: { value: "Café Especial" },
+      target: { value: "  " },
     });
     fireEvent.change(screen.getByLabelText(/precio base/i), {
       target: { value: "12000" },
-    });
-    fireEvent.change(screen.getByLabelText(/cantidad en stock/i), {
-      target: { value: "" },
     });
 
     await act(async () => {

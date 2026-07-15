@@ -144,7 +144,7 @@ export default async function RootLayout({
         ))}
       </head>
       <body
-        className={cn("antialiased min-h-screen")}
+        className={cn("antialiased min-h-dvh")}
         suppressHydrationWarning
       >
         <ApplyStylesScript />

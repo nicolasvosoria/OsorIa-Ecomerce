@@ -8,29 +8,23 @@ import {
 import { createElement, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import HomeDiscountPopupConfigPage from "@/app/admin/home-discount-popup/page";
+import { normalizeHomeDiscountPopupConfig } from "@/lib/home-discount-popup";
 
-const mockUseAdminPermissions = vi.fn();
-const mockPush = vi.fn();
 const mockGetAdminRequestHeaders = vi.fn();
+const mockSaveAction = vi.fn();
 const mockToastSuccess = vi.fn();
 const mockToastError = vi.fn();
 const mockCreateObjectURL = vi.fn();
 const mockRevokeObjectURL = vi.fn();
-
-vi.mock("@/contexts/admin-permissions-context", () => ({
-  useAdminPermissions: () => mockUseAdminPermissions(),
-}));
 
 vi.mock("@/lib/supabase/admin-request-headers", () => ({
   getAdminRequestHeaders: (...args: unknown[]) =>
     mockGetAdminRequestHeaders(...args),
 }));
 
-vi.mock("next/navigation", () => ({
-  useRouter: () => ({
-    push: mockPush,
-  }),
+vi.mock("@/app/admin/home-discount-popup/actions", () => ({
+  saveHomeDiscountPopupConfigAction: (...args: unknown[]) =>
+    mockSaveAction(...args),
 }));
 
 vi.mock("next/link", () => ({
@@ -42,7 +36,6 @@ vi.mock("lucide-react", () => {
   const Icon = () => createElement("span");
 
   return {
-    ArrowLeft: Icon,
     ChevronDownIcon: Icon,
     Loader2: Icon,
     Percent: Icon,
@@ -64,6 +57,13 @@ vi.mock("@/components/ui/select", () => ({
   SelectValue: () => createElement("span"),
 }));
 
+vi.mock("sonner", () => ({
+  toast: {
+    success: (...args: unknown[]) => mockToastSuccess(...args),
+    error: (...args: unknown[]) => mockToastError(...args),
+  },
+}));
+
 vi.mock("@/components/ui/switch", () => ({
   Switch: ({
     checked,
@@ -78,13 +78,6 @@ vi.mock("@/components/ui/switch", () => ({
       onChange: (event: Event) =>
         onCheckedChange((event.target as HTMLInputElement).checked),
     }),
-}));
-
-vi.mock("sonner", () => ({
-  toast: {
-    success: (...args: unknown[]) => mockToastSuccess(...args),
-    error: (...args: unknown[]) => mockToastError(...args),
-  },
 }));
 
 vi.mock("@/components/admin/image-upload", () => ({
@@ -126,14 +119,27 @@ vi.mock("@/components/admin/image-upload", () => ({
     ),
 }));
 
-describe("home discount popup admin page", () => {
+import { HomeDiscountPopupForm } from "@/app/admin/home-discount-popup/components/home-discount-popup-form";
+
+const COUPON_CAMPAIGN = normalizeHomeDiscountPopupConfig({
+  active: true,
+  title: "Promo home",
+  text: "Texto",
+  imageUrl: "https://cdn.example.com/original.png",
+  ctaText: "Copiar cupon",
+  coupon: "HOME10",
+  ctaMode: "copy_coupon",
+});
+
+function renderForm(defaultValues = COUPON_CAMPAIGN) {
+  return render(createElement(HomeDiscountPopupForm, { defaultValues }));
+}
+
+describe("home discount popup admin form", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockCreateObjectURL.mockReturnValue("blob:preview-image");
-    mockUseAdminPermissions.mockReturnValue({
-      isAdmin: true,
-      loading: false,
-    });
+    mockSaveAction.mockResolvedValue({ success: true });
     mockGetAdminRequestHeaders.mockResolvedValue({
       "Content-Type": "application/json",
       Authorization: "Bearer preview-token",
@@ -149,32 +155,10 @@ describe("home discount popup admin page", () => {
   });
 
   it("stages the selected image locally without uploading immediately", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: vi.fn().mockResolvedValue({
-        config: {
-          active: true,
-          title: "Promo home",
-          text: "Texto",
-          imageUrl: "https://cdn.example.com/original.png",
-          ctaText: "Copiar cupon",
-          coupon: "HOME10",
-          ctaMode: "copy_coupon",
-        },
-      }),
-    });
-
+    const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
 
-    render(createElement(HomeDiscountPopupConfigPage));
-
-    await screen.findByRole("button", { name: /guardar popup/i });
-    expect(fetchMock).toHaveBeenCalledWith("/api/home-discount-popup-config", {
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: "Bearer preview-token",
-      },
-    });
+    renderForm();
 
     await act(async () => {
       fireEvent.click(
@@ -182,47 +166,22 @@ describe("home discount popup admin page", () => {
       );
     });
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock).not.toHaveBeenCalledWith(
-      "/api/admin/home-discount-popup/upload",
-      expect.anything(),
-    );
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(mockSaveAction).not.toHaveBeenCalled();
     expect(screen.getByText(/hay una nueva imagen pendiente/i)).not.toBeNull();
   });
 
   it("uploads the pending image on save and then persists the popup config", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        json: vi.fn().mockResolvedValue({
-          config: {
-            active: true,
-            title: "Promo home",
-            text: "Texto",
-            imageUrl: "https://cdn.example.com/original.png",
-            ctaText: "Copiar cupon",
-            coupon: "HOME10",
-            ctaMode: "copy_coupon",
-          },
-        }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: vi.fn().mockResolvedValue({
-          url: "https://cdn.example.com/uploaded.png",
-        }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: vi.fn().mockResolvedValue({ success: true }),
-      });
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({
+        url: "https://cdn.example.com/uploaded.png",
+      }),
+    });
 
     vi.stubGlobal("fetch", fetchMock);
 
-    render(createElement(HomeDiscountPopupConfigPage));
-
-    await screen.findByRole("button", { name: /guardar popup/i });
+    renderForm();
 
     await act(async () => {
       fireEvent.click(
@@ -234,10 +193,10 @@ describe("home discount popup admin page", () => {
       fireEvent.click(screen.getByRole("button", { name: /guardar popup/i }));
     });
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+    await waitFor(() => expect(mockSaveAction).toHaveBeenCalledTimes(1));
 
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      2,
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith(
       "/api/admin/home-discount-popup/upload",
       expect.objectContaining({
         method: "POST",
@@ -247,42 +206,65 @@ describe("home discount popup admin page", () => {
         body: expect.any(FormData),
       }),
     );
-
-    const saveCall = fetchMock.mock.calls[2];
-    expect(saveCall?.[0]).toBe("/api/home-discount-popup-config");
-    expect(saveCall?.[1]).toMatchObject({
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: "Bearer preview-token",
-      },
-    });
-    expect(JSON.parse(String(saveCall?.[1]?.body))).toMatchObject({
-      config: {
-        imageUrl: "https://cdn.example.com/uploaded.png",
-      },
-    });
+    expect(mockSaveAction).toHaveBeenCalledWith(
+      expect.objectContaining({ imageUrl: "https://cdn.example.com/uploaded.png" }),
+    );
     expect(mockToastSuccess).toHaveBeenCalledWith("Popup promocional guardado");
   });
 
-  it("shows an actionable admin alert when the active popup config cannot publish", async () => {
+  it("keeps the config unsaved and reports the error when the image upload fails", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: vi.fn().mockResolvedValue({
-        config: {
-          active: true,
-          title: "Promo home",
-          text: "Texto",
-          ctaText: "Ir ahora",
-          ctaMode: "redirect",
-          ctaUrl: "",
-        },
-      }),
+      ok: false,
+      json: vi.fn().mockResolvedValue({ error: "Tipo de archivo no permitido." }),
     });
 
     vi.stubGlobal("fetch", fetchMock);
 
-    render(createElement(HomeDiscountPopupConfigPage));
+    renderForm();
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: "Seleccionar imagen pendiente" }),
+      );
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /guardar popup/i }));
+    });
+
+    await waitFor(() =>
+      expect(mockToastError).toHaveBeenCalledWith("Tipo de archivo no permitido."),
+    );
+    expect(mockSaveAction).not.toHaveBeenCalled();
+  });
+
+  it("surfaces the server action error instead of reporting a false success", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    mockSaveAction.mockResolvedValue({ success: false, error: "Acceso denegado" });
+
+    renderForm();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /guardar popup/i }));
+    });
+
+    await waitFor(() =>
+      expect(mockToastError).toHaveBeenCalledWith("Acceso denegado"),
+    );
+    expect(mockToastSuccess).not.toHaveBeenCalled();
+  });
+
+  it("shows an actionable admin alert when the active popup config cannot publish", async () => {
+    renderForm(
+      normalizeHomeDiscountPopupConfig({
+        active: true,
+        title: "Promo home",
+        text: "Texto",
+        ctaText: "Ir ahora",
+        ctaMode: "redirect",
+        ctaUrl: "",
+      }),
+    );
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "La promo activa no se publicará",
@@ -291,26 +273,10 @@ describe("home discount popup admin page", () => {
   });
 
   it("opens a local preview with unsaved content and the staged image without uploading", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: vi.fn().mockResolvedValue({
-        config: {
-          active: true,
-          title: "Promo home",
-          text: "Texto original",
-          imageUrl: "https://cdn.example.com/original.png",
-          ctaText: "Copiar cupon",
-          coupon: "HOME10",
-          ctaMode: "copy_coupon",
-        },
-      }),
-    });
-
+    const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
 
-    render(createElement(HomeDiscountPopupConfigPage));
-
-    await screen.findByRole("button", { name: /vista previa/i });
+    renderForm();
 
     fireEvent.change(screen.getByLabelText(/titulo/i), {
       target: { value: "Promo preview" },
@@ -327,7 +293,7 @@ describe("home discount popup admin page", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /vista previa/i }));
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).not.toHaveBeenCalled();
     expect(
       screen.getByText("Texto sin guardar para preview", { selector: "p" }),
     ).not.toBeNull();

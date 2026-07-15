@@ -1,18 +1,11 @@
+import { DEFAULT_MAX_IMAGE_SIZE_MB, validateImageFile } from "@/lib/images/image-file";
 import { getRuntimeStoreIdSync } from "@/lib/utils/store";
 import { getSupabaseBrowserClient } from "./client";
 import { ECOMMERCE_STORAGE_BUCKETS } from "./contract";
 import { isCurrentUserAdmin } from "./permissions-api";
 
 const BUCKET_NAME = ECOMMERCE_STORAGE_BUCKETS.products;
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB por defecto
-const MAX_PRODUCT_IMAGE_SIZE = 1 * 1024 * 1024; // 1MB para imágenes de productos
-const ALLOWED_TYPES = [
-  "image/jpeg",
-  "image/jpg",
-  "image/png",
-  "image/webp",
-  "image/gif",
-];
+const PUBLIC_OBJECT_URL_MARKER = `/storage/v1/object/public/${BUCKET_NAME}/`;
 
 export interface UploadImageResult {
   success: boolean;
@@ -20,26 +13,22 @@ export interface UploadImageResult {
   error?: string;
 }
 
+export function isStoredImageUrl(url: string): boolean {
+  return url.includes(PUBLIC_OBJECT_URL_MARKER);
+}
+
 function getStoragePath(path: string): string {
-  const marker = `/storage/v1/object/public/${BUCKET_NAME}/`;
-  if (!path.includes(marker)) {
+  if (!isStoredImageUrl(path)) {
     return path;
   }
 
-  return path.split(marker)[1] || path;
+  return path.split(PUBLIC_OBJECT_URL_MARKER)[1] || path;
 }
 
-/**
- * Sube una imagen a Supabase Storage
- * @param file - Archivo de imagen a subir
- * @param context - Contexto nemotécnico (ej: "hero-banner", "featured-product", "popular-item")
- * @param path - Ruta donde guardar la imagen (opcional, se genera automáticamente con contexto si no se proporciona)
- * @returns URL pública de la imagen o error
- */
 export async function uploadImage(
   file: File,
   context?: string,
-  path?: string,
+  maxSizeMB: number = DEFAULT_MAX_IMAGE_SIZE_MB,
 ): Promise<UploadImageResult> {
   try {
     // Verificar permisos de administrador
@@ -51,27 +40,11 @@ export async function uploadImage(
       };
     }
 
-    // Validar tipo de archivo
-    if (!ALLOWED_TYPES.includes(file.type)) {
+    const validationError = validateImageFile(file, maxSizeMB);
+    if (validationError) {
       return {
         success: false,
-        error: `Tipo de archivo no permitido. Solo se permiten: ${ALLOWED_TYPES.join(", ")}`,
-      };
-    }
-
-    // Validar tamaño - Si es contexto de productos, usar límite de 1MB
-    const isProductContext =
-      context &&
-      (context.includes("product") ||
-        context.includes("item") ||
-        context === "product-images");
-    const maxSize = isProductContext ? MAX_PRODUCT_IMAGE_SIZE : MAX_FILE_SIZE;
-    const maxSizeMB = isProductContext ? 1 : 5;
-
-    if (file.size > maxSize) {
-      return {
-        success: false,
-        error: `El archivo es demasiado grande. Tamaño máximo permitido: ${maxSizeMB}MB (${(file.size / 1024 / 1024).toFixed(2)}MB seleccionado)`,
+        error: validationError,
       };
     }
 
@@ -98,8 +71,7 @@ export async function uploadImage(
       : "image";
 
     // Generar nombre: {contexto}-{timestamp}-{random}.{ext}
-    const objectName =
-      path || `${cleanContext}-${timestamp}-${randomString}.${fileExtension}`;
+    const objectName = `${cleanContext}-${timestamp}-${randomString}.${fileExtension}`;
 
     // Namespacing por tienda: las subidas nuevas viven bajo {store_id}/ para que
     // la RLS per-tienda (can_manage_store) aísle el storage entre tiendas. Sin
@@ -151,11 +123,6 @@ export async function uploadImage(
   }
 }
 
-/**
- * Elimina una imagen de Supabase Storage
- * @param path - Ruta del archivo a eliminar
- * @returns true si se eliminó correctamente, false en caso contrario
- */
 export async function deleteImage(
   path: string,
 ): Promise<{ success: boolean; error?: string }> {

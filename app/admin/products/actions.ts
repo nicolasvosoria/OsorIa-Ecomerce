@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 
+import type { AdminActionResult } from "@/lib/admin/action-result"
 import { authorizeActiveStoreAdmin } from "@/lib/supabase/active-store"
 import {
   createItem,
@@ -15,11 +16,9 @@ import type { ProductFormValues } from "@/lib/products/schemas"
 
 const PRODUCTS_PATH = "/admin/products"
 
-export type ProductActionResult = { success: boolean; error?: string }
-
 export async function createProductAction(
   input: ProductFormValues,
-): Promise<ProductActionResult> {
+): Promise<AdminActionResult> {
   const authorization = await authorizeActiveStoreAdmin()
   if ("error" in authorization) {
     return { success: false, error: authorization.error }
@@ -44,7 +43,7 @@ export async function createProductAction(
 export async function updateProductAction(
   id: string,
   input: ProductFormValues,
-): Promise<ProductActionResult> {
+): Promise<AdminActionResult> {
   const authorization = await authorizeActiveStoreAdmin()
   if ("error" in authorization) {
     return { success: false, error: authorization.error }
@@ -72,19 +71,19 @@ export async function updateProductAction(
   return { success: result.success, error: result.error }
 }
 
-export async function softDeleteProductAction(id: string): Promise<void> {
+export async function softDeleteProductAction(id: string): Promise<AdminActionResult> {
   const authorization = await authorizeActiveStoreAdmin()
   if ("error" in authorization) {
-    throw new Error(authorization.error)
+    return { success: false, error: authorization.error }
   }
 
   const { supabase, storeId } = authorization
   const result = await updateItem(id, { is_active: false }, [], storeId, supabase)
-  if (!result.success) {
-    throw new Error(result.error || "No se pudo eliminar el producto")
+  if (result.success) {
+    revalidatePath(PRODUCTS_PATH)
   }
 
-  revalidatePath(PRODUCTS_PATH)
+  return { success: result.success, error: result.error }
 }
 
 function splitProductImages(images: string[]): {

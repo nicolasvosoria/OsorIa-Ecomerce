@@ -1,8 +1,7 @@
-import Link from "next/link"
 import { redirect } from "next/navigation"
-import { ArrowLeft } from "lucide-react"
 
-import { Button } from "@/components/ui/button"
+import { AdminPageContainer } from "@/components/admin/page-container"
+import { AdminPageHeader } from "@/components/admin/page-header"
 import { authorizeActiveStoreAdmin } from "@/lib/supabase/active-store"
 import { listCombos } from "@/lib/supabase/combos-api"
 import { getCategories, getItemById, getItems } from "@/lib/supabase/products-api"
@@ -22,22 +21,11 @@ export default async function AdminCombosPage() {
   ])
 
   return (
-    <div className="space-y-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <Button variant="ghost" size="icon" className="shrink-0" asChild>
-            <Link href="/admin/products">
-              <ArrowLeft className="h-5 w-5" />
-            </Link>
-          </Button>
-          <div className="min-w-0">
-            <h1 className="text-2xl font-bold text-foreground">Combos de productos</h1>
-            <p className="text-sm text-muted-foreground">
-              Crea combos vendibles con descuento y stock derivado.
-            </p>
-          </div>
-        </div>
-      </header>
+    <AdminPageContainer>
+      <AdminPageHeader
+        title="Combos de productos"
+        subtitle="Crea combos vendibles con descuento y stock derivado."
+      />
 
       <CombosManager
         combos={list.state === "ready" ? list.combos : []}
@@ -45,7 +33,7 @@ export default async function AdminCombosPage() {
         products={picker.products}
         categories={picker.categories}
       />
-    </div>
+    </AdminPageContainer>
   )
 }
 

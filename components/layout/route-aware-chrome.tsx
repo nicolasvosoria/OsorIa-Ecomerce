@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation"
 
 import { EditableWrapper } from "@/components/admin/editable-wrapper"
 import { MainContentWrapper } from "@/components/admin/main-content-wrapper"
+import { isRouteOrDescendant } from "@/lib/admin/routes"
 import { FloatingContactButton } from "@/components/ui/floating-contact-button"
 import { Header } from "@/components/layout/header"
 import { FooterNew } from "@/components/sections/footer-new"
@@ -16,11 +17,11 @@ interface RouteAwareChromeProps {
   children: ReactNode
 }
 
+const ADMIN_CHROME_BASES = ["/admin", "/dashboard"]
+
 export function isAdminChromeRoute(pathname: string | null): boolean {
-  return pathname === "/admin"
-    || pathname?.startsWith("/admin/") === true
-    || pathname === "/dashboard"
-    || pathname?.startsWith("/dashboard/") === true
+  if (!pathname) return false
+  return ADMIN_CHROME_BASES.some((base) => isRouteOrDescendant(pathname, base))
 }
 
 export function RouteAwareChrome({ children }: RouteAwareChromeProps) {
@@ -33,23 +34,29 @@ export function RouteAwareChrome({ children }: RouteAwareChromeProps) {
   const showEditableChrome = isStorefrontRoute
   const showStorefrontChrome = isStorefrontRoute && !isThemePreviewMode()
 
+  const pageMain = (
+    <main data-vaul-drawer-wrapper="true">
+      {showEditableChrome && (
+        <EditableWrapper componentName="header" label="Header">
+          <Header />
+        </EditableWrapper>
+      )}
+      {children}
+      {showEditableChrome && (
+        <EditableWrapper componentName="footer" label={sectionLabel("footer")}>
+          <FooterNew />
+        </EditableWrapper>
+      )}
+    </main>
+  )
+
+  // El admin queda fuera del wrapper: su `min-height: 100vh` se suma al alto del
+  // shell y hace scrollear el documento a la vez que el panel. La condición sale
+  // del pathname (no de la hidratación) para que el árbol del storefront no
+  // cambie entre servidor y cliente.
   return (
     <>
-      <MainContentWrapper>
-        <main data-vaul-drawer-wrapper="true">
-          {showEditableChrome && (
-            <EditableWrapper componentName="header" label="Header">
-              <Header />
-            </EditableWrapper>
-          )}
-          {children}
-          {showEditableChrome && (
-            <EditableWrapper componentName="footer" label={sectionLabel("footer")}>
-              <FooterNew />
-            </EditableWrapper>
-          )}
-        </main>
-      </MainContentWrapper>
+      {isAdminChromeRoute(pathname) ? pageMain : <MainContentWrapper>{pageMain}</MainContentWrapper>}
       {showStorefrontChrome && <FloatingContactButton />}
     </>
   )

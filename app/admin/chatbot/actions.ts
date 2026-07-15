@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 
+import type { AdminActionResult } from "@/lib/admin/action-result"
 import { authorizeActiveStoreAdmin } from "@/lib/supabase/active-store"
 import { saveChatbotConfigForStore } from "@/lib/supabase/chatbot-api"
 import type { ChatbotConfigFormValues } from "@/lib/chatbot/schemas"
@@ -9,11 +10,9 @@ import type { ChatbotConfigFormValues } from "@/lib/chatbot/schemas"
 const CHATBOT_CONFIG_PATH = "/admin/chatbot"
 const SAVE_ERROR_MESSAGE = "Error al guardar la configuración"
 
-export type ChatbotConfigActionResult = { success: boolean; error?: string }
-
 export async function saveChatbotConfigAction(
   input: ChatbotConfigFormValues,
-): Promise<ChatbotConfigActionResult> {
+): Promise<AdminActionResult> {
   const authorization = await authorizeActiveStoreAdmin()
   if ("error" in authorization) {
     return { success: false, error: authorization.error }

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 
+import type { AdminActionResult } from "@/lib/admin/action-result"
 import { authorizeActiveStoreAdmin } from "@/lib/supabase/active-store"
 import {
   createCombo,
@@ -15,9 +16,7 @@ import type { ComboComponentFormValues, ComboFormValues } from "@/lib/combos/sch
 
 const COMBOS_PATH = "/admin/products/combos"
 
-export type ComboActionResult = { success: boolean; error?: string }
-
-export async function createComboAction(input: ComboFormValues): Promise<ComboActionResult> {
+export async function createComboAction(input: ComboFormValues): Promise<AdminActionResult> {
   const authorization = await authorizeActiveStoreAdmin()
   if ("error" in authorization) {
     return { success: false, error: authorization.error }
@@ -37,7 +36,7 @@ export async function createComboAction(input: ComboFormValues): Promise<ComboAc
 export async function updateComboAction(
   id: string,
   input: ComboFormValues,
-): Promise<ComboActionResult> {
+): Promise<AdminActionResult> {
   const authorization = await authorizeActiveStoreAdmin()
   if ("error" in authorization) {
     return { success: false, error: authorization.error }
@@ -54,19 +53,19 @@ export async function updateComboAction(
   return { success: result.success, error: result.error }
 }
 
-export async function deleteComboAction(id: string): Promise<void> {
+export async function deleteComboAction(id: string): Promise<AdminActionResult> {
   const authorization = await authorizeActiveStoreAdmin()
   if ("error" in authorization) {
-    throw new Error(authorization.error)
+    return { success: false, error: authorization.error }
   }
 
   const { supabase, storeId } = authorization
   const result = await deleteCombo(id, storeId, supabase)
-  if (!result.success) {
-    throw new Error(result.error || "No se pudo eliminar el combo")
+  if (result.success) {
+    revalidatePath(COMBOS_PATH)
   }
 
-  revalidatePath(COMBOS_PATH)
+  return { success: result.success, error: result.error }
 }
 
 function buildComboFields(input: ComboFormValues): Omit<CreateComboData, "store_id"> {

@@ -1,8 +1,7 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { AdminPageContainer } from "@/components/admin/page-container";
+import { AdminPageHeader } from "@/components/admin/page-header";
 import {
   Card,
   CardContent,
@@ -42,26 +41,16 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailPagePr
     notFound();
   }
 
+  const orderLabel = `Pedido ${order.order_number}`;
+
   return (
-    <div className="space-y-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <Button variant="ghost" size="icon" className="shrink-0" asChild>
-            <Link href="/admin/orders">
-              <ArrowLeft className="h-5 w-5" />
-            </Link>
-          </Button>
-          <div className="min-w-0">
-            <h1 className="text-2xl font-bold text-foreground">
-              Pedido {order.order_number}
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              {formatOrderDateTime(order.order_date || order.created_at)}
-            </p>
-          </div>
-        </div>
-        <OrderStatusSelect orderId={order.id} status={order.status} />
-      </header>
+    <AdminPageContainer>
+      <AdminPageHeader
+        title={orderLabel}
+        subtitle={formatOrderDateTime(order.order_date || order.created_at)}
+        entityLabel={orderLabel}
+        actions={<OrderStatusSelect orderId={order.id} status={order.status} />}
+      />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
@@ -150,7 +139,7 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailPagePr
           </Card>
         </div>
       </div>
-    </div>
+    </AdminPageContainer>
   );
 }
 

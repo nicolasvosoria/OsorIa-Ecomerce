@@ -121,8 +121,9 @@ describe("product server actions", () => {
   })
 
   it("soft-deletes by archiving within the active store", async () => {
-    await softDeleteProductAction("item-1")
+    const result = await softDeleteProductAction("item-1")
 
+    expect(result).toEqual({ success: true, error: undefined })
     expect(updateItem).toHaveBeenCalledWith(
       "item-1",
       { is_active: false },
@@ -133,10 +134,22 @@ describe("product server actions", () => {
     expect(revalidatePath).toHaveBeenCalledWith("/admin/products")
   })
 
-  it("throws when a soft-delete is denied", async () => {
+  it("refuses to soft-delete when authorization is denied", async () => {
     authorizeActiveStoreAdmin.mockResolvedValue({ error: "Acceso denegado", status: 403 })
 
-    await expect(softDeleteProductAction("item-1")).rejects.toThrow("Acceso denegado")
+    const result = await softDeleteProductAction("item-1")
+
+    expect(result).toEqual({ success: false, error: "Acceso denegado" })
     expect(updateItem).not.toHaveBeenCalled()
+    expect(revalidatePath).not.toHaveBeenCalled()
+  })
+
+  it("surfaces the products-api's own message when the soft-delete fails", async () => {
+    updateItem.mockResolvedValue({ success: false, error: "Producto no encontrado" })
+
+    const result = await softDeleteProductAction("item-1")
+
+    expect(result).toEqual({ success: false, error: "Producto no encontrado" })
+    expect(revalidatePath).not.toHaveBeenCalled()
   })
 })

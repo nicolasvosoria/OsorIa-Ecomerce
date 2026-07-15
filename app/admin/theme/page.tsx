@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { AdminPermissionsProvider, useAdminPermissions } from "@/contexts/admin-permissions-context"
+import { useAdminPermissions } from "@/contexts/admin-permissions-context"
 import { ThemeCustomEditor } from "@/components/theme/theme-custom-editor"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -60,14 +60,12 @@ function AdminThemePageContent() {
 
 export default function AdminThemePage() {
   return (
-    <AdminPermissionsProvider>
-      <Suspense fallback={
-        <div className="editor-chrome flex items-center justify-center h-screen bg-background">
-          <Loader2 className="h-8 w-8 animate-spin text-foreground" />
-        </div>
-      }>
-        <AdminThemePageContent />
-      </Suspense>
-    </AdminPermissionsProvider>
+    <Suspense fallback={
+      <div className="editor-chrome flex items-center justify-center h-screen bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-foreground" />
+      </div>
+    }>
+      <AdminThemePageContent />
+    </Suspense>
   )
 }

@@ -1,9 +1,11 @@
 import type React from "react";
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 
 import { AdminAuthGuard } from "@/components/admin/admin-auth-guard";
 import { AdminShell } from "@/components/admin/shell/admin-shell";
 import { authorizeActiveStoreAdmin } from "@/lib/supabase/active-store";
+import { SIDEBAR_PIN_COOKIE, isSidebarPinned } from "@/lib/admin/sidebar-pin-cookie";
 import { listStoresForUser, type StoreSummary } from "@/lib/supabase/memberships-api";
 
 export const metadata: Metadata = {
@@ -17,10 +19,12 @@ export default async function AdminLayout({
   children: React.ReactNode;
 }) {
   const { stores, activeStoreId } = await resolveAdminStoreContext();
+  const cookieStore = await cookies();
+  const sidebarPinned = isSidebarPinned(cookieStore.get(SIDEBAR_PIN_COOKIE)?.value);
 
   return (
     <AdminAuthGuard>
-      <AdminShell stores={stores} activeStoreId={activeStoreId}>
+      <AdminShell stores={stores} activeStoreId={activeStoreId} defaultPinned={sidebarPinned}>
         {children}
       </AdminShell>
     </AdminAuthGuard>

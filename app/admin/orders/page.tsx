@@ -1,23 +1,16 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { AdminPageContainer } from "@/components/admin/page-container";
+import { AdminPageHeader } from "@/components/admin/page-header";
+import { DEFAULT_PAGE_SIZE, parsePositiveInt } from "@/lib/admin/pagination";
 import { authorizeActiveStoreAdmin } from "@/lib/supabase/active-store";
 import { getOrders, type OrderWithItems } from "@/lib/supabase/orders-api";
 import { OrdersExportButton } from "./components/orders-export-button";
 import { OrdersTable } from "./components/orders-table";
 
-const DEFAULT_PAGE_SIZE = 20;
-
 type OrdersPageProps = {
   searchParams: Promise<{ page?: string; pageSize?: string }>;
 };
-
-function parsePositiveInt(value: string | undefined, fallback: number): number {
-  const parsed = Number(value);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
-}
 
 export default async function AdminOrdersPage({ searchParams }: OrdersPageProps) {
   const authorization = await authorizeActiveStoreAdmin();
@@ -32,30 +25,19 @@ export default async function AdminOrdersPage({ searchParams }: OrdersPageProps)
   const list = await loadOrders(authorization.storeId, page, pageSize);
 
   return (
-    <div className="space-y-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <Button variant="ghost" size="icon" className="shrink-0" asChild>
-            <Link href="/admin">
-              <ArrowLeft className="h-5 w-5" />
-            </Link>
-          </Button>
-          <div className="min-w-0">
-            <h1 className="text-2xl font-bold text-foreground">Gestión de Pedidos</h1>
-            <p className="text-sm text-muted-foreground">
-              Revisa y gestiona los pedidos de tu tienda
-            </p>
-          </div>
-        </div>
-        <OrdersExportButton />
-      </header>
+    <AdminPageContainer>
+      <AdminPageHeader
+        title="Gestión de Pedidos"
+        subtitle="Revisa y gestiona los pedidos de tu tienda"
+        actions={<OrdersExportButton />}
+      />
 
       <OrdersTable
         rows={list.state === "ready" ? list.orders : []}
         state={list.state}
         pagination={{ page, pageSize, total: list.total }}
       />
-    </div>
+    </AdminPageContainer>
   );
 }
 

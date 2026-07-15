@@ -116,7 +116,9 @@ describe("RouteAwareChrome", () => {
     (pathname) => {
       renderChrome(pathname)
 
-      expect(screen.getByTestId("main-content-wrapper")).toBeInTheDocument()
+      // El wrapper impone `min-height: 100vh`, que sumado al alto del shell del
+      // admin haría scrollear el documento además del panel.
+      expect(screen.queryByTestId("main-content-wrapper")).not.toBeInTheDocument()
       expect(screen.getByTestId("route-children")).toBeInTheDocument()
       expect(screen.queryByTestId("editable-wrapper-header")).not.toBeInTheDocument()
       expect(screen.queryByTestId("storefront-header")).not.toBeInTheDocument()

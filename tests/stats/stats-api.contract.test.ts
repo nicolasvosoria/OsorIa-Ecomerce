@@ -347,82 +347,148 @@ describe("stats-api contract", () => {
     });
   });
 
-  it("loads detailed stats from orders and order_items without legacy views", async () => {
-    const state = new MockSupabaseState({
-      orders: [
+  describe("getDetailedStats", () => {
+    function scriptDetailed() {
+      const state = new MockSupabaseState({
+        orders: [
+          {
+            data: [
+              {
+                id: "order-1",
+                created_at: "2026-04-25T10:00:00.000Z",
+                total_amount: "120.25",
+              },
+              {
+                id: "order-2",
+                created_at: "2026-04-26T11:00:00.000Z",
+                total_amount: 79.75,
+              },
+            ],
+            error: null,
+          },
+          {
+            data: [
+              { id: "order-1", status: "confirmed" },
+              { id: "order-2", status: "delivered" },
+              { id: "order-3", status: "cancelled" },
+            ],
+            error: null,
+          },
+        ],
+        order_items: [
+          {
+            data: [
+              {
+                id: "line-1",
+                product_id: "item-1",
+                product_name: "Café",
+                quantity: "2",
+                unit_price: "50",
+              },
+              {
+                id: "line-2",
+                product_id: "item-1",
+                product_name: "Café",
+                quantity: 1,
+                unit_price: 50,
+              },
+            ],
+            error: null,
+          },
+        ],
+      });
+      getSupabaseServiceClientMock.mockReturnValue({ from: state.from });
+      return state;
+    }
+
+    it("loads detailed stats from orders and order_items without legacy views", async () => {
+      const state = scriptDetailed();
+
+      const result = await getDetailedStats("store-b", 2);
+
+      expect(state.fromCalls).toEqual(["orders", "orders", "order_items"]);
+      expect(state.fromCalls).not.toContain("orders_legacy");
+      expect(result.salesByDay).toEqual([
+        { date: "2026-04-25", sales: 120.25, orders: 1 },
+        { date: "2026-04-26", sales: 79.75, orders: 1 },
+      ]);
+      expect(result.ordersByStatus).toEqual([
+        { status: "confirmed", count: 1 },
+        { status: "delivered", count: 1 },
+        { status: "cancelled", count: 1 },
+      ]);
+      expect(result.topProducts).toEqual([
         {
-          data: [
-            {
-              id: "order-1",
-              created_at: "2026-04-25T10:00:00.000Z",
-              total_amount: "120.25",
-            },
-            {
-              id: "order-2",
-              created_at: "2026-04-26T11:00:00.000Z",
-              total_amount: 79.75,
-            },
-          ],
-          error: null,
+          id: "item-1",
+          name: "Café",
+          sales: 3,
+          quantity: 3,
+          revenue: 150,
         },
-        {
-          data: [
-            { id: "order-1", status: "confirmed" },
-            { id: "order-2", status: "delivered" },
-            { id: "order-3", status: "cancelled" },
-          ],
-          error: null,
-        },
-      ],
-      order_items: [
-        {
-          data: [
-            {
-              id: "line-1",
-              product_id: "item-1",
-              product_name: "Café",
-              quantity: "2",
-              unit_price: "50",
-            },
-            {
-              id: "line-2",
-              product_id: "item-1",
-              product_name: "Café",
-              quantity: 1,
-              unit_price: 50,
-            },
-          ],
-          error: null,
-        },
-      ],
+      ]);
+      expect(result.totalOrders).toBe(3);
+      expect(result.averageOrderValue).toBe(100);
+      expect(result.conversionRate).toBeCloseTo(66.666, 2);
     });
-    getSupabaseEcommerceMock.mockReturnValue({ from: state.from });
 
-    const result = await getDetailedStats(2);
+    it("scopes every query to the given store", async () => {
+      const state = scriptDetailed();
 
-    expect(state.fromCalls).toEqual(["orders", "orders", "order_items"]);
-    expect(state.fromCalls).not.toContain("orders_legacy");
-    expect(result.salesByDay).toEqual([
-      { date: "2026-04-25", sales: 120.25, orders: 1 },
-      { date: "2026-04-26", sales: 79.75, orders: 1 },
-    ]);
-    expect(result.ordersByStatus).toEqual([
-      { status: "confirmed", count: 1 },
-      { status: "delivered", count: 1 },
-      { status: "cancelled", count: 1 },
-    ]);
-    expect(result.topProducts).toEqual([
-      {
-        id: "item-1",
-        name: "Café",
-        sales: 3,
-        quantity: 3,
-        revenue: 150,
-      },
-    ]);
-    expect(result.totalOrders).toBe(3);
-    expect(result.averageOrderValue).toBe(100);
-    expect(result.conversionRate).toBeCloseTo(66.666, 2);
+      await getDetailedStats("store-b", 2);
+
+      expect(
+        state.filters.orders.filter((filter) => filter.column === "store_id"),
+      ).toEqual([
+        { op: "eq", column: "store_id", value: "store-b" },
+        { op: "eq", column: "store_id", value: "store-b" },
+      ]);
+      expect(state.filters.order_items).toEqual(
+        expect.arrayContaining([
+          { op: "eq", column: "orders.store_id", value: "store-b" },
+        ]),
+      );
+    });
+
+    it("reads through the service client instead of the browser client", async () => {
+      scriptDetailed();
+
+      await getDetailedStats("store-b", 2);
+
+      expect(getSupabaseServiceClientMock).toHaveBeenCalled();
+      expect(getSupabaseEcommerceMock).not.toHaveBeenCalled();
+    });
+
+    it("counts only sold and paid orders as sales", async () => {
+      const state = scriptDetailed();
+
+      await getDetailedStats("store-b", 2);
+
+      expect(state.filters.orders).toEqual(
+        expect.arrayContaining([
+          {
+            op: "in",
+            column: "status",
+            value: ["confirmed", "processing", "shipped", "delivered"],
+          },
+          { op: "in", column: "payment_status", value: ["paid"] },
+        ]),
+      );
+    });
+
+    it("returns empty stats when Supabase is not configured", async () => {
+      getSupabaseServiceClientMock.mockReturnValue(null);
+
+      const result = await getDetailedStats("store-b", 2);
+
+      expect(result).toEqual({
+        salesByDay: [],
+        ordersByStatus: [],
+        topProducts: [],
+        totalOrders: 0,
+        averageOrderValue: 0,
+        conversionRate: 0,
+      });
+    });
   });
 
   it("ranks top-selling product ids by summed quantity, filtering by paid/confirmed orders and store", async () => {

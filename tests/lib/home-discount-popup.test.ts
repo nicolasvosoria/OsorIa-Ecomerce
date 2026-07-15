@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   loadHomeDiscountPopupConfig,
   saveHomeDiscountPopupConfig,
-} from "@/app/api/home-discount-popup-config/route";
+} from "@/lib/home-discount-popup-admin";
 
 import {
   getHomeDiscountPopupStorageKey,

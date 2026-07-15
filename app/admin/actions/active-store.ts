@@ -8,47 +8,61 @@ import {
   cookieOptions,
   signActiveStore,
 } from "@/lib/admin/active-store-cookie";
+import type { AdminActionResult } from "@/lib/admin/action-result";
 import { checkCanManageStore } from "@/lib/supabase/active-store";
 import { getSupabaseAuthClient } from "@/lib/supabase/admin-route-auth";
 import { getSupabaseServiceClient } from "@/lib/supabase/admin-store";
 
-export async function setActiveStore(storeId: string): Promise<void> {
-  const userId = await requireAuthenticatedUserId();
-  await requireStoreIsManageable(userId, storeId);
+export async function setActiveStore(storeId: string): Promise<AdminActionResult> {
+  const userId = await resolveAuthenticatedUserId();
+  if ("error" in userId) {
+    return { success: false, error: userId.error };
+  }
+
+  const authorization = await checkStoreIsManageable(userId.userId, storeId);
+  if (!authorization.success) {
+    return authorization;
+  }
 
   const cookieStore = await cookies();
   cookieStore.set(ACTIVE_STORE_COOKIE, signActiveStore(storeId), cookieOptions);
 
   revalidatePath("/admin", "layout");
+  return { success: true };
 }
 
-async function requireAuthenticatedUserId(): Promise<string> {
+async function resolveAuthenticatedUserId(): Promise<{ userId: string } | { error: string }> {
   const authClient = await getSupabaseAuthClient();
   if (!authClient) {
-    throw new Error("Supabase no configurado");
+    return { error: "Supabase no configurado" };
   }
 
   const { data } = await authClient.auth.getUser();
   const userId = data?.user?.id;
   if (!userId) {
-    throw new Error("Acceso denegado");
+    return { error: "Acceso denegado" };
   }
 
-  return userId;
+  return { userId };
 }
 
-async function requireStoreIsManageable(userId: string, storeId: string): Promise<void> {
+async function checkStoreIsManageable(
+  userId: string,
+  storeId: string,
+): Promise<AdminActionResult> {
   const service = getSupabaseServiceClient();
   if (!service) {
-    throw new Error("Supabase no configurado");
+    return { success: false, error: "Supabase no configurado" };
   }
 
   const authorization = await checkCanManageStore(service, userId, storeId);
   if ("error" in authorization) {
-    throw new Error(authorization.error.error, { cause: authorization.error });
+    return { success: false, error: authorization.error.error };
   }
 
   if (!authorization.authorized) {
-    throw new Error("Acceso denegado");
+    return { success: false, error: "Acceso denegado" };
   }
+
+  return { success: true };
 }

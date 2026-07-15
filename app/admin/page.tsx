@@ -16,6 +16,8 @@ import {
 } from "lucide-react";
 
 import { DashboardCharts } from "./components/dashboard-charts";
+import { AdminPageContainer } from "@/components/admin/page-container";
+import { AdminPageHeader } from "@/components/admin/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -46,15 +48,15 @@ export default async function AdminDashboardPage() {
     summary = await getStoreDashboardSummary(authorization.storeId);
   } catch {
     return (
-      <div className="space-y-6">
+      <AdminPageContainer>
         <DashboardHeader />
         <DashboardErrorState />
-      </div>
+      </AdminPageContainer>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <AdminPageContainer>
       <DashboardHeader />
       <KpiRow summary={summary} />
       <AlertsRow
@@ -69,7 +71,7 @@ export default async function AdminDashboardPage() {
         <RecentOrdersCard orders={summary.recentOrders} />
         <QuickActionsCard />
       </div>
-    </div>
+    </AdminPageContainer>
   );
 }
 
@@ -93,28 +95,26 @@ function DashboardErrorState() {
 
 function DashboardHeader() {
   return (
-    <header className="flex flex-wrap items-center justify-between gap-3">
-      <div className="min-w-0">
-        <h1 className="text-2xl font-bold text-foreground">Resumen</h1>
-        <p className="text-sm text-muted-foreground">
-          El estado de tu tienda de un vistazo
-        </p>
-      </div>
-      <div className="flex shrink-0 gap-2">
-        <Button variant="outline" size="sm" className="gap-2" asChild>
-          <Link href="/">
-            <Eye className="h-4 w-4 shrink-0" />
-            <span className="hidden sm:inline">Ver tienda</span>
-          </Link>
-        </Button>
-        <Button size="sm" className="gap-2" asChild>
-          <Link href="/admin/stats">
-            <TrendingUp className="h-4 w-4 shrink-0" />
-            <span className="hidden sm:inline">Ver estadísticas</span>
-          </Link>
-        </Button>
-      </div>
-    </header>
+    <AdminPageHeader
+      title="Resumen"
+      subtitle="El estado de tu tienda de un vistazo"
+      actions={
+        <>
+          <Button variant="outline" size="sm" className="gap-2" asChild>
+            <Link href="/">
+              <Eye className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline">Ver tienda</span>
+            </Link>
+          </Button>
+          <Button size="sm" className="gap-2" asChild>
+            <Link href="/admin/stats">
+              <TrendingUp className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline">Ver estadísticas</span>
+            </Link>
+          </Button>
+        </>
+      }
+    />
   );
 }
 

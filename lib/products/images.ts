@@ -1,0 +1,4 @@
+export const MAX_PRODUCT_IMAGES = 5
+export const MAX_ADDITIONAL_PRODUCT_IMAGES = MAX_PRODUCT_IMAGES - 1
+export const MAX_PRODUCT_IMAGE_SIZE_MB = 1
+export const PRODUCT_IMAGES_UPLOAD_CONTEXT = "product-images"

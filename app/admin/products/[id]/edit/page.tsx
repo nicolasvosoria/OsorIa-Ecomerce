@@ -1,5 +1,7 @@
 import { notFound, redirect } from "next/navigation"
 
+import { AdminPageContainer } from "@/components/admin/page-container"
+import { AdminPageHeader } from "@/components/admin/page-header"
 import { authorizeActiveStoreAdmin } from "@/lib/supabase/active-store"
 import { getCategories, getItemById } from "@/lib/supabase/products-api"
 import { EditProductForm } from "./components/edit-product-form"
@@ -28,5 +30,10 @@ export default async function EditProductPage({
     notFound()
   }
 
-  return <EditProductForm product={product} categories={categories} />
+  return (
+    <AdminPageContainer>
+      <AdminPageHeader title="Editar Producto" subtitle="Modifica la información del producto" />
+      <EditProductForm product={product} categories={categories} />
+    </AdminPageContainer>
+  )
 }

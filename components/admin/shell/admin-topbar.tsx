@@ -1,8 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { ChevronDown, LogOut, User } from "lucide-react"
 
 import { useAuth } from "@/contexts/auth-context"
@@ -12,14 +11,6 @@ import type { StoreSummary } from "@/lib/supabase/memberships-api"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -27,8 +18,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { AdminMobileNav } from "./admin-mobile-nav"
-import { adminSectionTitle } from "./admin-sidebar"
+import { SidebarTrigger } from "@/components/ui/sidebar"
 import { StoreSwitcher } from "./store-switcher"
 
 function adminUserName(user: UserProfile | null): string {
@@ -44,7 +34,6 @@ export function AdminTopbar({
   stores: StoreSummary[]
   activeStoreId: string
 }) {
-  const pathname = usePathname() ?? ""
   const router = useRouter()
   const { user, logout } = useAuth()
   const { isSuperAdmin } = useAdminPermissions()
@@ -57,22 +46,8 @@ export function AdminTopbar({
   }
 
   return (
-    <header className="flex items-center gap-3 border-b bg-background px-4 py-3 shadow-sm sm:px-6">
-      <AdminMobileNav />
-
-      <Breadcrumb className="min-w-0">
-        <BreadcrumbList>
-          <BreadcrumbItem className="hidden sm:inline-flex">
-            <BreadcrumbLink asChild>
-              <Link href="/admin">Admin</Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator className="hidden sm:block" />
-          <BreadcrumbItem className="min-w-0">
-            <BreadcrumbPage className="truncate">{adminSectionTitle(pathname)}</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
+    <header className="flex h-14 shrink-0 items-center gap-3 border-b bg-background px-4 shadow-sm sm:px-6">
+      <SidebarTrigger className="md:hidden" />
 
       <div className="ml-auto flex items-center gap-2 sm:gap-3">
         <StoreSwitcher stores={stores} activeStoreId={activeStoreId} isSuperAdmin={isSuperAdmin} />

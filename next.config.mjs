@@ -3,9 +3,6 @@ const nextConfig = {
   // Next.js 16 - Configuración actualizada
   // Nota: eslint ya no se configura aquí, se maneja en eslint.config.mjs
   cacheComponents: true, // Requerido para 'use cache' directive (movido fuera de experimental en Next.js 16)
-  typescript: {
-    ignoreBuildErrors: true,
-  },
   // Fijar root del workspace para evitar warnings por lockfiles externos en entornos compartidos.
   turbopack: {
     root: process.cwd(),

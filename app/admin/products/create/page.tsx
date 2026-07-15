@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation"
 
+import { AdminPageContainer } from "@/components/admin/page-container"
+import { AdminPageHeader } from "@/components/admin/page-header"
 import { authorizeActiveStoreAdmin } from "@/lib/supabase/active-store"
 import { getCategories } from "@/lib/supabase/products-api"
 import { CreateProductForm } from "./components/create-product-form"
@@ -15,5 +17,13 @@ export default async function CreateProductPage() {
 
   const categories = await getCategories(true, authorization.storeId, authorization.supabase)
 
-  return <CreateProductForm categories={categories} />
+  return (
+    <AdminPageContainer>
+      <AdminPageHeader
+        title="Crear Nuevo Producto"
+        subtitle="Completa el formulario para agregar un nuevo producto al catálogo"
+      />
+      <CreateProductForm categories={categories} />
+    </AdminPageContainer>
+  )
 }

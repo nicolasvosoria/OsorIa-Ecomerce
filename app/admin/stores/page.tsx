@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
 
+import { AdminPageContainer } from "@/components/admin/page-container";
+import { AdminPageHeader } from "@/components/admin/page-header";
 import { authorizeSuperAdmin } from "@/lib/supabase/active-store";
 import {
   EMPTY_TENANT_METRICS,
@@ -17,16 +19,14 @@ export default async function AdminStoresPage() {
   const list = await loadTenants();
 
   return (
-    <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-bold text-foreground">Tiendas</h1>
-        <p className="text-sm text-muted-foreground">
-          Consola global de tiendas: métricas rápidas y acceso directo a cada tienda
-        </p>
-      </header>
+    <AdminPageContainer>
+      <AdminPageHeader
+        title="Tiendas"
+        subtitle="Consola global de tiendas: métricas rápidas y acceso directo a cada tienda"
+      />
 
       <TenantsTable rows={list.state === "ready" ? list.tenants : []} state={list.state} />
-    </div>
+    </AdminPageContainer>
   );
 }
 

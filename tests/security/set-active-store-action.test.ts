@@ -67,8 +67,9 @@ describe("setActiveStore", () => {
     const setCookie = mockCookieSetter();
     mockServiceClient({ [TARGET_STORE]: true });
 
-    await setActiveStore(TARGET_STORE);
+    const result = await setActiveStore(TARGET_STORE);
 
+    expect(result).toEqual({ success: true });
     expect(setCookie).toHaveBeenCalledTimes(1);
     const [cookieName, cookieValue] = setCookie.mock.calls[0];
     expect(cookieName).toBe(ACTIVE_STORE_COOKIE);
@@ -76,24 +77,26 @@ describe("setActiveStore", () => {
     expect(revalidatePath).toHaveBeenCalledWith("/admin", "layout");
   });
 
-  it("throws and never sets the cookie when the store is not manageable", async () => {
+  it("returns a failure and never sets the cookie when the store is not manageable", async () => {
     mockAuthUser("admin-1");
     const setCookie = mockCookieSetter();
     mockServiceClient({ [TARGET_STORE]: false });
 
-    await expect(setActiveStore(TARGET_STORE)).rejects.toThrow("Acceso denegado");
+    const result = await setActiveStore(TARGET_STORE);
 
+    expect(result).toEqual({ success: false, error: "Acceso denegado" });
     expect(setCookie).not.toHaveBeenCalled();
     expect(revalidatePath).not.toHaveBeenCalled();
   });
 
-  it("throws and never sets the cookie when there is no authenticated user", async () => {
+  it("returns a failure and never sets the cookie when there is no authenticated user", async () => {
     mockAuthUser(null);
     const setCookie = mockCookieSetter();
     mockServiceClient({ [TARGET_STORE]: true });
 
-    await expect(setActiveStore(TARGET_STORE)).rejects.toThrow("Acceso denegado");
+    const result = await setActiveStore(TARGET_STORE);
 
+    expect(result).toEqual({ success: false, error: "Acceso denegado" });
     expect(setCookie).not.toHaveBeenCalled();
     expect(revalidatePath).not.toHaveBeenCalled();
   });

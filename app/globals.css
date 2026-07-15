@@ -89,17 +89,20 @@
   --sidebar-ring: oklch(0.439 0 0);
 }
 
-/* Neutral chrome for the theme editor (D24): its own UI (topbar, sidebar,
-   panels, portaled Select content) must look the same no matter which store
-   theme is active, so it redeclares every semantic token this subtree's
-   shadcn components read. A plain, unlayered selector — like `--spacing`
-   above — beats `@theme`/`@layer` in the cascade, so it overrides the
-   theme bootstrap's inline vars on `:root` regardless of source order.
-   Applied to the editor root and to portaled Select/Popover/Tooltip content
-   the editor itself renders. Its light/dark axis follows the app's `.dark`
-   class (the SAME signal shadcn's `dark:` variants use) so the neutral chrome
-   and the form controls inside it are always consistent — only the palette is
-   neutral, decoupled from the store theme's colors. */
+/* Neutral chrome for the whole admin (D1): every route under the admin
+   shell (`components/admin/shell/admin-shell.tsx`) — plus the theme editor's
+   own full-bleed UI — must look the same no matter which store theme/preset
+   is active, so it redeclares every semantic, geometry, density and shadow
+   token the theme bootstrap (`lib/theme-font/bootstrap.ts`) writes inline on
+   `<html>`. A plain, unlayered selector — like `--spacing` above — beats
+   `@theme`/`@layer` in the cascade, so it overrides those inline vars
+   regardless of source order. Applied to the shell root and to portaled
+   Select/Popover/Tooltip/Dialog content rendered inside it. Its light/dark
+   axis follows the app's `.dark` class (the SAME signal shadcn's `dark:`
+   variants use) so the neutral chrome and the form controls inside it are
+   always consistent — only the palette is neutral, decoupled from the store
+   theme's colors. The in-editor theme *preview* is unaffected: it's an
+   `<iframe>` (a separate document), so none of this crosses into it. */
 .editor-chrome {
   /* Establish the neutral color as the inherited default so elements without an
      explicit text-* class don't fall back to the store theme's foreground
@@ -125,6 +128,30 @@
   --input: #d8dce2;
   --ring: #4f46e5;
   --success: #059669;
+  --success-foreground: #111111;
+  /* The sidebar is the most visible surface of the chrome, so it derives from
+     the chrome's own palette instead of shadcn's stock `:root` sidebar ramp.
+     Aliases, not copies — the indirection resolves against whichever
+     `--background`/`--accent`/... this element ends up with, so the dark block
+     below needs no repeat of these eight. */
+  --sidebar: var(--background);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: var(--accent);
+  --sidebar-accent-foreground: var(--accent-foreground);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
+  /* Geometry/density/shadow: same values as `:root`'s no-theme defaults
+     (`lib/theme-font/bootstrap.ts`'s own fallbacks), so the admin keeps its
+     current look regardless of the active store preset. Mode-independent —
+     declared once here, not repeated in `.dark .editor-chrome` below. */
+  --radius: 0.5rem;
+  --spacing: 0.25rem;
+  --button-radius: var(--radius);
+  --card-radius: var(--radius);
+  --shadow-card: none;
+  --shadow-elevated: none;
 }
 
 .dark .editor-chrome {

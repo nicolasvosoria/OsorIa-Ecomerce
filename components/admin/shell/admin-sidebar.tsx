@@ -17,7 +17,18 @@ import {
 } from "lucide-react"
 
 import { useAdminPermissions } from "@/contexts/admin-permissions-context"
-import { cn } from "@/lib/utils"
+import { isRouteOrDescendant } from "@/lib/admin/routes"
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarRail,
+  useSidebar,
+} from "@/components/ui/sidebar"
 
 interface AdminNavItem {
   label: string
@@ -40,58 +51,60 @@ const BASE_NAV_ITEMS: AdminNavItem[] = [
 const SUPER_ADMIN_NAV_ITEM: AdminNavItem = { label: "Tiendas", href: "/admin/stores", icon: Store }
 const ALL_NAV_ITEMS = [...BASE_NAV_ITEMS, SUPER_ADMIN_NAV_ITEM]
 
+export function AdminSidebar() {
+  return (
+    <Sidebar collapsible="icon" className="editor-chrome">
+      <SidebarHeader className="h-14 justify-center border-b">
+        <p className="truncate px-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground group-data-[collapsible=icon]:hidden">
+          Administración
+        </p>
+      </SidebarHeader>
+      <SidebarContent>
+        <SidebarGroup>
+          <AdminNavList />
+        </SidebarGroup>
+      </SidebarContent>
+      <SidebarRail />
+    </Sidebar>
+  )
+}
+
+function AdminNavList() {
+  const pathname = usePathname() ?? ""
+  const { isSuperAdmin } = useAdminPermissions()
+  const { isMobile, setOpenMobile } = useSidebar()
+  const items = isSuperAdmin ? ALL_NAV_ITEMS : BASE_NAV_ITEMS
+  const activeHref = activeNavHref(pathname, items)
+
+  const closeDrawerOnMobile = () => {
+    if (isMobile) setOpenMobile(false)
+  }
+
+  return (
+    <SidebarMenu>
+      {items.map(({ label, href, icon: Icon }) => (
+        <SidebarMenuItem key={href}>
+          <SidebarMenuButton asChild isActive={activeHref === href} tooltip={label}>
+            <Link
+              href={href}
+              onClick={closeDrawerOnMobile}
+              aria-current={activeHref === href ? "page" : undefined}
+            >
+              <Icon aria-hidden="true" />
+              <span>{label}</span>
+            </Link>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      ))}
+    </SidebarMenu>
+  )
+}
+
 // The active item is the one whose href is the longest prefix of the current
 // path, so nested routes (e.g. /admin/products/combos) highlight the deepest
 // match instead of every ancestor in the nav.
 function activeNavHref(pathname: string, items: AdminNavItem[]): string | null {
   return items
-    .filter((item) => pathname === item.href || pathname.startsWith(`${item.href}/`))
+    .filter((item) => isRouteOrDescendant(pathname, item.href))
     .sort((a, b) => b.href.length - a.href.length)[0]?.href ?? null
-}
-
-export function adminSectionTitle(pathname: string): string {
-  const activeHref = activeNavHref(pathname, ALL_NAV_ITEMS)
-  return ALL_NAV_ITEMS.find((item) => item.href === activeHref)?.label ?? "Panel"
-}
-
-export function AdminNavList({ onNavigate }: { onNavigate?: () => void }) {
-  const pathname = usePathname() ?? ""
-  const { isSuperAdmin } = useAdminPermissions()
-  const items = isSuperAdmin ? ALL_NAV_ITEMS : BASE_NAV_ITEMS
-  const activeHref = activeNavHref(pathname, items)
-
-  return (
-    <nav className="flex flex-col gap-1">
-      {items.map(({ label, href, icon: Icon }) => (
-        <Link
-          key={href}
-          href={href}
-          onClick={onNavigate}
-          aria-current={activeHref === href ? "page" : undefined}
-          className={cn(
-            "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-            activeHref === href
-              ? "bg-accent text-accent-foreground"
-              : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-          )}
-        >
-          <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-          {label}
-        </Link>
-      ))}
-    </nav>
-  )
-}
-
-export function AdminSidebar() {
-  return (
-    <aside className="hidden w-[300px] shrink-0 overflow-y-auto border-r bg-background md:block">
-      <div className="border-b px-4 py-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Administración</p>
-      </div>
-      <div className="p-3">
-        <AdminNavList />
-      </div>
-    </aside>
-  )
 }

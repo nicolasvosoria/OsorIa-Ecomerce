@@ -1,110 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import {
-  normalizeHomeDiscountPopupConfig,
-  type HomeDiscountPopupConfig,
-} from "@/lib/home-discount-popup";
-import {
-  asMetadataRecord,
   getHomeDiscountPopupServiceClients,
-  resolveHomeDiscountPopupStoreId,
+  loadHomeDiscountPopupConfig,
+  saveHomeDiscountPopupConfig,
+  type HomeDiscountPopupPersistenceClient,
 } from "@/lib/home-discount-popup-admin";
 import { authorizeStoreAdmin } from "@/lib/supabase/admin-route-guard";
-import { ECOMMERCE_TABLES } from "@/lib/supabase/contract";
-
-type PopupQuery = {
-  select: (columns: string) => PopupQuery;
-  eq: (column: string, value: unknown) => PopupQuery;
-  is: (column: string, value: null) => PopupQuery;
-  maybeSingle: () => Promise<{ data: unknown; error: unknown }>;
-  single: () => Promise<{ data: unknown; error: unknown }>;
-  upsert: (
-    values: Record<string, unknown>,
-    options?: Record<string, unknown>,
-  ) => Promise<{ error: unknown }>;
-};
-
-type PopupPersistenceClient = {
-  from: (table: string) => PopupQuery;
-};
-
-async function resolveStoreId(
-  ecommerceClient: PopupPersistenceClient,
-  storeLookup: string,
-): Promise<string> {
-  return resolveHomeDiscountPopupStoreId(ecommerceClient, storeLookup);
-}
-
-export async function loadHomeDiscountPopupConfig(
-  ecommerceClient: PopupPersistenceClient,
-  storeLookup: string,
-): Promise<{ storeId: string; config: HomeDiscountPopupConfig }> {
-  const storeId = await resolveStoreId(ecommerceClient, storeLookup);
-  const { data, error } = await ecommerceClient
-    .from(ECOMMERCE_TABLES.storeIntegrations)
-    .select("metadata")
-    .eq("store_id", storeId)
-    .maybeSingle();
-
-  if (error) {
-    throw error;
-  }
-
-  const metadata = asMetadataRecord(
-    (data as { metadata?: unknown } | null)?.metadata,
-  );
-
-  return {
-    storeId,
-    config: normalizeHomeDiscountPopupConfig(metadata?.homeDiscountPopup),
-  };
-}
-
-export async function saveHomeDiscountPopupConfig(
-  ecommerceClient: PopupPersistenceClient,
-  storeLookup: string,
-  input: unknown,
-): Promise<{ storeId: string; config: HomeDiscountPopupConfig }> {
-  const storeId = await resolveStoreId(ecommerceClient, storeLookup);
-  const config = normalizeHomeDiscountPopupConfig(input);
-  const { data, error: readError } = await ecommerceClient
-    .from(ECOMMERCE_TABLES.storeIntegrations)
-    .select("metadata")
-    .eq("store_id", storeId)
-    .maybeSingle();
-
-  if (readError) {
-    throw readError;
-  }
-
-  const metadata =
-    asMetadataRecord((data as { metadata?: unknown } | null)?.metadata) || {};
-
-  const { error: writeError } = await ecommerceClient
-    .from(ECOMMERCE_TABLES.storeIntegrations)
-    .upsert(
-      {
-        store_id: storeId,
-        metadata: {
-          ...metadata,
-          homeDiscountPopup: config,
-        },
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "store_id" },
-    );
-
-  if (writeError) {
-    throw writeError;
-  }
-
-  return { storeId, config };
-}
 
 async function getAuthorizedContext(
   request: NextRequest,
 ): Promise<
-  | { ecommerceClient: PopupPersistenceClient; storeId: string }
+  | { ecommerceClient: HomeDiscountPopupPersistenceClient; storeId: string }
   | { error: string; status: 401 | 403 | 500 }
 > {
   const clients = getHomeDiscountPopupServiceClients();
@@ -113,7 +20,7 @@ async function getAuthorizedContext(
   }
 
   const ecommerceClient =
-    clients.ecommerceClient as unknown as PopupPersistenceClient;
+    clients.ecommerceClient as unknown as HomeDiscountPopupPersistenceClient;
   const auth = await authorizeStoreAdmin(request, ecommerceClient);
   if ("error" in auth) {
     return { error: auth.error, status: auth.status };

@@ -476,49 +476,55 @@ export function ThemeCustomEditor() {
   }, [workingDefinition, selectedPairingId])
 
   return (
-    <div className="editor-chrome flex h-screen min-w-[720px] flex-col overflow-hidden bg-muted/20">
-      <TopBar
-        themes={themes}
-        loading={loading}
-        selectedBaseName={selectedBaseName}
-        onSelectBase={handleSelectBase}
-        onDiscard={handleDiscard}
-        onApply={handleApply}
-        applying={applying}
-        applyResult={applyResult}
-        canApply={workingDefinition !== null}
-        hasUnsavedChanges={dirty}
-        historyRefreshToken={historyRefreshToken}
-        onRevertVersion={revertToVersion}
-      />
-      <div className="flex flex-1 flex-col overflow-hidden md:flex-row">
-        <Sidebar
-          definition={workingDefinition}
-          editingColorSet={editingColorSet}
-          onEditingColorSetChange={setEditingColorSet}
-          onUpdateDefinition={updateDefinition}
-          onColorChange={handleColorChange}
-          pairings={pairings}
-          selectedPairingId={selectedPairingId}
-          onSelectPairing={handleSelectPairing}
-          selectedSection={selectedSection}
-          onBackToGeneral={handleBackToGeneral}
-          persistedContent={selectedSection ? globalStyles.get(selectedSection) ?? {} : {}}
-          stagedContent={selectedSection ? workingContent[selectedSection] ?? {} : {}}
-          onContentFieldChange={handleSectionContentChange}
-          sectionEntries={workingComposition}
-          onReorderSections={handleReorderSections}
-          onToggleSection={handleToggleSection}
-          onRemoveSection={handleRemoveSection}
-          onAddSection={handleAddSection}
+    // Outer wrapper is the horizontal scroll boundary for the two-panel
+    // layout's `min-w-[720px]` below: it scrolls on its own axis instead of
+    // letting the min-width overflow the document (nothing between here and
+    // <body> for this route clips or scrolls horizontally).
+    <div className="h-dvh w-full overflow-x-auto overflow-y-hidden bg-muted/20">
+      <div className="editor-chrome flex h-full min-w-[720px] flex-col overflow-hidden">
+        <TopBar
+          themes={themes}
+          loading={loading}
+          selectedBaseName={selectedBaseName}
+          onSelectBase={handleSelectBase}
+          onDiscard={handleDiscard}
+          onApply={handleApply}
+          applying={applying}
+          applyResult={applyResult}
+          canApply={workingDefinition !== null}
+          hasUnsavedChanges={dirty}
+          historyRefreshToken={historyRefreshToken}
+          onRevertVersion={revertToVersion}
         />
-        <Stage
-          iframeRef={iframeRef}
-          previewWidth={previewWidth}
-          onTogglePreviewWidth={setPreviewWidth}
-          onIframeLoad={handleIframeLoad}
-          editingColorSet={editingColorSet}
-        />
+        <div className="flex flex-1 flex-col overflow-hidden md:flex-row">
+          <Sidebar
+            definition={workingDefinition}
+            editingColorSet={editingColorSet}
+            onEditingColorSetChange={setEditingColorSet}
+            onUpdateDefinition={updateDefinition}
+            onColorChange={handleColorChange}
+            pairings={pairings}
+            selectedPairingId={selectedPairingId}
+            onSelectPairing={handleSelectPairing}
+            selectedSection={selectedSection}
+            onBackToGeneral={handleBackToGeneral}
+            persistedContent={selectedSection ? globalStyles.get(selectedSection) ?? {} : {}}
+            stagedContent={selectedSection ? workingContent[selectedSection] ?? {} : {}}
+            onContentFieldChange={handleSectionContentChange}
+            sectionEntries={workingComposition}
+            onReorderSections={handleReorderSections}
+            onToggleSection={handleToggleSection}
+            onRemoveSection={handleRemoveSection}
+            onAddSection={handleAddSection}
+          />
+          <Stage
+            iframeRef={iframeRef}
+            previewWidth={previewWidth}
+            onTogglePreviewWidth={setPreviewWidth}
+            onIframeLoad={handleIframeLoad}
+            editingColorSet={editingColorSet}
+          />
+        </div>
       </div>
     </div>
   )
@@ -913,7 +919,7 @@ function Stage({ iframeRef, previewWidth, onTogglePreviewWidth, onIframeLoad, ed
         </div>
       </div>
 
-      <div className="flex flex-1 items-start justify-center">
+      <div className="flex flex-1 min-h-0 justify-center">
         <div
           className="flex w-full flex-col overflow-hidden rounded-lg border bg-background shadow-sm"
           style={{ maxWidth: STAGE_WIDTH_BY_PREVIEW[previewWidth] }}
@@ -930,7 +936,7 @@ function Stage({ iframeRef, previewWidth, onTogglePreviewWidth, onIframeLoad, ed
             ref={iframeRef}
             src={PREVIEW_HOME_PATH}
             title="Vista previa de la tienda"
-            className="h-[75vh] min-h-[480px] w-full bg-background"
+            className="w-full min-h-0 flex-1 bg-background"
             onLoad={onIframeLoad}
           />
         </div>

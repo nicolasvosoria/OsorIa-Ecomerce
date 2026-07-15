@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { resolveStoreSubdomain } from '@/lib/utils/store-host'
 import { normalizeSafeAdminPath, resolveAdminAccess } from '@/lib/supabase/admin-access'
+import { isRouteOrDescendant } from '@/lib/admin/routes'
 
 // Variable de entorno para deshabilitar multi-tenant temporalmente
 const DISABLE_SUBDOMAIN_MULTI_TENANT = process.env.DISABLE_SUBDOMAIN_MULTI_TENANT === 'true'
@@ -22,14 +23,10 @@ interface Store {
 const storeCache = new Map<string, { store: Store | null; timestamp: number }>()
 const CACHE_TTL = 5 * 60 * 1000 // 5 minutos
 
-function isAdminRoute(pathname: string) {
-  return pathname === '/admin' || pathname.startsWith('/admin/')
-}
-
 async function applyAdminRouteGate(request: NextRequest, response: NextResponse) {
   const { pathname, search } = request.nextUrl
 
-  if (!isAdminRoute(pathname)) {
+  if (!isRouteOrDescendant(pathname, '/admin')) {
     return response
   }
 

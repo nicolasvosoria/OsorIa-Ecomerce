@@ -94,23 +94,32 @@ describe("combo server actions", () => {
   })
 
   it("deletes a combo scoped to the active store via the resolved storeId and service client", async () => {
-    await deleteComboAction("combo-1")
+    const result = await deleteComboAction("combo-1")
 
+    expect(result).toEqual({ success: true, error: undefined })
     expect(deleteCombo).toHaveBeenCalledWith("combo-1", "store-1", SERVICE)
     expect(revalidatePath).toHaveBeenCalledWith("/admin/products/combos")
   })
 
-  it("throws when a combo delete is denied", async () => {
+  it("refuses to delete a combo when authorization is denied", async () => {
     authorizeActiveStoreAdmin.mockResolvedValue({ error: "Acceso denegado", status: 403 })
 
-    await expect(deleteComboAction("combo-1")).rejects.toThrow("Acceso denegado")
+    const result = await deleteComboAction("combo-1")
+
+    expect(result).toEqual({ success: false, error: "Acceso denegado" })
     expect(deleteCombo).not.toHaveBeenCalled()
+    expect(revalidatePath).not.toHaveBeenCalled()
   })
 
-  it("throws when the combos-api delete fails", async () => {
+  // Key D13 regression: a delete blocked by a business rule (not an
+  // authorization gate) must surface the combos-api's own message instead of
+  // a hardcoded generic one — see ConfirmActionButton's `result.error` toast.
+  it("surfaces the combos-api's own message when the delete fails", async () => {
     deleteCombo.mockResolvedValue({ success: false, error: "Combo no encontrado" })
 
-    await expect(deleteComboAction("combo-1")).rejects.toThrow("Combo no encontrado")
+    const result = await deleteComboAction("combo-1")
+
+    expect(result).toEqual({ success: false, error: "Combo no encontrado" })
     expect(revalidatePath).not.toHaveBeenCalled()
   })
 })

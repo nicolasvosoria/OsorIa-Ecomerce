@@ -33,11 +33,14 @@ export type SuperAdminAuthorization = SuperAdminGrant | AdminAuthDenial;
 
 type StoreAuthorization = { authorized: boolean } | { error: AdminAuthDenial };
 
-// Per-store admin gate for RSC/server actions: authorizes the current cookie
-// session against its active store cookie, then the request host. The cookie is
-// HMAC-verified and re-checked with can_user_manage_store on every call; any
-// failure silently falls back to host, never to the raw cookie value.
-export async function authorizeActiveStoreAdmin(): Promise<ActiveStoreAdminAuthorization> {
+type AuthenticatedServiceSession = { service: any; userId: string };
+
+// Shared preamble of both gates below: SSR-auth the cookie session and hand back
+// the service client. Authenticating only — neither store membership nor global
+// role is decided here.
+async function authenticateServiceSession(): Promise<
+  AuthenticatedServiceSession | AdminAuthDenial
+> {
   const authClient = await getSupabaseAuthClient();
   if (!authClient) {
     return { error: "Supabase no configurado", status: 500 };
@@ -53,6 +56,21 @@ export async function authorizeActiveStoreAdmin(): Promise<ActiveStoreAdminAutho
   if (!service) {
     return { error: "Supabase no configurado", status: 500 };
   }
+
+  return { service, userId };
+}
+
+// Per-store admin gate for RSC/server actions: authorizes the current cookie
+// session against its active store cookie, then the request host. The cookie is
+// HMAC-verified and re-checked with can_user_manage_store on every call; any
+// failure silently falls back to host, never to the raw cookie value.
+export async function authorizeActiveStoreAdmin(): Promise<ActiveStoreAdminAuthorization> {
+  const session = await authenticateServiceSession();
+  if ("error" in session) {
+    return session;
+  }
+
+  const { service, userId } = session;
 
   const cookieStore = await cookies();
   const candidate = verifyActiveStore(cookieStore.get(ACTIVE_STORE_COOKIE)?.value);
@@ -81,21 +99,12 @@ export async function authorizeActiveStoreAdmin(): Promise<ActiveStoreAdminAutho
 // Mirrors requireSuperAdmin; never store-scoped. This is the only authority the
 // global-role actions trust — the per-store gate cannot grant it.
 export async function authorizeSuperAdmin(): Promise<SuperAdminAuthorization> {
-  const authClient = await getSupabaseAuthClient();
-  if (!authClient) {
-    return { error: "Supabase no configurado", status: 500 };
+  const session = await authenticateServiceSession();
+  if ("error" in session) {
+    return session;
   }
 
-  const { data } = await authClient.auth.getUser();
-  const userId = data?.user?.id;
-  if (!userId) {
-    return { error: "Acceso denegado", status: 401 };
-  }
-
-  const service = getSupabaseServiceClient();
-  if (!service) {
-    return { error: "Supabase no configurado", status: 500 };
-  }
+  const { service, userId } = session;
 
   const { data: profile, error } = await service
     .from(ECOMMERCE_TABLES.userProfiles)

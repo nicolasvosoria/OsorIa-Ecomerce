@@ -1,8 +1,7 @@
-import Link from "next/link"
 import { redirect } from "next/navigation"
-import { ArrowLeft } from "lucide-react"
 
-import { Button } from "@/components/ui/button"
+import { AdminPageContainer } from "@/components/admin/page-container"
+import { AdminPageHeader } from "@/components/admin/page-header"
 import { authorizeActiveStoreAdmin } from "@/lib/supabase/active-store"
 import { listStoreMembers, type StoreMember } from "@/lib/supabase/memberships-api"
 import { TeamSection } from "./components/team-section"
@@ -17,22 +16,11 @@ export default async function AdminUsersPage() {
   const team = await loadTeam(authorization.storeId)
 
   return (
-    <div className="space-y-8">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <Button variant="ghost" size="icon" className="shrink-0" asChild>
-            <Link href="/admin">
-              <ArrowLeft className="h-5 w-5" />
-            </Link>
-          </Button>
-          <div className="min-w-0">
-            <h1 className="text-2xl font-bold text-foreground">Gestión de Usuarios</h1>
-            <p className="text-sm text-muted-foreground">
-              Administra el equipo de tu tienda y los usuarios de la plataforma.
-            </p>
-          </div>
-        </div>
-      </header>
+    <AdminPageContainer>
+      <AdminPageHeader
+        title="Gestión de Usuarios"
+        subtitle="Administra el equipo de tu tienda y los usuarios de la plataforma."
+      />
 
       <TeamSection
         members={team.members}
@@ -40,7 +28,7 @@ export default async function AdminUsersPage() {
         currentUserId={authorization.userId}
       />
       <ClientsSection currentUserId={authorization.userId} />
-    </div>
+    </AdminPageContainer>
   )
 }
 

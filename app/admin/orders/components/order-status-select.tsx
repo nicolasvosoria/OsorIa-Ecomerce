@@ -31,13 +31,14 @@ export function OrderStatusSelect({
     setCurrent(nextStatus);
 
     startTransition(async () => {
-      try {
-        await updateOrderStatusAction(orderId, nextStatus);
-        toast.success("Estado del pedido actualizado");
-      } catch {
+      const result = await updateOrderStatusAction(orderId, nextStatus);
+      if (!result.success) {
         setCurrent(previousStatus);
-        toast.error("No se pudo actualizar el estado del pedido");
+        toast.error(result.error ?? "No se pudo actualizar el estado del pedido");
+        return;
       }
+
+      toast.success("Estado del pedido actualizado");
     });
   }
 

@@ -293,9 +293,12 @@ function toRecentOrderSummary(order: RecentOrderRow): RecentOrderSummary[] {
 /**
  * Obtener estadísticas detalladas para reportes
  */
-export async function getDetailedStats(days: number = 30): Promise<DetailedStats> {
+export async function getDetailedStats(
+  storeId: string,
+  days: number = 30
+): Promise<DetailedStats> {
   try {
-    const supabase = getSupabaseEcommerce()
+    const supabase = getSupabaseServiceClient()
     if (!supabase) {
       return {
         salesByDay: [],
@@ -315,9 +318,10 @@ export async function getDetailedStats(days: number = 30): Promise<DetailedStats
       supabase
         .from(ECOMMERCE_TABLES.orders)
         .select('created_at, total_amount, id')
+        .eq('store_id', storeId)
         .gte('created_at', startDateISO)
-        .in('status', ['confirmed', 'processing', 'shipped', 'delivered'])
-        .in('payment_status', ['paid']),
+        .in('status', SOLD_ORDER_STATUSES)
+        .in('payment_status', SOLD_PAYMENT_STATUSES),
       15000,
       'getSalesByDay'
     ) as { data: Array<{ created_at: string; total_amount: unknown; id: string }> | null; error: any }
@@ -326,6 +330,7 @@ export async function getDetailedStats(days: number = 30): Promise<DetailedStats
       supabase
         .from(ECOMMERCE_TABLES.orders)
         .select('status, id')
+        .eq('store_id', storeId)
         .gte('created_at', startDateISO),
       15000,
       'getOrdersByStatus'
@@ -340,8 +345,9 @@ export async function getDetailedStats(days: number = 30): Promise<DetailedStats
           unit_price,
           product_name,
           product_id,
-          orders!inner(created_at)
+          orders!inner(created_at, store_id)
         `)
+        .eq('orders.store_id', storeId)
         .gte('orders.created_at', startDateISO),
       15000,
       'getTopProducts'

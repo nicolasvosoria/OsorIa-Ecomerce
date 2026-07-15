@@ -7,8 +7,8 @@ import { Loader2, UserPlus } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
+import { FormField } from "@/components/ui/form-field"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import {
   Select,
   SelectContent,
@@ -18,7 +18,6 @@ import {
 } from "@/components/ui/select"
 import { addMemberSchema, type AddMemberFormValues } from "@/lib/memberships/schemas"
 import { STORE_ROLE_LABELS, STORE_ROLE_NAMES } from "@/lib/memberships/roles"
-import { FieldError } from "@/components/admin/field-error"
 import { addStoreMemberAction } from "../actions"
 
 const emptyValues: AddMemberFormValues = { email: "", role: "admin" }
@@ -51,40 +50,38 @@ export function AddMemberForm() {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="member-email">Correo del usuario</Label>
-        <Input
-          id="member-email"
-          type="email"
-          placeholder="persona@correo.com"
-          {...register("email")}
-        />
-        <FieldError message={errors.email?.message} />
-        <p className="text-xs text-muted-foreground">
-          El usuario debe tener una cuenta registrada en la plataforma.
-        </p>
-      </div>
-      <div className="space-y-2">
-        <Label>Rol en la tienda</Label>
-        <Controller
-          control={control}
-          name="role"
-          render={({ field }) => (
-            <Select value={field.value} onValueChange={field.onChange}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {STORE_ROLE_NAMES.map((roleName) => (
-                  <SelectItem key={roleName} value={roleName}>
-                    {STORE_ROLE_LABELS[roleName]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-        />
-      </div>
+      <FormField
+        id="member-email"
+        label="Correo del usuario"
+        hint="El usuario debe tener una cuenta registrada en la plataforma."
+        error={errors.email?.message}
+      >
+        {(field) => (
+          <Input {...field} type="email" placeholder="persona@correo.com" {...register("email")} />
+        )}
+      </FormField>
+      <FormField id="member-role" label="Rol en la tienda">
+        {(field) => (
+          <Controller
+            control={control}
+            name="role"
+            render={({ field: role }) => (
+              <Select value={role.value} onValueChange={role.onChange}>
+                <SelectTrigger {...field}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {STORE_ROLE_NAMES.map((roleName) => (
+                    <SelectItem key={roleName} value={roleName}>
+                      {STORE_ROLE_LABELS[roleName]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
+        )}
+      </FormField>
       <Button type="submit" disabled={isPending} className="w-full">
         {isPending ? (
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />

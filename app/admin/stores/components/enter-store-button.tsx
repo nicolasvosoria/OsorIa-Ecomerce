@@ -20,12 +20,13 @@ export function EnterStoreButton({
 
   function handleEnter() {
     startTransition(async () => {
-      try {
-        await setActiveStore(storeId)
-        router.push("/admin")
-      } catch {
-        toast.error(`No se pudo entrar a ${storeName}`)
+      const result = await setActiveStore(storeId)
+      if (!result.success) {
+        toast.error(result.error ?? `No se pudo entrar a ${storeName}`)
+        return
       }
+
+      router.push("/admin")
     })
   }
 

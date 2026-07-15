@@ -1,14 +1,11 @@
 import type { UserProfile } from "@/lib/types/user";
 import { isAdminRole } from "@/lib/memberships/roles";
+import { isRouteOrDescendant } from "@/lib/admin/routes";
 
 const AUTH_CONFIRMATION_SUCCESS_PATH = "/auth/cuenta-confirmada";
 export const ADMIN_ACCESS_DENIED_PATH = "/?admin_access=denied";
 
 export type AuthReturnUser = Pick<UserProfile, "role"> | null | undefined;
-
-function isAdminRoute(pathname: string) {
-  return pathname === "/admin" || pathname.startsWith("/admin/");
-}
 
 export function normalizeAuthReturnPath(candidate: string | null | undefined) {
   if (!candidate) {
@@ -31,7 +28,7 @@ export function normalizeAuthReturnPath(candidate: string | null | undefined) {
   }
 
   const pathname = parsed.pathname;
-  if (!isAdminRoute(pathname)) {
+  if (!isRouteOrDescendant(pathname, "/admin")) {
     return null;
   }
 

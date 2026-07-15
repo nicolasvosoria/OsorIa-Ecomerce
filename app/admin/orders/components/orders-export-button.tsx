@@ -1,11 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { Download, Loader2 } from "lucide-react";
-import { toast } from "sonner";
 import * as XLSX from "xlsx";
 
-import { Button } from "@/components/ui/button";
+import { ExcelExportButton } from "@/components/admin/excel-export-button";
 import { getAdminRequestHeaders } from "@/lib/supabase/admin-request-headers";
 import type { OrderWithItems } from "@/lib/supabase/orders-api";
 import {
@@ -136,50 +133,21 @@ function buildItemsSheet(orders: OrderWithItems[]) {
   return worksheet;
 }
 
+async function buildOrdersWorkbook(): Promise<XLSX.WorkBook> {
+  const orders = await fetchAllOrders();
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, buildOrdersSheet(orders), "Pedidos");
+  XLSX.utils.book_append_sheet(workbook, buildItemsSheet(orders), "Items de Pedidos");
+
+  return workbook;
+}
+
 export function OrdersExportButton() {
-  const [isExporting, setIsExporting] = useState(false);
-
-  async function handleExport() {
-    setIsExporting(true);
-    try {
-      const orders = await fetchAllOrders();
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, buildOrdersSheet(orders), "Pedidos");
-      XLSX.utils.book_append_sheet(
-        workbook,
-        buildItemsSheet(orders),
-        "Items de Pedidos",
-      );
-
-      const dateStr = new Date().toISOString().split("T")[0];
-      XLSX.writeFile(workbook, `pedidos_${dateStr}.xlsx`);
-    } catch (error) {
-      console.error("[Admin Orders] Error al generar Excel:", error);
-      toast.error("No se pudo generar el archivo Excel");
-    } finally {
-      setIsExporting(false);
-    }
-  }
-
   return (
-    <Button
-      type="button"
-      onClick={handleExport}
-      disabled={isExporting}
-      size="sm"
-      className="shrink-0 gap-2"
-    >
-      {isExporting ? (
-        <>
-          <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-          <span>Generando…</span>
-        </>
-      ) : (
-        <>
-          <Download className="h-4 w-4 shrink-0" />
-          <span className="hidden sm:inline">Descargar Excel</span>
-        </>
-      )}
-    </Button>
+    <ExcelExportButton
+      fileNamePrefix="pedidos"
+      errorLogLabel="[Admin Orders]"
+      buildWorkbook={buildOrdersWorkbook}
+    />
   );
 }

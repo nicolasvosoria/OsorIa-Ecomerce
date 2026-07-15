@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react"
 import { useRouter, usePathname, useSearchParams } from "next/navigation"
 import { useAdminPermissions } from "@/contexts/admin-permissions-context"
 import { useAuth } from "@/contexts/auth-context"
+import { isRouteOrDescendant } from "@/lib/admin/routes"
 
 /**
  * Componente que redirige automáticamente a los administradores al dashboard
@@ -48,8 +49,8 @@ export function AdminRedirect() {
       isAuthenticated &&
       isAdmin &&
       pathname === "/" &&
-      !pathname.startsWith("/dashboard") &&
-      !pathname.startsWith("/admin") &&
+      !isRouteOrDescendant(pathname, "/dashboard") &&
+      !isRouteOrDescendant(pathname, "/admin") &&
       isFromAuthCallback &&
       !hasRedirected.current &&
       !alreadyRedirected

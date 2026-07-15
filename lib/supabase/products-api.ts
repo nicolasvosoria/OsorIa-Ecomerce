@@ -18,9 +18,8 @@ import {
 } from './combos-api'
 import { buildProductImageRows } from './product-image-rows'
 import { sanitizeIlikeSearchTerm } from '@/lib/security/postgrest-search'
+import { MAX_ADDITIONAL_PRODUCT_IMAGES, MAX_PRODUCT_IMAGES } from '@/lib/products/images'
 
-const MAX_PRODUCT_IMAGES = 5
-const MAX_ADDITIONAL_PRODUCT_IMAGES = MAX_PRODUCT_IMAGES - 1
 const MAX_PRODUCT_IMAGES_ERROR =
   `Solo se permiten máximo ${MAX_PRODUCT_IMAGES} imágenes por producto (1 principal + ${MAX_ADDITIONAL_PRODUCT_IMAGES} adicionales)`
 
