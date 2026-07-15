@@ -29,8 +29,11 @@ export const ECOMMERCE_TABLES = {
   paymentTransactions: "payment_transactions",
   productComboComponents: "product_combo_components",
   productCombos: "product_combos",
+  roles: "roles",
   storeIntegrations: "store_integrations",
   storeItems: "store_items",
+  storeUserRoles: "store_user_roles",
+  storeUsers: "store_users",
   stores: "stores",
   userProfiles: "user_profiles",
 } as const satisfies Record<string, EcommerceTableName>;

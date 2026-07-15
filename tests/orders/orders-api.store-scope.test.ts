@@ -126,7 +126,7 @@ describe("orders-api store scoping", () => {
     vi.clearAllMocks();
   });
 
-  it("filters getOrders by store_id when a storeId is provided", async () => {
+  it("always scopes getOrders by the required store_id", async () => {
     const { client, eqCalls } = makeRecordingClient();
 
     await getOrders({ limit: 5, storeId: "store-1" }, client);
@@ -136,16 +136,7 @@ describe("orders-api store scoping", () => {
     ]);
   });
 
-  it("leaves getOrders unscoped when no storeId is provided", async () => {
-    const { client, eqCalls } = makeRecordingClient();
-    getSupabaseEcommerceMock.mockReturnValue(client);
-
-    await getOrders({ limit: 5 });
-
-    expect(storeFilterFor(eqCalls)).toHaveLength(0);
-  });
-
-  it("filters getOrderById by store_id when a storeId is provided", async () => {
+  it("always scopes getOrderById by the required store_id", async () => {
     const { client, eqCalls } = makeRecordingClient();
     getSupabaseEcommerceMock.mockReturnValue(client);
 

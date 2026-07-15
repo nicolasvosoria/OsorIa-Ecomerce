@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
     const supabase = createClient(supabaseUrl, supabaseKey).schema(ECOMMERCE_SCHEMA)
     const { data: orders, error: orderError } = await supabase
       .from(ECOMMERCE_TABLES.orders)
-      .select("id")
+      .select("id, store_id")
       .order("created_at", { ascending: false })
       .limit(1)
 
@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const order = await getOrderById(orders[0].id)
+    const order = await getOrderById(orders[0].id, orders[0].store_id)
     if (!order) {
       return NextResponse.json(
         { ok: false, message: "No se pudo cargar el pedido." },

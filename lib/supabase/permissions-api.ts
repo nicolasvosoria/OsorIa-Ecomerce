@@ -1,5 +1,6 @@
 import { getSupabaseBrowserClient, getSupabaseEcommerce } from "./client"
 import { ECOMMERCE_TABLES } from "./contract"
+import { isAdminRole } from "@/lib/memberships/roles"
 import type { UserRole } from "@/lib/types/user"
 
 // Helper para manejar timeouts
@@ -134,7 +135,7 @@ export async function isCurrentUserAdmin(): Promise<boolean> {
         }
 
         // Si llegamos aquí, la consulta fue exitosa
-        const isAdmin = data?.role === "admin"
+        const isAdmin = isAdminRole(data?.role)
         if (isAdmin) {
           console.log("[Permissions] Usuario verificado como administrador")
         }

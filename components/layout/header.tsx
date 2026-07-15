@@ -33,6 +33,7 @@ import { toast } from "sonner"
 import { resetPassword } from "@/lib/supabase/auth-api"
 import { deferStateUpdate } from "@/lib/react/defer-state-update"
 import { ADMIN_ACCESS_DENIED_PATH, getAuthReturnPath, resolvePostAuthDestination } from "@/lib/auth-return-intent"
+import { isAdminRole } from "@/lib/memberships/roles"
 import {
   Sheet,
   SheetContent,
@@ -525,7 +526,7 @@ export function Header() {
             >
               <User className="h-4 w-4 lg:h-5 lg:w-5" style={{ color: header.loginButtonColor || "var(--foreground)" }} />
               <span className="text-xs lg:text-sm xl:text-base font-medium hidden xl:inline truncate max-w-[150px]" style={{ color: header.loginButtonColor || "var(--foreground)" }}>
-                {user?.role === 'admin'
+                {isAdminRole(user?.role)
                   ? t.nav.admin
                   : user?.first_name && user?.last_name
                     ? `${user.first_name} ${user.last_name}`
@@ -535,14 +536,14 @@ export function Header() {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" style={{ backgroundColor: "var(--background)", borderColor: "var(--border)" }}>
             <DropdownMenuLabel style={{ color: "var(--foreground)" }}>
-              {user?.role === 'admin'
+              {isAdminRole(user?.role)
                 ? "Administrador"
                 : user?.first_name && user?.last_name
                   ? `${user.first_name} ${user.last_name}`
                   : user?.email || "Usuario"}
             </DropdownMenuLabel>
             <DropdownMenuSeparator style={{ backgroundColor: "var(--border)" }} />
-            {user?.role === 'admin' && (
+            {isAdminRole(user?.role) && (
               <>
                 <DropdownMenuItem asChild style={{ color: "var(--foreground)" }}>
                   <Link href="/dashboard">
@@ -562,7 +563,7 @@ export function Header() {
             <DropdownMenuItem
               onClick={async () => {
                 // Guardar si el usuario es administrador antes de cerrar sesión
-                const wasAdmin = user?.role === 'admin'
+                const wasAdmin = isAdminRole(user?.role)
                 const wasOnAdminPage = pathname === '/admin' || pathname === '/dashboard'
 
                 await logout()
@@ -614,7 +615,7 @@ export function Header() {
         buttonClassName: "h-9 w-9 lg:h-10 lg:w-10 rounded-full touch-manipulation relative flex-shrink-0",
         badgeClassName: "absolute -top-1 -right-1 h-4 w-4 lg:h-5 lg:w-5 rounded-full flex items-center justify-center text-[10px] lg:text-xs font-bold text-white",
       })}
-      {user?.role === 'admin' && (
+      {isAdminRole(user?.role) && (
         <Button
           variant="ghost"
           size="icon"
@@ -851,21 +852,21 @@ export function Header() {
                       style={{ backgroundColor: "transparent" }}
                       onMouseEnter={(e) => e.currentTarget.style.backgroundColor = header.loginButtonHoverBg || "var(--muted)"}
                       onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
-                      title={user?.role === 'admin' ? t.nav.admin : t.nav.account}
+                      title={isAdminRole(user?.role) ? t.nav.admin : t.nav.account}
                     >
                       <User className="h-4 w-4" style={{ color: header.loginButtonColor || "var(--foreground)" }} />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" style={{ backgroundColor: "var(--background)", borderColor: "var(--border)" }}>
                     <DropdownMenuLabel style={{ color: "var(--foreground)" }}>
-                      {user?.role === 'admin' 
+                      {isAdminRole(user?.role) 
                         ? "Administrador"
                         : user?.first_name && user?.last_name 
                           ? `${user.first_name} ${user.last_name}`
                           : user?.email || "Usuario"}
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator style={{ backgroundColor: "var(--border)" }} />
-                    {user?.role === 'admin' && (
+                    {isAdminRole(user?.role) && (
                       <>
                         <DropdownMenuItem asChild style={{ color: "var(--foreground)" }}>
                           <Link href="/dashboard">
@@ -884,7 +885,7 @@ export function Header() {
                     )}
                     <DropdownMenuItem
                       onClick={async () => {
-                        const wasAdmin = user?.role === 'admin'
+                        const wasAdmin = isAdminRole(user?.role)
                         const wasOnAdminPage = pathname === '/admin' || pathname === '/dashboard'
                         
                         await logout()
@@ -1026,7 +1027,7 @@ export function Header() {
             {/* Mensaje de bienvenida para usuarios autenticados - Solo en desktop */}
             {isAuthenticated && user && (
               <p className="hidden md:block text-base font-medium mt-4" style={{ color: "var(--foreground)" }}>
-                {user?.role === 'admin'
+                {isAdminRole(user?.role)
                   ? t.header.welcomeAdmin
                   : t.header.welcome.replace('{name}', user.first_name || user.email.split('@')[0])}
               </p>
@@ -1079,7 +1080,7 @@ export function Header() {
               )}
               
               {/* Sección de Administrador */}
-              {user?.role === 'admin' && (
+              {isAdminRole(user?.role) && (
                 <>
                   <div className="my-2 border-t" style={{ borderColor: "var(--border)" }}></div>
                   <div className="text-xs font-semibold uppercase tracking-wider px-4 py-2" style={{ color: "var(--muted-foreground)" }}>
@@ -1120,7 +1121,7 @@ export function Header() {
             </div>
             
             {/* Botones de tema y tipografía - Solo visibles para administradores */}
-            {user?.role === 'admin' && (
+            {isAdminRole(user?.role) && (
               <div className="flex-shrink-0 border-t p-6" style={{ borderColor: "var(--border)" }}>
                 <Button
                   variant="ghost"
@@ -1439,7 +1440,7 @@ export function Header() {
                     })
                   } else {
                     toast.success(t.header.accountCreated, {
-                      description: result.user?.role === 'admin'
+                      description: isAdminRole(result.user?.role)
                         ? t.header.welcomeAdminMessage
                         : t.header.accountCreatedSuccess,
                       duration: 3000,
@@ -1479,8 +1480,8 @@ export function Header() {
                   // Todos los usuarios (admin y user) inician sesión; solo admins consumen
                   // un destino admin seguro solicitado desde ?auth=login&next=...
                   toast.success(t.header.sessionStarted, {
-                    description: result.user?.role === 'admin' 
-                      ? t.header.welcomeAdminLogin 
+                    description: isAdminRole(result.user?.role)
+                      ? t.header.welcomeAdminLogin
                       : "Bienvenido de nuevo!",
                     duration: 3000,
                   })

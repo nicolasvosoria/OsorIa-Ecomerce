@@ -1,6 +1,9 @@
 import { getSupabaseEcommerce } from './client'
+import { getSupabaseServiceClient } from './admin-store'
 import { ECOMMERCE_TABLES } from './contract'
 import { getBusinessDayStartUtc, getBusinessMonthStartUtc, toBusinessDayKey } from '@/lib/date/business-day'
+import { ORDER_STATUSES } from '@/lib/orders/order-status'
+import type { Order } from './orders-api'
 
 // Helper para manejar timeouts
 async function withTimeout<T>(
@@ -14,13 +17,6 @@ async function withTimeout<T>(
       setTimeout(() => reject(new Error(`Timeout después de ${timeoutMs}ms en ${operation}`)), timeoutMs)
     ),
   ])
-}
-
-export interface DashboardStats {
-  totalProducts: number
-  ordersToday: number
-  totalUsers: number
-  monthlySales: number
 }
 
 export interface SalesByDay {
@@ -54,90 +50,244 @@ export interface DetailedStats {
 const SOLD_ORDER_STATUSES = ['confirmed', 'processing', 'shipped', 'delivered']
 const SOLD_PAYMENT_STATUSES = ['paid']
 
-/**
- * Obtener estadísticas del dashboard
- */
-export async function getDashboardStats(): Promise<DashboardStats> {
+export interface OrderStatusBreakdown {
+  status: Order['status']
+  count: number
+}
+
+export interface RecentOrderSummary {
+  id: string
+  orderNumber: string
+  customerName: string
+  total: number
+  status: Order['status']
+  createdAt: string
+}
+
+export interface StoreDashboardSummary {
+  monthlySales: number
+  ordersToday: number
+  averageOrderValue: number
+  lowStockItems: number
+  pendingOrders: number
+  salesByDay: SalesByDay[]
+  ordersByStatus: OrderStatusBreakdown[]
+  recentOrders: RecentOrderSummary[]
+}
+
+const TREND_DAYS = 30
+const RECENT_ORDERS_LIMIT = 6
+const MS_PER_DAY = 86_400_000
+
+const EMPTY_DASHBOARD_SUMMARY: StoreDashboardSummary = {
+  monthlySales: 0,
+  ordersToday: 0,
+  averageOrderValue: 0,
+  lowStockItems: 0,
+  pendingOrders: 0,
+  salesByDay: [],
+  ordersByStatus: [],
+  recentOrders: [],
+}
+
+type WindowOrderRow = {
+  created_at: string
+  status: string | null
+  payment_status: string | null
+  total_amount: unknown
+}
+
+type RecentOrderRow = {
+  id: string
+  order_number: string | null
+  order_date: string | null
+  created_at: string
+  status: string | null
+  total_amount: unknown
+  customer_first_name: string | null
+  customer_last_name: string | null
+  customer_email: string | null
+}
+
+type TrackedItemRow = {
+  inventory_quantity: number | null
+  low_stock_threshold: number | null
+}
+
+export async function getStoreDashboardSummary(storeId: string): Promise<StoreDashboardSummary> {
   try {
-    const supabase = getSupabaseEcommerce()
+    const supabase = getSupabaseServiceClient()
     if (!supabase) {
-      return {
-        totalProducts: 0,
-        ordersToday: 0,
-        totalUsers: 0,
-        monthlySales: 0,
-      }
+      return EMPTY_DASHBOARD_SUMMARY
     }
 
     const now = new Date()
-    const businessDayStart = getBusinessDayStartUtc(now)
-    const businessMonthStart = getBusinessMonthStartUtc(now)
+    const dayStartISO = getBusinessDayStartUtc(now).toISOString()
+    const monthStartISO = getBusinessMonthStartUtc(now).toISOString()
+    const trendStartISO = getTrendStartUtc(now).toISOString()
+    const windowStartISO = trendStartISO < monthStartISO ? trendStartISO : monthStartISO
 
-    const [productsResult, ordersTodayResult, usersResult, monthlySalesResult] = await Promise.all([
-      withTimeout(
-        supabase
-          .from(ECOMMERCE_TABLES.storeItems)
-          .select('id', { count: 'exact', head: true })
-          .eq('is_active', true),
-        10000,
-        'getProductsCount'
-      ) as Promise<{ count: number | null; error: any }>,
-      withTimeout(
-        supabase
-          .from(ECOMMERCE_TABLES.orders)
-          .select('id', { count: 'exact', head: true })
-          .gte('created_at', businessDayStart.toISOString()),
-        10000,
-        'getOrdersTodayCount'
-      ) as Promise<{ count: number | null; error: any }>,
-      withTimeout(
-        supabase
-          .from(ECOMMERCE_TABLES.userProfiles)
-          .select('id', { count: 'exact', head: true }),
-        10000,
-        'getUsersCount'
-      ) as Promise<{ count: number | null; error: any }>,
-      withTimeout(
-        supabase
-          .from(ECOMMERCE_TABLES.orders)
-          .select('total_amount, currency_code')
-          .gte('created_at', businessMonthStart.toISOString())
-          .in('status', ['confirmed', 'processing', 'shipped', 'delivered'])
-          .in('payment_status', ['paid']),
-        10000,
-        'getMonthlySales'
-      ) as Promise<{ data: Array<{ total_amount: unknown }> | null; error: any }>,
-    ])
+    const [windowOrdersResult, pendingOrdersResult, recentOrdersResult, trackedItemsResult] =
+      await Promise.all([
+        withTimeout(
+          supabase
+            .from(ECOMMERCE_TABLES.orders)
+            .select('created_at, status, payment_status, total_amount')
+            .eq('store_id', storeId)
+            .gte('created_at', windowStartISO),
+          10000,
+          'getDashboardWindowOrders'
+        ) as Promise<{ data: WindowOrderRow[] | null; error: any }>,
+        withTimeout(
+          supabase
+            .from(ECOMMERCE_TABLES.orders)
+            .select('id', { count: 'exact', head: true })
+            .eq('store_id', storeId)
+            .eq('status', 'pending'),
+          10000,
+          'getDashboardPendingOrders'
+        ) as Promise<{ count: number | null; error: any }>,
+        withTimeout(
+          supabase
+            .from(ECOMMERCE_TABLES.orders)
+            .select(
+              'id, order_number, order_date, created_at, status, total_amount, customer_first_name, customer_last_name, customer_email'
+            )
+            .eq('store_id', storeId)
+            .order('created_at', { ascending: false })
+            .limit(RECENT_ORDERS_LIMIT),
+          10000,
+          'getDashboardRecentOrders'
+        ) as Promise<{ data: RecentOrderRow[] | null; error: any }>,
+        withTimeout(
+          supabase
+            .from(ECOMMERCE_TABLES.storeItems)
+            .select('inventory_quantity, low_stock_threshold')
+            .eq('store_id', storeId)
+            .eq('is_active', true)
+            .eq('track_inventory', true),
+          10000,
+          'getDashboardTrackedItems'
+        ) as Promise<{ data: TrackedItemRow[] | null; error: any }>,
+      ])
 
-    // Procesar resultados
-    const totalProducts = productsResult.count || 0
-    const ordersToday = ordersTodayResult.count || 0
-    const totalUsers = usersResult.count || 0
+    assertQuerySucceeded('las ventas del período', windowOrdersResult.error)
+    assertQuerySucceeded('los pedidos pendientes', pendingOrdersResult.error)
+    assertQuerySucceeded('los pedidos recientes', recentOrdersResult.error)
+    assertQuerySucceeded('el inventario', trackedItemsResult.error)
 
-    // Calcular ventas del mes
-    let monthlySales = 0
-    if (monthlySalesResult.data) {
-      monthlySales = monthlySalesResult.data.reduce((sum, order) => {
-        // Convertir total_amount a número (viene como string desde Supabase)
-        return sum + (Number(order.total_amount) || 0)
-      }, 0)
-    }
+    const windowOrders = windowOrdersResult.data ?? []
+    const soldTrendOrders = windowOrders.filter(
+      (order) => isSoldOrder(order) && order.created_at >= trendStartISO
+    )
+    const trendSales = sumAmounts(soldTrendOrders)
 
     return {
-      totalProducts,
-      ordersToday,
-      totalUsers,
-      monthlySales,
+      monthlySales: sumAmounts(
+        windowOrders.filter((order) => isSoldOrder(order) && order.created_at >= monthStartISO)
+      ),
+      ordersToday: windowOrders.filter((order) => order.created_at >= dayStartISO).length,
+      averageOrderValue: soldTrendOrders.length > 0 ? trendSales / soldTrendOrders.length : 0,
+      lowStockItems: (trackedItemsResult.data ?? []).filter(isLowStock).length,
+      pendingOrders: pendingOrdersResult.count || 0,
+      salesByDay: buildSalesByDay(soldTrendOrders, now),
+      ordersByStatus: buildOrdersByStatus(windowOrders, trendStartISO),
+      recentOrders: (recentOrdersResult.data ?? []).flatMap(toRecentOrderSummary),
     }
   } catch (error: any) {
-    console.error('[Stats] Error al obtener estadísticas:', error)
-    return {
-      totalProducts: 0,
-      ordersToday: 0,
-      totalUsers: 0,
-      monthlySales: 0,
-    }
+    console.error('[Stats] Error al obtener el resumen del panel:', error)
+    throw error
   }
+}
+
+// Una consulta a Supabase que falla resuelve con `.error`, no lanza: sin esta
+// verificación el fallo se leería como datos vacíos reales.
+function assertQuerySucceeded(label: string, error: unknown): void {
+  if (!error) return
+  throw new Error(`No se pudo cargar ${label} del panel`, { cause: error })
+}
+
+function getTrendStartUtc(now: Date): Date {
+  return getBusinessDayStartUtc(new Date(now.getTime() - (TREND_DAYS - 1) * MS_PER_DAY))
+}
+
+function toAmount(value: unknown): number {
+  return Number(value) || 0
+}
+
+function sumAmounts(orders: WindowOrderRow[]): number {
+  return orders.reduce((sum, order) => sum + toAmount(order.total_amount), 0)
+}
+
+function isSoldOrder(order: WindowOrderRow): boolean {
+  return (
+    SOLD_ORDER_STATUSES.includes(order.status ?? '') &&
+    SOLD_PAYMENT_STATUSES.includes(order.payment_status ?? '')
+  )
+}
+
+function isLowStock(item: TrackedItemRow): boolean {
+  return (item.inventory_quantity ?? 0) <= (item.low_stock_threshold ?? 0)
+}
+
+function buildSalesByDay(soldOrders: WindowOrderRow[], now: Date): SalesByDay[] {
+  const totalsByDay = new Map<string, { sales: number; orders: number }>()
+  soldOrders.forEach((order) => {
+    const day = toBusinessDayKey(new Date(order.created_at))
+    const totals = totalsByDay.get(day) ?? { sales: 0, orders: 0 }
+    totalsByDay.set(day, {
+      sales: totals.sales + toAmount(order.total_amount),
+      orders: totals.orders + 1,
+    })
+  })
+
+  return Array.from({ length: TREND_DAYS }, (_unused, index) => {
+    const dayOffset = TREND_DAYS - 1 - index
+    const date = toBusinessDayKey(new Date(now.getTime() - dayOffset * MS_PER_DAY))
+    return { date, ...(totalsByDay.get(date) ?? { sales: 0, orders: 0 }) }
+  })
+}
+
+function buildOrdersByStatus(orders: WindowOrderRow[], trendStartISO: string): OrderStatusBreakdown[] {
+  const countsByStatus = new Map<Order['status'], number>()
+  orders.forEach((order) => {
+    if (order.created_at < trendStartISO) return
+    const status = toKnownOrderStatus(order.status)
+    if (!status) return
+    countsByStatus.set(status, (countsByStatus.get(status) ?? 0) + 1)
+  })
+
+  return ORDER_STATUSES.filter((status) => countsByStatus.has(status)).map((status) => ({
+    status,
+    count: countsByStatus.get(status)!,
+  }))
+}
+
+function toKnownOrderStatus(status: string | null): Order['status'] | null {
+  return ORDER_STATUSES.find((known) => known === status) ?? null
+}
+
+// An order whose status is outside ORDER_STATUSES cannot be rendered as a status
+// badge without inventing a label for it, so it is left out rather than mislabelled.
+function toRecentOrderSummary(order: RecentOrderRow): RecentOrderSummary[] {
+  const status = toKnownOrderStatus(order.status)
+  if (!status) return []
+
+  const customerName = [order.customer_first_name, order.customer_last_name]
+    .filter(Boolean)
+    .join(' ')
+    .trim()
+
+  return [
+    {
+      id: order.id,
+      orderNumber: order.order_number ?? order.id,
+      customerName: customerName || order.customer_email || 'Cliente invitado',
+      total: toAmount(order.total_amount),
+      status,
+      createdAt: order.order_date ?? order.created_at,
+    },
+  ]
 }
 
 /**

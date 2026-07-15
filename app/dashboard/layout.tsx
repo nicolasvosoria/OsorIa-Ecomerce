@@ -1,24 +1,9 @@
-import { AdminPermissionsProvider } from "@/contexts/admin-permissions-context"
-import type { ReactNode } from "react"
+import type { ReactNode } from "react";
 
 export default function DashboardLayout({
   children,
 }: {
-  children: ReactNode
+  children: ReactNode;
 }) {
-  return (
-    <AdminPermissionsProvider>
-      {children}
-    </AdminPermissionsProvider>
-  )
+  return children;
 }
-
-
-
-
-
-
-
-
-
-

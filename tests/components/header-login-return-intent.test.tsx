@@ -121,6 +121,20 @@ describe("Header login return intent", () => {
     expect(routerPush).toHaveBeenCalledTimes(1);
   });
 
+  it("routes a super_admin login to the safe next path once", async () => {
+    loginMock.mockResolvedValue({ success: true, user: { id: "super-admin-1", email: "superadmin@example.com", role: "super_admin" } });
+    render(<Header />);
+
+    fireEvent.change(await screen.findByPlaceholderText("tu@email.com"), { target: { value: "superadmin@example.com" } });
+    fireEvent.change(screen.getByPlaceholderText("••••••••"), { target: { value: "secret123" } });
+    fireEvent.click(screen.getByRole("button", { name: "Entrar" }));
+
+    await waitFor(() => {
+      expect(routerPush).toHaveBeenCalledWith("/admin/orders");
+    });
+    expect(routerPush).toHaveBeenCalledTimes(1);
+  });
+
   it("does not route a non-admin login into the admin next path", async () => {
     loginMock.mockResolvedValue({ success: true, user: { id: "user-1", email: "user@example.com", role: "user" } });
     render(<Header />);

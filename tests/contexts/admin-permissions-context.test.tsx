@@ -13,10 +13,14 @@ vi.mock("@/contexts/auth-context", () => ({
   useAuth: () => authState,
 }));
 
-vi.mock("@/lib/supabase/permissions-api", () => ({
-  isCurrentUserAdmin: () => mockIsCurrentUserAdmin(),
-  getCurrentUserRole: () => mockGetCurrentUserRole(),
-}));
+vi.mock("@/lib/supabase/permissions-api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/supabase/permissions-api")>();
+  return {
+    ...actual,
+    isCurrentUserAdmin: () => mockIsCurrentUserAdmin(),
+    getCurrentUserRole: () => mockGetCurrentUserRole(),
+  };
+});
 
 import {
   AdminPermissionsProvider,

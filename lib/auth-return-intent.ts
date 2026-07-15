@@ -1,4 +1,5 @@
 import type { UserProfile } from "@/lib/types/user";
+import { isAdminRole } from "@/lib/memberships/roles";
 
 const AUTH_CONFIRMATION_SUCCESS_PATH = "/auth/cuenta-confirmada";
 export const ADMIN_ACCESS_DENIED_PATH = "/?admin_access=denied";
@@ -59,7 +60,7 @@ export function resolvePostAuthDestination({
     return fallback;
   }
 
-  if (user?.role === "admin") {
+  if (isAdminRole(user?.role)) {
     return safeReturnPath;
   }
 

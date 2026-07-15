@@ -1463,7 +1463,7 @@ export async function createOrder(
  */
 export async function getOrderById(
   orderId: string,
-  storeId?: string,
+  storeId: string,
 ): Promise<OrderWithItems | null> {
   try {
     const supabase = getSupabaseEcommerce();
@@ -1472,13 +1472,11 @@ export async function getOrderById(
       return null;
     }
 
-    let query = supabase
+    const query = supabase
       .from(ECOMMERCE_TABLES.orders)
       .select("*")
-      .eq("id", orderId);
-    if (storeId) {
-      query = query.eq("store_id", storeId);
-    }
+      .eq("id", orderId)
+      .eq("store_id", storeId);
 
     const orderResult = (await withTimeout(
       query.single(),
@@ -1555,7 +1553,7 @@ export interface GetOrdersParams {
   order_direction?: "asc" | "desc";
   status?: Order["status"];
   payment_status?: Order["payment_status"];
-  storeId?: string;
+  storeId: string;
 }
 
 export interface GetOrdersResult {
@@ -1564,7 +1562,7 @@ export interface GetOrdersResult {
 }
 
 export async function getOrders(
-  params: GetOrdersParams = {},
+  params: GetOrdersParams,
   supabaseOverride?: any,
 ): Promise<GetOrdersResult> {
   try {
@@ -1584,12 +1582,11 @@ export async function getOrders(
       storeId,
     } = params;
 
-    let query = supabase.from(ECOMMERCE_TABLES.orders).select("*", { count: "exact" });
-
-    // Acotar a la tienda confiable (defensa en profundidad server-side)
-    if (storeId) {
-      query = query.eq("store_id", storeId);
-    }
+    let query = supabase
+      .from(ECOMMERCE_TABLES.orders)
+      .select("*", { count: "exact" })
+      // Acotar a la tienda confiable (defensa en profundidad server-side)
+      .eq("store_id", storeId);
 
     // Filtrar por estado si se especifica
     if (status) {

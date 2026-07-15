@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/command"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
-import { getCategories } from "@/lib/supabase/products-api"
+import { listActiveStoreCategories } from "@/app/admin/actions/catalog-pickers"
 import type { ItemCategory } from "@/lib/types/products"
 import { EMPTY_SELECT_VALUE } from "@/lib/ui/select-empty-value"
 
@@ -28,9 +28,9 @@ interface CategoryPickerProps {
 
 /**
  * Selector de categoría real del catálogo para curar los tiles de "Más
- * vendidos". Usa `getCategories`, la misma fuente que el resto del
- * storefront, así el preview del editor queda sincronizado con el live.
- * Mirrors `ProductPicker`'s UX.
+ * vendidos". Lee vía server action para que la tienda salga de la activa del
+ * admin (cookie firmada) y no del host, que sería otra tienda cuando el admin
+ * entró a una tienda distinta desde el switcher. Mirrors `ProductPicker`'s UX.
  */
 export function CategoryPicker({ value, onChange, contentClassName }: CategoryPickerProps) {
   const [categories, setCategories] = useState<ItemCategory[]>([])
@@ -40,7 +40,7 @@ export function CategoryPicker({ value, onChange, contentClassName }: CategoryPi
   useEffect(() => {
     let active = true
 
-    getCategories(false)
+    listActiveStoreCategories()
       .then((result) => {
         if (active) setCategories(result)
       })

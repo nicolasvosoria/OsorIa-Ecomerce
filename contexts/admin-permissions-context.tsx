@@ -2,12 +2,14 @@
 
 import { createContext, useContext, useEffect, useState, useRef, type ReactNode } from "react"
 import { isCurrentUserAdmin, getCurrentUserRole } from "@/lib/supabase/permissions-api"
+import { isSuperAdminRole } from "@/lib/memberships/roles"
 import { useAuth } from "@/contexts/auth-context"
 import type { UserRole } from "@/lib/types/user"
 import { deferStateUpdate } from "@/lib/react/defer-state-update"
 
 interface AdminPermissionsContextType {
   isAdmin: boolean
+  isSuperAdmin: boolean
   role: UserRole | null
   loading: boolean
   hasChecked: boolean // Indica si ya se ha verificado al menos una vez
@@ -27,6 +29,7 @@ export function AdminPermissionsProvider({ children }: { children: ReactNode }) 
   const verificationRunIdRef = useRef(0) // Invalida verificaciones viejas si cambia el usuario
   const verifiedAsAdminRef = useRef(false) // Ref para rastrear si ya se verificó como admin exitosamente
   const checkedUserIdRef = useRef<string | null>(null) // Evita reutilizar permisos de otro usuario autenticado
+  const isSuperAdmin = isSuperAdminRole(role)
 
   const refreshPermissions = async (expectedUserId = currentUserId) => {
     if (activeVerificationUserIdRef.current === expectedUserId) {
@@ -205,6 +208,7 @@ export function AdminPermissionsProvider({ children }: { children: ReactNode }) 
     <AdminPermissionsContext.Provider
       value={{
         isAdmin,
+        isSuperAdmin,
         role,
         loading,
         hasChecked,

@@ -1,3 +1,2 @@
-// Límite de items a traer en los listados admin (orders, products, users).
-// Mitigación temporal; la paginación real llega en Plan 5.
+// Límite de items a traer en listados admin que aún no paginan (ej. clientes).
 export const ADMIN_LIST_FETCH_LIMIT = 500

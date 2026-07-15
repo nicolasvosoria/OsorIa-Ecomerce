@@ -21,10 +21,12 @@ vi.mock("sonner", () => ({
   toast: { error: vi.fn(), success: vi.fn() },
 }));
 
-const { getCategoriesMock } = vi.hoisted(() => ({ getCategoriesMock: vi.fn() }));
+const { listActiveStoreCategoriesMock } = vi.hoisted(() => ({
+  listActiveStoreCategoriesMock: vi.fn(),
+}));
 
-vi.mock("@/lib/supabase/products-api", () => ({
-  getCategories: getCategoriesMock,
+vi.mock("@/app/admin/actions/catalog-pickers", () => ({
+  listActiveStoreCategories: listActiveStoreCategoriesMock,
 }));
 
 // jsdom doesn't implement ResizeObserver or scrollIntoView; the underlying
@@ -60,7 +62,7 @@ describe("SectionContentPanel content field dispatch", () => {
   });
 
   it("renders a CategoryPicker for a declared type:\"category\" array sub-field", async () => {
-    getCategoriesMock.mockResolvedValue([
+    listActiveStoreCategoriesMock.mockResolvedValue([
       { id: "cat-speakers", category_name: "Bocinas Bluetooth", display_order: 1, is_active: true, created_at: "", updated_at: "" },
     ]);
 
@@ -81,7 +83,7 @@ describe("SectionContentPanel content field dispatch", () => {
   });
 
   it("selecting a category on an existing tile propagates the updated array through onFieldChange", async () => {
-    getCategoriesMock.mockResolvedValue([
+    listActiveStoreCategoriesMock.mockResolvedValue([
       { id: "cat-speakers", category_name: "Bocinas Bluetooth", display_order: 1, is_active: true, created_at: "", updated_at: "" },
       { id: "cat-headphones", category_name: "Audífonos", display_order: 2, is_active: true, created_at: "", updated_at: "" },
     ]);

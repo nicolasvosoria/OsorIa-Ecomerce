@@ -42,11 +42,12 @@ async function resolveStoreIdBySubdomain(supabase: any, subdomain: string) {
   return data.id as string;
 }
 
-// Trusted target store for admin writes: derived from the request host, never
-// from the mutable `store_id` cookie. A stale/unknown subdomain falls back to
-// the default store, mirroring getStoreFromServer.
-export async function resolveTrustedStoreId(
-  request: NextRequest,
+// Trusted target store derived from a raw Host header, never from the mutable
+// `store_id` cookie. A stale/unknown subdomain falls back to the default store,
+// mirroring getStoreFromServer. Shared by the bearer routes (via NextRequest)
+// and the RSC/server-action authorizer (via headers()).
+export async function resolveTrustedStoreIdFromHost(
+  hostHeader: string | null | undefined,
   supabase: any,
 ): Promise<string> {
   if (process.env.DISABLE_SUBDOMAIN_MULTI_TENANT === "true") {
@@ -56,8 +57,16 @@ export async function resolveTrustedStoreId(
       : configuredStoreId;
   }
 
-  const subdomain = resolveStoreLookupSubdomain(request.headers.get("host"));
+  const subdomain = resolveStoreLookupSubdomain(hostHeader);
   const storeId = await resolveStoreIdBySubdomain(supabase, subdomain);
 
   return storeId ?? resolveDefaultStoreId(supabase);
+}
+
+// Trusted target store for admin writes on the bearer API routes.
+export function resolveTrustedStoreId(
+  request: NextRequest,
+  supabase: any,
+): Promise<string> {
+  return resolveTrustedStoreIdFromHost(request.headers.get("host"), supabase);
 }

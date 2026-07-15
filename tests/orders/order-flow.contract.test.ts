@@ -1712,12 +1712,12 @@ describe("orders-api live order contract", () => {
 
     getSupabaseEcommerceMock.mockReturnValue({ from: state.from, rpc: state.rpc });
 
-    const byId = await getOrderById("order-live-1");
+    const byId = await getOrderById("order-live-1", "store-live-1");
     const byNumber = await getOrderByNumber("A-2001", {
       storeId: "store-live-1",
       email: "buyer@example.com",
     });
-    const adminList = await getOrders({ limit: 20 });
+    const adminList = await getOrders({ limit: 20, storeId: "store-live-1" });
 
     expect(byId?.payment_method).toBe("cash_on_delivery");
     expect(byId?.payment_status).toBe("pending");
@@ -1808,7 +1808,7 @@ describe("orders-api live order contract", () => {
 
     getSupabaseEcommerceMock.mockReturnValue({ from: state.from, rpc: state.rpc });
 
-    const adminList = await getOrders({ limit: 20 });
+    const adminList = await getOrders({ limit: 20, storeId: "store-aligned-1" });
     const emailOrders = await getOrdersByEmail("aligned@example.com");
 
     expect(adminList.orders).toHaveLength(1);
@@ -1935,7 +1935,7 @@ describe("orders-api live order contract", () => {
 
     getSupabaseEcommerceMock.mockReturnValue({ from: state.from, rpc: state.rpc });
 
-    const order = await getOrderById("order-provider-1");
+    const order = await getOrderById("order-provider-1", "store-provider-1");
 
     expect(order?.payment_method).toBe("credit_card");
     expect(order?.payment_status).toBe("paid");

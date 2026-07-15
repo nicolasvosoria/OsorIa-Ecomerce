@@ -35,6 +35,9 @@ Common optional variables by feature:
   - `DEFAULT_STORE_ID`
   - `NEXT_PUBLIC_DISABLE_SUBDOMAIN_MULTI_TENANT`
   - `NEXT_PUBLIC_DEFAULT_STORE_ID`
+- Admin active-store cookie (signed HMAC for the RSC/server-action store gate):
+  - `ADMIN_COOKIE_SECRET` (required to trust the `active-store` cookie; when
+    unset the gate ignores the cookie and falls back to the request host)
 - Chat API enrichment (`app/api/chat/route.ts`):
   - `SUPABASE_SERVICE_ROLE_KEY`
   - `DEEPSEEK_API_KEY`

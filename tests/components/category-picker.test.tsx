@@ -3,10 +3,12 @@ import { beforeAll, describe, expect, it, vi } from "vitest"
 import { CategoryPicker } from "@/components/admin/category-picker"
 import type { ItemCategory } from "@/lib/types/products"
 
-const { getCategoriesMock } = vi.hoisted(() => ({ getCategoriesMock: vi.fn() }))
+const { listActiveStoreCategoriesMock } = vi.hoisted(() => ({
+  listActiveStoreCategoriesMock: vi.fn(),
+}))
 
-vi.mock("@/lib/supabase/products-api", () => ({
-  getCategories: getCategoriesMock,
+vi.mock("@/app/admin/actions/catalog-pickers", () => ({
+  listActiveStoreCategories: listActiveStoreCategoriesMock,
 }))
 
 // jsdom doesn't implement ResizeObserver or scrollIntoView; the underlying
@@ -33,7 +35,7 @@ const speakers: ItemCategory = {
 
 describe("CategoryPicker", () => {
   it("shows a placeholder while categories are loading", () => {
-    getCategoriesMock.mockReturnValue(new Promise(() => {}))
+    listActiveStoreCategoriesMock.mockReturnValue(new Promise(() => {}))
 
     render(<CategoryPicker value="" onChange={vi.fn()} />)
 
@@ -41,7 +43,7 @@ describe("CategoryPicker", () => {
   })
 
   it("shows the selected category's name once categories load", async () => {
-    getCategoriesMock.mockResolvedValue([speakers])
+    listActiveStoreCategoriesMock.mockResolvedValue([speakers])
 
     render(<CategoryPicker value="cat-speakers" onChange={vi.fn()} />)
 
@@ -49,7 +51,7 @@ describe("CategoryPicker", () => {
   })
 
   it("calls onChange with the picked category's id", async () => {
-    getCategoriesMock.mockResolvedValue([speakers])
+    listActiveStoreCategoriesMock.mockResolvedValue([speakers])
     const onChange = vi.fn()
 
     render(<CategoryPicker value="" onChange={onChange} />)

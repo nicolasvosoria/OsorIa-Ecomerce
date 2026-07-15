@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
     );
     const { data: orders, error } = await supabase
       .from(ECOMMERCE_TABLES.orders)
-      .select("id")
+      .select("id, store_id")
       .order("created_at", { ascending: false })
       .limit(1);
     if (error || !orders?.length) {
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
         { headers: { "Content-Type": "text/html; charset=utf-8" } },
       );
     }
-    const order = await getOrderById(orders[0].id);
+    const order = await getOrderById(orders[0].id, orders[0].store_id);
     if (!order) {
       return new NextResponse(
         "<html><body><p>No se pudo cargar el pedido.</p></body></html>",

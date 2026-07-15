@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import type { NextRequest } from "next/server";
 import { ECOMMERCE_TABLES } from "./contract";
 import { normalizeAuthReturnPath } from "@/lib/auth-return-intent";
+import { isAdminRole } from "@/lib/memberships/roles";
 
 export type AdminAccessResult =
   | { status: "admin"; userId: string }
@@ -108,7 +109,7 @@ export async function resolveAdminAccess(request: NextRequest): Promise<AdminAcc
       return { status: "error", userId: user.id, reason: "profile_lookup_failed" };
     }
 
-    if (profile.role === "admin") {
+    if (isAdminRole(profile.role)) {
       return { status: "admin", userId: user.id };
     }
 

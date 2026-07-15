@@ -1,247 +1,57 @@
-"use client"
-
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import { useAdminPermissions } from "@/contexts/admin-permissions-context"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import {
-  Loader2,
-  ShieldAlert,
-  Users,
-  ArrowLeft,
-  Mail,
-  User,
-} from "lucide-react"
 import Link from "next/link"
-import { getUsers } from "@/lib/supabase/users-api"
-import { ADMIN_LIST_FETCH_LIMIT } from "@/lib/admin/constants"
-import type { UserProfile } from "@/lib/types/user"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
+import { redirect } from "next/navigation"
+import { ArrowLeft } from "lucide-react"
 
-export default function AdminUsersPage() {
-  const { isAdmin, loading } = useAdminPermissions()
-  const router = useRouter()
-  const [users, setUsers] = useState<UserProfile[]>([])
-  const [loadingUsers, setLoadingUsers] = useState(true)
-  const [totalUsers, setTotalUsers] = useState(0)
+import { Button } from "@/components/ui/button"
+import { authorizeActiveStoreAdmin } from "@/lib/supabase/active-store"
+import { listStoreMembers, type StoreMember } from "@/lib/supabase/memberships-api"
+import { TeamSection } from "./components/team-section"
+import { ClientsSection } from "./components/clients-section"
 
-  useEffect(() => {
-    if (!loading && !isAdmin) {
-      router.push("/")
-    }
-  }, [isAdmin, loading, router])
-
-  useEffect(() => {
-    const loadUsers = async () => {
-      if (!isAdmin) return
-      
-      setLoadingUsers(true)
-      try {
-        const result = await getUsers({
-          limit: ADMIN_LIST_FETCH_LIMIT,
-          order_by: 'created_at',
-          order_direction: 'desc',
-        })
-        setUsers(result.users)
-        setTotalUsers(result.total)
-      } catch (error) {
-        console.error("[Admin Users] Error al cargar usuarios:", error)
-      } finally {
-        setLoadingUsers(false)
-      }
-    }
-
-    if (isAdmin) {
-      loadUsers()
-    }
-  }, [isAdmin])
-
-  if (loading) {
-    return (
-      <div 
-        className="flex items-center justify-center h-screen"
-        style={{ backgroundColor: "var(--background)" }}
-      >
-        <Loader2 
-          className="h-8 w-8 animate-spin" 
-          style={{ color: "var(--foreground)" }}
-        />
-      </div>
-    )
+export default async function AdminUsersPage() {
+  const authorization = await authorizeActiveStoreAdmin()
+  if ("error" in authorization) {
+    redirect("/")
   }
 
-  if (!isAdmin) {
-    return (
-      <div 
-        className="flex items-center justify-center h-screen p-4"
-        style={{ backgroundColor: "var(--background)" }}
-      >
-        <Card className="max-w-md w-full">
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <ShieldAlert className="h-5 w-5 text-destructive" />
-              <CardTitle>Acceso Denegado</CardTitle>
-            </div>
-            <CardDescription>
-              No tienes permisos para acceder a esta página.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild className="w-full">
-              <Link href="/">Volver al Inicio</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
+  const team = await loadTeam(authorization.storeId)
 
   return (
-    <div 
-      className="min-h-screen" 
-      style={{ 
-        backgroundColor: "var(--background)",
-        background: "linear-gradient(to bottom right, var(--background), var(--muted))"
-      }}
-    >
-      {/* Header */}
-      <header 
-        className="border-b shadow-sm"
-        style={{ 
-          backgroundColor: "var(--card)",
-          borderColor: "var(--border)"
-        }}
-      >
-        <div className="container mx-auto px-4 py-4 max-w-full">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
-              <Button variant="ghost" size="icon" className="shrink-0 h-9 w-9 sm:h-10 sm:w-10" asChild>
-                <Link href="/dashboard">
-                  <ArrowLeft className="h-5 w-5" />
-                </Link>
-              </Button>
-              <div className="min-w-0">
-                <h1 
-                  className="text-lg sm:text-xl md:text-2xl font-bold truncate"
-                  style={{ color: "var(--foreground)" }}
-                >
-                  Gestión de Usuarios
-                </h1>
-                <p 
-                  className="text-xs sm:text-sm mt-1 truncate"
-                  style={{ color: "var(--muted-foreground)" }}
-                >
-                  Administra usuarios y permisos del sistema
-                </p>
-              </div>
-            </div>
+    <div className="space-y-8">
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <Button variant="ghost" size="icon" className="shrink-0" asChild>
+            <Link href="/admin">
+              <ArrowLeft className="h-5 w-5" />
+            </Link>
+          </Button>
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold text-foreground">Gestión de Usuarios</h1>
+            <p className="text-sm text-muted-foreground">
+              Administra el equipo de tu tienda y los usuarios de la plataforma.
+            </p>
           </div>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-8 max-w-full overflow-x-hidden">
-        {loadingUsers ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
-        ) : users.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <Users className="h-12 w-12 text-muted-foreground mb-4" />
-              <CardTitle className="mb-2">No hay usuarios</CardTitle>
-              <CardDescription>
-                Los usuarios se crearán automáticamente al registrarse
-              </CardDescription>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card>
-            <CardHeader>
-              <CardTitle>Lista de Usuarios ({totalUsers})</CardTitle>
-              <CardDescription>
-                Gestiona todos los usuarios registrados en el sistema
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-2 sm:p-6">
-              <div className="overflow-x-auto -mx-2 sm:mx-0 rounded-md border border-border">
-                <Table className="min-w-[600px]">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Usuario</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Rol</TableHead>
-                      <TableHead>Fecha de Registro</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {users.map((user) => (
-                      <TableRow key={user.id}>
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                              <User className="h-5 w-5 text-primary" />
-                            </div>
-                            <div>
-                              <div className="font-medium">
-                                {user.first_name || user.last_name
-                                  ? `${user.first_name || ''} ${user.last_name || ''}`.trim()
-                                  : 'Sin nombre'}
-                              </div>
-                              {user.first_name || user.last_name ? (
-                                <div className="text-sm text-muted-foreground">
-                                  ID: {user.id.substring(0, 8)}...
-                                </div>
-                              ) : null}
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Mail className="h-4 w-4 text-muted-foreground" />
-                            <span>{user.email}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {user.role === 'admin' ? (
-                            <Badge variant="default" className="bg-purple-600">Administrador</Badge>
-                          ) : (
-                            <Badge variant="secondary">Usuario</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {user.created_at ? (
-                            <div className="text-sm">
-                              {new Date(user.created_at).toLocaleDateString('es-ES', {
-                                year: 'numeric',
-                                month: 'short',
-                                day: 'numeric',
-                              })}
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-      </main>
+      <TeamSection
+        members={team.members}
+        state={team.state}
+        currentUserId={authorization.userId}
+      />
+      <ClientsSection currentUserId={authorization.userId} />
     </div>
   )
 }
 
+type TeamData = { members: StoreMember[]; state: "ready" | "empty" | "error" }
 
+async function loadTeam(storeId: string): Promise<TeamData> {
+  try {
+    const members = await listStoreMembers(storeId)
+    return { members, state: members.length === 0 ? "empty" : "ready" }
+  } catch (error) {
+    console.error("[Admin Users] Error al cargar el equipo:", error)
+    return { members: [], state: "error" }
+  }
+}

@@ -1,13 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { getDashboardStats, getDetailedStats, getTopSellingProductIds } from "@/lib/supabase/stats-api";
+import {
+  getDetailedStats,
+  getStoreDashboardSummary,
+  getTopSellingProductIds,
+} from "@/lib/supabase/stats-api";
 
-const { getSupabaseEcommerceMock } = vi.hoisted(() => ({
+const { getSupabaseEcommerceMock, getSupabaseServiceClientMock } = vi.hoisted(() => ({
   getSupabaseEcommerceMock: vi.fn(),
+  getSupabaseServiceClientMock: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase/client", () => ({
   getSupabaseEcommerce: getSupabaseEcommerceMock,
+}));
+
+vi.mock("@/lib/supabase/admin-store", () => ({
+  getSupabaseServiceClient: getSupabaseServiceClientMock,
 }));
 
 type ScriptedResponse = { data?: any; error?: any; count?: number | null };
@@ -35,6 +44,16 @@ class QueryBuilder {
 
   in(column: string, value: unknown): this {
     this.state.record(this.state.filters, this.table, { op: "in", column, value });
+    return this;
+  }
+
+  order(column: string, options?: Record<string, unknown>): this {
+    this.state.record(this.state.filters, this.table, { op: "order", column, value: options });
+    return this;
+  }
+
+  limit(value: number): this {
+    this.state.record(this.state.filters, this.table, { op: "limit", column: "", value });
     return this;
   }
 
@@ -88,49 +107,244 @@ describe("stats-api contract", () => {
     vi.useRealTimers();
   });
 
-  it("loads dashboard stats from canonical ecommerce tables", async () => {
-    const state = new MockSupabaseState({
-      store_items: [{ count: 3, error: null }],
-      orders: [
-        { count: 2, error: null },
-        {
-          data: [{ total_amount: "100.50" }, { total_amount: 200 }],
-          error: null,
-        },
-      ],
-      user_profiles: [{ count: 4, error: null }],
-    });
-    getSupabaseEcommerceMock.mockReturnValue({ from: state.from });
+  describe("getStoreDashboardSummary", () => {
+    function scriptDashboard() {
+      const state = new MockSupabaseState({
+        orders: [
+          {
+            data: [
+              {
+                created_at: "2026-04-26T16:00:00.000Z",
+                status: "confirmed",
+                payment_status: "paid",
+                total_amount: "100.50",
+              },
+              {
+                created_at: "2026-04-26T14:00:00.000Z",
+                status: "pending",
+                payment_status: "pending",
+                total_amount: 999,
+              },
+              {
+                created_at: "2026-04-20T12:00:00.000Z",
+                status: "delivered",
+                payment_status: "paid",
+                total_amount: 200,
+              },
+              {
+                created_at: "2026-03-29T12:00:00.000Z",
+                status: "delivered",
+                payment_status: "paid",
+                total_amount: 50,
+              },
+            ],
+            error: null,
+          },
+          { count: 3, error: null },
+          {
+            data: [
+              {
+                id: "order-1",
+                order_number: "OSO-1001",
+                order_date: "2026-04-26T16:00:00.000Z",
+                created_at: "2026-04-26T16:05:00.000Z",
+                status: "confirmed",
+                total_amount: "100.50",
+                customer_first_name: "Ana",
+                customer_last_name: "Ruiz",
+                customer_email: "ana@example.com",
+              },
+              {
+                id: "order-2",
+                order_number: null,
+                order_date: null,
+                created_at: "2026-04-20T12:00:00.000Z",
+                status: "delivered",
+                total_amount: 200,
+                customer_first_name: null,
+                customer_last_name: null,
+                customer_email: "guest@example.com",
+              },
+              {
+                id: "order-3",
+                order_number: "OSO-1003",
+                order_date: "2026-04-19T12:00:00.000Z",
+                created_at: "2026-04-19T12:00:00.000Z",
+                status: "archived",
+                total_amount: 10,
+                customer_first_name: "Leo",
+                customer_last_name: "Paz",
+                customer_email: "leo@example.com",
+              },
+            ],
+            error: null,
+          },
+        ],
+        store_items: [
+          {
+            data: [
+              { inventory_quantity: 2, low_stock_threshold: 5 },
+              { inventory_quantity: 20, low_stock_threshold: 5 },
+              { inventory_quantity: 0, low_stock_threshold: 0 },
+            ],
+            error: null,
+          },
+        ],
+      });
+      getSupabaseServiceClientMock.mockReturnValue({ from: state.from });
+      return state;
+    }
 
-    const result = await getDashboardStats();
+    it("scopes every query to the given store and uses canonical tables", async () => {
+      const state = scriptDashboard();
 
-    expect(result).toEqual({
-      totalProducts: 3,
-      ordersToday: 2,
-      totalUsers: 4,
-      monthlySales: 300.5,
+      await getStoreDashboardSummary("store-1");
+
+      expect(state.fromCalls).toEqual(["orders", "orders", "orders", "store_items"]);
+      expect(state.fromCalls).not.toContain("orders_legacy");
+      expect(state.fromCalls).not.toContain("store_items_legacy");
+      expect(
+        state.filters.orders.filter((filter) => filter.column === "store_id"),
+      ).toEqual([
+        { op: "eq", column: "store_id", value: "store-1" },
+        { op: "eq", column: "store_id", value: "store-1" },
+        { op: "eq", column: "store_id", value: "store-1" },
+      ]);
+      expect(state.filters.store_items).toEqual([
+        { op: "eq", column: "store_id", value: "store-1" },
+        { op: "eq", column: "is_active", value: true },
+        { op: "eq", column: "track_inventory", value: true },
+      ]);
     });
-    expect(state.fromCalls).toEqual([
-      "store_items",
-      "orders",
-      "user_profiles",
-      "orders",
-    ]);
-    expect(state.fromCalls).not.toContain("store_items_legacy");
-    expect(state.fromCalls).not.toContain("orders_legacy");
-    expect(state.filters.store_items).toEqual([
-      { op: "eq", column: "is_active", value: true },
-    ]);
-    expect(state.filters.orders).toEqual(
-      expect.arrayContaining([
-        { op: "gte", column: "created_at", value: "2026-04-26T05:00:00.000Z" },
+
+    it("reads orders once from the widest window covering the month and the trend", async () => {
+      const state = scriptDashboard();
+
+      await getStoreDashboardSummary("store-1");
+
+      expect(state.filters.orders).toEqual(
+        expect.arrayContaining([
+          { op: "gte", column: "created_at", value: "2026-03-28T05:00:00.000Z" },
+        ]),
+      );
+    });
+
+    it("derives month sales, today's orders and the paid-order average ticket", async () => {
+      scriptDashboard();
+
+      const summary = await getStoreDashboardSummary("store-1");
+
+      expect(summary.monthlySales).toBe(300.5);
+      expect(summary.ordersToday).toBe(2);
+      expect(summary.averageOrderValue).toBeCloseTo(116.833, 2);
+      expect(summary.pendingOrders).toBe(3);
+    });
+
+    it("counts only tracked items at or below their low-stock threshold", async () => {
+      scriptDashboard();
+
+      const summary = await getStoreDashboardSummary("store-1");
+
+      expect(summary.lowStockItems).toBe(2);
+    });
+
+    it("buckets paid sales into one entry per business day of the trend window", async () => {
+      scriptDashboard();
+
+      const summary = await getStoreDashboardSummary("store-1");
+
+      expect(summary.salesByDay).toHaveLength(30);
+      expect(summary.salesByDay[0]).toEqual({ date: "2026-03-28", sales: 0, orders: 0 });
+      expect(summary.salesByDay.at(-1)).toEqual({
+        date: "2026-04-26",
+        sales: 100.5,
+        orders: 1,
+      });
+      expect(summary.salesByDay).toEqual(
+        expect.arrayContaining([
+          { date: "2026-03-29", sales: 50, orders: 1 },
+          { date: "2026-04-20", sales: 200, orders: 1 },
+        ]),
+      );
+    });
+
+    it("breaks orders down by known status in canonical status order", async () => {
+      scriptDashboard();
+
+      const summary = await getStoreDashboardSummary("store-1");
+
+      expect(summary.ordersByStatus).toEqual([
+        { status: "pending", count: 1 },
+        { status: "confirmed", count: 1 },
+        { status: "delivered", count: 2 },
+      ]);
+    });
+
+    it("maps recent orders to serializable rows and drops unknown statuses", async () => {
+      scriptDashboard();
+
+      const summary = await getStoreDashboardSummary("store-1");
+
+      expect(summary.recentOrders).toEqual([
         {
-          op: "in",
-          column: "payment_status",
-          value: ["paid"],
+          id: "order-1",
+          orderNumber: "OSO-1001",
+          customerName: "Ana Ruiz",
+          total: 100.5,
+          status: "confirmed",
+          createdAt: "2026-04-26T16:00:00.000Z",
         },
-      ]),
-    );
+        {
+          id: "order-2",
+          orderNumber: "order-2",
+          customerName: "guest@example.com",
+          total: 200,
+          status: "delivered",
+          createdAt: "2026-04-20T12:00:00.000Z",
+        },
+      ]);
+    });
+
+    it("throws instead of returning zeros when a query resolves with an error", async () => {
+      const state = new MockSupabaseState({
+        orders: [
+          { data: [], error: null },
+          { data: null, error: { message: 'relation "orders" does not exist' }, count: null },
+          { data: [], error: null },
+        ],
+        store_items: [{ data: [], error: null }],
+      });
+      getSupabaseServiceClientMock.mockReturnValue({ from: state.from });
+      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      await expect(getStoreDashboardSummary("store-1")).rejects.toThrow(
+        /pedidos pendientes/,
+      );
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        "[Stats] Error al obtener el resumen del panel:",
+        expect.any(Error),
+      );
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    it("returns an empty summary when Supabase is not configured", async () => {
+      getSupabaseServiceClientMock.mockReturnValue(null);
+
+      const summary = await getStoreDashboardSummary("store-1");
+
+      expect(summary).toEqual({
+        monthlySales: 0,
+        ordersToday: 0,
+        averageOrderValue: 0,
+        lowStockItems: 0,
+        pendingOrders: 0,
+        salesByDay: [],
+        ordersByStatus: [],
+        recentOrders: [],
+      });
+    });
   });
 
   it("loads detailed stats from orders and order_items without legacy views", async () => {

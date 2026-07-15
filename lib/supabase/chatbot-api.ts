@@ -55,10 +55,10 @@ type MetadataRecord = Record<string, unknown>
 
 const DEFAULT_TEMPERATURE = 0.7
 const DEFAULT_MAX_TOKENS = 500
-const MIN_TEMPERATURE = 0
-const MAX_TEMPERATURE = 2
-const MIN_MAX_TOKENS = 100
-const MAX_MAX_TOKENS = 2000
+export const MIN_TEMPERATURE = 0
+export const MAX_TEMPERATURE = 2
+export const MIN_MAX_TOKENS = 100
+export const MAX_MAX_TOKENS = 2000
 const DEFAULT_STORE_SUBDOMAIN = "default"
 
 export const SAFE_GENERIC_ECOMMERCE_ASSISTANT_GUIDE = `Eres un asistente seguro para una tienda ecommerce. Ayuda a los clientes en español con orientación general sobre navegación, productos disponibles en el contexto real del catálogo y próximos pasos de compra.
@@ -417,41 +417,5 @@ export async function getChatbotConfig(): Promise<ChatbotConfig> {
   } catch (error) {
     console.error("[Chatbot API] Error al obtener configuración:", error)
     return { ...DEFAULT_CHATBOT_CONFIG }
-  }
-}
-
-/**
- * Guarda la configuración del chatbot para la tienda actual desde el navegador.
- * Preferir /api/chatbot-config para validar permisos de administrador.
- */
-export async function saveChatbotConfig(config: ChatbotConfig): Promise<{ success: boolean; error?: string }> {
-  try {
-    const supabase = getSupabaseEcommerce()
-    if (!supabase) {
-      return { success: false, error: "Supabase no configurado" }
-    }
-
-    const storeId = typeof document !== "undefined"
-      ? document.cookie.split(";").find((c) => c.trim().startsWith("store_id="))?.split("=")[1] || "default"
-      : "default"
-
-    const lookups = buildChatbotStoreLookups({
-      storeId,
-      host: typeof window !== "undefined" ? window.location.hostname : null,
-    })
-
-    await saveChatbotConfigForStore(
-      supabase as unknown as ChatbotPersistenceClient,
-      lookups,
-      config,
-    )
-
-    return { success: true }
-  } catch (error) {
-    console.error("[Chatbot API] Error al guardar configuración:", error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Error desconocido",
-    }
   }
 }

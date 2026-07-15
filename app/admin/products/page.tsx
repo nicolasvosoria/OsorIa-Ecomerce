@@ -1,314 +1,107 @@
-"use client"
-
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import { useAdminPermissions } from "@/contexts/admin-permissions-context"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import {
-  Loader2,
-  ShieldAlert,
-  Package,
-  Plus,
-  Edit,
-  Eye,
-  ArrowLeft,
-} from "lucide-react"
 import Link from "next/link"
+import { redirect } from "next/navigation"
+import { ArrowLeft, Package, Plus } from "lucide-react"
+
+import { Button } from "@/components/ui/button"
+import { authorizeActiveStoreAdmin } from "@/lib/supabase/active-store"
 import { getItems } from "@/lib/supabase/products-api"
-import { ADMIN_LIST_FETCH_LIMIT } from "@/lib/admin/constants"
 import type { StoreItemWithDetails } from "@/lib/types/products"
-import { formatPrice } from "@/lib/commerce/utils"
-import Image from "next/image"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
+import { ProductsTable } from "./components/products-table"
 
-export default function AdminProductsPage() {
-  const { isAdmin, loading, hasChecked } = useAdminPermissions()
-  const router = useRouter()
-  const [products, setProducts] = useState<StoreItemWithDetails[]>([])
-  const [loadingProducts, setLoadingProducts] = useState(true)
+const DEFAULT_PAGE_SIZE = 20
 
-  useEffect(() => {
-    // Solo redirigir si la verificación se completó (hasChecked) y no es admin
-    // Esto asegura que esperamos a que isAdmin se actualice antes de redirigir
-    if (hasChecked && !loading && !isAdmin) {
-      console.log("[Admin Products] Usuario no es admin después de verificación, redirigiendo...")
-      router.push("/")
-    }
-  }, [isAdmin, loading, hasChecked, router])
+type ProductsPageProps = {
+  searchParams: Promise<{ page?: string; pageSize?: string }>
+}
 
-  useEffect(() => {
-    const loadProducts = async () => {
-      if (!isAdmin) return
-      
-      setLoadingProducts(true)
-      try {
-        const result = await getItems({
-          limit: ADMIN_LIST_FETCH_LIMIT,
-          order_by: 'created_at',
-          order_direction: 'desc',
-        })
-        setProducts(result.items)
-      } catch (error) {
-        console.error("[Admin Products] Error al cargar productos:", error)
-      } finally {
-        setLoadingProducts(false)
-      }
-    }
+function parsePositiveInt(value: string | undefined, fallback: number): number {
+  const parsed = Number(value)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback
+}
 
-    if (isAdmin) {
-      loadProducts()
-    }
-  }, [isAdmin])
-
-  // Mostrar loading mientras se verifican permisos
-  if (loading || !hasChecked) {
-    return (
-      <div 
-        className="flex flex-col items-center justify-center h-screen gap-4"
-        style={{ backgroundColor: "var(--background)" }}
-      >
-        <Loader2 
-          className="h-8 w-8 animate-spin" 
-          style={{ color: "var(--foreground)" }}
-        />
-        <p className="text-sm text-muted-foreground">
-          Verificando permisos de administrador...
-        </p>
-      </div>
-    )
+export default async function AdminProductsPage({ searchParams }: ProductsPageProps) {
+  const authorization = await authorizeActiveStoreAdmin()
+  if ("error" in authorization) {
+    redirect("/")
   }
 
-  // Solo mostrar acceso denegado si ya se verificaron los permisos y no es admin
-  if (!isAdmin && hasChecked) {
-    return (
-      <div 
-        className="flex items-center justify-center h-screen p-4"
-        style={{ backgroundColor: "var(--background)" }}
-      >
-        <Card className="max-w-md w-full">
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <ShieldAlert className="h-5 w-5 text-destructive" />
-              <CardTitle>Acceso Denegado</CardTitle>
-            </div>
-            <CardDescription>
-              No tienes permisos para acceder a esta página.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild className="w-full">
-              <Link href="/">Volver al Inicio</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
+  const { page: pageParam, pageSize: pageSizeParam } = await searchParams
+  const page = parsePositiveInt(pageParam, 1)
+  const pageSize = parsePositiveInt(pageSizeParam, DEFAULT_PAGE_SIZE)
+
+  const list = await loadProducts(authorization.supabase, authorization.storeId, page, pageSize)
 
   return (
-    <div 
-      className="min-h-screen" 
-      style={{ 
-        backgroundColor: "var(--background)",
-        background: "linear-gradient(to bottom right, var(--background), var(--muted))"
-      }}
-    >
-      {/* Header */}
-      <header 
-        className="border-b shadow-sm"
-        style={{ 
-          backgroundColor: "var(--card)",
-          borderColor: "var(--border)"
-        }}
-      >
-        <div className="container mx-auto px-4 py-4 max-w-full">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
-              <Button variant="ghost" size="icon" className="shrink-0 h-9 w-9 sm:h-10 sm:w-10" asChild>
-                <Link href="/dashboard">
-                  <ArrowLeft className="h-5 w-5" />
-                </Link>
-              </Button>
-              <div className="min-w-0">
-                <h1 
-                  className="text-lg sm:text-xl md:text-2xl font-bold truncate"
-                  style={{ color: "var(--foreground)" }}
-                >
-                  Gestión de Productos
-                </h1>
-                <p 
-                  className="text-xs sm:text-sm mt-1 truncate"
-                  style={{ color: "var(--muted-foreground)" }}
-                >
-                  Administra tu catálogo de productos
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Button asChild size="sm" variant="outline" className="shrink-0 gap-1.5 sm:gap-2">
-                <Link href="/admin/products/combos">
-                  <Package className="h-4 w-4 shrink-0" />
-                  <span className="hidden sm:inline">Combos</span>
-                </Link>
-              </Button>
-              <Button asChild size="sm" className="shrink-0 gap-1.5 sm:gap-2">
-                <Link href="/admin/products/create">
-                  <Plus className="h-4 w-4 shrink-0" />
-                  <span className="hidden sm:inline">Nuevo Producto</span>
-                </Link>
-              </Button>
-            </div>
+    <div className="space-y-6">
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <Button variant="ghost" size="icon" className="shrink-0" asChild>
+            <Link href="/admin">
+              <ArrowLeft className="h-5 w-5" />
+            </Link>
+          </Button>
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold text-foreground">Gestión de Productos</h1>
+            <p className="text-sm text-muted-foreground">Administra tu catálogo de productos</p>
           </div>
+        </div>
+        <div className="flex gap-2">
+          <Button asChild size="sm" variant="outline" className="shrink-0 gap-1.5 sm:gap-2">
+            <Link href="/admin/products/combos">
+              <Package className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline">Combos</span>
+            </Link>
+          </Button>
+          <Button asChild size="sm" className="shrink-0 gap-1.5 sm:gap-2">
+            <Link href="/admin/products/create">
+              <Plus className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline">Nuevo Producto</span>
+            </Link>
+          </Button>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-8 max-w-full overflow-x-hidden">
-        {loadingProducts ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
-        ) : products.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <Package className="h-12 w-12 text-muted-foreground mb-4" />
-              <CardTitle className="mb-2">No hay productos</CardTitle>
-              <CardDescription className="mb-4">
-                Comienza creando tu primer producto
-              </CardDescription>
-              <Button asChild>
-                <Link href="/admin/products/create">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Crear Producto
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card>
-            <CardHeader>
-              <CardTitle>Lista de Productos ({products.length})</CardTitle>
-              <CardDescription>
-                Gestiona todos tus productos desde aquí
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-2 sm:p-6">
-              <div className="overflow-x-auto -mx-2 sm:mx-0 rounded-md border border-border">
-                <Table className="min-w-[640px]">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[100px]">Imagen</TableHead>
-                      <TableHead>Nombre</TableHead>
-                      <TableHead>Categoría</TableHead>
-                      <TableHead>Precio</TableHead>
-                      <TableHead>Stock</TableHead>
-                      <TableHead>Estado</TableHead>
-                      <TableHead className="text-right">Acciones</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {products.map((product) => (
-                      <TableRow key={product.id}>
-                        <TableCell>
-                          <div className="relative w-16 h-16 rounded-lg overflow-hidden bg-muted">
-                            {product.primary_image_url ? (
-                              <Image
-                                src={product.primary_image_url}
-                                alt={product.primary_image_alt || product.item_name}
-                                fill
-                                className="object-cover"
-                                sizes="64px"
-                              />
-                            ) : (
-                              <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
-                                Sin imagen
-                              </div>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="font-medium">{product.item_name}</div>
-                          {product.item_code && (
-                            <div className="text-sm text-muted-foreground">
-                              Código: {product.item_code}
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {product.category?.category_name || (
-                            <span className="text-muted-foreground">Sin categoría</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <div className="font-medium">
-                            {formatPrice(product.base_price.toString(), product.currency_code)}
-                          </div>
-                          {product.compare_at_price && (
-                            <div className="text-sm text-muted-foreground line-through">
-                              {formatPrice(product.compare_at_price.toString(), product.currency_code)}
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <div className="font-medium">{product.inventory_quantity}</div>
-                          {product.track_inventory && product.inventory_quantity <= product.low_stock_threshold && (
-                            <Badge variant="destructive" className="text-xs mt-1">
-                              Stock bajo
-                            </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-col gap-1">
-                            {product.is_active ? (
-                              <Badge variant="default" className="w-fit">Activo</Badge>
-                            ) : (
-                              <Badge variant="secondary" className="w-fit">Inactivo</Badge>
-                            )}
-                            {product.is_featured && (
-                              <Badge variant="outline" className="w-fit">Destacado</Badge>
-                            )}
-                            {product.item_kind === 'combo' && (
-                              <Badge variant="outline" className="w-fit">Combo</Badge>
-                            )}
-                            {!product.is_available_for_sale && (
-                              <Badge variant="outline" className="w-fit">No disponible</Badge>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            {product.item_slug && (
-                              <Button variant="ghost" size="icon" asChild>
-                                <Link href={`/products/${product.item_slug}`} target="_blank">
-                                  <Eye className="h-4 w-4" />
-                                </Link>
-                              </Button>
-                            )}
-                            <Button variant="ghost" size="icon" asChild>
-                              <Link href={product.item_kind === 'combo' ? `/admin/products/combos` : `/admin/products/${product.id}/edit`}>
-                                <Edit className="h-4 w-4" />
-                              </Link>
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-      </main>
+      <ProductsTable
+        rows={list.state === "ready" ? list.products : []}
+        state={list.state}
+        pagination={{ page, pageSize, total: list.total }}
+      />
     </div>
   )
+}
+
+type ProductsList =
+  | { state: "ready"; products: StoreItemWithDetails[]; total: number }
+  | { state: "empty"; total: number }
+  | { state: "error"; total: number }
+
+async function loadProducts(
+  supabase: any,
+  storeId: string,
+  page: number,
+  pageSize: number,
+): Promise<ProductsList> {
+  try {
+    const { items, total } = await getItems(
+      {
+        store_id: storeId,
+        item_kind: "products",
+        is_active: true,
+        limit: pageSize,
+        offset: (page - 1) * pageSize,
+        order_by: "created_at",
+        order_direction: "desc",
+      },
+      supabase,
+    )
+
+    if (items.length === 0) {
+      return { state: "empty", total }
+    }
+
+    return { state: "ready", products: items, total }
+  } catch (error) {
+    console.error("[Admin Products] Error al cargar productos:", error)
+    return { state: "error", total: 0 }
+  }
 }

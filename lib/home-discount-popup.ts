@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import { sanitizePublicUrl } from "@/lib/security/html-sanitization";
 
 export type HomeDiscountPopupCtaMode = "redirect" | "copy_coupon";
@@ -197,6 +199,47 @@ export function normalizeHomeDiscountPopupConfig(
     ctaMode,
   };
 }
+
+const INVALID_DELAY_SECONDS_MESSAGE = `El delay debe estar entre ${MIN_DELAY_SECONDS} y ${MAX_DELAY_SECONDS} segundos`;
+const INVALID_FREQUENCY_HOURS_MESSAGE = `La frecuencia debe estar entre ${MIN_FREQUENCY_HOURS} y ${MAX_FREQUENCY_HOURS} horas`;
+const INVALID_VISIBLE_DURATION_MESSAGE = `La duración visible debe estar entre ${MIN_VISIBLE_DURATION_SECONDS} y ${MAX_VISIBLE_DURATION_SECONDS} segundos`;
+
+function isFiniteInRange(value: number, min: number, max: number): boolean {
+  return Number.isFinite(value) && value >= min && value <= max;
+}
+
+// Valida la forma y los rangos numéricos de los campos del formulario. Las
+// reglas de publicabilidad (título requerido si está activo, CTA válido,
+// vigencia, etc.) viven en validateHomeDiscountPopupAdminStatus, no aquí.
+export const homeDiscountPopupFormSchema = z.object({
+  active: z.boolean(),
+  title: z.string(),
+  text: z.string(),
+  imageUrl: z.string().nullable(),
+  ctaText: z.string(),
+  ctaUrl: z.string().nullable(),
+  coupon: z.string(),
+  startsAt: z.string().nullable(),
+  endsAt: z.string().nullable(),
+  delaySeconds: z
+    .number({ invalid_type_error: INVALID_DELAY_SECONDS_MESSAGE })
+    .refine((value) => isFiniteInRange(value, MIN_DELAY_SECONDS, MAX_DELAY_SECONDS), INVALID_DELAY_SECONDS_MESSAGE),
+  frequencyHours: z
+    .number({ invalid_type_error: INVALID_FREQUENCY_HOURS_MESSAGE })
+    .refine(
+      (value) => isFiniteInRange(value, MIN_FREQUENCY_HOURS, MAX_FREQUENCY_HOURS),
+      INVALID_FREQUENCY_HOURS_MESSAGE,
+    ),
+  visibleDurationSeconds: z
+    .number({ invalid_type_error: INVALID_VISIBLE_DURATION_MESSAGE })
+    .refine(
+      (value) => isFiniteInRange(value, MIN_VISIBLE_DURATION_SECONDS, MAX_VISIBLE_DURATION_SECONDS),
+      INVALID_VISIBLE_DURATION_MESSAGE,
+    ),
+  ctaMode: z.enum(["redirect", "copy_coupon"]),
+});
+
+export type HomeDiscountPopupFormValues = z.infer<typeof homeDiscountPopupFormSchema>;
 
 export function toDateTimeLocalValue(value: string | null): string {
   if (!value) {

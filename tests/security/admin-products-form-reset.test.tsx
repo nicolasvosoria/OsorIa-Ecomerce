@@ -9,22 +9,17 @@ import {
 import { createElement, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import CreateProductPage from "@/app/admin/products/create/page";
+import { CreateProductForm } from "@/app/admin/products/create/components/create-product-form";
 
-const mockUseAdminPermissions = vi.fn();
 const mockPush = vi.fn();
-const mockCreateItem = vi.fn();
-const mockGetCategories = vi.fn();
+const mockCreateProductAction = vi.fn();
 const mockToastSuccess = vi.fn();
 const mockToastError = vi.fn();
 
-vi.mock("@/contexts/admin-permissions-context", () => ({
-  useAdminPermissions: () => mockUseAdminPermissions(),
-}));
+const CATEGORIES = [{ id: "category-1", category_name: "Cafés" }] as never;
 
-vi.mock("@/lib/supabase/products-api", () => ({
-  createItem: (...args: unknown[]) => mockCreateItem(...args),
-  getCategories: (...args: unknown[]) => mockGetCategories(...args),
+vi.mock("@/app/admin/products/actions", () => ({
+  createProductAction: (...args: unknown[]) => mockCreateProductAction(...args),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -121,15 +116,8 @@ vi.mock("sonner", () => ({
   },
 }));
 
-function setupSuccessfulCreate() {
-  mockUseAdminPermissions.mockReturnValue({ isAdmin: true, loading: false });
-  mockGetCategories.mockResolvedValue([
-    { id: "category-1", category_name: "Cafés" },
-  ]);
-  mockCreateItem.mockResolvedValue({
-    success: true,
-    item: { id: "item-1", item_name: "Café Especial" },
-  });
+function renderCreateForm() {
+  return render(createElement(CreateProductForm, { categories: CATEGORIES }));
 }
 
 async function fillRequiredProductFields() {
@@ -154,11 +142,11 @@ async function fillRequiredProductFields() {
 describe("admin product create form reset", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    setupSuccessfulCreate();
+    mockCreateProductAction.mockResolvedValue({ success: true });
   });
 
   it("clears form values and selected images after Guardar y crear otro", async () => {
-    render(createElement(CreateProductPage));
+    renderCreateForm();
 
     await fillRequiredProductFields();
 
@@ -166,7 +154,7 @@ describe("admin product create form reset", () => {
       fireEvent.click(screen.getByRole("button", { name: /guardar y crear otro/i }));
     });
 
-    await waitFor(() => expect(mockCreateItem).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mockCreateProductAction).toHaveBeenCalledTimes(1));
 
     expect(mockPush).not.toHaveBeenCalled();
     expect(mockToastSuccess).toHaveBeenCalledWith(
@@ -177,17 +165,19 @@ describe("admin product create form reset", () => {
     expect(screen.getByLabelText(/descripción$/i)).toHaveValue("");
     expect(screen.getByTestId("selected-images")).toHaveTextContent("");
 
-    expect(mockCreateItem).toHaveBeenCalledWith(
+    expect(mockCreateProductAction).toHaveBeenCalledWith(
       expect.objectContaining({
         item_name: "Café Especial",
-        primary_image_url: "https://cdn.example.com/first.webp",
+        images: [
+          "https://cdn.example.com/first.webp",
+          "https://cdn.example.com/second.webp",
+        ],
       }),
-      ["https://cdn.example.com/second.webp"],
     );
   });
 
   it("requires valid native form fields before Guardar y crear otro creates a product", async () => {
-    render(createElement(CreateProductPage));
+    renderCreateForm();
 
     fireEvent.change(screen.getByLabelText(/nombre del producto/i), {
       target: { value: "Café Especial" },
@@ -203,13 +193,13 @@ describe("admin product create form reset", () => {
       fireEvent.click(screen.getByRole("button", { name: /guardar y crear otro/i }));
     });
 
-    expect(mockCreateItem).not.toHaveBeenCalled();
+    expect(mockCreateProductAction).not.toHaveBeenCalled();
     expect(mockPush).not.toHaveBeenCalled();
     expect(mockToastSuccess).not.toHaveBeenCalled();
   });
 
   it("navigates after Guardar and a later create page mount starts with defaults", async () => {
-    const { unmount } = render(createElement(CreateProductPage));
+    const { unmount } = renderCreateForm();
 
     await fillRequiredProductFields();
 
@@ -221,7 +211,7 @@ describe("admin product create form reset", () => {
 
     unmount();
     await act(async () => {
-      render(createElement(CreateProductPage));
+      renderCreateForm();
     });
 
     expect(screen.getByLabelText(/nombre del producto/i)).toHaveValue("");
@@ -231,13 +221,13 @@ describe("admin product create form reset", () => {
 
   it("keeps a double click on save from creating duplicate products", async () => {
     let resolveCreate: (value: unknown) => void = () => undefined;
-    mockCreateItem.mockReturnValue(
+    mockCreateProductAction.mockReturnValue(
       new Promise((resolve) => {
         resolveCreate = resolve;
       }),
     );
 
-    render(createElement(CreateProductPage));
+    renderCreateForm();
 
     await fillRequiredProductFields();
 
@@ -250,10 +240,10 @@ describe("admin product create form reset", () => {
     fireEvent.click(saveButton);
     fireEvent.click(saveButton);
 
-    expect(mockCreateItem).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(mockCreateProductAction).toHaveBeenCalledTimes(1));
 
     await act(async () => {
-      resolveCreate({ success: true, item: { id: "item-1" } });
+      resolveCreate({ success: true });
     });
   });
 });

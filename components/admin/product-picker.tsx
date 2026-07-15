@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/command"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
-import { getItems } from "@/lib/supabase/products-api"
+import { listActiveStoreItems } from "@/app/admin/actions/catalog-pickers"
 import type { StoreItemWithDetails } from "@/lib/types/products"
 import { EMPTY_SELECT_VALUE } from "@/lib/ui/select-empty-value"
 
@@ -28,8 +28,9 @@ interface ProductPickerProps {
 
 /**
  * Selector de producto real del catálogo para hidratar secciones destacadas.
- * Usa `getItems`, la misma fuente que el resto del storefront, así el preview
- * del editor queda sincronizado con el live. No filtramos por UUID (ilegible
+ * Lee vía server action para que la tienda salga de la activa del admin
+ * (cookie firmada) y no del host, que sería otra tienda cuando el admin entró
+ * a una tienda distinta desde el switcher. No filtramos por UUID (ilegible
  * para el admin); para sumar otro criterio de filtrado a futuro, usar la prop
  * `keywords` de cada CommandItem.
  */
@@ -41,14 +42,9 @@ export function ProductPicker({ value, onChange, contentClassName }: ProductPick
   useEffect(() => {
     let active = true
 
-    getItems({
-      is_active: true,
-      limit: 100,
-      order_by: "item_name",
-      order_direction: "asc",
-    })
+    listActiveStoreItems()
       .then((result) => {
-        if (active) setItems(result.items)
+        if (active) setItems(result)
       })
       .catch((error) => {
         console.error("Error fetching products for picker:", error)

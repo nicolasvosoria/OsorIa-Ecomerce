@@ -81,9 +81,13 @@ async function resolveDefaultStoreId(supabase: ReturnType<typeof getSupabaseEcom
 /**
  * Obtener todas las categorías activas
  */
-export async function getCategories(includeInactive: boolean = false, storeId?: string | null): Promise<ItemCategory[]> {
+export async function getCategories(
+  includeInactive: boolean = false,
+  storeId?: string | null,
+  supabaseOverride?: any,
+): Promise<ItemCategory[]> {
   try {
-    const supabase = getSupabaseEcommerce()
+    const supabase = supabaseOverride ?? getSupabaseEcommerce()
     if (!supabase) {
       console.error('[Products] Supabase no configurado')
       return []
@@ -131,9 +135,12 @@ export async function getCategories(includeInactive: boolean = false, storeId?: 
 /**
  * Obtener productos con filtros y paginación
  */
-export async function getItems(params: GetItemsParams = {}): Promise<GetItemsResult> {
+export async function getItems(
+  params: GetItemsParams = {},
+  supabaseOverride?: any,
+): Promise<GetItemsResult> {
   try {
-    const supabase = getSupabaseEcommerce()
+    const supabase = supabaseOverride ?? getSupabaseEcommerce()
     if (!supabase) {
       return { items: [], total: 0, has_more: false }
     }
@@ -554,9 +561,13 @@ export async function getItemBySlug(slug: string, storeId?: string | null): Prom
 /**
  * Obtener un producto por ID
  */
-export async function getItemById(itemId: string, storeId?: string): Promise<StoreItemWithDetails | null> {
+export async function getItemById(
+  itemId: string,
+  storeId?: string,
+  supabaseOverride?: any,
+): Promise<StoreItemWithDetails | null> {
   try {
-    const supabase = getSupabaseEcommerce()
+    const supabase = supabaseOverride ?? getSupabaseEcommerce()
     if (!supabase) {
       return null
     }
@@ -628,20 +639,6 @@ export async function getItemById(itemId: string, storeId?: string): Promise<Sto
     console.error('[Products] Error inesperado al obtener producto:', error)
     return null
   }
-}
-
-/**
- * Obtener productos destacados
- */
-export async function getFeaturedItems(limit: number = 10): Promise<StoreItemWithDetails[]> {
-  const result = await getItems({
-    is_featured: true,
-    limit,
-    order_by: 'display_order',
-    order_direction: 'asc',
-  })
-
-  return result.items
 }
 
 /**
@@ -793,10 +790,11 @@ async function syncProductNormalizedDetails(
 
 export async function createItem(
   data: CreateItemData,
-  additionalImages: string[] = []
+  additionalImages: string[] = [],
+  supabaseOverride?: any
 ): Promise<CreateItemResult> {
   try {
-    const supabase = getSupabaseEcommerce()
+    const supabase = supabaseOverride ?? getSupabaseEcommerce()
     if (!supabase) {
       return {
         success: false,
@@ -1002,10 +1000,12 @@ export interface UpdateItemResult {
 export async function updateItem(
   itemId: string,
   data: UpdateItemData,
-  additionalImages: string[] = []
+  additionalImages: string[] = [],
+  storeId?: string,
+  supabaseOverride?: any
 ): Promise<UpdateItemResult> {
   try {
-    const supabase = getSupabaseEcommerce()
+    const supabase = supabaseOverride ?? getSupabaseEcommerce()
     if (!supabase) {
       return {
         success: false,
@@ -1021,13 +1021,19 @@ export async function updateItem(
       }
     }
 
-    // Obtener el producto actual para preservar valores no modificados
+    // Obtener el producto actual para preservar valores no modificados.
+    // Si se pasa storeId, se acota aquí para que no se pueda editar/archivar
+    // un producto de otra tienda (defensa contra IDOR).
+    let currentItemQuery = supabase
+      .from(ECOMMERCE_VIEWS.storeItemsLegacy)
+      .select('*')
+      .eq('id', itemId)
+    if (storeId) {
+      currentItemQuery = currentItemQuery.eq('store_id', storeId)
+    }
+
     const currentItemResult = await withTimeout(
-      supabase
-        .from(ECOMMERCE_VIEWS.storeItemsLegacy)
-        .select('*')
-        .eq('id', itemId)
-        .single(),
+      currentItemQuery.single(),
       15000,
       'getCurrentItem'
     ) as { data: any; error: any }

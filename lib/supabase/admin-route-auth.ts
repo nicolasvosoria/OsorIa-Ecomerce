@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
+import { isSuperAdminRole } from "@/lib/memberships/roles";
 import { ECOMMERCE_TABLES } from "./contract";
 
 export type AdminAuthDenial = {
@@ -46,7 +47,7 @@ type CandidateAuthorization =
   | { authorized: boolean }
   | { error: PermissionError };
 
-async function getSupabaseAuthClient() {
+export async function getSupabaseAuthClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -196,10 +197,6 @@ async function authorizeAnyCandidate(
   }
 
   return deniedResult(403, authResolution, debugEnabled);
-}
-
-function isSuperAdminRole(role: unknown): boolean {
-  return typeof role === "string" && role.toLowerCase() === "super_admin";
 }
 
 // Per-store admin gate: authorizes if any authenticated identity (cookie or

@@ -538,8 +538,8 @@ async function restoreComboComponents(supabase: any, rows: any[]): Promise<void>
   )
 }
 
-export async function createCombo(data: CreateComboData): Promise<ComboMutationResult> {
-  const supabase = getClient()
+export async function createCombo(data: CreateComboData, supabaseOverride?: any): Promise<ComboMutationResult> {
+  const supabase = getClient(supabaseOverride)
   if (!supabase) return { success: false, error: 'Supabase no configurado' }
 
   const storeId = await resolveStoreId(supabase, data.store_id)
@@ -605,8 +605,13 @@ export async function createCombo(data: CreateComboData): Promise<ComboMutationR
   return { success: true, combo: await getComboById(result.data.id) || undefined }
 }
 
-export async function updateCombo(comboId: string, data: UpdateComboData): Promise<ComboMutationResult> {
-  const supabase = getClient()
+export async function updateCombo(
+  comboId: string,
+  data: UpdateComboData,
+  storeId?: string,
+  supabaseOverride?: any,
+): Promise<ComboMutationResult> {
+  const supabase = getClient(supabaseOverride)
   if (!supabase) return { success: false, error: 'Supabase no configurado' }
 
   const updateData: Record<string, unknown> = {}
@@ -628,13 +633,21 @@ export async function updateCombo(comboId: string, data: UpdateComboData): Promi
     }
   }
 
+  // Se resuelve una sola vez y se reutiliza tanto para validar componentes
+  // como para acotar el update final (defensa contra IDOR cuando storeId
+  // viene de una acción autorizada).
+  let comboStoreId: string | null = null
+  if (storeId || data.components !== undefined) {
+    comboStoreId = await fetchComboStoreId(supabase, comboId)
+    if (!comboStoreId || (storeId && comboStoreId !== storeId)) {
+      return { success: false, error: 'No se pudo obtener el combo' }
+    }
+  }
+
   let replacementRows: any[] | null = null
   let existingComponentRows: any[] = []
   if (data.components !== undefined) {
-    const storeId = await fetchComboStoreId(supabase, comboId)
-    if (!storeId) return { success: false, error: 'No se pudo obtener el combo' }
-
-    const componentValidation = await validateComboComponentRows(supabase, data.components, comboId, storeId)
+    const componentValidation = await validateComboComponentRows(supabase, data.components, comboId, comboStoreId!)
     if (componentValidation.error) {
       return { success: false, error: componentValidation.error }
     }
@@ -679,11 +692,12 @@ export async function updateCombo(comboId: string, data: UpdateComboData): Promi
   }
 
   if (Object.keys(updateData).length > 0) {
-    const result = await withTimeout(
-      supabase.from(ECOMMERCE_TABLES.productCombos).update(updateData).eq('id', comboId),
-      20000,
-      'updateCombo',
-    ) as { error: any }
+    let updateQuery = supabase.from(ECOMMERCE_TABLES.productCombos).update(updateData).eq('id', comboId)
+    if (comboStoreId) {
+      updateQuery = updateQuery.eq('store_id', comboStoreId)
+    }
+
+    const result = await withTimeout(updateQuery, 20000, 'updateCombo') as { error: any }
 
     if (result.error) {
       if (componentsWereReplaced) {
@@ -699,4 +713,33 @@ export async function updateCombo(comboId: string, data: UpdateComboData): Promi
   }
 
   return { success: true, combo: await getComboById(comboId) || undefined }
+}
+
+export async function deleteCombo(
+  comboId: string,
+  storeId: string,
+  supabaseOverride?: any,
+): Promise<ComboMutationResult> {
+  const supabase = getClient(supabaseOverride)
+  if (!supabase) return { success: false, error: 'Supabase no configurado' }
+
+  // El .eq('store_id', storeId) acota el delete para que no se pueda borrar
+  // el combo de otra tienda (mismo patrón de defensa que updateCombo).
+  const result = await withTimeout(
+    supabase
+      .from(ECOMMERCE_TABLES.productCombos)
+      .delete()
+      .eq('id', comboId)
+      .eq('store_id', storeId)
+      .select('id')
+      .single(),
+    20000,
+    'deleteCombo',
+  ) as { data: { id: string } | null; error: any }
+
+  if (result.error || !result.data) {
+    return { success: false, error: result.error?.message || 'Combo no encontrado' }
+  }
+
+  return { success: true }
 }

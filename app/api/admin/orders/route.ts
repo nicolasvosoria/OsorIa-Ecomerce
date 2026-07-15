@@ -9,19 +9,12 @@ import {
   type GetOrdersParams,
   type Order,
 } from "@/lib/supabase/orders-api";
+import { ORDER_STATUSES } from "@/lib/orders/order-status";
 
-const ORDER_STATUSES: Order["status"][] = [
-  "pending",
-  "confirmed",
-  "processing",
-  "shipped",
-  "delivered",
-  "returned",
-  "cancelled",
-];
+type OrderListFilters = Omit<GetOrdersParams, "storeId">;
 
-function parseListParams(searchParams: URLSearchParams): GetOrdersParams {
-  const params: GetOrdersParams = {};
+function parseListParams(searchParams: URLSearchParams): OrderListFilters {
+  const params: OrderListFilters = {};
 
   const limit = Number(searchParams.get("limit"));
   if (Number.isFinite(limit) && limit > 0) params.limit = limit;
