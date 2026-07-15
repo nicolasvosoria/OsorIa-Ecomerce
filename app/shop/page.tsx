@@ -4,11 +4,15 @@ import { Suspense } from 'react';
 import ResultsControls from './components/results-controls';
 import { ProductGrid } from './components/product-grid';
 import { ProductCardSkeleton } from './components/product-card-skeleton';
+import { resolveStoreNameForMetadata } from '@/lib/metadata/store-name';
 
-export const metadata: Metadata = {
-  title: 'Osoria Store | Shop',
-  description: 'Osoria Store, tu tienda de café de especialidad y productos electrónicos.',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const storeName = await resolveStoreNameForMetadata();
+  return {
+    title: `${storeName} | Tienda`,
+    description: `Explorá el catálogo de ${storeName}.`,
+  };
+}
 
 // Cache is handled via 'use cache' directive in getProducts()
 export default async function Shop(props: {

@@ -2,6 +2,7 @@ import { Metadata } from 'next';
 import { getCollection, getCollections } from '@/lib/products';
 import { notFound } from 'next/navigation';
 import ProductList from '../components/product-list';
+import { resolveStoreNameForMetadata } from '@/lib/metadata/store-name';
 
 // Generate static params for all collections at build time
 export async function generateStaticParams() {
@@ -31,8 +32,10 @@ export async function generateMetadata(props: { params: Promise<{ collection: st
 
   if (!collection) return notFound();
 
+  const storeName = await resolveStoreNameForMetadata();
+
   return {
-    title: `ACME Store | ${collection.seo?.title || collection.title}`,
+    title: `${storeName} | ${collection.seo?.title || collection.title}`,
     description: collection.seo?.description || collection.description || `${collection.title} products`,
   };
 }

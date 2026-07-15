@@ -212,7 +212,7 @@ async function ProductContent({ slug }: { slug: string }) {
                 )}
               </div>
               {hasDiscount && (
-                <p className="text-sm text-green-600 font-medium">
+                <p className="text-sm text-success font-medium">
                   Ahorra {formatPrice((product.compare_at_price! - product.base_price).toString(), product.currency_code)} ({discountPercentage}% de descuento)
                 </p>
               )}
@@ -231,13 +231,13 @@ async function ProductContent({ slug }: { slug: string }) {
             <div className="flex items-center gap-2">
               {isAvailable ? (
                 <>
-                  <Check className="h-5 w-5 text-green-500" />
-                  <span className="text-green-600 font-medium">Disponible</span>
+                  <Check className="h-5 w-5 text-success" />
+                  <span className="text-success font-medium">Disponible</span>
                 </>
               ) : (
                 <>
-                  <AlertCircle className="h-5 w-5 text-red-500" />
-                  <span className="text-red-600 font-medium">Agotado</span>
+                  <AlertCircle className="h-5 w-5 text-destructive" />
+                  <span className="text-destructive font-medium">Agotado</span>
                 </>
               )}
             </div>
@@ -341,7 +341,7 @@ async function ProductContent({ slug }: { slug: string }) {
           <div className="mt-12 pt-12 border-t">
             <h2 className="text-2xl font-bold mb-6">Descripción del producto</h2>
             <div
-              className="prose prose-sm max-w-none"
+              className="prose prose-sm dark:prose-invert max-w-none"
               dangerouslySetInnerHTML={{ __html: product.item_description_html }}
             />
           </div>

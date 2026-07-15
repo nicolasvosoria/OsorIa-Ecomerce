@@ -1,4 +1,3 @@
-import { FooterNew } from "@/components/sections/footer-new";
 import { EditableWrapper } from "@/components/admin/editable-wrapper";
 import { HomeDiscountPopup } from "@/components/home-discount-popup";
 import {
@@ -61,9 +60,6 @@ export async function ConditionalHomeContent({
     <>
       <main className="flex flex-col">
         <HomeComposition sections={sections} composition={composition} previewMode={previewMode} />
-        <EditableWrapper componentName="footer" label={sectionLabel("footer")}>
-          <FooterNew />
-        </EditableWrapper>
       </main>
       <HomeDiscountPopup config={homeDiscountPopupConfig} storeId={storeId} />
     </>

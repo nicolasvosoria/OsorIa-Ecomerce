@@ -1,30 +1,20 @@
 import type { ReactNode } from "react"
-import { fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { render, screen } from "@testing-library/react"
 import { renderToString } from "react-dom/server"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 let mockedPathname = "/"
-const routerPush = vi.hoisted(() => vi.fn())
-const logoutMock = vi.hoisted(() => vi.fn())
-const authState = vi.hoisted(() => ({
-  isAuthenticated: true,
-  isLoading: false,
-}))
 
 vi.mock("next/navigation", () => ({
   usePathname: () => mockedPathname,
-  useRouter: () => ({ push: routerPush }),
-}))
-
-vi.mock("@/contexts/auth-context", () => ({
-  useAuth: () => ({
-    ...authState,
-    logout: logoutMock,
-  }),
 }))
 
 vi.mock("@/components/layout/header", () => ({
   Header: () => <div data-testid="storefront-header">Storefront header</div>,
+}))
+
+vi.mock("@/components/sections/footer-new", () => ({
+  FooterNew: () => <div data-testid="storefront-footer">Storefront footer</div>,
 }))
 
 vi.mock("@/components/admin/editable-wrapper", () => ({
@@ -91,9 +81,6 @@ describe("RouteAwareChrome", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockedPathname = "/"
-    authState.isAuthenticated = true
-    authState.isLoading = false
-    logoutMock.mockResolvedValue(undefined)
   })
 
   it("renders a stable server shell before the client pathname is resolved", () => {
@@ -107,6 +94,7 @@ describe("RouteAwareChrome", () => {
 
     expect(markup).toContain("Route children")
     expect(markup).not.toContain("Storefront header")
+    expect(markup).not.toContain("Storefront footer")
     expect(markup).not.toContain("Contact")
     expect(markup).not.toContain("Cerrar sesión")
   })
@@ -117,6 +105,8 @@ describe("RouteAwareChrome", () => {
     expect(screen.getByTestId("main-content-wrapper")).toBeInTheDocument()
     expect(screen.getByTestId("editable-wrapper-header")).toBeInTheDocument()
     expect(screen.getAllByTestId("storefront-header")).toHaveLength(1)
+    expect(screen.getByTestId("editable-wrapper-footer")).toBeInTheDocument()
+    expect(screen.getAllByTestId("storefront-footer")).toHaveLength(1)
     expect(screen.getByTestId("floating-contact-button")).toBeInTheDocument()
     expect(screen.getByTestId("route-children")).toBeInTheDocument()
   })
@@ -130,38 +120,15 @@ describe("RouteAwareChrome", () => {
       expect(screen.getByTestId("route-children")).toBeInTheDocument()
       expect(screen.queryByTestId("editable-wrapper-header")).not.toBeInTheDocument()
       expect(screen.queryByTestId("storefront-header")).not.toBeInTheDocument()
+      expect(screen.queryByTestId("editable-wrapper-footer")).not.toBeInTheDocument()
+      expect(screen.queryByTestId("storefront-footer")).not.toBeInTheDocument()
       expect(screen.queryByTestId("floating-contact-button")).not.toBeInTheDocument()
-      expect(screen.getByRole("button", { name: /cerrar sesión/i })).toBeInTheDocument()
     },
   )
 
-  it("logs out from admin chrome routes without restoring the storefront header", async () => {
-    renderChrome("/admin/orders")
-
-    fireEvent.click(screen.getByRole("button", { name: /cerrar sesión/i }))
-
-    await waitFor(() => {
-      expect(logoutMock).toHaveBeenCalledTimes(1)
-    })
-    expect(routerPush).toHaveBeenCalledWith("/")
-    expect(screen.queryByTestId("storefront-header")).not.toBeInTheDocument()
-  })
-
-  it("does not render admin session actions for anonymous admin visitors", () => {
-    authState.isAuthenticated = false
-
-    renderChrome("/admin/orders")
-
+  it("never renders a floating session button, leaving logout to the admin shell", () => {
+    renderChrome("/dashboard")
     expect(screen.queryByRole("button", { name: /cerrar sesión/i })).not.toBeInTheDocument()
-  })
-
-  it("hides admin session actions on /admin/theme while still rendering them on other admin routes", () => {
-    const themeEditor = renderChrome("/admin/theme")
-    expect(screen.queryByRole("button", { name: /cerrar sesión/i })).not.toBeInTheDocument()
-    themeEditor.unmount()
-
-    renderChrome("/admin")
-    expect(screen.getByRole("button", { name: /cerrar sesión/i })).toBeInTheDocument()
   })
 
   it("hides only the root chrome on /admin while preserving an embedded preview header from the route children", () => {

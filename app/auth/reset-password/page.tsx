@@ -306,8 +306,8 @@ function ResetPasswordContent() {
         <div className="w-full max-w-md">
           <div className="text-center space-y-6 p-8 rounded-lg border" style={{ backgroundColor: "var(--card)", borderColor: "var(--border)" }}>
             <div className="flex justify-center">
-              <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ backgroundColor: "#ef4444", opacity: 0.1 }}>
-                <XCircle className="w-8 h-8" style={{ color: "#ef4444" }} />
+              <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ backgroundColor: "var(--destructive)", opacity: 0.1 }}>
+                <XCircle className="w-8 h-8" style={{ color: "var(--destructive)" }} />
               </div>
             </div>
             <div className="space-y-2">
@@ -440,7 +440,7 @@ function ResetPasswordContent() {
               </div>
 
               {errorMessage && (
-                <div className="p-3 rounded-lg text-sm" style={{ backgroundColor: "#ef4444", opacity: 0.1, color: "#ef4444" }}>
+                <div className="p-3 rounded-lg text-sm" style={{ backgroundColor: "var(--destructive)", opacity: 0.1, color: "var(--destructive)" }}>
                   {errorMessage}
                 </div>
               )}

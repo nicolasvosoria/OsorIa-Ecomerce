@@ -52,10 +52,7 @@ export function RelatedProductsCarousel({ products }: { products: RelatedProduct
                         sizes="(max-width: 640px) 70vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
                       />
                       {hasDiscount && (
-                        <span
-                          className="absolute top-2 left-2 z-10 rounded-md bg-red-600 text-white text-xs font-semibold px-2 py-1 shadow-md"
-                          style={{ textShadow: "0 0 1px rgba(0,0,0,0.5)" }}
-                        >
+                        <span className="absolute top-2 left-2 z-10 rounded-md bg-destructive text-destructive-foreground text-xs font-semibold px-2 py-1 shadow-md">
                           Oferta
                         </span>
                       )}

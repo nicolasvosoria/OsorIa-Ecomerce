@@ -1,5 +1,3 @@
-import { NavItem } from './types';
-
 export const TAGS = {
   mode: 'mode',
   collections: 'collections',
@@ -7,21 +5,6 @@ export const TAGS = {
   collectionProducts: 'collection-products',
   cart: 'cart',
 };
-
-export const CONTACT_LINKS: NavItem[] = [
-  {
-    label: '37°47\'33.4"N 122°24\'18.6"W',
-    href: 'https://maps.app.goo.gl/MnpbPDEHxoDydc9M9',
-  },
-  {
-    label: '(269) 682-1402',
-    href: 'https://joyco.studio/showcase',
-  },
-  {
-    label: 'Instagram',
-    href: 'https://www.instagram.com/joyco.studio/',
-  },
-];
 
 export const HIDDEN_PRODUCT_TAG = 'nextjs-frontend-hidden';
 

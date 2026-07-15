@@ -8,6 +8,7 @@ import {
 import { SPECIAL_OFFER_DEFAULTS } from "@/components/sections/special-offer";
 import { NEWSLETTER_DEFAULTS } from "@/components/sections/newsletter-section";
 import { HEADER_DEFAULTS } from "@/components/layout/header";
+import { FOOTER_DEFAULTS } from "@/components/sections/footer-new";
 import { HEADER_LAYOUT_VARIANT_OPTIONS } from "@/lib/header/header-layout-variant";
 import { HEADER_STICKY_MODE_OPTIONS } from "@/lib/header/header-sticky-mode";
 import { FEATURED_DEFAULTS } from "@/components/sections/featured-product";
@@ -628,19 +629,52 @@ export const COMPONENT_FIELDS: Record<string, SectionFieldsConfig> = {
   footer: {
     content: [
       { key: "brandName", label: "Nombre de la Marca", type: "text" },
+      { key: "logoImage", label: "Logo de la Empresa", type: "image" },
+      {
+        key: "logoImageDark",
+        label: "Logo para Tema Oscuro (opcional)",
+        type: "image",
+      },
+      { key: "group1Title", label: "Título del Grupo 1", type: "text" },
+      {
+        key: "group1Links",
+        label: "Enlaces del Grupo 1",
+        type: "array",
+        isArray: true,
+        arrayFields: [
+          { key: "label", label: "Texto", type: "text" },
+          { key: "url", label: "Enlace", type: "text" },
+        ],
+      },
+      { key: "group2Title", label: "Título del Grupo 2", type: "text" },
+      {
+        key: "group2Links",
+        label: "Enlaces del Grupo 2",
+        type: "array",
+        isArray: true,
+        arrayFields: [
+          { key: "label", label: "Texto", type: "text" },
+          { key: "url", label: "Enlace", type: "text" },
+        ],
+      },
+      { key: "group3Title", label: "Título del Grupo 3", type: "text" },
+      {
+        key: "group3Links",
+        label: "Enlaces del Grupo 3",
+        type: "array",
+        isArray: true,
+        arrayFields: [
+          { key: "label", label: "Texto", type: "text" },
+          { key: "url", label: "Enlace", type: "text" },
+        ],
+      },
       { key: "copyrightText", label: "Texto de Copyright", type: "text" },
     ],
     styles: [
       { key: "bgColor", label: "Color de Fondo", type: "color" },
       { key: "textColor", label: "Color de Texto", type: "color" },
     ],
-    defaults: {
-      brandName: "Osoria",
-      copyrightText:
-        "© 2025 Betheme by Muffin group | All Rights Reserved | Powered by WordPress",
-      bgColor: "#ffffff",
-      textColor: "#666666",
-    },
+    defaults: FOOTER_DEFAULTS,
   },
   header: {
     content: [

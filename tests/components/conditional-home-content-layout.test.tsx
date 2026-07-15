@@ -74,10 +74,6 @@ vi.mock("@/components/sections/newsletter-section", () => ({
   NewsletterSection: () => <MockSection testId="newsletter" />,
 }));
 
-vi.mock("@/components/sections/footer-new", () => ({
-  FooterNew: () => <MockSection testId="footer" />,
-}));
-
 vi.mock("@/components/home-discount-popup", () => ({
   HomeDiscountPopup: (props: { config: unknown; storeId: string | null }) => (
     <MockSection testId="discount-popup" {...props} />
@@ -110,7 +106,6 @@ describe("ConditionalHomeContent layout", () => {
       "special-offer",
       "why-us",
       "newsletter",
-      "footer",
       "discount-popup",
     ]);
   });

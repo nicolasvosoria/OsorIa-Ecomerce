@@ -20,6 +20,8 @@ export const CRITICAL_THEME_CSS_VARIABLES = [
   "--popover-foreground",
   "--destructive",
   "--destructive-foreground",
+  "--success",
+  "--success-foreground",
   "--border",
 ] as const;
 
@@ -35,6 +37,7 @@ export const CRITICAL_THEME_CONTRAST_PAIRS = [
   ["secondary/secondary-foreground", "--secondary", "--secondary-foreground"],
   ["accent/accent-foreground", "--accent", "--accent-foreground"],
   ["destructive/destructive-foreground", "--destructive", "--destructive-foreground"],
+  ["success/success-foreground", "--success", "--success-foreground"],
 ].map(([name, background, foreground]) => ({
   name,
   background: background as ThemeCssVariable,
@@ -49,6 +52,7 @@ function createThemeContrastResolver(
   const light = "#ffffff";
   const dark = "#111111";
   const destructive = "#dc2626";
+  const success = "#16a34a";
 
   function normalize(value: string | null | undefined, fallback: string) {
     if (typeof value !== "string") return fallback;
@@ -125,6 +129,8 @@ function createThemeContrastResolver(
       "--popover-foreground": cardForeground,
       "--destructive": destructive,
       "--destructive-foreground": foreground(destructive, light),
+      "--success": success,
+      "--success-foreground": foreground(success, light),
       "--border": normalize(colors.border, defaults.border),
     };
   }

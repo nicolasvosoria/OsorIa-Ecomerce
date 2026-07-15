@@ -190,34 +190,6 @@ export interface Translations {
     apply: string
     reset: string
   }
-  // Footer
-  footer: {
-    navigation: string
-    customerService: string
-    ourCompany: string
-    about: string
-    terms: string
-    contact: string
-    sales: string
-    help: string
-    trackOrder: string
-    shipping: string
-    returns: string
-    team: string
-    stores: string
-    marketing: string
-    copyright: string
-    shop: string
-    catalog: string
-    products: string
-    information: string
-    shippingAndDelivery: string
-    customOrders: string
-    faq: string
-    madeWith: string
-    electronicsBy: string
-    allRightsReserved: string
-  }
   // Contacto
   contact: {
     title: string
@@ -237,6 +209,19 @@ export interface Translations {
     administration: string
     changeTheme: string
     changeFont: string
+  }
+  // Página no encontrada (404)
+  notFound: {
+    heading: string
+    goHome: string
+    description: string
+  }
+  // Página de error
+  errorPage: {
+    heading: string
+    description: string
+    errorLabel: string
+    tryAgain: string
   }
   // Header & Menu
     header: {
@@ -470,33 +455,6 @@ export const translations: Record<Language, Translations> = {
       apply: 'Aplicar',
       reset: 'Restablecer',
     },
-    footer: {
-      navigation: 'Navegación',
-      customerService: 'Servicio al cliente',
-      ourCompany: 'Nuestra Empresa',
-      about: 'Acerca de',
-      terms: 'Términos y Condiciones',
-      contact: 'Contacto',
-      sales: 'Ventas',
-      help: 'Ayuda y Preguntas Frecuentes',
-      trackOrder: 'Rastrear Pedido',
-      shipping: 'Envío y Entrega',
-      returns: 'Entrega y Devoluciones',
-      team: 'Nuestro equipo',
-      stores: 'Tiendas Físicas',
-      marketing: 'Cooperación de Marketing',
-      copyright: 'Todos los Derechos Reservados',
-      shop: 'Tienda',
-      catalog: 'Catálogo',
-      products: 'Productos',
-      information: 'Información',
-      shippingAndDelivery: 'Envíos y Entrega',
-      customOrders: 'Pedidos Personalizados',
-      faq: 'Preguntas Frecuentes',
-      madeWith: 'Hecho con ❤️ y mucho azúcar',
-      electronicsBy: 'Electrónica por Muffin group',
-      allRightsReserved: 'Todos los Derechos Reservados',
-    },
     contact: {
       title: 'Contáctanos',
       contactUs: 'Contáctanos',
@@ -514,6 +472,19 @@ export const translations: Record<Language, Translations> = {
       administration: 'Administración',
       changeTheme: 'Cambiar tema',
       changeFont: 'Cambiar fuente',
+    },
+    notFound: {
+      heading: 'Página no encontrada',
+      goHome: 'Volver al inicio',
+      description:
+        'Lo sentimos, no pudimos encontrar la página que buscás. Puede que haya sido movida, eliminada, o que hayas ingresado una URL incorrecta.',
+    },
+    errorPage: {
+      heading: '¡Oh no!',
+      description:
+        'Hubo un problema con nuestra tienda. Puede ser un inconveniente temporal, por favor intentá tu acción de nuevo.',
+      errorLabel: 'Error:',
+      tryAgain: 'Intentar de nuevo',
     },
     header: {
       menu: 'Menú',
@@ -744,33 +715,6 @@ export const translations: Record<Language, Translations> = {
       apply: 'Apply',
       reset: 'Reset',
     },
-    footer: {
-      navigation: 'Navigation',
-      customerService: 'Customer Service',
-      ourCompany: 'Our Company',
-      about: 'About',
-      terms: 'Terms and Conditions',
-      contact: 'Contact',
-      sales: 'Sales',
-      help: 'Help and FAQ',
-      trackOrder: 'Track Order',
-      shipping: 'Shipping and Delivery',
-      returns: 'Returns and Refunds',
-      team: 'Our team',
-      stores: 'Physical Stores',
-      marketing: 'Marketing Cooperation',
-      copyright: 'All Rights Reserved',
-      shop: 'Shop',
-      catalog: 'Catalog',
-      products: 'Products',
-      information: 'Information',
-      shippingAndDelivery: 'Shipping and Delivery',
-      customOrders: 'Custom Orders',
-      faq: 'FAQ',
-      madeWith: 'Made with ❤️ and lots of sugar',
-      electronicsBy: 'Electronics by Muffin group',
-      allRightsReserved: 'All Rights Reserved',
-    },
     contact: {
       title: 'Contact us',
       contactUs: 'Contact us',
@@ -788,6 +732,19 @@ export const translations: Record<Language, Translations> = {
       administration: 'Administration',
       changeTheme: 'Change theme',
       changeFont: 'Change font',
+    },
+    notFound: {
+      heading: 'Page Not Found',
+      goHome: 'Go Back Home',
+      description:
+        "Sorry, we couldn't find the page you're looking for. The page might have been moved, deleted, or you entered the wrong URL.",
+    },
+    errorPage: {
+      heading: 'Oh no!',
+      description:
+        'There was an issue with our storefront. This could be a temporary issue, please try your action again.',
+      errorLabel: 'Error:',
+      tryAgain: 'Try Again',
     },
     header: {
       menu: 'Menu',
@@ -1018,33 +975,6 @@ export const translations: Record<Language, Translations> = {
       apply: 'Aplicar',
       reset: 'Redefinir',
     },
-    footer: {
-      navigation: 'Navegação',
-      customerService: 'Atendimento ao Cliente',
-      ourCompany: 'Nossa Empresa',
-      about: 'Sobre',
-      terms: 'Termos e Condições',
-      contact: 'Contato',
-      sales: 'Vendas',
-      help: 'Ajuda e Perguntas Frequentes',
-      trackOrder: 'Rastrear Pedido',
-      shipping: 'Envio e Entrega',
-      returns: 'Devoluções e Reembolsos',
-      team: 'Nosso time',
-      stores: 'Lojas Físicas',
-      marketing: 'Cooperação de Marketing',
-      copyright: 'Todos os Direitos Reservados',
-      shop: 'Loja',
-      catalog: 'Catálogo',
-      products: 'Produtos',
-      information: 'Informação',
-      shippingAndDelivery: 'Envios e Entrega',
-      customOrders: 'Pedidos Personalizados',
-      faq: 'Perguntas Frequentes',
-      madeWith: 'Feito com ❤️ e muito açúcar',
-      electronicsBy: 'Eletrônica por Muffin group',
-      allRightsReserved: 'Todos os Direitos Reservados',
-    },
     contact: {
       title: 'Entre em contato',
       contactUs: 'Entre em contato',
@@ -1062,6 +992,19 @@ export const translations: Record<Language, Translations> = {
       administration: 'Administração',
       changeTheme: 'Mudar tema',
       changeFont: 'Mudar fonte',
+    },
+    notFound: {
+      heading: 'Página não encontrada',
+      goHome: 'Voltar ao início',
+      description:
+        'Desculpe, não conseguimos encontrar a página que você procura. Ela pode ter sido movida, excluída, ou você digitou uma URL incorreta.',
+    },
+    errorPage: {
+      heading: 'Oh não!',
+      description:
+        'Houve um problema com nossa loja. Pode ser um problema temporário, por favor tente sua ação novamente.',
+      errorLabel: 'Erro:',
+      tryAgain: 'Tentar novamente',
     },
     header: {
       menu: 'Menu',

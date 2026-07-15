@@ -3,7 +3,6 @@ import { Suspense } from "react"
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { FooterNew } from "@/components/sections/footer-new"
 import { getCategories, getItems } from "@/lib/supabase/products-api"
 import { CatalogProductsList } from "@/components/catalog/catalog-products-list"
 import { getStoreId } from "@/lib/utils/store"
@@ -184,9 +183,6 @@ export default async function CategoryPage({
           <CategoryContent categorySlug={categorySlug} />
         </Suspense>
       </div>
-
-      {/* Footer */}
-      <FooterNew />
     </main>
   )
 }
