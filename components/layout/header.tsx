@@ -10,7 +10,6 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { useComponentStyle } from "@/contexts/styles-context"
 import { useAdmin } from "@/contexts/admin-context"
-import { generateCategorySlug } from "@/lib/utils/category-slug"
 import { resolveFeaturedProductId } from "@/lib/products/featured-product"
 import { HeaderMegaMenu } from "@/components/layout/header-mega-menu"
 import { HeaderSearchSuggestions } from "@/components/layout/header-search-suggestions"
@@ -137,7 +136,9 @@ export function Header() {
   const [searchSuggestions, setSearchSuggestions] = useState<Array<{ id: string; title: string; slug: string; image?: string }>>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [isSearching, setIsSearching] = useState(false)
-  const [categories, setCategories] = useState<Array<{ id: string; category_name: string; display_order: number }>>([])
+  const [categories, setCategories] = useState<
+    Array<{ id: string; category_name: string; slug: string; display_order: number }>
+  >([])
   const [openMegaMenuCategoryId, setOpenMegaMenuCategoryId] = useState<string | null>(null)
   const [categoryFeaturedProductId, setCategoryFeaturedProductId] = useState<Record<string, string | null>>({})
   const { activeTheme } = useTheme()
@@ -293,14 +294,8 @@ export function Header() {
         const response = await fetch('/api/categories')
         if (response.ok) {
           const data = await response.json()
-          // Filtrar categorías no deseadas (por si acaso)
-          const filtered = data.filter(
-            (cat: any) => 
-              cat.category_name?.toLowerCase() !== 'sin categoría' &&
-              cat.category_name?.toLowerCase() !== 'ropa'
-          )
           // Ordenar por display_order
-          const sorted = filtered.sort((a: any, b: any) => (a.display_order || 0) - (b.display_order || 0))
+          const sorted = data.sort((a: any, b: any) => (a.display_order || 0) - (b.display_order || 0))
           setCategories(sorted)
         }
       } catch (error) {
@@ -657,11 +652,10 @@ export function Header() {
   const renderCategoryLinks = (navClassName: string, withMegaMenu: boolean, linkTextClass: string = "text-sm") => (
     <nav className={navClassName}>
       {categories.map((category) => {
-        const categorySlug = generateCategorySlug(category.category_name)
         return (
           <Link
             key={category.id}
-            href={`/catalog/${categorySlug}`}
+            href={`/catalog/${category.slug}`}
             className={cn(linkTextClass, "font-inter font-medium tracking-wide transition-opacity hover:opacity-70")}
             style={{ color: header.linkColor || "var(--foreground)" }}
             {...(withMegaMenu
@@ -706,7 +700,7 @@ export function Header() {
           <div className="container mx-auto px-4">
             <HeaderMegaMenu
               categoryName={category.category_name}
-              categoryHref={`/catalog/${generateCategorySlug(category.category_name)}`}
+              categoryHref={`/catalog/${category.slug}`}
               description={header.megaMenuDescription}
               viewAllText={header.viewAllText}
               featuredProductId={categoryFeaturedProductId[category.id] ?? null}
@@ -1053,11 +1047,10 @@ export function Header() {
               {/* Categorías dinámicas desde la BD */}
               {categories.length > 0 ? (
                 categories.map((category) => {
-                  const categorySlug = generateCategorySlug(category.category_name)
                   return (
                     <Link
                       key={category.id}
-                      href={`/catalog/${categorySlug}`}
+                      href={`/catalog/${category.slug}`}
                       className="text-base font-inter font-medium py-3 px-4 rounded-lg transition-colors"
                       style={{ color: "var(--foreground)" }}
                       onMouseEnter={(e) => {

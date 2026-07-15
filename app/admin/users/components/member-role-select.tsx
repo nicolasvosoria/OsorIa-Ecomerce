@@ -53,7 +53,7 @@ export function MemberRoleSelect({
         <SelectTrigger className="h-9 w-[160px]">
           <SelectValue />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="editor-chrome">
           {STORE_ROLE_NAMES.map((roleName) => (
             <SelectItem key={roleName} value={roleName}>
               {STORE_ROLE_LABELS[roleName]}

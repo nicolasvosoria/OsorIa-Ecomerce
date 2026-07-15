@@ -13,6 +13,8 @@ import { adminBreadcrumbTrail, isRouteOrDescendant } from "@/lib/admin/routes"
 
 const ORDER_ID = "0c9f9a1e-1c4c-4f0a-9d1f-6a1b2c3d4e5f"
 const PRODUCT_ID = "7b8c9d0e-1f2a-3b4c-5d6e-7f8a9b0c1d2e"
+const COMBO_ID = "11111111-1111-4111-8111-111111111111"
+const CATEGORY_ID = "22222222-2222-4222-8222-222222222222"
 
 function labelsOf(pathname: string, entityLabel?: string): string[] {
   return adminBreadcrumbTrail(pathname, entityLabel).map((step) => step.label)
@@ -41,6 +43,46 @@ describe("adminBreadcrumbTrail", () => {
 
   it("skips the dynamic segment of a route that has no page of its own", () => {
     expect(labelsOf(`/admin/products/${PRODUCT_ID}/edit`)).toEqual(["Admin", "Productos", "Editar"])
+  })
+
+  it("nests the combo create screen under combos", () => {
+    expect(labelsOf("/admin/products/combos/create")).toEqual([
+      "Admin",
+      "Productos",
+      "Combos",
+      "Crear",
+    ])
+  })
+
+  it("nests the combo edit screen under combos, skipping the combo id", () => {
+    expect(labelsOf(`/admin/products/combos/${COMBO_ID}/edit`)).toEqual([
+      "Admin",
+      "Productos",
+      "Combos",
+      "Editar",
+    ])
+  })
+
+  it("derives the trail from the url, so categories reads as a child of products", () => {
+    expect(labelsOf("/admin/products/categories")).toEqual(["Admin", "Productos", "Categorías"])
+  })
+
+  it("nests the category create screen under categories", () => {
+    expect(labelsOf("/admin/products/categories/create")).toEqual([
+      "Admin",
+      "Productos",
+      "Categorías",
+      "Crear",
+    ])
+  })
+
+  it("nests the category edit screen under categories, skipping the category id", () => {
+    expect(labelsOf(`/admin/products/categories/${CATEGORY_ID}/edit`)).toEqual([
+      "Admin",
+      "Productos",
+      "Categorías",
+      "Editar",
+    ])
   })
 
   it("uses the entity override as the leaf label of a dynamic route", () => {

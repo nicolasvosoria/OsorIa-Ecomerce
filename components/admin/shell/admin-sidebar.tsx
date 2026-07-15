@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation"
 import {
   BarChart3,
   Bot,
-  Layers,
   LayoutDashboard,
   Megaphone,
   Package,
@@ -26,7 +25,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarRail,
+  SidebarPinToggle,
   useSidebar,
 } from "@/components/ui/sidebar"
 
@@ -40,7 +39,6 @@ const BASE_NAV_ITEMS: AdminNavItem[] = [
   { label: "Dashboard", href: "/admin", icon: LayoutDashboard },
   { label: "Pedidos", href: "/admin/orders", icon: ShoppingBag },
   { label: "Productos", href: "/admin/products", icon: Package },
-  { label: "Combos", href: "/admin/products/combos", icon: Layers },
   { label: "Usuarios", href: "/admin/users", icon: Users },
   { label: "Estadísticas", href: "/admin/stats", icon: BarChart3 },
   { label: "Chatbot", href: "/admin/chatbot", icon: Bot },
@@ -64,7 +62,7 @@ export function AdminSidebar() {
           <AdminNavList />
         </SidebarGroup>
       </SidebarContent>
-      <SidebarRail />
+      <SidebarPinToggle />
     </Sidebar>
   )
 }
@@ -101,8 +99,9 @@ function AdminNavList() {
 }
 
 // The active item is the one whose href is the longest prefix of the current
-// path, so nested routes (e.g. /admin/products/combos) highlight the deepest
-// match instead of every ancestor in the nav.
+// path: the nav holds shortcuts, not the hierarchy, so a nested route without an
+// entry of its own (/admin/products/combos) highlights its section instead of
+// every ancestor in the nav.
 function activeNavHref(pathname: string, items: AdminNavItem[]): string | null {
   return items
     .filter((item) => isRouteOrDescendant(pathname, item.href))

@@ -1,14 +1,15 @@
 /* eslint-disable react-hooks/error-boundaries -- Server components render fallback UI after async data-loading failures. */
 import { Suspense } from "react"
+import type { Metadata } from "next"
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { getCategories, getItems } from "@/lib/supabase/products-api"
+import { getItems } from "@/lib/supabase/products-api"
+import { getCategoryBySlug } from "@/lib/supabase/categories-api"
 import { CatalogProductsList } from "@/components/catalog/catalog-products-list"
 import { getStoreId } from "@/lib/utils/store"
 import { notFound } from "next/navigation"
 import { getStoreIdServer } from "@/lib/utils/store-server"
-import { generateCategorySlug } from "@/lib/utils/category-slug"
 
 // Helper para formatear precio
 function formatPrice(price: number | string, currencyCode: string = "COP"): string {
@@ -21,20 +22,47 @@ function formatPrice(price: number | string, currencyCode: string = "COP"): stri
   }).format(numPrice)
 }
 
+async function resolveStoreId(): Promise<string | null> {
+  return (await getStoreId()) ?? (await getStoreIdServer())
+}
+
+// Generar metadata para SEO
+export async function generateMetadata(props: {
+  params: Promise<{ category: string }>
+}): Promise<Metadata> {
+  try {
+    const { category: categoryParam } = await props.params
+    const storeId = await resolveStoreId()
+    if (!storeId) {
+      return { title: 'Categoría' }
+    }
+
+    const category = await getCategoryBySlug(decodeURIComponent(categoryParam), storeId)
+    if (!category) {
+      return { title: 'Categoría no encontrada' }
+    }
+
+    return {
+      title: category.seo_title || category.category_name,
+      description:
+        category.seo_description || category.category_description || category.category_name,
+      openGraph: category.category_image_url
+        ? { images: [{ url: category.category_image_url, alt: category.category_name }] }
+        : undefined,
+    }
+  } catch (error) {
+    // generateMetadata no puede lanzar sin tumbar el render de la página, así que
+    // degrada al título genérico dejando rastro de la causa.
+    console.error('[Category] Error al generar metadata:', error)
+    return { title: 'Categoría' }
+  }
+}
+
 // Contenido de la categoría
 async function CategoryContent({ categorySlug }: { categorySlug: string }) {
-  let storeId: string | null = null
-  let categories: any[] = []
-  let category: any = null
-  
   try {
-    // Obtener store_id de múltiples fuentes
-    storeId = await getStoreId()
-    
-    if (!storeId) {
-      storeId = await getStoreIdServer()
-    }
-    
+    const storeId = await resolveStoreId()
+
     if (!storeId) {
       console.warn('[Category] No se pudo obtener store_id')
       return (
@@ -51,26 +79,12 @@ async function CategoryContent({ categorySlug }: { categorySlug: string }) {
       )
     }
     
-    // Obtener todas las categorías
-    categories = await getCategories(false, storeId || undefined)
-    
-    // Filtrar categorías no deseadas
-    categories = categories.filter(
-      (cat: any) => 
-        cat.category_name?.toLowerCase() !== 'sin categoría' &&
-        cat.category_name?.toLowerCase() !== 'ropa'
-    )
-    
-    // Buscar la categoría por slug
-    category = categories.find(cat => {
-      const catSlug = generateCategorySlug(cat.category_name)
-      return catSlug === categorySlug
-    })
-    
+    const category = await getCategoryBySlug(categorySlug, storeId)
+
     if (!category) {
       notFound()
     }
-    
+
     // Obtener productos de la categoría
     const result = await getItems({
       store_id: storeId,

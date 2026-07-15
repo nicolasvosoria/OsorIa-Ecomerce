@@ -18,6 +18,8 @@ export interface CreateComboData {
   category_id?: string | null
   description?: string
   image_url?: string
+  seo_title?: string
+  seo_description?: string
   is_active?: boolean
   discount_type: ComboDiscountType
   discount_value: number
@@ -269,6 +271,8 @@ export async function hydrateCombos(
       categoryId: comboCategoryId(combo),
       description: combo.description,
       imageUrl: combo.image_url,
+      seoTitle: combo.seo_title,
+      seoDescription: combo.seo_description,
       isActive: combo.is_active !== false,
       pricing,
       availability: {
@@ -373,8 +377,8 @@ export function comboToStoreItem(combo: ComboCatalogDetails): StoreItemWithDetai
     inventory_quantity: combo.availability.derivedStock ?? 999999,
     low_stock_threshold: 1,
     item_slug: normalizeComboSlug(combo.slug || combo.name || combo.id) || combo.id,
-    seo_title: combo.name,
-    seo_description: combo.description || undefined,
+    seo_title: combo.seoTitle?.trim() || combo.name,
+    seo_description: combo.seoDescription?.trim() || combo.description || undefined,
     metadata: {
       item_kind: 'combo',
       combo_id: combo.id,
@@ -516,6 +520,36 @@ async function validateComboComponentRows(
   return { rows: normalized }
 }
 
+const SLUG_TAKEN_BY_PRODUCT_MESSAGE =
+  'Ya existe un producto con este slug en la tienda. Elige otro para que el combo sea accesible.'
+
+// La unique de product_combos es (store_id, slug) y los productos viven en otra
+// tabla, así que ninguna constraint cubre ambos espacios de nombres. getItemBySlug
+// resuelve productos primero, por lo que un combo que colisione quedaría accesible
+// solo como producto, en silencio.
+async function productSlugConflictError(
+  supabase: any,
+  slug: string,
+  storeId: string,
+): Promise<string | undefined> {
+  const result = await withTimeout(
+    supabase
+      .from(ECOMMERCE_TABLES.storeItems)
+      .select('id')
+      .eq('item_slug', slug)
+      .eq('store_id', storeId)
+      .limit(1)
+      .maybeSingle(),
+    15000,
+    'findProductBySlug',
+  ) as { data: { id: string } | null; error: any }
+
+  if (result.error) {
+    return result.error.message || 'Error al validar el slug del combo'
+  }
+  return result.data ? SLUG_TAKEN_BY_PRODUCT_MESSAGE : undefined
+}
+
 async function fetchComboStoreId(supabase: any, comboId: string): Promise<string | null> {
   const result = await withTimeout(
     supabase.from(ECOMMERCE_TABLES.productCombos).select('store_id').eq('id', comboId).single(),
@@ -556,6 +590,11 @@ export async function createCombo(data: CreateComboData, supabaseOverride?: any)
   }
 
   const slug = normalizeComboSlug(data.slug?.trim() || data.name)
+  const slugError = await productSlugConflictError(supabase, slug, storeId)
+  if (slugError) {
+    return { success: false, error: slugError }
+  }
+
   const result = await withTimeout(
     supabase
       .from(ECOMMERCE_TABLES.productCombos)
@@ -565,6 +604,8 @@ export async function createCombo(data: CreateComboData, supabaseOverride?: any)
         slug,
         description: data.description?.trim() || null,
         image_url: data.image_url?.trim() || null,
+        seo_title: data.seo_title?.trim() || null,
+        seo_description: data.seo_description?.trim() || null,
         is_active: data.is_active ?? true,
         discount_type: data.discount_type,
         discount_value: Number(data.discount_value || 0),
@@ -616,12 +657,20 @@ export async function updateCombo(
 
   const updateData: Record<string, unknown> = {}
   if (data.name !== undefined) updateData.name = data.name.trim()
+
+  let nextSlug: string | null = null
   if (data.slug !== undefined || data.name !== undefined) {
-    const nextSlug = data.slug?.trim() || (data.name ? data.name : '')
-    if (nextSlug) updateData.slug = normalizeComboSlug(nextSlug)
+    const requestedSlug = data.slug?.trim() || (data.name ? data.name : '')
+    if (requestedSlug) nextSlug = normalizeComboSlug(requestedSlug)
   }
+  if (nextSlug) updateData.slug = nextSlug
+
   if (data.description !== undefined) updateData.description = data.description?.trim() || null
   if (data.image_url !== undefined) updateData.image_url = data.image_url?.trim() || null
+  if (data.seo_title !== undefined) updateData.seo_title = data.seo_title?.trim() || null
+  if (data.seo_description !== undefined) {
+    updateData.seo_description = data.seo_description?.trim() || null
+  }
   if (data.is_active !== undefined) updateData.is_active = data.is_active
   if (data.discount_type !== undefined) updateData.discount_type = data.discount_type
   if (data.discount_value !== undefined) updateData.discount_value = Number(data.discount_value || 0)
@@ -637,10 +686,17 @@ export async function updateCombo(
   // como para acotar el update final (defensa contra IDOR cuando storeId
   // viene de una acción autorizada).
   let comboStoreId: string | null = null
-  if (storeId || data.components !== undefined) {
+  if (storeId || data.components !== undefined || nextSlug) {
     comboStoreId = await fetchComboStoreId(supabase, comboId)
     if (!comboStoreId || (storeId && comboStoreId !== storeId)) {
       return { success: false, error: 'No se pudo obtener el combo' }
+    }
+  }
+
+  if (nextSlug && comboStoreId) {
+    const slugError = await productSlugConflictError(supabase, nextSlug, comboStoreId)
+    if (slugError) {
+      return { success: false, error: slugError }
     }
   }
 

@@ -10,7 +10,6 @@
  * only one query per section, not one for the editor and a different one for
  * the live page.
  */
-import { generateCategorySlug } from "@/lib/utils/category-slug"
 import { formatCommercePrice } from "@/lib/products/pricing"
 import { toCommerceProductCard } from "@/lib/products/adapter"
 import { getCategories, getItemById, getItems } from "@/lib/supabase/products-api"
@@ -67,7 +66,7 @@ async function resolveStartingPrice(categoryId: string): Promise<{ label: string
 }
 
 async function buildCategoryTile(category: ItemCategory, imageOverride?: string): Promise<PopularCategoryTile> {
-  const slug = generateCategorySlug(category.category_name)
+  const { slug } = category
   const startingPrice = await resolveStartingPrice(category.id)
 
   return {

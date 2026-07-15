@@ -118,6 +118,7 @@ export type Database = {
           fonts: Json | null
           id: string
           is_current: boolean | null
+          is_custom: boolean
           store_id: string
           theme_id: number
           variables: Json | null
@@ -127,6 +128,7 @@ export type Database = {
           fonts?: Json | null
           id?: string
           is_current?: boolean | null
+          is_custom?: boolean
           store_id: string
           theme_id: number
           variables?: Json | null
@@ -136,6 +138,7 @@ export type Database = {
           fonts?: Json | null
           id?: string
           is_current?: boolean | null
+          is_custom?: boolean
           store_id?: string
           theme_id?: number
           variables?: Json | null
@@ -461,6 +464,9 @@ export type Database = {
           id: string
           is_active: boolean | null
           parent_category_id: string | null
+          seo_description: string | null
+          seo_title: string | null
+          slug: string
           store_id: string
           updated_at: string | null
         }
@@ -473,6 +479,9 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           parent_category_id?: string | null
+          seo_description?: string | null
+          seo_title?: string | null
+          slug: string
           store_id: string
           updated_at?: string | null
         }
@@ -485,6 +494,9 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           parent_category_id?: string | null
+          seo_description?: string | null
+          seo_title?: string | null
+          slug?: string
           store_id?: string
           updated_at?: string | null
         }
@@ -1364,6 +1376,8 @@ export type Database = {
           is_active: boolean
           metadata: Json
           name: string
+          seo_description: string | null
+          seo_title: string | null
           slug: string
           store_id: string
           updated_at: string | null
@@ -1378,6 +1392,8 @@ export type Database = {
           is_active?: boolean
           metadata?: Json
           name: string
+          seo_description?: string | null
+          seo_title?: string | null
           slug: string
           store_id: string
           updated_at?: string | null
@@ -1392,6 +1408,8 @@ export type Database = {
           is_active?: boolean
           metadata?: Json
           name?: string
+          seo_description?: string | null
+          seo_title?: string | null
           slug?: string
           store_id?: string
           updated_at?: string | null
@@ -2332,6 +2350,10 @@ export type Database = {
     }
     Functions: {
       can_manage_store: { Args: { p_store_id: string }; Returns: boolean }
+      can_user_manage_store: {
+        Args: { p_store_id: string; p_user_id: string }
+        Returns: boolean
+      }
       decrement_inventory: {
         Args: { p_items: Json; p_order_id: string; p_store_id: string }
         Returns: Json
@@ -2346,6 +2368,7 @@ export type Database = {
       is_public_item: { Args: { p_item_id: string }; Returns: boolean }
       is_public_store: { Args: { p_store_id: string }; Returns: boolean }
       is_storage_admin: { Args: never; Returns: boolean }
+      storage_root_store_id: { Args: { object_name: string }; Returns: string }
     }
     Enums: {
       address_type: "billing" | "shipping"

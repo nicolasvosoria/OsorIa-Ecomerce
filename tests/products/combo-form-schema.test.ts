@@ -8,6 +8,8 @@ const validInput = {
   category_id: "",
   description: "",
   image_url: "",
+  seo_title: "",
+  seo_description: "",
   is_active: true,
   discount_type: "percentage" as const,
   discount_value: "10",

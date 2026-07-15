@@ -48,7 +48,7 @@ export function OrderStatusSelect({
         <SelectTrigger className="h-9 w-[150px]">
           <SelectValue />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="editor-chrome">
           {ORDER_STATUSES.map((orderStatus) => (
             <SelectItem key={orderStatus} value={orderStatus}>
               {ORDER_STATUS_LABELS[orderStatus]}

@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
-import { PanelLeftIcon } from "lucide-react"
+import { ChevronLeftIcon, PanelLeftIcon } from "lucide-react"
 import { Slot } from "@radix-ui/react-slot"
 
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -32,15 +32,17 @@ const SIDEBAR_PEEK_DELAY_MS = 200
 
 // Upstream fusiona tres roles en un flag `open`: qué se persiste, qué reserva
 // espacio y qué se ve desplegado. Aquí van separados:
-// - `pinned`: estado persistido. Lo mueven el rail y Cmd+B, y es lo único que
-//   reserva espacio, es decir, lo único que empuja el contenido.
+// - `pinned`: estado persistido. Lo mueven el botón de la orilla y Cmd+B, y es
+//   lo único que reserva espacio, es decir, lo único que empuja el contenido.
 // - `peeking`: hover efímero. Solo presentación (labels, tooltips, ancho del
 //   overlay); nunca toca el pin ni lo que se persiste.
 type SidebarContextProps = {
   state: "expanded" | "collapsed"
   pinned: boolean
   setPinned: (pinned: boolean) => void
-  setPeeking: (peeking: boolean) => void
+  startPeekCountdown: () => void
+  cancelPeekCountdown: () => void
+  stopPeeking: () => void
   openMobile: boolean
   setOpenMobile: (open: boolean) => void
   isMobile: boolean
@@ -75,6 +77,7 @@ function SidebarProvider({
   const [openMobile, setOpenMobile] = React.useState(false)
   const [peeking, setPeeking] = React.useState(false)
   const [uncontrolledPinned, setUncontrolledPinned] = React.useState(defaultPinned)
+  const peekTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const pinned = pinnedProp ?? uncontrolledPinned
   const setPinned = React.useCallback(
@@ -88,6 +91,22 @@ function SidebarProvider({
     },
     [onPinnedChange]
   )
+
+  const cancelPeekCountdown = React.useCallback(() => {
+    clearTimeout(peekTimerRef.current ?? undefined)
+  }, [])
+
+  const startPeekCountdown = React.useCallback(() => {
+    cancelPeekCountdown()
+    peekTimerRef.current = setTimeout(() => setPeeking(true), SIDEBAR_PEEK_DELAY_MS)
+  }, [cancelPeekCountdown])
+
+  const stopPeeking = React.useCallback(() => {
+    cancelPeekCountdown()
+    setPeeking(false)
+  }, [cancelPeekCountdown])
+
+  React.useEffect(() => cancelPeekCountdown, [cancelPeekCountdown])
 
   const toggleSidebar = React.useCallback(() => {
     if (isMobile) {
@@ -121,13 +140,26 @@ function SidebarProvider({
       state,
       pinned,
       setPinned,
-      setPeeking,
+      startPeekCountdown,
+      cancelPeekCountdown,
+      stopPeeking,
       isMobile,
       openMobile,
       setOpenMobile,
       toggleSidebar,
     }),
-    [state, pinned, setPinned, setPeeking, isMobile, openMobile, setOpenMobile, toggleSidebar]
+    [
+      state,
+      pinned,
+      setPinned,
+      startPeekCountdown,
+      cancelPeekCountdown,
+      stopPeeking,
+      isMobile,
+      openMobile,
+      setOpenMobile,
+      toggleSidebar,
+    ]
   )
 
   return (
@@ -142,8 +174,11 @@ function SidebarProvider({
               ...style,
             } as React.CSSProperties
           }
+          // La altura la fija quien monta el shell: twMerge no fusiona min-height
+          // con height (son grupos distintos), así que un `min-h-svh` de fábrica
+          // sobreviviría al `h-dvh` del consumidor y dejaría dos alturas vivas.
           className={cn(
-            "group/sidebar-wrapper flex min-h-svh w-full has-data-[variant=inset]:bg-sidebar",
+            "group/sidebar-wrapper flex w-full has-data-[variant=inset]:bg-sidebar",
             className
           )}
           {...props}
@@ -167,23 +202,8 @@ function Sidebar({
   variant?: "sidebar" | "floating" | "inset"
   collapsible?: "offcanvas" | "icon" | "none"
 }) {
-  const { isMobile, state, pinned, setPeeking, openMobile, setOpenMobile } = useSidebar()
-  const peekTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  React.useEffect(() => {
-    const peekTimer = peekTimerRef
-    return () => clearTimeout(peekTimer.current ?? undefined)
-  }, [])
-
-  const startPeekCountdown = () => {
-    clearTimeout(peekTimerRef.current ?? undefined)
-    peekTimerRef.current = setTimeout(() => setPeeking(true), SIDEBAR_PEEK_DELAY_MS)
-  }
-
-  const stopPeeking = () => {
-    clearTimeout(peekTimerRef.current ?? undefined)
-    setPeeking(false)
-  }
+  const { isMobile, state, pinned, startPeekCountdown, stopPeeking, openMobile, setOpenMobile } =
+    useSidebar()
 
   if (collapsible === "none") {
     return (
@@ -303,28 +323,36 @@ function SidebarTrigger({
   )
 }
 
-function SidebarRail({ className, ...props }: React.ComponentProps<"button">) {
-  const { toggleSidebar } = useSidebar()
+// Vive en la orilla de la barra, dentro de la zona que dispara el peek: sin la
+// excepción del contador, acercar el puntero al botón desplegaría la barra justo
+// antes del clic.
+function SidebarPinToggle({ className, ...props }: React.ComponentProps<typeof Button>) {
+  const { pinned, toggleSidebar, startPeekCountdown, cancelPeekCountdown } = useSidebar()
+  const label = pinned ? "Contraer barra lateral" : "Expandir barra lateral"
 
   return (
-    <button
-      data-sidebar="rail"
-      data-slot="sidebar-rail"
-      aria-label="Alternar barra lateral"
-      tabIndex={-1}
-      onClick={toggleSidebar}
-      title="Alternar barra lateral"
-      className={cn(
-        "absolute inset-y-0 z-20 hidden w-4 -translate-x-1/2 transition-all ease-linear group-data-[side=left]:-right-4 group-data-[side=right]:left-0 after:absolute after:inset-y-0 after:left-1/2 after:w-[2px] hover:after:bg-sidebar-border sm:flex",
-        "in-data-[side=left]:cursor-w-resize in-data-[side=right]:cursor-e-resize",
-        "[[data-side=left][data-pinned=false]_&]:cursor-e-resize [[data-side=right][data-pinned=false]_&]:cursor-w-resize",
-        "group-data-[collapsible=offcanvas]:translate-x-0 group-data-[collapsible=offcanvas]:after:left-full hover:group-data-[collapsible=offcanvas]:bg-sidebar",
-        "[[data-side=left][data-collapsible=offcanvas]_&]:-right-2",
-        "[[data-side=right][data-collapsible=offcanvas]_&]:-left-2",
-        className
-      )}
-      {...props}
-    />
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          data-sidebar="pin-toggle"
+          data-slot="sidebar-pin-toggle"
+          variant="outline"
+          size="icon"
+          aria-label={label}
+          onClick={toggleSidebar}
+          onMouseEnter={cancelPeekCountdown}
+          onMouseLeave={startPeekCountdown}
+          className={cn(
+            "absolute top-4 -right-3 z-20 hidden size-6 rounded-full border-sidebar-border bg-sidebar p-0 text-sidebar-foreground shadow-sm hover:bg-sidebar-accent hover:text-sidebar-accent-foreground md:flex",
+            className
+          )}
+          {...props}
+        >
+          <ChevronLeftIcon className="size-4 transition-transform duration-200 group-data-[pinned=false]:rotate-180" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="right">{label}</TooltipContent>
+    </Tooltip>
   )
 }
 
@@ -703,8 +731,8 @@ export {
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
+  SidebarPinToggle,
   SidebarProvider,
-  SidebarRail,
   SidebarSeparator,
   SidebarTrigger,
   useSidebar,

@@ -55,6 +55,8 @@ export interface ComboCatalogDetails {
   categoryId?: string | null
   description?: string | null
   imageUrl?: string | null
+  seoTitle?: string | null
+  seoDescription?: string | null
   isActive: boolean
   pricing: ComboPricingTrace
   availability: ComboAvailabilityTrace

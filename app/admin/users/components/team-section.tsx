@@ -3,11 +3,11 @@
 import { Mail } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { DataTable, type Column } from "@/components/admin/data-table"
 import { STORE_ROLE_LABELS } from "@/lib/memberships/roles"
 import type { StoreMember } from "@/lib/supabase/memberships-api"
-import { AddMemberForm } from "./add-member-form"
+import { AddMemberDialog } from "./add-member-dialog"
 import { MemberRoleSelect } from "./member-role-select"
 import { RemoveMemberButton } from "./remove-member-button"
 
@@ -22,34 +22,26 @@ export function TeamSection({ members, state, currentUserId }: TeamSectionProps)
 
   return (
     <section className="space-y-4">
-      <div>
-        <h2 className="text-xl font-semibold text-foreground">Equipo</h2>
-        <p className="text-sm text-muted-foreground">
-          Miembros con acceso de administración a esta tienda.
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-semibold text-foreground">Equipo</h2>
+          <p className="text-sm text-muted-foreground">
+            Miembros con acceso de administración a esta tienda.
+          </p>
+        </div>
+        <AddMemberDialog />
       </div>
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardContent className="p-2 sm:p-6">
-            <DataTable
-              columns={columns}
-              rows={members}
-              state={state}
-              emptyMessage="Aún no hay miembros en el equipo de esta tienda."
-              errorMessage="No se pudieron cargar los miembros"
-            />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Agregar miembro</CardTitle>
-            <CardDescription>Da acceso a un usuario ya registrado.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <AddMemberForm />
-          </CardContent>
-        </Card>
-      </div>
+      <Card>
+        <CardContent className="p-2 sm:p-6">
+          <DataTable
+            columns={columns}
+            rows={members}
+            state={state}
+            emptyMessage="Aún no hay miembros en el equipo de esta tienda."
+            errorMessage="No se pudieron cargar los miembros"
+          />
+        </CardContent>
+      </Card>
     </section>
   )
 }

@@ -20,17 +20,10 @@ export async function GET(_request: NextRequest) {
     
     // Obtener categorías
     const categories = await getCategories(false, storeId || undefined)
-    
-    // Filtrar categorías no deseadas
-    const filteredCategories = categories.filter(
-      (cat: any) => 
-        cat.category_name?.toLowerCase() !== 'sin categoría' &&
-        cat.category_name?.toLowerCase() !== 'ropa'
-    )
-    
+
     // Ordenar por display_order
-    const sortedCategories = filteredCategories.sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
-    
+    const sortedCategories = categories.sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
+
     return NextResponse.json(sortedCategories)
   } catch (error) {
     console.error('[Categories API] Error:', error)

@@ -5,11 +5,14 @@ import type { ComboCatalogDetails } from '@/lib/combos/types'
 export interface ItemCategory {
   id: string
   category_name: string
+  slug: string
   category_description?: string
   category_image_url?: string
   parent_category_id?: string
   display_order: number
   is_active: boolean
+  seo_title?: string
+  seo_description?: string
   created_at: string
   updated_at: string
 }

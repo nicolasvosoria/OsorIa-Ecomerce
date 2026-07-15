@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { Package, Plus } from "lucide-react"
+import { Package, Plus, Tag } from "lucide-react"
 
 import { AdminPageContainer } from "@/components/admin/page-container"
 import { AdminPageHeader } from "@/components/admin/page-header"
@@ -34,6 +34,12 @@ export default async function AdminProductsPage({ searchParams }: ProductsPagePr
         subtitle="Administra tu catálogo de productos"
         actions={
           <>
+            <Button asChild size="sm" variant="outline" className="shrink-0 gap-1.5 sm:gap-2">
+              <Link href="/admin/products/categories">
+                <Tag className="h-4 w-4 shrink-0" />
+                <span className="hidden sm:inline">Categorías</span>
+              </Link>
+            </Button>
             <Button asChild size="sm" variant="outline" className="shrink-0 gap-1.5 sm:gap-2">
               <Link href="/admin/products/combos">
                 <Package className="h-4 w-4 shrink-0" />

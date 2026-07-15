@@ -75,6 +75,8 @@ function buildComboFields(input: ComboFormValues): Omit<CreateComboData, "store_
     category_id: input.category_id || null,
     description: input.description || undefined,
     image_url: input.image_url || undefined,
+    seo_title: input.seo_title,
+    seo_description: input.seo_description,
     is_active: input.is_active,
     discount_type: input.discount_type,
     discount_value: Number(input.discount_value || 0),

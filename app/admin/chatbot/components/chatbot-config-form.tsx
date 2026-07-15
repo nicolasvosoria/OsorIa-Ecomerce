@@ -153,7 +153,7 @@ function ConversationToneCard({
               name="tone"
               render={({ field: tone }) => (
                 <Select value={tone.value} onValueChange={tone.onChange}>
-                  <SelectTrigger {...field}>
+                  <SelectTrigger {...field} className="w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="editor-chrome">

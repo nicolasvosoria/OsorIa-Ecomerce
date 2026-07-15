@@ -22,7 +22,11 @@ import { addStoreMemberAction } from "../actions"
 
 const emptyValues: AddMemberFormValues = { email: "", role: "admin" }
 
-export function AddMemberForm() {
+type AddMemberFormProps = {
+  onSuccess?: () => void
+}
+
+export function AddMemberForm({ onSuccess }: AddMemberFormProps) {
   const [isPending, startTransition] = useTransition()
   const {
     register,
@@ -41,6 +45,7 @@ export function AddMemberForm() {
       if (result.success) {
         toast.success("Miembro agregado al equipo")
         reset(emptyValues)
+        onSuccess?.()
         return
       }
 
@@ -67,10 +72,10 @@ export function AddMemberForm() {
             name="role"
             render={({ field: role }) => (
               <Select value={role.value} onValueChange={role.onChange}>
-                <SelectTrigger {...field}>
+                <SelectTrigger {...field} className="w-full">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="editor-chrome">
                   {STORE_ROLE_NAMES.map((roleName) => (
                     <SelectItem key={roleName} value={roleName}>
                       {STORE_ROLE_LABELS[roleName]}

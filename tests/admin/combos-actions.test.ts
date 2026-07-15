@@ -34,6 +34,8 @@ const baseInput: ComboFormValues = {
   category_id: "",
   description: "",
   image_url: "https://cdn/combo.webp",
+  seo_title: "Combo Café Premium | OsorIA",
+  seo_description: "Dos cafés de origen y un mug con descuento.",
   is_active: true,
   discount_type: "percentage",
   discount_value: "10",
@@ -63,6 +65,8 @@ describe("combo server actions", () => {
     expect(data).toMatchObject({
       store_id: "store-1",
       name: "  Combo Café  ",
+      seo_title: "Combo Café Premium | OsorIA",
+      seo_description: "Dos cafés de origen y un mug con descuento.",
       components: [
         { product_id: "coffee", variant_id: null, quantity: 1, display_order: 0 },
         { product_id: "mug", variant_id: "extra-large", quantity: 2, display_order: 1 },

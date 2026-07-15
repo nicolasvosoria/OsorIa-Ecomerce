@@ -30,6 +30,7 @@ function makeCategory(overrides: Partial<ItemCategory>): ItemCategory {
   return {
     id: "cat-1",
     category_name: "Speakers",
+    slug: "speakers",
     display_order: 1,
     is_active: true,
     created_at: "2026-01-01",
@@ -66,8 +67,8 @@ describe("getPopularCategoryTiles", () => {
 
   it("builds one tile per category with name, slug, image, and starting price from the cheapest active item", async () => {
     getCategoriesMock.mockResolvedValue([
-      makeCategory({ id: "cat-speakers", category_name: "Bocinas Bluetooth", display_order: 1, category_image_url: "/speakers.webp" }),
-      makeCategory({ id: "cat-earphones", category_name: "Auriculares y Audífonos", display_order: 2 }),
+      makeCategory({ id: "cat-speakers", category_name: "Bocinas Bluetooth", slug: "bocinas-bluetooth", display_order: 1, category_image_url: "/speakers.webp" }),
+      makeCategory({ id: "cat-earphones", category_name: "Auriculares y Audífonos", slug: "auriculares-y-audifonos", display_order: 2 }),
     ])
     getItemsMock.mockImplementation(async ({ category_id }: { category_id: string }) => ({
       items: category_id === "cat-speakers"
@@ -95,6 +96,19 @@ describe("getPopularCategoryTiles", () => {
       href: "/catalog/auriculares-y-audifonos",
       startingPriceAmount: 29000,
     })
+  })
+
+  // Renombrar una categoría en el admin no debe mover su URL pública: el tile
+  // enlaza al slug almacenado, no a uno derivado del nombre nuevo.
+  it("links a renamed category to its stored slug, not to one derived from the new name", async () => {
+    getCategoriesMock.mockResolvedValue([
+      makeCategory({ id: "cat-speakers", category_name: "Bocinas Bluetooth", slug: "speakers" }),
+    ])
+    getItemsMock.mockResolvedValue({ items: [makeItem({})], total: 1, has_more: false })
+
+    const [tile] = await getPopularCategoryTiles()
+
+    expect(tile).toMatchObject({ name: "Bocinas Bluetooth", slug: "speakers", href: "/catalog/speakers" })
   })
 
   it("respects the requested limit and queries the cheapest item per category", async () => {

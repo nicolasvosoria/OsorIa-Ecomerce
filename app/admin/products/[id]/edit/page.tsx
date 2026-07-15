@@ -31,7 +31,7 @@ export default async function EditProductPage({
   }
 
   return (
-    <AdminPageContainer>
+    <AdminPageContainer maxWidth="4xl">
       <AdminPageHeader title="Editar Producto" subtitle="Modifica la información del producto" />
       <EditProductForm product={product} categories={categories} />
     </AdminPageContainer>

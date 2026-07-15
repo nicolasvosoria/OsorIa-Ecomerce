@@ -50,7 +50,12 @@ export function AdminShell({
       <AdminSidebar />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <AdminTopbar stores={stores} activeStoreId={activeStoreId} />
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6">{children}</div>
+        {/* `relative` no es cosmético: Radix monta los controles nativos ocultos de
+            Select y Checkbox como `position: absolute`. Sin un ancestro posicionado
+            su bloque contenedor es el ICB, así que escapan del recorte de este
+            scroller y estiran el área de scroll del documento hasta el alto del
+            contenido — un segundo scroll sobre el panel entero. */}
+        <div className="relative flex-1 overflow-y-auto p-4 sm:p-6">{children}</div>
       </div>
     </SidebarProvider>
   )

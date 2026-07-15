@@ -1,10 +1,11 @@
 /**
- * Generates a URL-friendly slug from a category name.
+ * Normalizes a category name into a URL-friendly slug.
  *
- * This is the single source of truth for category slugs: every place that
- * links to a category (home tiles, header nav) and the route that resolves
- * a category by slug (`app/catalog/[category]/page.tsx`) must use this same
- * function, or the link and the route matcher can silently diverge.
+ * Only writes use this: it suggests and normalizes the slug the operator saves.
+ * Reads resolve `item_categories.slug`, which is the stored source of truth, so a
+ * rename never moves a live URL. The backfill in
+ * `20260715000300_ecommerce_category_slug_seo.sql` replicates these exact steps in
+ * SQL, so changing them here diverges from the slugs already stored.
  */
 export function generateCategorySlug(name: string): string {
   return name

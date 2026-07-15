@@ -26,6 +26,8 @@ export const comboSchema = z.object({
   category_id: z.string(),
   description: z.string(),
   image_url: z.string(),
+  seo_title: z.string(),
+  seo_description: z.string(),
   is_active: z.boolean(),
   discount_type: z.enum(["percentage", "fixed_cop"]),
   discount_value: z.string(),

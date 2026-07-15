@@ -27,6 +27,7 @@ beforeAll(() => {
 const speakers: ItemCategory = {
   id: "cat-speakers",
   category_name: "Bocinas Bluetooth",
+  slug: "bocinas-bluetooth",
   display_order: 1,
   is_active: true,
   created_at: "2026-01-01",

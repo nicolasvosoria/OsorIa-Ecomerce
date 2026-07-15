@@ -49,6 +49,45 @@ interface MutationOperation {
   payload?: unknown
 }
 
+const seoHydrationScript: Record<string, ScriptedResponse[]> = {
+  product_combo_components: [
+    {
+      data: [
+        { combo_id: 'combo-seo', product_id: 'coffee-250g', variant_id: null, quantity: 2 },
+        { combo_id: 'combo-seo', product_id: 'mug', variant_id: null, quantity: 1 },
+      ],
+      error: null,
+    },
+  ],
+  store_items: [
+    {
+      data: [
+        {
+          id: 'coffee-250g',
+          item_name: 'Café 250g',
+          base_price: 30000,
+          currency_code: 'COP',
+          track_inventory: true,
+          inventory_quantity: 10,
+          is_active: true,
+          is_available_for_sale: true,
+        },
+        {
+          id: 'mug',
+          item_name: 'Mug',
+          base_price: 20000,
+          currency_code: 'COP',
+          track_inventory: true,
+          inventory_quantity: 10,
+          is_active: true,
+          is_available_for_sale: true,
+        },
+      ],
+      error: null,
+    },
+  ],
+}
+
 function createComboMutationSupabase(
   script: Record<string, ScriptedResponse[]>,
   operations: MutationOperation[],
@@ -82,8 +121,15 @@ function createComboMutationSupabase(
         in() {
           return builder
         },
+        limit() {
+          return builder
+        },
         single() {
           return builder
+        },
+        maybeSingle() {
+          const response = script[`${table}:maybeSingle`]?.shift() || { data: null, error: null }
+          return Promise.resolve(response)
         },
         then<TResult1 = ScriptedResponse, TResult2 = never>(
           onfulfilled?: ((value: ScriptedResponse) => TResult1 | PromiseLike<TResult1>) | null,
@@ -348,6 +394,58 @@ describe('combo domain pricing and stock', () => {
     expect(comboToStoreItem(combo)).toEqual(expect.objectContaining({
       category_id: 'category-cafe',
       item_slug: 'combo-categorizado',
+    }))
+  })
+
+  it('maps stored combo SEO columns into catalog items so the admin controls the public metadata', async () => {
+    const supabase = createComboHydrationSupabase(seoHydrationScript)
+
+    const [combo] = await hydrateCombos(
+      [
+        {
+          id: 'combo-seo',
+          name: 'Combo Café',
+          slug: 'combo-cafe',
+          description: 'Dos cafés y un mug',
+          seo_title: 'Combo Café Premium | OsorIA',
+          seo_description: 'Llévate dos cafés de origen y un mug con descuento.',
+          discount_type: 'percentage',
+          discount_value: 0,
+          is_active: true,
+        },
+      ],
+      supabase,
+    )
+
+    expect(comboToStoreItem(combo)).toEqual(expect.objectContaining({
+      seo_title: 'Combo Café Premium | OsorIA',
+      seo_description: 'Llévate dos cafés de origen y un mug con descuento.',
+    }))
+  })
+
+  it('falls back to the combo name and description when the SEO columns are empty', async () => {
+    const supabase = createComboHydrationSupabase(seoHydrationScript)
+
+    const [combo] = await hydrateCombos(
+      [
+        {
+          id: 'combo-seo',
+          name: 'Combo Café',
+          slug: 'combo-cafe',
+          description: 'Dos cafés y un mug',
+          seo_title: '   ',
+          seo_description: null,
+          discount_type: 'percentage',
+          discount_value: 0,
+          is_active: true,
+        },
+      ],
+      supabase,
+    )
+
+    expect(comboToStoreItem(combo)).toEqual(expect.objectContaining({
+      seo_title: 'Combo Café',
+      seo_description: 'Dos cafés y un mug',
     }))
   })
 

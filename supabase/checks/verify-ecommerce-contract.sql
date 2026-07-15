@@ -22,6 +22,8 @@ begin
     ('store_items','seo_title'),('store_items','seo_description'),('store_items','tags'),('store_items','primary_image_url'),
     ('store_items','primary_image_alt'),('product_combos','id'),('product_combos','store_id'),('product_combos','slug'),
     ('product_combos','is_active'),('product_combos','discount_type'),('product_combos','discount_value'),
+    ('product_combos','seo_title'),('product_combos','seo_description'),
+    ('item_categories','slug'),('item_categories','seo_title'),('item_categories','seo_description'),
     ('product_combo_components','combo_id'),('product_combo_components','product_id'),('product_combo_components','variant_id'),
     ('product_combo_components','quantity'),('product_combo_components','display_order'),('order_combo_snapshots','order_id'),
     ('order_combo_snapshots','order_item_id'),('order_combo_snapshots','combo_id'),('order_combo_snapshots','ordered_quantity'),
@@ -156,6 +158,15 @@ begin
 
   if v_missing is not null then
     raise exception 'Missing combo constraints: %', array_to_string(v_missing, ', ');
+  end if;
+end $$;
+
+-- /catalog/<slug> resolves a category by this column, so a store with two
+-- categories on one slug would serve whichever row came back first.
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'item_categories_store_id_slug_key') then
+    raise exception 'Missing category constraint: item_categories_store_id_slug_key';
   end if;
 end $$;
 

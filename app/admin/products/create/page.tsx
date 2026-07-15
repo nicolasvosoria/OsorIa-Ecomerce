@@ -18,7 +18,7 @@ export default async function CreateProductPage() {
   const categories = await getCategories(true, authorization.storeId, authorization.supabase)
 
   return (
-    <AdminPageContainer>
+    <AdminPageContainer maxWidth="4xl">
       <AdminPageHeader
         title="Crear Nuevo Producto"
         subtitle="Completa el formulario para agregar un nuevo producto al catálogo"

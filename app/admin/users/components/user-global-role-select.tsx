@@ -62,7 +62,7 @@ export function UserGlobalRoleControl({
         <SelectTrigger className="h-9 w-[160px]">
           <SelectValue />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="editor-chrome">
           {GLOBAL_ROLE_NAMES.map((roleName) => (
             <SelectItem key={roleName} value={roleName}>
               {GLOBAL_ROLE_LABELS[roleName]}

@@ -1,7 +1,16 @@
 "use client"
 
 import { useMemo, useState, useTransition } from "react"
-import { Controller, useFieldArray, useForm, useWatch, type Control } from "react-hook-form"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+import {
+  Controller,
+  useFieldArray,
+  useForm,
+  useWatch,
+  type Control,
+  type UseFormRegister,
+} from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Loader2, Save } from "lucide-react"
 import { toast } from "sonner"
@@ -22,9 +31,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { emptyComboFormValues, toComboFormValues } from "@/lib/combos/form-values"
+import type { AdminActionResult } from "@/lib/admin/action-result"
 import { comboSchema, type ComboFormValues } from "@/lib/combos/schemas"
-import type { ComboCatalogDetails } from "@/lib/combos/types"
 import {
   cleanupDeferredUploadedImage,
   resolveDeferredImageUpload,
@@ -32,20 +40,31 @@ import {
 import { MAX_PRODUCT_IMAGE_SIZE_MB, PRODUCT_IMAGES_UPLOAD_CONTEXT } from "@/lib/products/images"
 import { deleteImage, uploadImage } from "@/lib/supabase/storage-api"
 import type { ItemCategory, StoreItemWithDetails } from "@/lib/types/products"
-import { createComboAction, updateComboAction } from "../actions"
 
+const COMBOS_PATH = "/admin/products/combos"
 const NO_CATEGORY_VALUE = "__none"
 const BASE_PRODUCT_VALUE = "base"
 
 type ComboFormProps = {
-  editingCombo: ComboCatalogDetails | null
   products: StoreItemWithDetails[]
   categories: ItemCategory[]
-  onFinished: () => void
+  defaultValues: ComboFormValues
+  submitLabel: string
+  pendingLabel: string
+  successMessage: string
+  onSubmit: (values: ComboFormValues) => Promise<AdminActionResult>
 }
 
-export function ComboForm({ editingCombo, products, categories, onFinished }: ComboFormProps) {
-  const defaultValues = editingCombo ? toComboFormValues(editingCombo) : emptyComboFormValues
+export function ComboForm({
+  products,
+  categories,
+  defaultValues,
+  submitLabel,
+  pendingLabel,
+  successMessage,
+  onSubmit,
+}: ComboFormProps) {
+  const router = useRouter()
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null)
   const [isPending, startTransition] = useTransition()
 
@@ -54,7 +73,6 @@ export function ComboForm({ editingCombo, products, categories, onFinished }: Co
     handleSubmit,
     control,
     setValue,
-    reset,
     formState: { errors },
   } = useForm<ComboFormValues>({
     resolver: zodResolver(comboSchema),
@@ -63,13 +81,7 @@ export function ComboForm({ editingCombo, products, categories, onFinished }: Co
 
   const imageUrl = useWatch({ control, name: "image_url" })
 
-  const finish = () => {
-    setSelectedImageFile(null)
-    reset(emptyComboFormValues)
-    onFinished()
-  }
-
-  const onSubmit = (values: ComboFormValues) => {
+  const saveCombo = (values: ComboFormValues) => {
     startTransition(async () => {
       let uploadedImageUrl: string | undefined
       try {
@@ -81,10 +93,7 @@ export function ComboForm({ editingCombo, products, categories, onFinished }: Co
         })
         uploadedImageUrl = imageResult.uploadedUrl
 
-        const payload: ComboFormValues = { ...values, image_url: imageResult.imageUrl ?? "" }
-        const result = editingCombo
-          ? await updateComboAction(editingCombo.id, payload)
-          : await createComboAction(payload)
+        const result = await onSubmit({ ...values, image_url: imageResult.imageUrl ?? "" })
 
         if (!result.success) {
           await cleanupDeferredUploadedImage(uploadedImageUrl, deleteImage)
@@ -92,8 +101,8 @@ export function ComboForm({ editingCombo, products, categories, onFinished }: Co
           return
         }
 
-        toast.success(editingCombo ? "Combo actualizado" : "Combo creado")
-        finish()
+        toast.success(successMessage)
+        router.push(COMBOS_PATH)
       } catch (error) {
         await cleanupDeferredUploadedImage(uploadedImageUrl, deleteImage)
         console.error("[Admin Combos] Error guardando combo:", error)
@@ -105,11 +114,11 @@ export function ComboForm({ editingCombo, products, categories, onFinished }: Co
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{editingCombo ? "Editar combo" : "Nuevo combo"}</CardTitle>
+        <CardTitle>Datos del combo</CardTitle>
         <CardDescription>El precio se calcula desde los componentes actuales.</CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={handleSubmit(saveCombo)} className="space-y-4">
           <FormField id="name" label="Nombre *" error={errors.name?.message}>
             {(fieldProps) => <Input {...fieldProps} {...register("name")} />}
           </FormField>
@@ -136,10 +145,10 @@ export function ComboForm({ editingCombo, products, categories, onFinished }: Co
                       field.onChange(value === NO_CATEGORY_VALUE ? "" : value)
                     }
                   >
-                    <SelectTrigger {...fieldProps}>
+                    <SelectTrigger {...fieldProps} className="w-full">
                       <SelectValue placeholder="Selecciona una categoría" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="editor-chrome">
                       <SelectItem value={NO_CATEGORY_VALUE}>Sin categoría</SelectItem>
                       {categories.map((category) => (
                         <SelectItem key={category.id} value={category.id}>
@@ -168,7 +177,7 @@ export function ComboForm({ editingCombo, products, categories, onFinished }: Co
             allowUrlInput
           />
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-4 md:grid-cols-2">
             <FormField id="discount_type" label="Tipo descuento">
               {(fieldProps) => (
                 <Controller
@@ -176,10 +185,10 @@ export function ComboForm({ editingCombo, products, categories, onFinished }: Co
                   name="discount_type"
                   render={({ field }) => (
                     <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger {...fieldProps}>
+                      <SelectTrigger {...fieldProps} className="w-full">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="editor-chrome">
                         <SelectItem value="percentage">Porcentaje</SelectItem>
                         <SelectItem value="fixed_cop">Valor fijo COP</SelectItem>
                       </SelectContent>
@@ -213,22 +222,60 @@ export function ComboForm({ editingCombo, products, categories, onFinished }: Co
           <ComboComponentsField control={control} products={products} setValue={setValue} />
           <FieldError message={errors.components?.message} />
 
-          <div className="flex gap-2">
-            <Button type="submit" disabled={isPending} className="flex-1">
-              {isPending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="mr-2 h-4 w-4" />
-              )}
-              Guardar
+          <ComboSeoCard register={register} />
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-end">
+            <Button type="button" variant="outline" asChild>
+              <Link href={COMBOS_PATH}>Cancelar</Link>
             </Button>
-            {editingCombo && (
-              <Button type="button" variant="outline" onClick={finish}>
-                Cancelar
-              </Button>
-            )}
+            <Button type="submit" disabled={isPending}>
+              {isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {pendingLabel}
+                </>
+              ) : (
+                <>
+                  <Save className="mr-2 h-4 w-4" />
+                  {submitLabel}
+                </>
+              )}
+            </Button>
           </div>
         </form>
+      </CardContent>
+    </Card>
+  )
+}
+
+function ComboSeoCard({ register }: { register: UseFormRegister<ComboFormValues> }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>SEO</CardTitle>
+        <CardDescription>Si lo dejas vacío se usa el nombre y la descripción del combo.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <FormField id="seo_title" label="Título SEO">
+          {(fieldProps) => (
+            <Input
+              {...fieldProps}
+              placeholder="Título para motores de búsqueda"
+              {...register("seo_title")}
+            />
+          )}
+        </FormField>
+
+        <FormField id="seo_description" label="Descripción SEO">
+          {(fieldProps) => (
+            <Textarea
+              {...fieldProps}
+              placeholder="Descripción para motores de búsqueda"
+              rows={3}
+              {...register("seo_description")}
+            />
+          )}
+        </FormField>
       </CardContent>
     </Card>
   )
@@ -252,7 +299,7 @@ function ComboComponentsField({
   )
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       <div className="flex items-center justify-between">
         <Label>Componentes</Label>
         <Button
@@ -281,10 +328,10 @@ function ComboComponentsField({
                     setValue(`components.${index}.variant_id`, "")
                   }}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="Producto" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="editor-chrome">
                     {products.map((product) => (
                       <SelectItem key={product.id} value={product.id}>
                         {product.item_name}
@@ -304,10 +351,10 @@ function ComboComponentsField({
                     variantField.onChange(value === BASE_PRODUCT_VALUE ? "" : value)
                   }
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="Producto base o variante" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="editor-chrome">
                     <SelectItem value={BASE_PRODUCT_VALUE}>Producto base</SelectItem>
                     {(selectedProduct?.variants || []).map((variant) => (
                       <SelectItem key={variant.id} value={variant.id}>

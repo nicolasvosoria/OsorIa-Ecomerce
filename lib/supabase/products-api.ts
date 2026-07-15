@@ -640,6 +640,37 @@ export async function getItemById(
   }
 }
 
+export async function getVariantsByItemIds(
+  itemIds: string[],
+  supabaseOverride?: any,
+): Promise<Map<string, ItemVariant[]>> {
+  const variantsByItemId = new Map<string, ItemVariant[]>()
+  if (itemIds.length === 0) return variantsByItemId
+
+  const supabase = supabaseOverride ?? getSupabaseEcommerce()
+  if (!supabase) return variantsByItemId
+
+  const result = await withTimeout(
+    supabase
+      .from(ECOMMERCE_TABLES.itemVariants)
+      .select('*')
+      .in('item_id', itemIds)
+      .order('display_order', { ascending: true }),
+    15000,
+    'getVariantsByItemIds',
+  ) as { data: ItemVariant[] | null; error: any }
+
+  if (result.error) throw result.error
+
+  for (const variant of result.data || []) {
+    const variants = variantsByItemId.get(variant.item_id) || []
+    variants.push(variant)
+    variantsByItemId.set(variant.item_id, variants)
+  }
+
+  return variantsByItemId
+}
+
 /**
  * Buscar productos por término de búsqueda
  */

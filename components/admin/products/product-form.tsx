@@ -92,21 +92,17 @@ export function ProductForm({ categories, defaultValues, submitActions }: Produc
   }
 
   return (
-    <form onSubmit={(event) => void form.handleSubmit(runSubmittedAction)(event)}>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <BasicInfoCard form={form} categories={categories} />
-          <PricingCard form={form} compareAtPriceNotice={compareAtPriceNotice} />
-          <InventoryCard form={form} />
-          <SeoCard form={form} />
-        </div>
-
-        <div className="space-y-6">
-          <ImagesCard form={form} resetToken={imageResetToken} />
-          <StatusCard form={form} />
-          <SubmitActions actions={submitActions} isSubmitting={form.formState.isSubmitting} />
-        </div>
-      </div>
+    <form
+      onSubmit={(event) => void form.handleSubmit(runSubmittedAction)(event)}
+      className="space-y-6"
+    >
+      <BasicInfoCard form={form} categories={categories} />
+      <ImagesCard form={form} resetToken={imageResetToken} />
+      <PricingCard form={form} compareAtPriceNotice={compareAtPriceNotice} />
+      <InventoryCard form={form} />
+      <StatusCard form={form} />
+      <SeoCard form={form} />
+      <SubmitActions actions={submitActions} isSubmitting={form.formState.isSubmitting} />
     </form>
   )
 }
@@ -141,7 +137,7 @@ function BasicInfoCard({
           )}
         </FormField>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid gap-4 md:grid-cols-2">
           <FormField id="item_code" label="Código del Producto">
             {(fieldProps) => (
               <Input {...fieldProps} placeholder="SKU-001" {...register("item_code")} />
@@ -155,10 +151,10 @@ function BasicInfoCard({
                 name="category_id"
                 render={({ field }) => (
                   <Select value={field.value} onValueChange={field.onChange}>
-                    <SelectTrigger {...fieldProps}>
+                    <SelectTrigger {...fieldProps} className="w-full">
                       <SelectValue placeholder="Seleccionar categoría" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="editor-chrome">
                       {categories.length === 0 ? (
                         <div className="p-2 text-center text-sm text-muted-foreground">
                           No hay categorías disponibles
@@ -228,7 +224,7 @@ function PricingCard({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid gap-4 md:grid-cols-3">
           <FormField
             id="base_price"
             label="Precio base / venta actual *"
@@ -273,10 +269,10 @@ function PricingCard({
                 name="currency_code"
                 render={({ field }) => (
                   <Select value={field.value} onValueChange={field.onChange}>
-                    <SelectTrigger {...fieldProps}>
+                    <SelectTrigger {...fieldProps} className="w-full">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="editor-chrome">
                       <SelectItem value="COP">COP - Peso Colombiano</SelectItem>
                       <SelectItem value="USD">USD - Dólar</SelectItem>
                       <SelectItem value="EUR">EUR - Euro</SelectItem>
@@ -305,7 +301,7 @@ function InventoryCard({ form }: { form: UseFormReturn<ProductFormValues> }) {
         <CheckboxField control={control} name="track_inventory" label="Rastrear inventario" />
 
         {trackInventory && (
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 md:grid-cols-2">
             <FormField
               id="inventory_quantity"
               label="Cantidad en Stock"
@@ -495,7 +491,10 @@ function SubmitActions({
   isSubmitting: boolean
 }) {
   return (
-    <div className="flex flex-col sm:flex-row gap-2">
+    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-end">
+      <Button type="button" variant="outline" asChild>
+        <Link href={PRODUCTS_PATH}>Cancelar</Link>
+      </Button>
       {actions.map((action, index) => (
         <Button
           key={action.label}
@@ -503,7 +502,6 @@ function SubmitActions({
           name={SUBMIT_ACTION_FIELD}
           value={index}
           variant={action.variant}
-          className="flex-1"
           disabled={isSubmitting}
         >
           {isSubmitting ? (
@@ -519,9 +517,6 @@ function SubmitActions({
           )}
         </Button>
       ))}
-      <Button type="button" variant="outline" asChild>
-        <Link href={PRODUCTS_PATH}>Cancelar</Link>
-      </Button>
     </div>
   )
 }

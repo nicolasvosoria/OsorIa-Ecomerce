@@ -345,7 +345,7 @@ function BehaviorCard({ register, control, errors }: PopupFormFields) {
                     value={ctaMode.value}
                     onValueChange={(value: HomeDiscountPopupCtaMode) => ctaMode.onChange(value)}
                   >
-                    <SelectTrigger {...field}>
+                    <SelectTrigger {...field} className="w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="editor-chrome">
