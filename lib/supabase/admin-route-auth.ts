@@ -37,15 +37,23 @@ type AuthResolution = {
   cookieAuthUserExists: boolean;
 };
 
-type PermissionError = {
+export type PermissionError = {
   code?: string;
   message?: string;
   hint?: string;
 };
 
-type CandidateAuthorization =
-  | { authorized: boolean }
+// Shared user-facing message for a PermissionError surfaced by any gate below,
+// so the string lives in one place even though the gates that return it don't
+// share a call path.
+export const PERMISSION_CHECK_ERROR_MESSAGE = "Error verificando permisos";
+
+type CandidateAuthorization<TGrant> =
+  | { authorized: true; grant: TGrant }
+  | { authorized: false }
   | { error: PermissionError };
+
+type AuthorizedCandidate<TGrant> = { userId: string; grant: TGrant };
 
 export async function getSupabaseAuthClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -155,7 +163,7 @@ function deniedResult(
   status: 401 | 403,
   authResolution: AuthResolution,
   debugEnabled: boolean,
-): AdminRouteAuthResult {
+): AdminAuthDenial {
   return {
     error: "Acceso denegado",
     status,
@@ -163,10 +171,13 @@ function deniedResult(
   };
 }
 
-async function authorizeAnyCandidate(
+// Runs a per-user authorization against every authenticated identity of the
+// request (cookie session and preview bearer) and grants on the first one that
+// passes, so a preview token keeps working alongside a signed-in session.
+export async function authorizeAnyCandidate<TGrant>(
   request: NextRequest,
-  authorizeCandidate: (userId: string) => Promise<CandidateAuthorization>,
-): Promise<AdminRouteAuthResult> {
+  authorizeCandidate: (userId: string) => Promise<CandidateAuthorization<TGrant>>,
+): Promise<AuthorizedCandidate<TGrant> | AdminAuthDenial> {
   const debugEnabled = isAdminDebugEnabled(request);
   const authSupabase = await getSupabaseAuthClient();
   if (!authSupabase) {
@@ -183,7 +194,7 @@ async function authorizeAnyCandidate(
 
     if ("error" in result) {
       return {
-        error: "Error verificando permisos",
+        error: PERMISSION_CHECK_ERROR_MESSAGE,
         status: 500,
         ...(debugEnabled
           ? { diagnostics: buildDiagnostics(authResolution, result.error) }
@@ -192,43 +203,19 @@ async function authorizeAnyCandidate(
     }
 
     if (result.authorized) {
-      return { userId: user.id };
+      return { userId: user.id, grant: result.grant };
     }
   }
 
   return deniedResult(403, authResolution, debugEnabled);
 }
 
-// Per-store admin gate: authorizes if any authenticated identity (cookie or
-// preview bearer) can manage the trusted target store. The store id comes from
-// the request host, never the mutable `store_id` cookie.
-export function requireAdminUser(
-  request: NextRequest,
-  serviceSupabase: any,
-  targetStoreId: string,
-): Promise<AdminRouteAuthResult> {
-  return authorizeAnyCandidate(request, async (userId) => {
-    const { data, error } = await serviceSupabase.rpc(
-      "can_user_manage_store",
-      { p_user_id: userId, p_store_id: targetStoreId },
-    );
-
-    if (error) {
-      return {
-        error: { code: error.code, message: error.message, hint: error.hint },
-      };
-    }
-
-    return { authorized: data === true };
-  });
-}
-
 // Global gate for cross-store routes: only super_admin, never store-scoped roles.
-export function requireSuperAdmin(
+export async function requireSuperAdmin(
   request: NextRequest,
   serviceSupabase: any,
 ): Promise<AdminRouteAuthResult> {
-  return authorizeAnyCandidate(request, async (userId) => {
+  const candidate = await authorizeAnyCandidate<null>(request, async (userId) => {
     const { data: profile, error: profileError } = await serviceSupabase
       .from(ECOMMERCE_TABLES.userProfiles)
       .select("role")
@@ -245,6 +232,10 @@ export function requireSuperAdmin(
       };
     }
 
-    return { authorized: isSuperAdminRole(profile?.role) };
+    return isSuperAdminRole(profile?.role)
+      ? { authorized: true, grant: null }
+      : { authorized: false };
   });
+
+  return "error" in candidate ? candidate : { userId: candidate.userId };
 }

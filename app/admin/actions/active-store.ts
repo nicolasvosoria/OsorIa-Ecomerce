@@ -10,7 +10,10 @@ import {
 } from "@/lib/admin/active-store-cookie";
 import type { AdminActionResult } from "@/lib/admin/action-result";
 import { checkCanManageStore } from "@/lib/supabase/active-store";
-import { getSupabaseAuthClient } from "@/lib/supabase/admin-route-auth";
+import {
+  getSupabaseAuthClient,
+  PERMISSION_CHECK_ERROR_MESSAGE,
+} from "@/lib/supabase/admin-route-auth";
 import { getSupabaseServiceClient } from "@/lib/supabase/admin-store";
 
 export async function setActiveStore(storeId: string): Promise<AdminActionResult> {
@@ -57,7 +60,7 @@ async function checkStoreIsManageable(
 
   const authorization = await checkCanManageStore(service, userId, storeId);
   if ("error" in authorization) {
-    return { success: false, error: authorization.error.error };
+    return { success: false, error: PERMISSION_CHECK_ERROR_MESSAGE };
   }
 
   if (!authorization.authorized) {

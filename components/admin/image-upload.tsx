@@ -8,6 +8,7 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { useAdminActiveStoreId } from "@/contexts/admin-active-store-context"
 import {
   ALLOWED_IMAGE_TYPE_LABELS,
   DEFAULT_MAX_IMAGE_SIZE_MB,
@@ -73,6 +74,7 @@ function SingleImageField({
   deferUpload = false,
   allowUrlInput = false,
 }: SingleImageUploadProps) {
+  const storeId = useAdminActiveStoreId()
   const fileInputId = useId()
   const urlInputId = useId()
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -110,7 +112,7 @@ function SingleImageField({
 
     setUploading(true)
     try {
-      const result = await uploadImage(file, context, maxSizeMB)
+      const result = await uploadImage({ file, storeId, context, maxSizeMB })
 
       if (!result.success || !result.url) {
         toast.error(result.error || UPLOAD_ERROR_MESSAGE)
@@ -233,6 +235,7 @@ function MultiImageField({
   recommendedSize,
   resetToken = 0,
 }: MultiImageUploadProps) {
+  const storeId = useAdminActiveStoreId()
   const fileInputId = useId()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const replaceIndexRef = useRef<number | null>(null)
@@ -271,7 +274,7 @@ function MultiImageField({
       setUploadingIndex(uploadIndex)
 
       try {
-        const result = await uploadImage(file, context, maxSizeMB)
+        const result = await uploadImage({ file, storeId, context, maxSizeMB })
 
         if (uploadResetToken !== resetTokenRef.current) return
 

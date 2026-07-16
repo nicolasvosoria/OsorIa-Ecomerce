@@ -2,6 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 import { POST } from "@/app/api/admin/home-composition/route";
+import {
+  ACTIVE_STORE_COOKIE,
+  signActiveStore,
+} from "@/lib/admin/active-store-cookie";
 
 const { createServerClient, createClient, cookies } = vi.hoisted(() => ({
   createServerClient: vi.fn(),
@@ -79,6 +83,7 @@ describe("home composition admin route", () => {
     process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "test-anon-key";
     process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role-key";
+    process.env.ADMIN_COOKIE_SECRET = "test-cookie-secret";
     cookies.mockResolvedValue(makeCookieStore());
     createServerClient.mockReturnValue({
       auth: {
@@ -162,5 +167,41 @@ describe("home composition admin route", () => {
       }),
     );
     await expect(response.json()).resolves.toEqual({ data: updatedRow.sections });
+  });
+
+  it("writes to the signed active store instead of the host store", async () => {
+    const updateChain = {
+      eq: vi.fn().mockReturnThis(),
+      select: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({
+        data: { id: "layout-2", sections: [] },
+        error: null,
+      }),
+    };
+    const layoutTable = {
+      select: vi.fn().mockReturnValue(makeExistingLayoutQuery("layout-2")),
+      update: vi.fn().mockReturnValue(updateChain),
+    };
+    const serviceSchema = {
+      rpc: makeCanManageStoreRpc(true),
+      from: vi.fn((table: string) => {
+        if (table === "stores_legacy") return makeStoresLegacyQuery("store-1");
+        if (table === "home_section_layout") return layoutTable;
+        throw new Error(`unexpected table ${table}`);
+      }),
+    };
+
+    createClient.mockReturnValue({
+      schema: vi.fn().mockReturnValue(serviceSchema),
+    });
+
+    const response = await POST(
+      makeRequest({ sections: [{ key: "hero", enabled: false }] }, {
+        cookie: `${ACTIVE_STORE_COOKIE}=${signActiveStore("store-2")}`,
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(updateChain.eq).toHaveBeenCalledWith("store_id", "store-2");
   });
 });

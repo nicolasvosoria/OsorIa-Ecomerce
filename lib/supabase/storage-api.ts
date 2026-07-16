@@ -1,11 +1,17 @@
 import { DEFAULT_MAX_IMAGE_SIZE_MB, validateImageFile } from "@/lib/images/image-file";
-import { getRuntimeStoreIdSync } from "@/lib/utils/store";
 import { getSupabaseBrowserClient } from "./client";
 import { ECOMMERCE_STORAGE_BUCKETS } from "./contract";
 import { isCurrentUserAdmin } from "./permissions-api";
 
 const BUCKET_NAME = ECOMMERCE_STORAGE_BUCKETS.products;
 const PUBLIC_OBJECT_URL_MARKER = `/storage/v1/object/public/${BUCKET_NAME}/`;
+
+export interface UploadImageRequest {
+  file: File;
+  storeId: string;
+  context?: string;
+  maxSizeMB?: number;
+}
 
 export interface UploadImageResult {
   success: boolean;
@@ -25,11 +31,12 @@ function getStoragePath(path: string): string {
   return path.split(PUBLIC_OBJECT_URL_MARKER)[1] || path;
 }
 
-export async function uploadImage(
-  file: File,
-  context?: string,
-  maxSizeMB: number = DEFAULT_MAX_IMAGE_SIZE_MB,
-): Promise<UploadImageResult> {
+export async function uploadImage({
+  file,
+  storeId,
+  context,
+  maxSizeMB = DEFAULT_MAX_IMAGE_SIZE_MB,
+}: UploadImageRequest): Promise<UploadImageResult> {
   try {
     // Verificar permisos de administrador
     const isAdmin = await isCurrentUserAdmin();
@@ -73,11 +80,22 @@ export async function uploadImage(
     // Generar nombre: {contexto}-{timestamp}-{random}.{ext}
     const objectName = `${cleanContext}-${timestamp}-${randomString}.${fileExtension}`;
 
-    // Namespacing por tienda: las subidas nuevas viven bajo {store_id}/ para que
-    // la RLS per-tienda (can_manage_store) aísle el storage entre tiendas. Sin
-    // tienda resoluble, se mantiene el path plano (queda bajo gestión super_admin).
-    const storeId = getRuntimeStoreIdSync();
-    const fileName = storeId ? `${storeId}/${objectName}` : objectName;
+    // Namespacing por tienda: las subidas viven bajo {store_id}/ para que la RLS
+    // per-tienda (can_manage_store) aísle el storage entre tiendas. La tienda la
+    // inyecta quien llama con el dato que el servidor autorizó, nunca el ambiente
+    // del navegador: vacía significa que authorizeActiveStoreAdmin falló. La RLS
+    // ya rechaza un path plano por su cuenta (solo lo admite is_storage_admin,
+    // super_admin global) — pero como un error opaco de storage. Rechazar acá es
+    // honesto: nombra el fallo de autorización en vez de disfrazarlo de intento
+    // de escritura.
+    if (!storeId) {
+      return {
+        success: false,
+        error: "Acceso denegado: no hay una tienda activa para subir la imagen",
+      };
+    }
+
+    const fileName = `${storeId}/${objectName}`;
 
     // Convertir File a ArrayBuffer
     const arrayBuffer = await file.arrayBuffer();

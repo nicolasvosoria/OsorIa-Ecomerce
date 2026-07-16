@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 
 import { AdminAuthGuard } from "@/components/admin/admin-auth-guard";
 import { AdminShell } from "@/components/admin/shell/admin-shell";
+import { AdminActiveStoreProvider } from "@/contexts/admin-active-store-context";
 import { authorizeActiveStoreAdmin } from "@/lib/supabase/active-store";
 import { SIDEBAR_PIN_COOKIE, isSidebarPinned } from "@/lib/admin/sidebar-pin-cookie";
 import { listStoresForUser, type StoreSummary } from "@/lib/supabase/memberships-api";
@@ -24,9 +25,11 @@ export default async function AdminLayout({
 
   return (
     <AdminAuthGuard>
-      <AdminShell stores={stores} activeStoreId={activeStoreId} defaultPinned={sidebarPinned}>
-        {children}
-      </AdminShell>
+      <AdminActiveStoreProvider storeId={activeStoreId}>
+        <AdminShell stores={stores} activeStoreId={activeStoreId} defaultPinned={sidebarPinned}>
+          {children}
+        </AdminShell>
+      </AdminActiveStoreProvider>
     </AdminAuthGuard>
   );
 }

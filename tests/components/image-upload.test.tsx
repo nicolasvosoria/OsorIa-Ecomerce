@@ -1,9 +1,11 @@
 /* eslint-disable @next/next/no-img-element */
+import type { ReactNode } from "react";
 import { fireEvent, isInaccessible, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ImageUpload } from "@/components/admin/image-upload";
+import { AdminActiveStoreProvider } from "@/contexts/admin-active-store-context";
 
 const { uploadImageMock, deleteImageMock, toastErrorMock, toastSuccessMock } = vi.hoisted(() => ({
   uploadImageMock: vi.fn(),
@@ -35,14 +37,21 @@ vi.mock("sonner", () => ({
 
 const STORED_IMAGE_URL = `https://project.supabase.co${STORED_IMAGE_MARKER}uno.webp`;
 const PRODUCT_CONTEXT = "product-images";
+const ACTIVE_STORE_ID = "9b1b807c-de03-438f-a92a-349b9aa64c11";
 
 function imageFile(name: string, size = 16, type = "image/webp") {
   return new File([new Uint8Array(size)], name, { type });
 }
 
+// El control sólo se monta dentro de /admin, donde el layout ya resolvió en el
+// servidor qué tienda está activa: sin ese proveedor no tiene a dónde subir.
+function renderInAdmin(ui: ReactNode) {
+  return render(<AdminActiveStoreProvider storeId={ACTIVE_STORE_ID}>{ui}</AdminActiveStoreProvider>);
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
-  uploadImageMock.mockImplementation(async (file: File) => ({
+  uploadImageMock.mockImplementation(async ({ file }: { file: File }) => ({
     success: true,
     url: `https://cdn.example.com/${file.name}`,
   }));
@@ -52,30 +61,33 @@ beforeEach(() => {
 describe("ImageUpload single mode", () => {
   it("uploads the chosen file and publishes the resulting URL", async () => {
     const onChange = vi.fn();
-    render(
+    renderInAdmin(
       <ImageUpload value="" onChange={onChange} label="Imagen de fondo" context="hero-background" />,
     );
 
     await userEvent.upload(screen.getByLabelText("Imagen de fondo"), imageFile("fondo.webp"));
 
     await waitFor(() => expect(onChange).toHaveBeenCalledWith("https://cdn.example.com/fondo.webp"));
-    expect(uploadImageMock).toHaveBeenCalledWith(
-      expect.objectContaining({ name: "fondo.webp" }),
-      "hero-background",
-      5,
-    );
+    expect(uploadImageMock).toHaveBeenCalledWith({
+      file: expect.objectContaining({ name: "fondo.webp" }),
+      storeId: ACTIVE_STORE_ID,
+      context: "hero-background",
+      maxSizeMB: 5,
+    });
     expect(toastErrorMock).not.toHaveBeenCalled();
   });
 
   it("passes its own size limit down to the upload instead of letting it be guessed", async () => {
-    render(
+    renderInAdmin(
       <ImageUpload value="" onChange={vi.fn()} context={PRODUCT_CONTEXT} maxSizeMB={1} />,
     );
 
     await userEvent.upload(screen.getByLabelText("Imagen"), imageFile("foto.webp"));
 
     await waitFor(() =>
-      expect(uploadImageMock).toHaveBeenCalledWith(expect.anything(), PRODUCT_CONTEXT, 1),
+      expect(uploadImageMock).toHaveBeenCalledWith(
+        expect.objectContaining({ context: PRODUCT_CONTEXT, maxSizeMB: 1 }),
+      ),
     );
   });
 
@@ -83,7 +95,7 @@ describe("ImageUpload single mode", () => {
   // descartaría el archivo antes de que el componente pudiera validarlo.
   it("rejects a file that is not an image without uploading it", async () => {
     const onChange = vi.fn();
-    render(<ImageUpload value="" onChange={onChange} />);
+    renderInAdmin(<ImageUpload value="" onChange={onChange} />);
 
     fireEvent.change(screen.getByLabelText("Imagen"), {
       target: { files: [new File(["notas"], "notas.txt", { type: "text/plain" })] },
@@ -96,7 +108,7 @@ describe("ImageUpload single mode", () => {
   });
 
   it("rejects a file over the limit without uploading it", async () => {
-    render(<ImageUpload value="" onChange={vi.fn()} maxSizeMB={1} />);
+    renderInAdmin(<ImageUpload value="" onChange={vi.fn()} maxSizeMB={1} />);
 
     fireEvent.change(screen.getByLabelText("Imagen"), {
       target: { files: [imageFile("enorme.webp", 1024 * 1024 + 1)] },
@@ -111,7 +123,7 @@ describe("ImageUpload single mode", () => {
   it("surfaces the upload error and keeps the previous value", async () => {
     const onChange = vi.fn();
     uploadImageMock.mockResolvedValue({ success: false, error: "Acceso denegado" });
-    render(<ImageUpload value="" onChange={onChange} />);
+    renderInAdmin(<ImageUpload value="" onChange={onChange} />);
 
     await userEvent.upload(screen.getByLabelText("Imagen"), imageFile("foto.webp"));
 
@@ -121,7 +133,7 @@ describe("ImageUpload single mode", () => {
 
   it("deletes the stored image from storage when it is removed", async () => {
     const onChange = vi.fn();
-    render(<ImageUpload value={STORED_IMAGE_URL} onChange={onChange} label="Imagen del combo" />);
+    renderInAdmin(<ImageUpload value={STORED_IMAGE_URL} onChange={onChange} label="Imagen del combo" />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Quitar imagen del combo" }));
 
@@ -130,7 +142,7 @@ describe("ImageUpload single mode", () => {
   });
 
   it("leaves an external URL untouched in storage when it is removed", async () => {
-    render(<ImageUpload value="https://cdn.example.com/externa.webp" onChange={vi.fn()} />);
+    renderInAdmin(<ImageUpload value="https://cdn.example.com/externa.webp" onChange={vi.fn()} />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Quitar imagen" }));
 
@@ -139,7 +151,7 @@ describe("ImageUpload single mode", () => {
 
   it("reports a failed deletion instead of swallowing it", async () => {
     deleteImageMock.mockResolvedValue({ success: false, error: "Objeto no encontrado" });
-    render(<ImageUpload value={STORED_IMAGE_URL} onChange={vi.fn()} />);
+    renderInAdmin(<ImageUpload value={STORED_IMAGE_URL} onChange={vi.fn()} />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Quitar imagen" }));
 
@@ -150,7 +162,7 @@ describe("ImageUpload single mode", () => {
   // visible, así que dos campos con nombres distintos se anunciaban igual: el
   // nombre accesible ahora se deriva de `label`, como pide F10.
   it("announces its own domain name instead of a shared generic one", () => {
-    render(
+    renderInAdmin(
       <>
         <ImageUpload value="" onChange={vi.fn()} label="Imagen del combo" />
         <ImageUpload value="" onChange={vi.fn()} label="Imagen" />
@@ -173,7 +185,7 @@ describe("ImageUpload single mode", () => {
     document.head.appendChild(hiddenUtilityStyle);
 
     try {
-      render(<ImageUpload value="" onChange={vi.fn()} label="Imagen de fondo" />);
+      renderInAdmin(<ImageUpload value="" onChange={vi.fn()} label="Imagen de fondo" />);
 
       expect(isInaccessible(screen.getByLabelText("Imagen de fondo"))).toBe(false);
     } finally {
@@ -186,7 +198,7 @@ describe("ImageUpload deferred upload", () => {
   it("hands the file to the caller instead of uploading it", async () => {
     const onFileSelect = vi.fn();
     const onChange = vi.fn();
-    render(
+    renderInAdmin(
       <ImageUpload value="" onChange={onChange} onFileSelect={onFileSelect} deferUpload />,
     );
 
@@ -200,7 +212,7 @@ describe("ImageUpload deferred upload", () => {
 
   it("still validates the file before handing it over", async () => {
     const onFileSelect = vi.fn();
-    render(
+    renderInAdmin(
       <ImageUpload value="" onChange={vi.fn()} onFileSelect={onFileSelect} deferUpload maxSizeMB={1} />,
     );
 
@@ -217,7 +229,7 @@ describe("ImageUpload deferred upload", () => {
   it("does not delete from storage, because the caller owns the pending save", async () => {
     const onFileSelect = vi.fn();
     const onChange = vi.fn();
-    render(
+    renderInAdmin(
       <ImageUpload
         value={STORED_IMAGE_URL}
         onChange={onChange}
@@ -236,7 +248,7 @@ describe("ImageUpload deferred upload", () => {
 
 describe("ImageUpload pasted URL", () => {
   it("stays hidden unless the caller opts in", () => {
-    render(<ImageUpload value="" onChange={vi.fn()} />);
+    renderInAdmin(<ImageUpload value="" onChange={vi.fn()} />);
 
     expect(screen.queryByLabelText(/pegar URL/i)).not.toBeInTheDocument();
   });
@@ -244,7 +256,7 @@ describe("ImageUpload pasted URL", () => {
   it("publishes the pasted URL and drops any file staged for upload", async () => {
     const onChange = vi.fn();
     const onFileSelect = vi.fn();
-    render(
+    renderInAdmin(
       <ImageUpload
         value=""
         onChange={onChange}
@@ -265,7 +277,7 @@ describe("ImageUpload pasted URL", () => {
 
   // Los ids literales del componente anterior chocaban al montar dos instancias.
   it("keeps its field ids unique across instances", () => {
-    render(
+    renderInAdmin(
       <>
         <ImageUpload value="" onChange={vi.fn()} label="Imagen A" allowUrlInput />
         <ImageUpload value="" onChange={vi.fn()} label="Imagen B" allowUrlInput />
@@ -281,7 +293,7 @@ describe("ImageUpload pasted URL", () => {
 describe("ImageUpload multiple mode", () => {
   function renderMultiple({ values = [] }: { values?: string[] } = {}) {
     const onChange = vi.fn();
-    render(
+    renderInAdmin(
       <ImageUpload
         multiple
         values={values}
@@ -346,11 +358,12 @@ describe("ImageUpload multiple mode", () => {
     });
 
     await waitFor(() => expect(uploadImageMock).toHaveBeenCalledTimes(1));
-    expect(uploadImageMock).toHaveBeenCalledWith(
-      expect.objectContaining({ name: "ok.webp" }),
-      PRODUCT_CONTEXT,
-      1,
-    );
+    expect(uploadImageMock).toHaveBeenCalledWith({
+      file: expect.objectContaining({ name: "ok.webp" }),
+      storeId: ACTIVE_STORE_ID,
+      context: PRODUCT_CONTEXT,
+      maxSizeMB: 1,
+    });
     expect(onChange).toHaveBeenLastCalledWith([
       "/a.webp",
       "/b.webp",

@@ -19,7 +19,7 @@ describe("root docs cleanup", () => {
     expect(readme).toContain("## Deployment");
     expect(readme).toContain("tests/README.md");
     expect(readme).toContain("lib/email-templates/README.md");
-    expect(readme).not.toContain(".env.example");
+    expect(readme).toContain(".env.example");
   });
 
   it("removes loose markdown notes from repository root", () => {

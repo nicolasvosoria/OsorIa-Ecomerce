@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { requireAdminUser, type AdminAuthDenial } from "./admin-route-auth";
-import {
-  getSupabaseServiceClient,
-  resolveTrustedStoreId,
-} from "./admin-store";
+import { ACTIVE_STORE_COOKIE } from "@/lib/admin/active-store-cookie";
+import { resolveActiveStoreId } from "./active-store";
+import { authorizeAnyCandidate, type AdminAuthDenial } from "./admin-route-auth";
+import { getSupabaseServiceClient } from "./admin-store";
 
 type StoreAdminGrant = {
   supabase: any;
@@ -14,10 +13,13 @@ type StoreAdminGrant = {
 
 export type StoreAdminAuthorization = StoreAdminGrant | AdminAuthDenial;
 
-// Shared admin preamble for per-store routes: resolves the trusted target store
-// from the request host and gates on per-store admin. `providedClient` lets a
-// route reuse a client it already built (config routes on their own service
-// client); omit it to build the standard ecommerce service client.
+// Shared admin preamble for per-store routes: grants to the first authenticated
+// identity (cookie session or preview bearer) that can manage its active store,
+// resolved with the same rule as the RSC gate. Each identity is resolved on its
+// own, so a preview bearer never inherits the session's store. `providedClient`
+// lets a route reuse a client it already built (e.g. the home-discount-popup
+// upload route at app/api/admin/home-discount-popup/upload/route.ts reuses its
+// own ecommerce client); omit it to build the standard ecommerce service client.
 export async function authorizeStoreAdmin(
   request: NextRequest,
   providedClient?: any,
@@ -27,13 +29,32 @@ export async function authorizeStoreAdmin(
     return { error: "Supabase no configurado", status: 500 };
   }
 
-  const storeId = await resolveTrustedStoreId(request, supabase);
-  const adminCheck = await requireAdminUser(request, supabase, storeId);
-  if ("error" in adminCheck) {
-    return adminCheck;
+  const activeStoreCookie = request.cookies.get(ACTIVE_STORE_COOKIE)?.value;
+  const hostHeader = request.headers.get("host");
+
+  const candidate = await authorizeAnyCandidate<string>(request, async (userId) => {
+    const resolution = await resolveActiveStoreId({
+      service: supabase,
+      userId,
+      activeStoreCookie,
+      hostHeader,
+    });
+
+    if ("error" in resolution) {
+      return resolution;
+    }
+    if ("unauthorized" in resolution) {
+      return { authorized: false };
+    }
+
+    return { authorized: true, grant: resolution.storeId };
+  });
+
+  if ("error" in candidate) {
+    return candidate;
   }
 
-  return { supabase, storeId, userId: adminCheck.userId };
+  return { supabase, storeId: candidate.grant, userId: candidate.userId };
 }
 
 export function adminErrorResponse(denial: AdminAuthDenial): NextResponse {

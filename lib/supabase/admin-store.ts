@@ -1,5 +1,4 @@
 import { createClient } from "@supabase/supabase-js";
-import type { NextRequest } from "next/server";
 import { resolveStoreLookupSubdomain } from "@/lib/utils/store-host";
 import { ECOMMERCE_SCHEMA, ECOMMERCE_VIEWS } from "./contract";
 
@@ -44,8 +43,8 @@ async function resolveStoreIdBySubdomain(supabase: any, subdomain: string) {
 
 // Trusted target store derived from a raw Host header, never from the mutable
 // `store_id` cookie. A stale/unknown subdomain falls back to the default store,
-// mirroring getStoreFromServer. Shared by the bearer routes (via NextRequest)
-// and the RSC/server-action authorizer (via headers()).
+// mirroring getStoreFromServer. Used as the fallback of resolveActiveStoreId,
+// which serves both the API routes and the RSC/server-action authorizer.
 export async function resolveTrustedStoreIdFromHost(
   hostHeader: string | null | undefined,
   supabase: any,
@@ -61,12 +60,4 @@ export async function resolveTrustedStoreIdFromHost(
   const storeId = await resolveStoreIdBySubdomain(supabase, subdomain);
 
   return storeId ?? resolveDefaultStoreId(supabase);
-}
-
-// Trusted target store for admin writes on the bearer API routes.
-export function resolveTrustedStoreId(
-  request: NextRequest,
-  supabase: any,
-): Promise<string> {
-  return resolveTrustedStoreIdFromHost(request.headers.get("host"), supabase);
 }

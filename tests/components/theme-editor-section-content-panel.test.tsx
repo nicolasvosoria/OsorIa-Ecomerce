@@ -6,11 +6,13 @@
 // `component-fields.ts` config (the "about" section, which has both a
 // declared image field and a plain text field) through the real renderer.
 
+import type { ReactNode } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import { SectionContentPanel } from "@/components/theme/theme-editor-section-content-panel";
 import { SectionDesignFieldList } from "@/components/theme/theme-editor-section-design-panel";
+import { AdminActiveStoreProvider } from "@/contexts/admin-active-store-context";
 
 vi.mock("@/lib/supabase/storage-api", () => ({
   uploadImage: vi.fn(),
@@ -29,6 +31,14 @@ vi.mock("@/app/admin/actions/catalog-pickers", () => ({
   listActiveStoreCategories: listActiveStoreCategoriesMock,
 }));
 
+// El editor vive bajo /admin, cuyo layout resuelve la tienda activa en el
+// servidor: el control de imagen la necesita para saber a qué carpeta subir.
+function renderInAdmin(ui: ReactNode) {
+  return render(
+    <AdminActiveStoreProvider storeId="9b1b807c-de03-438f-a92a-349b9aa64c11">{ui}</AdminActiveStoreProvider>,
+  );
+}
+
 // jsdom doesn't implement ResizeObserver or scrollIntoView; the underlying
 // `cmdk` Command list (CategoryPicker) needs both once its popover mounts.
 beforeAll(() => {
@@ -43,7 +53,7 @@ beforeAll(() => {
 
 describe("SectionContentPanel content field dispatch", () => {
   it("renders the image control for a declared type:\"image\" field and a text input otherwise", () => {
-    render(
+    renderInAdmin(
       <SectionContentPanel
         sectionName="about"
         persistedContent={{}}
@@ -66,7 +76,7 @@ describe("SectionContentPanel content field dispatch", () => {
       { id: "cat-speakers", category_name: "Bocinas Bluetooth", display_order: 1, is_active: true, created_at: "", updated_at: "" },
     ]);
 
-    render(
+    renderInAdmin(
       <SectionContentPanel
         sectionName="popular"
         persistedContent={{ categoryTiles: [{ categoryId: "cat-speakers", imageUrl: "" }] }}
@@ -89,7 +99,7 @@ describe("SectionContentPanel content field dispatch", () => {
     ]);
 
     const onFieldChange = vi.fn();
-    render(
+    renderInAdmin(
       <SectionContentPanel
         sectionName="popular"
         persistedContent={{ categoryTiles: [{ categoryId: "cat-speakers", imageUrl: "" }] }}
@@ -119,7 +129,7 @@ describe("SectionContentPanel content field dispatch", () => {
 // through `SectionDesignFieldList`, not `SectionContentPanel`.
 describe("SectionDesignFieldList content field dispatch", () => {
   it("renders a declared type:\"toggle\" field as a Switch, checked from a legacy 'si' value", () => {
-    render(
+    renderInAdmin(
       <SectionDesignFieldList
         sectionName="products"
         persistedContent={{ showCategory: "si" }}
@@ -135,7 +145,7 @@ describe("SectionDesignFieldList content field dispatch", () => {
 
   it("writes a real boolean when a toggle field is flipped", () => {
     const onContentFieldChange = vi.fn();
-    render(
+    renderInAdmin(
       <SectionDesignFieldList
         sectionName="products"
         persistedContent={{ showCategory: "no" }}

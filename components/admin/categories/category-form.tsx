@@ -16,6 +16,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { FormField } from "@/components/ui/form-field"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { useAdminActiveStoreId } from "@/contexts/admin-active-store-context"
 import type { AdminActionResult } from "@/lib/admin/action-result"
 import { categorySchema, type CategoryFormValues } from "@/lib/categories/schemas"
 import {
@@ -44,6 +45,7 @@ export function CategoryForm({
   onSubmit,
 }: CategoryFormProps) {
   const router = useRouter()
+  const storeId = useAdminActiveStoreId()
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null)
   const [isPending, startTransition] = useTransition()
 
@@ -74,6 +76,7 @@ export function CategoryForm({
         const imageResult = await resolveDeferredImageUpload({
           file: selectedImageFile,
           imageUrl: values.category_image_url,
+          storeId,
           context: PRODUCT_IMAGES_UPLOAD_CONTEXT,
           uploadImage,
         })

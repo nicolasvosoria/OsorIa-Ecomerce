@@ -14,6 +14,8 @@ vi.mock('@/lib/supabase/client', () => ({
 
 const getSupabaseEcommerceMock = vi.mocked(getSupabaseEcommerce)
 
+const DEFERRED_UPLOAD_STORE_ID = '9b1b807c-de03-438f-a92a-349b9aa64c11'
+
 type ScriptedResponse = { data?: unknown; error?: unknown }
 
 function createComboHydrationSupabase(script: Record<string, ScriptedResponse[]>) {
@@ -460,11 +462,16 @@ describe('combo domain pricing and stock', () => {
       resolveDeferredImageUpload({
         file,
         imageUrl: 'https://example.com/old.png',
+        storeId: DEFERRED_UPLOAD_STORE_ID,
         uploadImage,
       }),
     ).rejects.toThrow('new row violates row-level security policy')
 
-    expect(uploadImage).toHaveBeenCalledWith(file, 'product-images')
+    expect(uploadImage).toHaveBeenCalledWith({
+      file,
+      storeId: DEFERRED_UPLOAD_STORE_ID,
+      context: 'product-images',
+    })
   })
 
   it('uses an existing combo image URL without uploading a file', async () => {
@@ -473,6 +480,7 @@ describe('combo domain pricing and stock', () => {
     await expect(
       resolveDeferredImageUpload({
         imageUrl: ' https://example.com/combo.jpg ',
+        storeId: DEFERRED_UPLOAD_STORE_ID,
         uploadImage,
       }),
     ).resolves.toEqual({ imageUrl: 'https://example.com/combo.jpg' })

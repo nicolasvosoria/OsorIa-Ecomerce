@@ -28,6 +28,18 @@ Required for app boot:
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 
+Required in production — admin active-store cookie (signed HMAC for the
+RSC/server-action store gate that every `/admin` request runs through):
+
+- `ADMIN_COOKIE_SECRET` — signs and verifies the `active-store` cookie. When
+  unset, `verifyActiveStore()` ignores the cookie and silently falls back to
+  resolving the store from the request host; the admin store switcher stops
+  working with no visible error. To make that impossible in a deployed
+  environment, `instrumentation.ts` throws at server startup when
+  `NODE_ENV=production` and this secret is missing — the app will not start.
+  Not enforced in development, where `.env.development` already sets it.
+  Generate one with `openssl rand -hex 32`. See `.env.example`.
+
 Common optional variables by feature:
 
 - Multi-tenant toggle (used in `proxy.ts` and store helpers):
@@ -35,9 +47,6 @@ Common optional variables by feature:
   - `DEFAULT_STORE_ID`
   - `NEXT_PUBLIC_DISABLE_SUBDOMAIN_MULTI_TENANT`
   - `NEXT_PUBLIC_DEFAULT_STORE_ID`
-- Admin active-store cookie (signed HMAC for the RSC/server-action store gate):
-  - `ADMIN_COOKIE_SECRET` (required to trust the `active-store` cookie; when
-    unset the gate ignores the cookie and falls back to the request host)
 - Chat API enrichment (`app/api/chat/route.ts`):
   - `SUPABASE_SERVICE_ROLE_KEY`
   - `DEEPSEEK_API_KEY`

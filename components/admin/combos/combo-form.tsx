@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { useAdminActiveStoreId } from "@/contexts/admin-active-store-context"
 import type { AdminActionResult } from "@/lib/admin/action-result"
 import { comboSchema, type ComboFormValues } from "@/lib/combos/schemas"
 import {
@@ -59,6 +60,7 @@ export function ComboForm({
   onSubmit,
 }: ComboFormProps) {
   const router = useRouter()
+  const storeId = useAdminActiveStoreId()
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null)
   const [isPending, startTransition] = useTransition()
 
@@ -82,6 +84,7 @@ export function ComboForm({
         const imageResult = await resolveDeferredImageUpload({
           file: selectedImageFile,
           imageUrl: values.image_url,
+          storeId,
           context: PRODUCT_IMAGES_UPLOAD_CONTEXT,
           uploadImage,
         })

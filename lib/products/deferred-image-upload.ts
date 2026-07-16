@@ -1,12 +1,13 @@
 import { PRODUCT_IMAGES_UPLOAD_CONTEXT } from '@/lib/products/images'
-import type { UploadImageResult } from '@/lib/supabase/storage-api'
+import type { UploadImageRequest, UploadImageResult } from '@/lib/supabase/storage-api'
 
-export type DeferredImageUploadFn = (file: File, context: string) => Promise<UploadImageResult>
+export type DeferredImageUploadFn = (request: UploadImageRequest) => Promise<UploadImageResult>
 export type DeferredImageCleanupFn = (url: string) => Promise<{ success: boolean; error?: string }>
 
 export interface ResolveDeferredImageInput {
   file?: File | null
   imageUrl?: string | null
+  storeId: string
   context?: string
   uploadImage: DeferredImageUploadFn
 }
@@ -19,6 +20,7 @@ export interface ResolveDeferredImageResult {
 export async function resolveDeferredImageUpload({
   file,
   imageUrl,
+  storeId,
   context = PRODUCT_IMAGES_UPLOAD_CONTEXT,
   uploadImage,
 }: ResolveDeferredImageInput): Promise<ResolveDeferredImageResult> {
@@ -27,7 +29,7 @@ export async function resolveDeferredImageUpload({
     return { imageUrl: trimmedUrl || undefined }
   }
 
-  const uploadResult = await uploadImage(file, context)
+  const uploadResult = await uploadImage({ file, storeId, context })
   if (!uploadResult.success || !uploadResult.url) {
     throw new Error(uploadResult.error || 'No se pudo subir la imagen del combo')
   }
