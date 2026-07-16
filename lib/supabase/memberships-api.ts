@@ -1,4 +1,7 @@
+import { randomBytes } from "node:crypto";
+
 import { getSupabaseServiceClient } from "./admin-store";
+import { getServiceAuthAdminClient } from "./service-client";
 import { ECOMMERCE_TABLES } from "./contract";
 import { isStoreRoleName, isSuperAdminRole, type StoreRoleName } from "@/lib/memberships/roles";
 import type { UserRole } from "@/lib/types/user";
@@ -17,6 +20,27 @@ export type StoreMember = {
 };
 
 export type MembershipResult = { success: boolean; error?: string };
+
+// Adding a member can now mint a brand-new platform identity, so its result
+// carries the one-time temporary password on that path (D21). Kept separate from
+// MembershipResult so the three role/removal actions never see a `tempPassword`
+// field they can't produce.
+export type AddStoreMemberResult =
+  | { success: true; created: false }
+  | { success: true; created: true; tempPassword: string }
+  | { success: false; error: string };
+
+// Outcome of resolving a platform account behind an email. `created` discriminates
+// the freshly-minted identity (which carries the temporary password its owner must
+// change on first entry) from one that already had an ecommerce profile.
+export type EnsurePlatformUserResult =
+  | { userId: string; created: false }
+  | { userId: string; created: true; tempPassword: string };
+
+type PlatformUserNames = { firstName?: string; lastName?: string };
+
+const FOREIGN_PLATFORM_ACCOUNT_ERROR =
+  "Ese correo ya pertenece a una cuenta de la plataforma pero no del ecommerce. Usa otro correo.";
 
 // Stores a user can act as admin for: every store for a super_admin/global
 // admin, otherwise only the stores they hold a store_users membership in.
@@ -120,32 +144,138 @@ export async function listStoreMembers(
   return (data ?? []).map(toStoreMember);
 }
 
-// Adds an EXISTING platform user to the store by email. Never creates accounts:
-// an unknown email returns a clear error. Re-adding an existing member updates
-// their store role instead of duplicating the membership.
+// Adds a member to the store by email. An email with an ecommerce profile is
+// attached directly; an unknown email is minted a platform account first (D21).
+// Re-adding an existing member updates their store role instead of duplicating
+// the membership. When a new identity is minted its temporary password is returned.
 export async function addStoreMember(
   storeId: string,
   email: string,
   roleName: StoreRoleName,
   supabaseOverride?: any,
-): Promise<MembershipResult> {
+): Promise<AddStoreMemberResult> {
   const service = supabaseOverride ?? getSupabaseServiceClient();
   if (!service) {
     return { success: false, error: "Supabase no configurado" };
   }
 
   try {
-    const userId = await findUserIdByEmail(email, service);
-    if (!userId) {
-      return { success: false, error: "No existe un usuario registrado con ese correo" };
-    }
-
-    const storeUserId = await ensureStoreUser(service, storeId, userId);
+    const platformUser = await ensurePlatformUserByEmail(email, service);
+    const storeUserId = await ensureStoreUser(service, storeId, platformUser.userId);
     const roleId = await resolveStoreRoleId(service, storeId, roleName);
     await assignSingleRole(service, storeUserId, roleId);
-    return { success: true };
+
+    return platformUser.created
+      ? { success: true, created: true, tempPassword: platformUser.tempPassword }
+      : { success: true, created: false };
   } catch (error) {
     return { success: false, error: toMembershipErrorMessage(error) };
+  }
+}
+
+// Resolves the platform identity behind an email, minting one when it is unknown
+// to the whole platform (D21/D15). Three outcomes, in order:
+//   - profile exists  -> reuse its user id, create nothing
+//   - unknown email    -> create a confirmed account with a temporary password,
+//                         seed an ecommerce profile (role defaults to 'user',
+//                         must_change_password true), return that password
+//   - belongs to auth but not ecommerce -> a clear error (D20): createUser
+//                         collides with `email_exists`, and we deliberately do
+//                         not look up or adopt an account another platform app
+//                         owns.
+// D21 replaces the invite link (D9): the shared project's Site URL redirects to
+// copaosoria, so an owner never reaches this app through an emailed link. Instead
+// the operator hands off the temporary password and the owner logs in here.
+export async function ensurePlatformUserByEmail(
+  email: string,
+  service: any,
+  names: PlatformUserNames = {},
+): Promise<EnsurePlatformUserResult> {
+  const normalizedEmail = email.trim().toLowerCase();
+
+  const existingUserId = await findUserIdByEmail(normalizedEmail, service);
+  if (existingUserId) {
+    return { userId: existingUserId, created: false };
+  }
+
+  const authAdmin = getServiceAuthAdminClient();
+  if (!authAdmin) {
+    throw new Error("Supabase no configurado");
+  }
+
+  const tempPassword = generateTempPassword();
+  const userId = await createConfirmedIdentity(authAdmin, normalizedEmail, tempPassword);
+  await insertInvitedProfile(service, userId, normalizedEmail, names);
+
+  return { userId, created: true, tempPassword };
+}
+
+// 24 random bytes (~32 base64url chars) clears Supabase's 6-char minimum with a
+// wide margin and is unguessable; the owner replaces it on first entry anyway.
+const TEMP_PASSWORD_BYTES = 24;
+
+function generateTempPassword(): string {
+  return randomBytes(TEMP_PASSWORD_BYTES).toString("base64url");
+}
+
+// Creates the owner's account already email-confirmed, so no verification mail is
+// sent and no redirect to the shared project's Site URL ever happens. Wraps the
+// call because `on_auth_user_created_copaosoria` — a foreign AFTER INSERT trigger
+// with no exception handling — can abort it, and an already-registered email comes
+// back as `email_exists` rather than a throw.
+async function createConfirmedIdentity(
+  authAdmin: any,
+  email: string,
+  password: string,
+): Promise<string> {
+  let response: { data: any; error: any };
+  try {
+    response = await authAdmin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+    });
+  } catch (error) {
+    throw new Error(`No se pudo crear la cuenta del dueño: ${toMembershipErrorMessage(error)}`);
+  }
+
+  const { data, error } = response;
+  if (error) {
+    if (error.code === "email_exists") {
+      throw new Error(FOREIGN_PLATFORM_ACCOUNT_ERROR);
+    }
+    throw new Error(`No se pudo crear la cuenta del dueño: ${error.message}`);
+  }
+
+  const userId = data?.user?.id;
+  if (!userId) {
+    throw new Error("No se pudo crear la cuenta del dueño");
+  }
+
+  return userId;
+}
+
+// Seeds the ecommerce profile for a freshly-minted identity, mirroring the normal
+// sign-up insert (no role -> DB default 'user') but flagging must_change_password
+// so the admin forces the owner off the temporary password on first entry.
+// Surfaces the insert error instead of dropping it, so a failed profile never
+// passes silently.
+async function insertInvitedProfile(
+  service: any,
+  userId: string,
+  email: string,
+  names: PlatformUserNames,
+): Promise<void> {
+  const { error } = await service.from(ECOMMERCE_TABLES.userProfiles).insert({
+    id: userId,
+    email,
+    first_name: names.firstName ?? null,
+    last_name: names.lastName ?? null,
+    must_change_password: true,
+  });
+
+  if (error) {
+    throw new Error(`No se pudo crear el perfil de ecommerce: ${error.message}`);
   }
 }
 
@@ -232,6 +362,55 @@ export async function setUserGlobalRole(
 
   if (error) {
     return { success: false, error: `No se pudo actualizar el rol: ${error.message}` };
+  }
+
+  return { success: true };
+}
+
+// Whether this user still holds the temporary password an owner-invite minted
+// (D21). The admin guard reads it to force the change before any admin use; it is
+// false for everyone who set their own password, so the guard never fires for them.
+export async function requiresPasswordChange(
+  userId: string,
+  supabaseOverride?: any,
+): Promise<boolean> {
+  const service = supabaseOverride ?? getSupabaseServiceClient();
+  if (!service) {
+    return false;
+  }
+
+  const { data, error } = await service
+    .from(ECOMMERCE_TABLES.userProfiles)
+    .select("must_change_password")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`No se pudo verificar el estado de la contraseña: ${error.message}`);
+  }
+
+  return data?.must_change_password === true;
+}
+
+// Clears the forced-change flag once the owner has replaced the temporary password.
+// The caller passes the userId it resolved from the session — never from client
+// input — so a user can only clear their own flag.
+export async function clearMustChangePassword(
+  userId: string,
+  supabaseOverride?: any,
+): Promise<MembershipResult> {
+  const service = supabaseOverride ?? getSupabaseServiceClient();
+  if (!service) {
+    return { success: false, error: "Supabase no configurado" };
+  }
+
+  const { error } = await service
+    .from(ECOMMERCE_TABLES.userProfiles)
+    .update({ must_change_password: false })
+    .eq("id", userId);
+
+  if (error) {
+    return { success: false, error: `No se pudo actualizar la contraseña: ${error.message}` };
   }
 
   return { success: true };

@@ -315,7 +315,7 @@ describe("theme activation admin client contract", () => {
     });
   });
 
-  it("falls back to active theme without store_id filters when version lookup misses", async () => {
+  it("falls back to the 'Tech' preset by name (D7) when the store has no current version — never by is_active", async () => {
     mockedGetStoreId.mockResolvedValue("store-123");
 
     const maybeSingleVersion = vi.fn().mockResolvedValue({
@@ -332,8 +332,8 @@ describe("theme activation admin client contract", () => {
 
     const maybeSingleTheme = vi.fn().mockResolvedValue({
       data: {
-        id: "theme-1",
-        theme_name: "Claro Original",
+        id: "theme-4",
+        theme_name: "Tech",
         colors: {
           primary: "#111111",
           secondary: "#222222",
@@ -350,8 +350,8 @@ describe("theme activation admin client contract", () => {
       error: null,
     });
     const limit = vi.fn().mockReturnValue({ maybeSingle: maybeSingleTheme });
-    const eqIsActive = vi.fn().mockReturnValue({ limit });
-    const appThemesSelect = vi.fn().mockReturnValue({ eq: eqIsActive });
+    const eqThemeName = vi.fn().mockReturnValue({ limit });
+    const appThemesSelect = vi.fn().mockReturnValue({ eq: eqThemeName });
 
     const from = vi.fn((table: string) => {
       if (table === "app_theme_versions") {
@@ -367,13 +367,20 @@ describe("theme activation admin client contract", () => {
 
     mockedGetSupabaseEcommerce.mockReturnValue({ from } as any);
 
+    // (a) A store with no `app_theme_versions` row resolves to Tech.
     await expect(getActiveTheme()).resolves.toEqual(
-      expect.objectContaining({ theme_name: "Claro Original" }),
+      expect.objectContaining({ theme_name: "Tech" }),
     );
 
     expect(from).toHaveBeenCalledWith("app_theme_versions");
     expect(from).toHaveBeenCalledWith("app_themes");
-    expect(eqIsActive).toHaveBeenCalledWith("is_active", true);
+    // (b) The fallback anchors by name, not by the shared `is_active` flag —
+    // this is the assertion that closes the cross-tenant leak: another
+    // store's admin flipping `is_active` on the catalog can no longer change
+    // what an unpublished store resolves to, because that column is never
+    // read here.
+    expect(eqThemeName).toHaveBeenCalledWith("theme_name", "Tech");
+    expect(eqThemeName).not.toHaveBeenCalledWith("is_active", true);
     expect(limit).toHaveBeenCalledWith(1);
   });
 });

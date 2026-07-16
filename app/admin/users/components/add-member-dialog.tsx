@@ -28,7 +28,9 @@ export function AddMemberDialog() {
       <DialogContent className="editor-chrome">
         <DialogHeader>
           <DialogTitle>Agregar miembro</DialogTitle>
-          <DialogDescription>Da acceso a un usuario ya registrado a esta tienda.</DialogDescription>
+          <DialogDescription>
+            Da acceso a esta tienda. Si el correo no tiene cuenta, se creará una invitación.
+          </DialogDescription>
         </DialogHeader>
         <AddMemberForm onSuccess={() => setOpen(false)} />
       </DialogContent>

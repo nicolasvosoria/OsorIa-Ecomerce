@@ -21,7 +21,7 @@ interface Store {
 
 // Caché simple en memoria para las tiendas (evita consultas repetidas)
 const storeCache = new Map<string, { store: Store | null; timestamp: number }>()
-const CACHE_TTL = 5 * 60 * 1000 // 5 minutos
+const CACHE_TTL = 60 * 1000 // 60 segundos: acota el retraso de publicar/despublicar a 1 min
 
 async function applyAdminRouteGate(request: NextRequest, response: NextResponse) {
   const { pathname, search } = request.nextUrl
@@ -53,9 +53,11 @@ async function applyAdminRouteGate(request: NextRequest, response: NextResponse)
   return NextResponse.redirect(redirectUrl)
 }
 
-/**
- * Obtiene la tienda desde Supabase por subdominio (schema ecommerce, vista stores_legacy)
- */
+// Resuelve la tienda por subdominio con la SERVICE KEY, no la anon key: la RLS de
+// stores (is_active AND is_public) esconde las tiendas despublicadas o suspendidas
+// a la anon key, por lo que el resolver no podría distinguir "no existe" de
+// "existe pero no está live". La service key bypassea la RLS; deleted_at IS NULL
+// se mantiene porque una tienda borrada sí es "no encontrada".
 async function getStoreBySubdomain(subdomain: string): Promise<Store | null> {
   const cached = storeCache.get(subdomain)
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
@@ -64,16 +66,15 @@ async function getStoreBySubdomain(subdomain: string): Promise<Store | null> {
 
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-    if (!supabaseUrl || !supabaseAnonKey) {
+    if (!supabaseUrl || !serviceRoleKey) {
       console.error('[Proxy] Supabase no configurado')
       return null
     }
 
     const params = new URLSearchParams({
       subdomain: `eq.${subdomain}`,
-      is_active: 'eq.true',
       deleted_at: 'is.null',
       select: 'id,subdomain,store_name,domain,is_active,is_public',
     })
@@ -81,11 +82,10 @@ async function getStoreBySubdomain(subdomain: string): Promise<Store | null> {
       `${supabaseUrl}/rest/v1/stores_legacy?${params.toString()}`,
       {
         headers: {
-          'apikey': supabaseAnonKey,
-          'Authorization': `Bearer ${supabaseAnonKey}`,
+          'apikey': serviceRoleKey,
+          'Authorization': `Bearer ${serviceRoleKey}`,
           'Content-Type': 'application/json',
           'Accept-Profile': 'ecommerce',
-          'Prefer': 'return=representation',
         },
         signal: AbortSignal.timeout(5000),
       }
@@ -107,6 +107,23 @@ async function getStoreBySubdomain(subdomain: string): Promise<Store | null> {
     storeCache.set(subdomain, { store: null, timestamp: Date.now() })
     return null
   }
+}
+
+// is_active = suspensión del operador; is_public = bandera de publicación del dueño.
+// Una tienda solo se sirve como storefront si ambas se cumplen.
+function isStoreLive(store: Store): boolean {
+  return store.is_active && store.is_public
+}
+
+// El recorrido con el que un dueño gestiona y publica su tienda vive fuera del
+// storefront: /admin (panel), /auth (login, callback, cambio forzado de clave,
+// cuenta confirmada) y /dashboard (redirige a /admin). Debe pasar aunque la tienda
+// no esté live; si no, el dueño de una tienda despublicada queda atrapado en
+// /store-inactive sin poder entrar a publicarla ni cambiar su clave temporal.
+const ADMIN_JOURNEY_ROOTS = ['/admin', '/auth', '/dashboard']
+
+function isAdminJourneyPath(pathname: string): boolean {
+  return ADMIN_JOURNEY_ROOTS.some(root => isRouteOrDescendant(pathname, root))
 }
 
 export async function proxy(request: NextRequest) {
@@ -152,7 +169,7 @@ export async function proxy(request: NextRequest) {
     // Obtener tienda por defecto desde Supabase
     const defaultStore = await getStoreBySubdomain('default')
     
-    if (defaultStore && defaultStore.is_active) {
+    if (defaultStore && isStoreLive(defaultStore)) {
       // Usar tienda por defecto si existe
       const response = NextResponse.next()
       response.headers.set('x-store-id', defaultStore.id)
@@ -188,14 +205,18 @@ export async function proxy(request: NextRequest) {
   const store = await getStoreBySubdomain(subdomain)
 
   if (!store) {
-    // Tienda no encontrada
+    // La tienda no existe (o está borrada): no encontrada
     const url = request.nextUrl.clone()
     url.pathname = '/store-not-found'
     return NextResponse.rewrite(url)
   }
 
-  if (!store.is_active) {
-    // Tienda inactiva
+  // Una tienda que existe pero no está live esconde su storefront, pero su dueño
+  // debe poder recorrer /admin, /auth y /dashboard para gestionarla, publicarla y
+  // cambiar su clave temporal: dejamos pasar ese recorrido (el gate de servidor
+  // sigue decidiendo la membresía en /admin) y solo reescribimos el storefront a
+  // /store-inactive.
+  if (!isStoreLive(store) && !isAdminJourneyPath(pathname)) {
     const url = request.nextUrl.clone()
     url.pathname = '/store-inactive'
     return NextResponse.rewrite(url)

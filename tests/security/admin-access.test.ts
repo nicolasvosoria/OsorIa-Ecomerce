@@ -15,6 +15,36 @@ function makeRequest(pathname = "/admin/orders") {
   });
 }
 
+type RestStubs = {
+  profile?: Response | (() => Response);
+  storeAccess?: Response | (() => Response);
+};
+
+function stubRest({ profile, storeAccess }: RestStubs) {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (url: string) => {
+      const stub = url.includes("/rpc/user_manages_any_store") ? storeAccess : profile;
+      if (!stub) {
+        throw new Error(`unstubbed REST call: ${url}`);
+      }
+      return typeof stub === "function" ? stub() : stub;
+    }),
+  );
+}
+
+function profileRole(role: string | null) {
+  return () => new Response(JSON.stringify(role ? [{ role }] : []), { status: 200 });
+}
+
+function managesAnyStore(manages: boolean) {
+  return () => new Response(JSON.stringify(manages), { status: 200 });
+}
+
+function lookupFailure() {
+  return () => new Response(JSON.stringify({ message: "boom" }), { status: 500 });
+}
+
 describe("admin access resolver", () => {
   beforeEach(() => {
     vi.resetModules();
@@ -52,12 +82,9 @@ describe("admin access resolver", () => {
     });
   });
 
-  it("returns admin for a user with ecommerce.user_profiles.role admin", async () => {
+  it("returns admin for a global admin that manages no store", async () => {
     getUserMock.mockResolvedValue({ data: { user: { id: "admin-1" } }, error: null });
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => new Response(JSON.stringify([{ role: "admin" }]), { status: 200 })),
-    );
+    stubRest({ profile: profileRole("admin"), storeAccess: managesAnyStore(false) });
     const { resolveAdminAccess } = await import("@/lib/supabase/admin-access");
 
     await expect(resolveAdminAccess(makeRequest())).resolves.toEqual({
@@ -66,12 +93,20 @@ describe("admin access resolver", () => {
     });
   });
 
-  it("returns non_admin for an authenticated non-admin profile", async () => {
+  it("returns admin for a global 'user' that owns a store", async () => {
+    getUserMock.mockResolvedValue({ data: { user: { id: "store-owner-1" } }, error: null });
+    stubRest({ profile: profileRole("user"), storeAccess: managesAnyStore(true) });
+    const { resolveAdminAccess } = await import("@/lib/supabase/admin-access");
+
+    await expect(resolveAdminAccess(makeRequest())).resolves.toEqual({
+      status: "admin",
+      userId: "store-owner-1",
+    });
+  });
+
+  it("returns non_admin for an authenticated user that manages no store", async () => {
     getUserMock.mockResolvedValue({ data: { user: { id: "customer-1" } }, error: null });
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => new Response(JSON.stringify([{ role: "customer" }]), { status: 200 })),
-    );
+    stubRest({ profile: profileRole("customer"), storeAccess: managesAnyStore(false) });
     const { resolveAdminAccess } = await import("@/lib/supabase/admin-access");
 
     await expect(resolveAdminAccess(makeRequest())).resolves.toEqual({
@@ -82,10 +117,7 @@ describe("admin access resolver", () => {
 
   it("returns error when the service-role profile lookup fails", async () => {
     getUserMock.mockResolvedValue({ data: { user: { id: "admin-1" } }, error: null });
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => new Response(JSON.stringify({ message: "boom" }), { status: 500 })),
-    );
+    stubRest({ profile: lookupFailure(), storeAccess: managesAnyStore(false) });
     const { resolveAdminAccess } = await import("@/lib/supabase/admin-access");
 
     await expect(resolveAdminAccess(makeRequest())).resolves.toEqual({
@@ -93,5 +125,34 @@ describe("admin access resolver", () => {
       userId: "admin-1",
       reason: "profile_lookup_failed",
     });
+  });
+
+  it("returns error when the store access lookup fails instead of falling back to the role", async () => {
+    getUserMock.mockResolvedValue({ data: { user: { id: "store-owner-1" } }, error: null });
+    stubRest({ profile: profileRole("user"), storeAccess: lookupFailure() });
+    const { resolveAdminAccess } = await import("@/lib/supabase/admin-access");
+
+    await expect(resolveAdminAccess(makeRequest())).resolves.toEqual({
+      status: "error",
+      userId: "store-owner-1",
+      reason: "store_access_lookup_failed",
+    });
+  });
+
+  it("asks ecommerce.user_manages_any_store over GET with the ecommerce profile header", async () => {
+    getUserMock.mockResolvedValue({ data: { user: { id: "store-owner-1" } }, error: null });
+    stubRest({ profile: profileRole("user"), storeAccess: managesAnyStore(true) });
+    const { resolveAdminAccess } = await import("@/lib/supabase/admin-access");
+
+    await resolveAdminAccess(makeRequest());
+
+    const rpcCall = vi.mocked(fetch).mock.calls.find(([url]) =>
+      String(url).includes("/rpc/user_manages_any_store"),
+    );
+    expect(rpcCall?.[0]).toBe(
+      "https://test.supabase.co/rest/v1/rpc/user_manages_any_store?p_user_id=store-owner-1",
+    );
+    expect(rpcCall?.[1]?.method).toBeUndefined();
+    expect((rpcCall?.[1]?.headers as Record<string, string>)["Accept-Profile"]).toBe("ecommerce");
   });
 });

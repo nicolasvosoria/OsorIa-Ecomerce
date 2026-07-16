@@ -21,6 +21,7 @@ vi.mock("@/lib/supabase/themes-api", () => ({
   getThemes: vi.fn(),
   getActiveTheme: vi.fn(),
   setActiveTheme: vi.fn(),
+  CATALOG_DEFAULT_THEME_NAME: "Tech",
 }));
 
 vi.mock("@/lib/react/defer-state-update", () => ({

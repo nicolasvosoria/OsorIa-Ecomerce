@@ -1,14 +1,18 @@
 import { createServerClient } from "@supabase/ssr";
 import type { NextRequest } from "next/server";
-import { ECOMMERCE_TABLES } from "./contract";
+import { ECOMMERCE_FUNCTIONS, ECOMMERCE_TABLES } from "./contract";
 import { normalizeAuthReturnPath } from "@/lib/auth-return-intent";
-import { isAdminRole } from "@/lib/memberships/roles";
+import { canAccessAdmin } from "@/lib/memberships/roles";
 
 export type AdminAccessResult =
   | { status: "admin"; userId: string }
   | { status: "guest"; reason: "no_user" | "auth_error" | "supabase_not_configured" }
   | { status: "non_admin"; userId: string; reason?: "missing_profile" | "role_mismatch" }
-  | { status: "error"; userId?: string; reason: "supabase_not_configured" | "profile_lookup_failed" };
+  | {
+      status: "error";
+      userId?: string;
+      reason: "supabase_not_configured" | "profile_lookup_failed" | "store_access_lookup_failed";
+    };
 
 type AuthenticatedUser = {
   id: string;
@@ -56,34 +60,36 @@ async function getCurrentUser(request: NextRequest): Promise<AuthenticatedUser |
   return { id: data.user.id };
 }
 
-async function fetchProfileRole(userId: string) {
+const SERVICE_LOOKUP_TIMEOUT_MS = 5000;
+
+async function readWithServiceRole(resourcePath: string) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!supabaseUrl || !serviceRoleKey) {
-    return { kind: "error" as const };
+    return null;
   }
 
+  return fetch(`${supabaseUrl}/rest/v1/${resourcePath}`, {
+    headers: {
+      apikey: serviceRoleKey,
+      Authorization: `Bearer ${serviceRoleKey}`,
+      "Content-Type": "application/json",
+      "Accept-Profile": "ecommerce",
+    },
+    signal: AbortSignal.timeout(SERVICE_LOOKUP_TIMEOUT_MS),
+  });
+}
+
+async function fetchProfileRole(userId: string) {
   const params = new URLSearchParams({
     id: `eq.${userId}`,
     select: "role",
     limit: "1",
   });
 
-  const response = await fetch(
-    `${supabaseUrl}/rest/v1/${ECOMMERCE_TABLES.userProfiles}?${params.toString()}`,
-    {
-      headers: {
-        apikey: serviceRoleKey,
-        Authorization: `Bearer ${serviceRoleKey}`,
-        "Content-Type": "application/json",
-        "Accept-Profile": "ecommerce",
-      },
-      signal: AbortSignal.timeout(5000),
-    },
-  );
-
-  if (!response.ok) {
+  const response = await readWithServiceRole(`${ECOMMERCE_TABLES.userProfiles}?${params.toString()}`);
+  if (!response?.ok) {
     return { kind: "error" as const };
   }
 
@@ -91,6 +97,22 @@ async function fetchProfileRole(userId: string) {
   const role = Array.isArray(data) && data[0]?.role ? String(data[0].role) : null;
 
   return { kind: "role" as const, role };
+}
+
+// ecommerce.user_manages_any_store is STABLE, so PostgREST exposes it over GET
+// with its arguments in the query string, and GET selects the schema with
+// Accept-Profile (Content-Profile would be the POST equivalent).
+async function fetchManagesAnyStore(userId: string) {
+  const params = new URLSearchParams({ p_user_id: userId });
+
+  const response = await readWithServiceRole(
+    `rpc/${ECOMMERCE_FUNCTIONS.userManagesAnyStore}?${params.toString()}`,
+  );
+  if (!response?.ok) {
+    return { kind: "error" as const };
+  }
+
+  return { kind: "storeAccess" as const, managesAnyStore: (await response.json()) === true };
 }
 
 export async function resolveAdminAccess(request: NextRequest): Promise<AdminAccessResult> {
@@ -104,12 +126,20 @@ export async function resolveAdminAccess(request: NextRequest): Promise<AdminAcc
   }
 
   try {
-    const profile = await fetchProfileRole(user.id);
+    const [profile, storeAccess] = await Promise.all([
+      fetchProfileRole(user.id),
+      fetchManagesAnyStore(user.id),
+    ]);
+
     if (profile.kind === "error") {
       return { status: "error", userId: user.id, reason: "profile_lookup_failed" };
     }
 
-    if (isAdminRole(profile.role)) {
+    if (storeAccess.kind === "error") {
+      return { status: "error", userId: user.id, reason: "store_access_lookup_failed" };
+    }
+
+    if (canAccessAdmin({ globalRole: profile.role, managesAnyStore: storeAccess.managesAnyStore })) {
       return { status: "admin", userId: user.id };
     }
 

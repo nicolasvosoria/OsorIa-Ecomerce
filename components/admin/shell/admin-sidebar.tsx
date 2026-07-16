@@ -9,6 +9,7 @@ import {
   Megaphone,
   Package,
   Palette,
+  Settings,
   ShoppingBag,
   Store,
   Users,
@@ -44,6 +45,7 @@ const BASE_NAV_ITEMS: AdminNavItem[] = [
   { label: "Chatbot", href: "/admin/chatbot", icon: Bot },
   { label: "Popup", href: "/admin/home-discount-popup", icon: Megaphone },
   { label: "Editor de tema", href: "/admin/theme", icon: Palette },
+  { label: "Configuración", href: "/admin/settings", icon: Settings },
 ]
 
 const SUPER_ADMIN_NAV_ITEM: AdminNavItem = { label: "Tiendas", href: "/admin/stores", icon: Store }

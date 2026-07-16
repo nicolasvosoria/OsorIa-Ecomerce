@@ -3,8 +3,8 @@
 import { useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
-import { getCurrentUser } from "@/lib/supabase/auth-api"
-import { getAuthReturnPath, resolvePostAuthDestination } from "@/lib/auth-return-intent"
+import { currentUserMustChangePassword, isCurrentUserAdminOrUnverified } from "@/lib/supabase/permissions-api"
+import { FORCE_PASSWORD_CHANGE_PATH, getAuthReturnPath, resolvePostAuthDestination } from "@/lib/auth-return-intent"
 
 function AuthCallbackContent() {
   const router = useRouter()
@@ -34,10 +34,17 @@ function AuthCallbackContent() {
         const returnPath = getAuthReturnPath(searchParams)
 
         const pushPostAuthDestination = async () => {
-          const currentUser = await getCurrentUser()
+          // Un dueño con clave temporal (D21) va a cambiarla antes que a cualquier
+          // destino; el guard de servidor de /admin es la red de seguridad si este
+          // adelanto de UX no concluye.
+          if (await currentUserMustChangePassword()) {
+            router.push(FORCE_PASSWORD_CHANGE_PATH)
+            return
+          }
+
           router.push(resolvePostAuthDestination({
             returnPath,
-            user: currentUser.success ? currentUser.user : null,
+            canAccessAdmin: await isCurrentUserAdminOrUnverified(),
           }))
         }
 

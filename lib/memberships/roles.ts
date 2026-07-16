@@ -40,3 +40,15 @@ export function isSuperAdminRole(role: unknown): boolean {
 export function isAdminRole(role: unknown): boolean {
   return normalizeRoleName(role) === "admin" || isSuperAdminRole(role)
 }
+
+// Single definition of "can enter the admin". Membership is an async question to
+// ecommerce.user_manages_any_store, so each surface fetches it over its own
+// transport (edge REST, browser client) and decides here.
+export type AdminAccessClaims = {
+  globalRole: unknown
+  managesAnyStore: boolean
+}
+
+export function canAccessAdmin({ globalRole, managesAnyStore }: AdminAccessClaims): boolean {
+  return isAdminRole(globalRole) || managesAnyStore
+}

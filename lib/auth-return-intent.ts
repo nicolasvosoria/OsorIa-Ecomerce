@@ -1,11 +1,8 @@
-import type { UserProfile } from "@/lib/types/user";
-import { isAdminRole } from "@/lib/memberships/roles";
 import { isRouteOrDescendant } from "@/lib/admin/routes";
 
 const AUTH_CONFIRMATION_SUCCESS_PATH = "/auth/cuenta-confirmada";
 export const ADMIN_ACCESS_DENIED_PATH = "/?admin_access=denied";
-
-export type AuthReturnUser = Pick<UserProfile, "role"> | null | undefined;
+export const FORCE_PASSWORD_CHANGE_PATH = "/auth/force-password-change";
 
 export function normalizeAuthReturnPath(candidate: string | null | undefined) {
   if (!candidate) {
@@ -45,11 +42,11 @@ export function getAuthReturnPath(params: Pick<URLSearchParams, "get">) {
 
 export function resolvePostAuthDestination({
   returnPath,
-  user,
+  canAccessAdmin,
   fallback = AUTH_CONFIRMATION_SUCCESS_PATH,
 }: {
   returnPath: string | null | undefined;
-  user: AuthReturnUser;
+  canAccessAdmin: boolean;
   fallback?: string;
 }) {
   const safeReturnPath = normalizeAuthReturnPath(returnPath);
@@ -57,9 +54,5 @@ export function resolvePostAuthDestination({
     return fallback;
   }
 
-  if (isAdminRole(user?.role)) {
-    return safeReturnPath;
-  }
-
-  return ADMIN_ACCESS_DENIED_PATH;
+  return canAccessAdmin ? safeReturnPath : ADMIN_ACCESS_DENIED_PATH;
 }

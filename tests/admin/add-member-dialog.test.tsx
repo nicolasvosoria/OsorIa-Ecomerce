@@ -65,6 +65,25 @@ describe("AddMemberDialog", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument())
   })
 
+  it("keeps the modal open and reveals the temporary password when a new identity is minted", async () => {
+    mockAddStoreMemberAction.mockResolvedValue({
+      success: true,
+      created: true,
+      tempPassword: "aVeryStrongTempPassword",
+    })
+    const { user, dialog } = await renderAndOpenDialog()
+
+    await fillAndSubmit(user, dialog, "nuevo-dueno@correo.com")
+
+    await waitFor(() =>
+      expect(mockToastSuccess).toHaveBeenCalledWith(
+        "Cuenta creada. Comparte la contraseña temporal.",
+      ),
+    )
+    expect(screen.getByRole("dialog")).toBeInTheDocument()
+    expect(screen.getByDisplayValue("aVeryStrongTempPassword")).toBeInTheDocument()
+  })
+
   it("keeps the modal open and shows the real error when the invite fails", async () => {
     mockAddStoreMemberAction.mockResolvedValue({
       success: false,

@@ -61,6 +61,7 @@ describe("proxy store resolution", () => {
     errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "test-anon-key";
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role";
     delete process.env.DISABLE_SUBDOMAIN_MULTI_TENANT;
     delete process.env.DEFAULT_STORE_ID;
   });

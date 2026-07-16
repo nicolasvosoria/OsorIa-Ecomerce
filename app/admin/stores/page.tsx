@@ -1,7 +1,10 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Plus } from "lucide-react";
 
 import { AdminPageContainer } from "@/components/admin/page-container";
 import { AdminPageHeader } from "@/components/admin/page-header";
+import { Button } from "@/components/ui/button";
 import { authorizeSuperAdmin } from "@/lib/supabase/active-store";
 import {
   EMPTY_TENANT_METRICS,
@@ -23,6 +26,14 @@ export default async function AdminStoresPage() {
       <AdminPageHeader
         title="Tiendas"
         subtitle="Consola global de tiendas: métricas rápidas y acceso directo a cada tienda"
+        actions={
+          <Button asChild>
+            <Link href="/admin/stores/create">
+              <Plus className="mr-2 h-4 w-4" />
+              Crear tienda
+            </Link>
+          </Button>
+        }
       />
 
       <TenantsTable rows={list.state === "ready" ? list.tenants : []} state={list.state} />

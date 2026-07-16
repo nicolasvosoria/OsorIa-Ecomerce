@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { Header } from '@/components/layout/header'
+import { AdminPermissionsProvider } from '@/contexts/admin-permissions-context'
 import { AuthProvider } from '@/contexts/auth-context'
 import { CartProvider } from '@/contexts/cart-context'
 import { FontProvider } from '@/contexts/font-context'
@@ -96,17 +97,19 @@ describe('Formulario de Registro - Componente Header', () => {
         <StoreProvider>
           <StylesProvider>
             <AuthProvider>
-              <ThemeProvider>
-                <ModeProvider>
-                  <FontProvider>
-                    <CartProvider>
-                      <WishlistProvider>
-                        <Header />
-                      </WishlistProvider>
-                    </CartProvider>
-                  </FontProvider>
-                </ModeProvider>
-              </ThemeProvider>
+              <AdminPermissionsProvider>
+                <ThemeProvider>
+                  <ModeProvider>
+                    <FontProvider>
+                      <CartProvider>
+                        <WishlistProvider>
+                          <Header />
+                        </WishlistProvider>
+                      </CartProvider>
+                    </FontProvider>
+                  </ModeProvider>
+                </ThemeProvider>
+              </AdminPermissionsProvider>
             </AuthProvider>
           </StylesProvider>
         </StoreProvider>

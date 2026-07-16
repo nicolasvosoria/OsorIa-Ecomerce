@@ -14,6 +14,7 @@ import {
   setActiveTheme,
   setActiveThemeCustom,
   revertToThemeVersion,
+  CATALOG_DEFAULT_THEME_NAME,
 } from "@/lib/supabase/themes-api";
 import { useAuth } from "@/contexts/auth-context";
 import { useStyles } from "@/contexts/styles-context";
@@ -77,9 +78,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       setThemes(themesData);
 
       // Usar el tema activo de BD para TODOS los usuarios (autenticados o no)
-      // Si no hay tema activo en BD, usar "Claro Original" por defecto
+      // `getActiveTheme` ya resuelve al ancla del catálogo (D7) cuando la
+      // tienda no tiene publicación propia; este `find` es solo un respaldo
+      // extra por si esa llamada devolvió null (p.ej. Supabase no configurado).
       const defaultTheme = themesData.find(
-        (t) => t.theme_name === "Claro Original",
+        (t) => t.theme_name === CATALOG_DEFAULT_THEME_NAME,
       );
       let themeToUse = activeThemeData || defaultTheme;
 
@@ -91,7 +94,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         );
       } else if (defaultTheme) {
         console.log(
-          "[Theme] No hay tema activo en BD, usando 'Claro Original' por defecto",
+          `[Theme] No hay tema activo en BD, usando '${CATALOG_DEFAULT_THEME_NAME}' por defecto`,
         );
         themeToUse = defaultTheme;
       }
@@ -103,10 +106,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       setError(errorMessage);
       console.error("[Theme] Error loading themes:", err);
 
-      // En caso de error, intentar aplicar "Claro Original" si hay temas cargados
+      // En caso de error, intentar aplicar el ancla del catálogo (D7) si hay
+      // temas cargados
       if (themes.length > 0 && !isAuthenticated) {
         const defaultTheme = themes.find(
-          (t) => t.theme_name === "Claro Original",
+          (t) => t.theme_name === CATALOG_DEFAULT_THEME_NAME,
         );
         if (defaultTheme) {
           setActiveThemeState(defaultTheme);
@@ -336,10 +340,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         applyTheme(activeTheme);
       }
     } else if (!activeTheme && themes.length > 0) {
-      // Si no hay tema activo, aplicar tema por defecto "Claro Original"
+      // Si no hay tema activo, aplicar el ancla del catálogo (D7)
       // Esto aplica para TODOS los usuarios (autenticados o no)
       const defaultTheme = themes.find(
-        (t) => t.theme_name === "Claro Original",
+        (t) => t.theme_name === CATALOG_DEFAULT_THEME_NAME,
       );
       if (defaultTheme) {
         const normalizedDefaultTheme = normalizeThemeRecord(defaultTheme);

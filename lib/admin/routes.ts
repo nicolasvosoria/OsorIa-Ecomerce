@@ -28,6 +28,7 @@ const ADMIN_ROUTES: Record<string, AdminRoute> = {
   "/admin/stats": { kind: "static", label: "Estadísticas" },
   "/admin/chatbot": { kind: "static", label: "Chatbot" },
   "/admin/home-discount-popup": { kind: "static", label: "Popup" },
+  "/admin/settings": { kind: "static", label: "Configuración" },
   "/admin/stores": { kind: "static", label: "Tiendas" },
 }
 

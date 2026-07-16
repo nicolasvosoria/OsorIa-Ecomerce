@@ -2001,6 +2001,7 @@ export type Database = {
           first_name: string | null
           id: string
           last_name: string | null
+          must_change_password: boolean
           role: string
           updated_at: string | null
         }
@@ -2010,6 +2011,7 @@ export type Database = {
           first_name?: string | null
           id: string
           last_name?: string | null
+          must_change_password?: boolean
           role?: string
           updated_at?: string | null
         }
@@ -2019,6 +2021,7 @@ export type Database = {
           first_name?: string | null
           id?: string
           last_name?: string | null
+          must_change_password?: boolean
           role?: string
           updated_at?: string | null
         }
@@ -2368,7 +2371,17 @@ export type Database = {
       is_public_item: { Args: { p_item_id: string }; Returns: boolean }
       is_public_store: { Args: { p_store_id: string }; Returns: boolean }
       is_storage_admin: { Args: never; Returns: boolean }
+      provision_store: {
+        Args: {
+          p_currency_code?: string
+          p_owner_user_id: string
+          p_store_name: string
+          p_subdomain: string
+        }
+        Returns: string
+      }
       storage_root_store_id: { Args: { object_name: string }; Returns: string }
+      user_manages_any_store: { Args: { p_user_id: string }; Returns: boolean }
     }
     Enums: {
       address_type: "billing" | "shipping"

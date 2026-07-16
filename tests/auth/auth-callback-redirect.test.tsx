@@ -5,7 +5,8 @@ const routerPush = vi.hoisted(() => vi.fn());
 const searchParamsGet = vi.hoisted(() => vi.fn());
 const exchangeCodeForSession = vi.hoisted(() => vi.fn());
 const getSession = vi.hoisted(() => vi.fn());
-const getCurrentUser = vi.hoisted(() => vi.fn());
+const isCurrentUserAdminOrUnverified = vi.hoisted(() => vi.fn());
+const currentUserMustChangePassword = vi.hoisted(() => vi.fn());
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: routerPush }),
@@ -21,8 +22,9 @@ vi.mock("@/lib/supabase/client", () => ({
   }),
 }));
 
-vi.mock("@/lib/supabase/auth-api", () => ({
-  getCurrentUser,
+vi.mock("@/lib/supabase/permissions-api", () => ({
+  isCurrentUserAdminOrUnverified,
+  currentUserMustChangePassword,
 }));
 
 import AuthCallback from "@/app/auth/callback/page";
@@ -42,7 +44,8 @@ describe("auth callback safe return destinations", () => {
     });
     exchangeCodeForSession.mockResolvedValue({ data: { session: { access_token: "token" } }, error: null });
     getSession.mockResolvedValue({ data: { session: null }, error: null });
-    getCurrentUser.mockResolvedValue({ success: true, user: { id: "admin-1", email: "admin@example.com", role: "admin" } });
+    isCurrentUserAdminOrUnverified.mockResolvedValue(true);
+    currentUserMustChangePassword.mockResolvedValue(false);
   });
 
   it("returns an admin to a safe admin next destination after code exchange", async () => {
@@ -87,7 +90,7 @@ describe("auth callback safe return destinations", () => {
     expect(routerPush).not.toHaveBeenCalledWith(expect.stringContaining("evil"));
   });
 
-  it("does not send a non-admin user into an admin next destination", async () => {
+  it("does not send a user that manages no store into an admin next destination", async () => {
     searchParamsGet.mockImplementation((key: string) => {
       const values: Record<string, string | null> = {
         code: "auth-code",
@@ -98,12 +101,54 @@ describe("auth callback safe return destinations", () => {
       };
       return values[key] ?? null;
     });
-    getCurrentUser.mockResolvedValue({ success: true, user: { id: "user-1", email: "user@example.com", role: "user" } });
+    isCurrentUserAdminOrUnverified.mockResolvedValue(false);
 
     render(<AuthCallback />);
 
     await waitFor(() => {
       expect(routerPush).toHaveBeenCalledWith("/?admin_access=denied");
+    });
+    expect(routerPush).not.toHaveBeenCalledWith("/admin/orders");
+  });
+
+  it("keeps the admin next destination when the admin check is unverified", async () => {
+    searchParamsGet.mockImplementation((key: string) => {
+      const values: Record<string, string | null> = {
+        code: "auth-code",
+        error: null,
+        error_description: null,
+        next: "/admin/orders",
+        redirect: null,
+      };
+      return values[key] ?? null;
+    });
+    isCurrentUserAdminOrUnverified.mockResolvedValue(true);
+
+    render(<AuthCallback />);
+
+    await waitFor(() => {
+      expect(routerPush).toHaveBeenCalledWith("/admin/orders");
+    });
+    expect(routerPush).not.toHaveBeenCalledWith("/?error=auth_callback_failed");
+  });
+
+  it("forces a minted owner with a temporary password to the change screen before the next path", async () => {
+    searchParamsGet.mockImplementation((key: string) => {
+      const values: Record<string, string | null> = {
+        code: "auth-code",
+        error: null,
+        error_description: null,
+        next: "/admin/orders",
+        redirect: null,
+      };
+      return values[key] ?? null;
+    });
+    currentUserMustChangePassword.mockResolvedValue(true);
+
+    render(<AuthCallback />);
+
+    await waitFor(() => {
+      expect(routerPush).toHaveBeenCalledWith("/auth/force-password-change");
     });
     expect(routerPush).not.toHaveBeenCalledWith("/admin/orders");
   });

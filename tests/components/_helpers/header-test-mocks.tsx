@@ -77,7 +77,7 @@ export const uiAlertDialogMock = {
 export const uiDropdownMenuMock = {
   DropdownMenu: ({ children }: React.PropsWithChildren) => <>{children}</>,
   DropdownMenuContent: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
-  DropdownMenuItem: ({ children, ...props }: React.HTMLAttributes<HTMLDivElement>) => <div {...props}>{children}</div>,
+  DropdownMenuItem: ({ children, asChild: _asChild, ...props }: React.HTMLAttributes<HTMLDivElement> & { asChild?: boolean }) => <div {...props}>{children}</div>,
   DropdownMenuLabel: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
   DropdownMenuSeparator: () => <hr />,
   DropdownMenuTrigger: ({ children }: React.PropsWithChildren) => <>{children}</>,
@@ -99,6 +99,16 @@ export const cartContextMock = {
   }),
 }
 export const wishlistContextMock = { useWishlist: () => ({ getTotalItems: () => 0 }) }
+export const adminPermissionsContextMock = {
+  useAdminPermissions: () => ({
+    isAdmin: false,
+    isSuperAdmin: false,
+    role: null,
+    loading: false,
+    hasChecked: true,
+    refreshPermissions: vi.fn(),
+  }),
+}
 
 export const themeSelectorModalMock = { ThemeSelectorModal: () => null }
 export const fontSelectorModalMock = { FontSelectorModal: () => null }

@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { useComponentStyle } from "@/contexts/styles-context"
 import { useAdmin } from "@/contexts/admin-context"
+import { useAdminPermissions } from "@/contexts/admin-permissions-context"
 import { resolveFeaturedProductId } from "@/lib/products/featured-product"
 import { HeaderMegaMenu } from "@/components/layout/header-mega-menu"
 import { HeaderSearchSuggestions } from "@/components/layout/header-search-suggestions"
@@ -31,8 +32,8 @@ import { Trash2, Plus, Minus } from "lucide-react"
 import { toast } from "sonner"
 import { resetPassword } from "@/lib/supabase/auth-api"
 import { deferStateUpdate } from "@/lib/react/defer-state-update"
-import { ADMIN_ACCESS_DENIED_PATH, getAuthReturnPath, resolvePostAuthDestination } from "@/lib/auth-return-intent"
-import { isAdminRole } from "@/lib/memberships/roles"
+import { ADMIN_ACCESS_DENIED_PATH, FORCE_PASSWORD_CHANGE_PATH, getAuthReturnPath, resolvePostAuthDestination } from "@/lib/auth-return-intent"
+import { currentUserMustChangePassword, isCurrentUserAdminOrUnverified } from "@/lib/supabase/permissions-api"
 import {
   Sheet,
   SheetContent,
@@ -146,6 +147,7 @@ export function Header() {
   const { items, removeFromCart, updateQuantity, getTotal, getItemSubtotal, getTotalItems } = useCart()
   const { getTotalItems: getWishlistTotalItems } = useWishlist()
   const { user, isAuthenticated, login, register, logout, refreshUser } = useAuth()
+  const { isAdmin } = useAdminPermissions()
   const { store } = useStore()
   const { t, language } = useLanguage()
   const localCartSummary = buildLocalCartSummary({
@@ -521,7 +523,7 @@ export function Header() {
             >
               <User className="h-4 w-4 lg:h-5 lg:w-5" style={{ color: header.loginButtonColor || "var(--foreground)" }} />
               <span className="text-xs lg:text-sm xl:text-base font-medium hidden xl:inline truncate max-w-[150px]" style={{ color: header.loginButtonColor || "var(--foreground)" }}>
-                {isAdminRole(user?.role)
+                {isAdmin
                   ? t.nav.admin
                   : user?.first_name && user?.last_name
                     ? `${user.first_name} ${user.last_name}`
@@ -531,14 +533,14 @@ export function Header() {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" style={{ backgroundColor: "var(--background)", borderColor: "var(--border)" }}>
             <DropdownMenuLabel style={{ color: "var(--foreground)" }}>
-              {isAdminRole(user?.role)
+              {isAdmin
                 ? "Administrador"
                 : user?.first_name && user?.last_name
                   ? `${user.first_name} ${user.last_name}`
                   : user?.email || "Usuario"}
             </DropdownMenuLabel>
             <DropdownMenuSeparator style={{ backgroundColor: "var(--border)" }} />
-            {isAdminRole(user?.role) && (
+            {isAdmin && (
               <>
                 <DropdownMenuItem asChild style={{ color: "var(--foreground)" }}>
                   <Link href="/dashboard">
@@ -557,14 +559,11 @@ export function Header() {
             )}
             <DropdownMenuItem
               onClick={async () => {
-                // Guardar si el usuario es administrador antes de cerrar sesión
-                const wasAdmin = isAdminRole(user?.role)
                 const wasOnAdminPage = pathname === '/admin' || pathname === '/dashboard'
 
                 await logout()
 
-                // Si era administrador, redirigir a la página principal
-                if (wasAdmin && wasOnAdminPage) {
+                if (isAdmin && wasOnAdminPage) {
                   router.push('/')
                 }
 
@@ -610,7 +609,7 @@ export function Header() {
         buttonClassName: "h-9 w-9 lg:h-10 lg:w-10 rounded-full touch-manipulation relative flex-shrink-0",
         badgeClassName: "absolute -top-1 -right-1 h-4 w-4 lg:h-5 lg:w-5 rounded-full flex items-center justify-center text-[10px] lg:text-xs font-bold text-white",
       })}
-      {isAdminRole(user?.role) && (
+      {isAdmin && (
         <Button
           variant="ghost"
           size="icon"
@@ -846,21 +845,21 @@ export function Header() {
                       style={{ backgroundColor: "transparent" }}
                       onMouseEnter={(e) => e.currentTarget.style.backgroundColor = header.loginButtonHoverBg || "var(--muted)"}
                       onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
-                      title={isAdminRole(user?.role) ? t.nav.admin : t.nav.account}
+                      title={isAdmin ? t.nav.admin : t.nav.account}
                     >
                       <User className="h-4 w-4" style={{ color: header.loginButtonColor || "var(--foreground)" }} />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" style={{ backgroundColor: "var(--background)", borderColor: "var(--border)" }}>
                     <DropdownMenuLabel style={{ color: "var(--foreground)" }}>
-                      {isAdminRole(user?.role) 
+                      {isAdmin
                         ? "Administrador"
                         : user?.first_name && user?.last_name 
                           ? `${user.first_name} ${user.last_name}`
                           : user?.email || "Usuario"}
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator style={{ backgroundColor: "var(--border)" }} />
-                    {isAdminRole(user?.role) && (
+                    {isAdmin && (
                       <>
                         <DropdownMenuItem asChild style={{ color: "var(--foreground)" }}>
                           <Link href="/dashboard">
@@ -879,12 +878,11 @@ export function Header() {
                     )}
                     <DropdownMenuItem
                       onClick={async () => {
-                        const wasAdmin = isAdminRole(user?.role)
                         const wasOnAdminPage = pathname === '/admin' || pathname === '/dashboard'
-                        
+
                         await logout()
-                        
-                        if (wasAdmin && wasOnAdminPage) {
+
+                        if (isAdmin && wasOnAdminPage) {
                           router.push('/')
                         }
                         
@@ -1021,7 +1019,7 @@ export function Header() {
             {/* Mensaje de bienvenida para usuarios autenticados - Solo en desktop */}
             {isAuthenticated && user && (
               <p className="hidden md:block text-base font-medium mt-4" style={{ color: "var(--foreground)" }}>
-                {isAdminRole(user?.role)
+                {isAdmin
                   ? t.header.welcomeAdmin
                   : t.header.welcome.replace('{name}', user.first_name || user.email.split('@')[0])}
               </p>
@@ -1073,7 +1071,7 @@ export function Header() {
               )}
               
               {/* Sección de Administrador */}
-              {isAdminRole(user?.role) && (
+              {isAdmin && (
                 <>
                   <div className="my-2 border-t" style={{ borderColor: "var(--border)" }}></div>
                   <div className="text-xs font-semibold uppercase tracking-wider px-4 py-2" style={{ color: "var(--muted-foreground)" }}>
@@ -1114,7 +1112,7 @@ export function Header() {
             </div>
             
             {/* Botones de tema y tipografía - Solo visibles para administradores */}
-            {isAdminRole(user?.role) && (
+            {isAdmin && (
               <div className="flex-shrink-0 border-t p-6" style={{ borderColor: "var(--border)" }}>
                 <Button
                   variant="ghost"
@@ -1432,8 +1430,9 @@ export function Header() {
                       duration: 6000,
                     })
                   } else {
+                    const canAccessAdmin = await isCurrentUserAdminOrUnverified()
                     toast.success(t.header.accountCreated, {
-                      description: isAdminRole(result.user?.role)
+                      description: canAccessAdmin
                         ? t.header.welcomeAdminMessage
                         : t.header.accountCreatedSuccess,
                       duration: 3000,
@@ -1469,11 +1468,10 @@ export function Header() {
                 if (result.success) {
                   // Refrescar el usuario para obtener el rol actualizado
                   await refreshUser()
-                  
-                  // Todos los usuarios (admin y user) inician sesión; solo admins consumen
-                  // un destino admin seguro solicitado desde ?auth=login&next=...
+                  const canAccessAdmin = await isCurrentUserAdminOrUnverified()
+
                   toast.success(t.header.sessionStarted, {
-                    description: isAdminRole(result.user?.role)
+                    description: canAccessAdmin
                       ? t.header.welcomeAdminLogin
                       : "Bienvenido de nuevo!",
                     duration: 3000,
@@ -1491,10 +1489,15 @@ export function Header() {
                   setShowConfirmPassword(false)
                   setIsRegisterMode(false)
 
-                  if (loginReturnPath) {
+                  // Un dueño con clave temporal (D21) va a cambiarla antes que a
+                  // cualquier destino; el guard de servidor de /admin sigue siendo
+                  // la red de seguridad si este adelanto de UX no concluye.
+                  if (await currentUserMustChangePassword()) {
+                    router.push(FORCE_PASSWORD_CHANGE_PATH)
+                  } else if (loginReturnPath) {
                     const nextDestination = resolvePostAuthDestination({
                       returnPath: loginReturnPath,
-                      user: result.user,
+                      canAccessAdmin,
                       fallback: ADMIN_ACCESS_DENIED_PATH,
                     })
                     router.push(nextDestination)

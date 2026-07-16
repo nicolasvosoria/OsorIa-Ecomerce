@@ -1,7 +1,9 @@
 import { getSupabaseBrowserClient, getSupabaseEcommerce } from "./client"
-import { ECOMMERCE_TABLES } from "./contract"
-import { isAdminRole } from "@/lib/memberships/roles"
+import { ECOMMERCE_FUNCTIONS, ECOMMERCE_TABLES } from "./contract"
+import { canAccessAdmin } from "@/lib/memberships/roles"
 import type { UserRole } from "@/lib/types/user"
+
+type EcommerceClient = NonNullable<ReturnType<typeof getSupabaseEcommerce>>
 
 // Helper para manejar timeouts
 async function withTimeout<T>(
@@ -15,6 +17,23 @@ async function withTimeout<T>(
       setTimeout(() => reject(new Error(`Timeout después de ${timeoutMs}ms en ${operation}`)), timeoutMs)
     ),
   ])
+}
+
+async function fetchManagesAnyStore(supabase: EcommerceClient, userId: string): Promise<boolean> {
+  const timeoutMs = 15000
+
+  const { data, error } = await withTimeout(
+    supabase.rpc(ECOMMERCE_FUNCTIONS.userManagesAnyStore, { p_user_id: userId }),
+    timeoutMs,
+    "user_manages_any_store",
+  ) as { data: boolean | null; error: any }
+
+  if (error) {
+    console.error("[Permissions] Error al verificar membresías de tienda:", error.message)
+    return false
+  }
+
+  return data === true
 }
 
 /**
@@ -111,7 +130,8 @@ export async function isCurrentUserAdmin(): Promise<boolean> {
         const { data, error } = result
 
         if (error) {
-          // Si es un error de "no encontrado", retornar false (no es admin)
+          // store_users.user_id referencia user_profiles(id): sin perfil no puede
+          // haber membresía, así que tampoco hay tienda que gestionar.
           if (error.code === 'PGRST116' || error.message?.includes('No rows') || error.message?.includes('not found')) {
             console.log("[Permissions] Perfil no encontrado, usuario no es admin")
             return false
@@ -135,7 +155,8 @@ export async function isCurrentUserAdmin(): Promise<boolean> {
         }
 
         // Si llegamos aquí, la consulta fue exitosa
-        const isAdmin = isAdminRole(data?.role)
+        const managesAnyStore = await fetchManagesAnyStore(supabase, user.id)
+        const isAdmin = canAccessAdmin({ globalRole: data?.role, managesAnyStore })
         if (isAdmin) {
           console.log("[Permissions] Usuario verificado como administrador")
         }
@@ -168,6 +189,55 @@ export async function isCurrentUserAdmin(): Promise<boolean> {
       throw error
     }
     console.error("[Permissions] Error inesperado al verificar permisos:", error)
+    return false
+  }
+}
+
+// El gate real de /admin/** vive en el servidor (applyAdminRouteGate + AdminAuthGuard).
+// Una verificación que no concluye no puede leerse como "no es admin": degradaría a un
+// dueño legítimo a un falso "acceso denegado" en una redirección que es sólo UX.
+export async function isCurrentUserAdminOrUnverified(): Promise<boolean> {
+  try {
+    return await isCurrentUserAdmin()
+  } catch (error) {
+    console.warn("[Permissions] Verificación de admin no concluyente, decide el servidor:", error)
+    return true
+  }
+}
+
+// Si el usuario recién autenticado aún carga la clave temporal que acuñó una
+// invitación de dueño (D21), los flujos de login/callback lo mandan a la pantalla
+// de cambio forzado antes del destino normal: es un adelanto de UX, no el gate.
+// La RLS (user_profiles_self_or_admin_read) deja leer id = auth.uid(). Ante
+// cualquier fallo devolvemos false para no atrapar un login (D18): el guard de
+// servidor en /admin sigue siendo la red de seguridad que atrapa el caso real.
+export async function currentUserMustChangePassword(): Promise<boolean> {
+  const authClient = getSupabaseBrowserClient()
+  const supabase = getSupabaseEcommerce()
+  if (!authClient || !supabase) {
+    return false
+  }
+
+  try {
+    const { data: { user } } = await authClient.auth.getUser()
+    if (!user) {
+      return false
+    }
+
+    const { data, error } = await supabase
+      .from(ECOMMERCE_TABLES.userProfiles)
+      .select("must_change_password")
+      .eq("id", user.id)
+      .maybeSingle()
+
+    if (error) {
+      console.warn("[Permissions] No se pudo verificar el cambio forzado de clave:", error.message)
+      return false
+    }
+
+    return data?.must_change_password === true
+  } catch (error) {
+    console.warn("[Permissions] Verificación de cambio forzado no concluyente, decide el servidor:", error)
     return false
   }
 }

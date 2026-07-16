@@ -571,7 +571,9 @@ export async function resetPassword(email: string): Promise<{ success: boolean; 
 /**
  * Actualizar contraseña con token de recuperación
  */
-export async function updatePassword(newPassword: string): Promise<{ success: boolean; error?: string }> {
+export async function updatePassword(
+  newPassword: string
+): Promise<{ success: boolean; error?: string; code?: 'same_password' }> {
   try {
     const supabase = getSupabaseBrowserClient()
     if (!supabase) {
@@ -585,7 +587,7 @@ export async function updatePassword(newPassword: string): Promise<{ success: bo
       supabase.auth.updateUser({
         password: newPassword,
       }),
-      10000,
+      30000,
       'updatePassword'
     ) as { error: any }
     const { error } = result
@@ -595,6 +597,7 @@ export async function updatePassword(newPassword: string): Promise<{ success: bo
       return {
         success: false,
         error: error.message || 'Error al actualizar contraseña',
+        code: isSamePasswordError(error) ? 'same_password' : undefined,
       }
     }
 
@@ -606,6 +609,18 @@ export async function updatePassword(newPassword: string): Promise<{ success: bo
       error: error.message || 'Error inesperado al actualizar contraseña',
     }
   }
+}
+
+// Supabase rejects updateUser when the new password matches the current one. Recent
+// supabase-js versions surface this as error.code === 'same_password'; older ones only
+// set the message, so we fall back to matching it (kept non-locale-specific: Supabase's
+// error messages are English regardless of the app locale).
+function isSamePasswordError(error: any): boolean {
+  if (error?.code === 'same_password') {
+    return true
+  }
+  const message: string = error?.message || ''
+  return message.includes('different from the old') || message.includes('should be different')
 }
 
 /**

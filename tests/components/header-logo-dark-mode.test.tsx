@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import {
+  adminPermissionsContextMock,
   authApiMock,
   cartContextMock,
   checkoutOptionsDialogMock,
@@ -64,6 +65,7 @@ vi.mock("@/contexts/mode-context", () => ({
 vi.mock("@/contexts/store-context", () => storeContextMock)
 vi.mock("@/contexts/cart-context", () => cartContextMock)
 vi.mock("@/contexts/wishlist-context", () => wishlistContextMock)
+vi.mock("@/contexts/admin-permissions-context", () => adminPermissionsContextMock)
 vi.mock("@/contexts/auth-context", () => ({ useAuth: () => ({ user: null, isAuthenticated: false, login: vi.fn(), register: vi.fn(), logout: vi.fn(), refreshUser: vi.fn() }) }))
 vi.mock("@/contexts/language-context", () => ({
   useLanguage: () => ({

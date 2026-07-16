@@ -54,6 +54,8 @@ export const ECOMMERCE_FUNCTIONS = {
   incrementItemViews: "increment_item_views",
   isComponentStylesAdmin: "is_component_styles_admin",
   isStorageAdmin: "is_storage_admin",
+  provisionStore: "provision_store",
+  userManagesAnyStore: "user_manages_any_store",
 } as const satisfies Record<string, EcommerceFunctionName>;
 
 export const ECOMMERCE_STORAGE_BUCKETS = {

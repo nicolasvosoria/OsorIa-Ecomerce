@@ -5,6 +5,7 @@ import { DataTable, type Column, type DataTableState } from "@/components/admin/
 import type { TenantMetrics, TenantSummary } from "@/lib/supabase/stores-admin-api";
 import { formatPrice } from "@/lib/commerce/utils";
 import { EnterStoreButton } from "./enter-store-button";
+import { PublishStoreButton } from "./publish-store-button";
 
 export type TenantRow = TenantSummary & TenantMetrics;
 
@@ -70,7 +71,12 @@ const columns: Column<TenantRow>[] = [
     header: <span className="sr-only">Acciones</span>,
     className: "text-right",
     cell: (tenant) => (
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-1.5">
+        <PublishStoreButton
+          storeId={tenant.id}
+          storeName={tenant.store_name}
+          isPublic={tenant.is_public}
+        />
         <EnterStoreButton storeId={tenant.id} storeName={tenant.store_name} />
       </div>
     ),

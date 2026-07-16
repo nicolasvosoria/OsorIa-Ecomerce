@@ -1,5 +1,7 @@
 import { getSupabaseServiceClient } from "./admin-store";
-import { ECOMMERCE_TABLES } from "./contract";
+import { ECOMMERCE_FUNCTIONS, ECOMMERCE_TABLES } from "./contract";
+import { ensurePlatformUserByEmail } from "./memberships-api";
+import type { CreateStoreFormValues } from "@/lib/stores/schemas";
 
 export type TenantSummary = {
   id: string;
@@ -21,6 +23,70 @@ export const EMPTY_TENANT_METRICS: TenantMetrics = {
   orderCount: 0,
   revenue: 0,
 };
+
+export type CreateTenantResult =
+  | { success: true; storeId: string; tempPassword?: string }
+  | { success: false; error: string };
+
+const UNIQUE_VIOLATION_CODE = "23505";
+const SUBDOMAIN_TAKEN_ERROR = "Ese subdominio ya está en uso. Elige otro.";
+const PROVISION_FAILED_ERROR = "No se pudo crear la tienda";
+
+// Provisions a brand-new tenant from the platform console. The owner's platform
+// identity is resolved FIRST because provision_store writes store_users.user_id,
+// whose FK to user_profiles(id) demands that identity already exist — inverting
+// the order would fail the FK. Only then does the atomic provision_store create
+// the store (born private), its 'owner' role, and the membership in one call.
+// A freshly-minted owner carries the temporary password back for the operator.
+export async function createTenant(
+  input: CreateStoreFormValues,
+  supabaseOverride?: any,
+): Promise<CreateTenantResult> {
+  const service = supabaseOverride ?? getSupabaseServiceClient();
+  if (!service) {
+    return { success: false, error: "Supabase no configurado" };
+  }
+
+  let owner;
+  try {
+    owner = await ensurePlatformUserByEmail(input.ownerEmail, service, {
+      firstName: input.ownerFirstName,
+      lastName: input.ownerLastName,
+    });
+  } catch (error) {
+    return { success: false, error: toCreateTenantError(error) };
+  }
+
+  const { data, error } = await service.rpc(ECOMMERCE_FUNCTIONS.provisionStore, {
+    p_subdomain: input.subdomain,
+    p_store_name: input.storeName,
+    p_owner_user_id: owner.userId,
+    p_currency_code: input.currencyCode,
+  });
+
+  if (error || !data) {
+    return { success: false, error: provisionErrorMessage(error) };
+  }
+
+  return owner.created
+    ? { success: true, storeId: data as string, tempPassword: owner.tempPassword }
+    : { success: true, storeId: data as string };
+}
+
+// The subdomain's uniqueness is the DB's job (stores_subdomain_key), so a race
+// that loses to another provision surfaces here as a raw 23505; every other
+// failure keeps its own message instead of being masked as a collision.
+function provisionErrorMessage(error: any): string {
+  const isSubdomainCollision =
+    error?.code === UNIQUE_VIOLATION_CODE &&
+    `${error.message ?? ""} ${error.details ?? ""}`.includes("stores_subdomain_key");
+
+  return isSubdomainCollision ? SUBDOMAIN_TAKEN_ERROR : error?.message || PROVISION_FAILED_ERROR;
+}
+
+function toCreateTenantError(error: unknown): string {
+  return error instanceof Error ? error.message : PROVISION_FAILED_ERROR;
+}
 
 // Every tenant on the platform: this console is the one place a super_admin
 // legitimately sees across stores, so unlike listStoresForUser this is never

@@ -10,6 +10,18 @@ import { getAdminRequestHeaders } from "./admin-request-headers";
 import { getStoreId, normalizeRuntimeStoreId } from "@/lib/utils/store";
 import { normalizeThemeRecord } from "@/lib/theme-font/runtime-contract";
 
+/**
+ * The preset `getActiveTheme` resolves to for a store with no publication of
+ * its own (no `is_current=true` row in `app_theme_versions`) — anchored by
+ * name in code (D7), not by `app_themes.is_active`. `is_active` is a flag on
+ * the shared preset catalog (no `store_id`); letting it decide any one
+ * store's theme is a cross-tenant leak (touching it for one store silently
+ * changes what every unpublished store renders). "Tech" is the preset that
+ * already resolves de facto today (the only row with `is_active=true`), so
+ * anchoring to it here is behavior-invisible.
+ */
+export const CATALOG_DEFAULT_THEME_NAME = "Tech";
+
 function toPlainRecord(value: unknown): Record<string, unknown> | null {
   if (typeof value === "object" && value !== null && !Array.isArray(value)) {
     return value as Record<string, unknown>;
@@ -256,11 +268,13 @@ export async function getActiveTheme(): Promise<AppTheme | null> {
     }
   }
 
-  // Fallback: tema con is_active en app_themes (compatibilidad)
+  // Fallback: la tienda no tiene publicación propia. Ancla al preset "Tech"
+  // del catálogo por nombre (D7) — nunca por `is_active`, que es un flag
+  // global compartido por todas las tiendas.
   const { data, error } = await supabase
     .from(ECOMMERCE_TABLES.appThemes)
     .select("*")
-    .eq("is_active", true)
+    .eq("theme_name", CATALOG_DEFAULT_THEME_NAME)
     .limit(1)
     .maybeSingle();
 

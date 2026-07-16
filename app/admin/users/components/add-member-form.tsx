@@ -1,6 +1,6 @@
 "use client"
 
-import { useTransition } from "react"
+import { useState, useTransition } from "react"
 import { Controller, useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Loader2, UserPlus } from "lucide-react"
@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { TempPasswordReveal } from "@/components/admin/temp-password-reveal"
 import { addMemberSchema, type AddMemberFormValues } from "@/lib/memberships/schemas"
 import { STORE_ROLE_LABELS, STORE_ROLE_NAMES } from "@/lib/memberships/roles"
 import { addStoreMemberAction } from "../actions"
@@ -28,6 +29,7 @@ type AddMemberFormProps = {
 
 export function AddMemberForm({ onSuccess }: AddMemberFormProps) {
   const [isPending, startTransition] = useTransition()
+  const [tempPassword, setTempPassword] = useState<string | null>(null)
   const {
     register,
     handleSubmit,
@@ -42,14 +44,23 @@ export function AddMemberForm({ onSuccess }: AddMemberFormProps) {
   const onSubmit = (values: AddMemberFormValues) => {
     startTransition(async () => {
       const result = await addStoreMemberAction(values.email, values.role)
-      if (result.success) {
-        toast.success("Miembro agregado al equipo")
-        reset(emptyValues)
-        onSuccess?.()
+      if (!result.success) {
+        toast.error(result.error ?? "No se pudo agregar al miembro")
         return
       }
 
-      toast.error(result.error ?? "No se pudo agregar al miembro")
+      // A minted identity gets a temporary password: keep the dialog open so the
+      // admin can hand it off before it disappears.
+      if (result.created) {
+        setTempPassword(result.tempPassword)
+        toast.success("Cuenta creada. Comparte la contraseña temporal.")
+        reset(emptyValues)
+        return
+      }
+
+      toast.success("Miembro agregado al equipo")
+      reset(emptyValues)
+      onSuccess?.()
     })
   }
 
@@ -58,7 +69,7 @@ export function AddMemberForm({ onSuccess }: AddMemberFormProps) {
       <FormField
         id="member-email"
         label="Correo del usuario"
-        hint="El usuario debe tener una cuenta registrada en la plataforma."
+        hint="Si el correo no tiene cuenta, se creará una con una contraseña temporal."
         error={errors.email?.message}
       >
         {(field) => (
@@ -95,6 +106,13 @@ export function AddMemberForm({ onSuccess }: AddMemberFormProps) {
         )}
         Agregar miembro
       </Button>
+      {tempPassword ? (
+        <TempPasswordReveal
+          value={tempPassword}
+          title="Contraseña temporal"
+          recipient="a la persona"
+        />
+      ) : null}
     </form>
   )
 }

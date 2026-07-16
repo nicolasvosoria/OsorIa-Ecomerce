@@ -12,6 +12,7 @@ import {
   removeMembership,
   setUserGlobalRole,
   upsertMembershipRole,
+  type AddStoreMemberResult,
   type MembershipResult,
 } from "@/lib/supabase/memberships-api"
 import { isGlobalRoleName, isStoreRoleName } from "@/lib/memberships/roles"
@@ -22,7 +23,7 @@ const SELF_ROLE_CHANGE_ERROR = "No puedes cambiar tu propio rol"
 export async function addStoreMemberAction(
   email: string,
   roleName: string,
-): Promise<MembershipResult> {
+): Promise<AddStoreMemberResult> {
   const authorization = await authorizeActiveStoreAdmin()
   if ("error" in authorization) {
     return { success: false, error: authorization.error }
