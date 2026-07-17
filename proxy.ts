@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { resolveStoreSubdomain } from '@/lib/utils/store-host'
+import {
+  isPlatformAdminHost,
+  resolveDeploymentRootHost,
+  resolveStoreSubdomain,
+  toPlatformAdminHost,
+} from '@/lib/utils/store-host'
 import { normalizeSafeAdminPath, resolveAdminAccess } from '@/lib/supabase/admin-access'
 import { isRouteOrDescendant } from '@/lib/admin/routes'
 
@@ -126,6 +131,77 @@ function isAdminJourneyPath(pathname: string): boolean {
   return ADMIN_JOURNEY_ROOTS.some(root => isRouteOrDescendant(pathname, root))
 }
 
+// ── Host admin (Plan 12, separación de privilegios) ─────────────────────────
+// admin.<dominio> sirve SOLO el tier plataforma (D1/D4): la consola de tenants
+// con rutas limpias (`/` consola, `/create` alta, `/<uuid>` ficha — su página
+// llega en el slice 7) que el proxy reescribe a las páginas existentes bajo
+// /admin/stores (A3), más el auth journey, que pasa tal cual. El storefront no
+// existe aquí: la rama no emite headers x-store-* ni cookie store_id ni toca el
+// caché de tiendas. Plan 13 reescribirá el proxy: mantener esta rama localizada.
+const PLATFORM_CONSOLE_BASE = '/admin/stores'
+const PLATFORM_LOGIN_PATH = '/auth/login'
+
+// stores.id es un uuid: cualquier otro segmento no es la ficha de un tenant.
+const STORE_ID_SEGMENT = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+
+function resolvePlatformConsolePath(pathname: string): string | null {
+  if (pathname === '/') return PLATFORM_CONSOLE_BASE
+  if (pathname === '/create') return `${PLATFORM_CONSOLE_BASE}/create`
+  if (pathname === '/users') return `${PLATFORM_CONSOLE_BASE}/users`
+
+  const segment = pathname.slice(1)
+  return STORE_ID_SEGMENT.test(segment) ? `${PLATFORM_CONSOLE_BASE}/${segment}` : null
+}
+
+async function handlePlatformAdminHost(request: NextRequest, hostname: string) {
+  const { pathname } = request.nextUrl
+
+  // El auth journey se sirve en este mismo host: la sesión de Supabase es una
+  // cookie host-only, así que loguearse en otro host no valdría aquí.
+  if (isRouteOrDescendant(pathname, '/auth') || isRouteOrDescendant(pathname, '/dashboard')) {
+    return NextResponse.next()
+  }
+
+  const consolePath = resolvePlatformConsolePath(pathname)
+  if (!consolePath) {
+    // D4: cualquier ruta ajena al tier plataforma vuelve a la consola.
+    const redirectUrl = request.nextUrl.clone()
+    redirectUrl.pathname = '/'
+    redirectUrl.search = ''
+    return NextResponse.redirect(redirectUrl)
+  }
+
+  const access = await resolveAdminAccess(request)
+
+  // El modal de login vive en el header del storefront, que no existe en este
+  // host: el guest va al login dedicado del auth journey.
+  if (access.status === 'guest') {
+    const redirectUrl = request.nextUrl.clone()
+    redirectUrl.pathname = PLATFORM_LOGIN_PATH
+    redirectUrl.search = ''
+    return NextResponse.redirect(redirectUrl)
+  }
+
+  // non_admin/error: aquí `/` es la propia consola gateada — redirigir ahí sería
+  // un loop. Sin membresía no se puede resolver "su" tienda, así que sale al
+  // host raíz del despliegue con el mismo feedback que dan los hosts de tienda.
+  if (access.status !== 'admin') {
+    const redirectUrl = request.nextUrl.clone()
+    redirectUrl.host = resolveDeploymentRootHost(hostname)
+    redirectUrl.pathname = '/'
+    redirectUrl.search = ''
+    redirectUrl.searchParams.set('admin_access', access.status === 'error' ? 'error' : 'denied')
+    return NextResponse.redirect(redirectUrl)
+  }
+
+  // El proxy solo enruta: no distingue super_admin (resolveAdminAccess no lo
+  // sabe); authorizeSuperAdmin en las páginas decide el acceso real.
+  const rewriteUrl = request.nextUrl.clone()
+  rewriteUrl.pathname = consolePath
+  return NextResponse.rewrite(rewriteUrl)
+}
+// ── Fin del host admin ──────────────────────────────────────────────────────
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
   const hostname = request.headers.get('host') || ''
@@ -141,6 +217,27 @@ export async function proxy(request: NextRequest) {
   if (publicPaths.some(path => pathname.startsWith(path))) {
     return NextResponse.next()
   }
+
+  // ── Host admin (Plan 12): corre antes del flag DISABLE_SUBDOMAIN_MULTI_TENANT
+  // a propósito. El flag congela la resolución de tienda del storefront, pero la
+  // consola no es un storefront: con el flag activo el host admin sería tratado
+  // como la tienda por defecto (headers y cookie de tienda incluidos), justo lo
+  // que D4 prohíbe. La rama tampoco consulta tiendas, así que no reintroduce las
+  // consultas a BD que el flag evita.
+
+  // Los marcadores viejos de la consola saltan en cualquier host al host admin
+  // con su ruta limpia (/admin/stores → /, /admin/stores/create → /create).
+  if (isRouteOrDescendant(pathname, PLATFORM_CONSOLE_BASE)) {
+    const redirectUrl = request.nextUrl.clone()
+    redirectUrl.host = toPlatformAdminHost(hostname)
+    redirectUrl.pathname = pathname.slice(PLATFORM_CONSOLE_BASE.length) || '/'
+    return NextResponse.redirect(redirectUrl, 301)
+  }
+
+  if (isPlatformAdminHost(hostname)) {
+    return handlePlatformAdminHost(request, hostname)
+  }
+  // ── Fin del host admin ──
 
   // Si multi-tenant está deshabilitado, usar store_id por defecto sin consultar BD
   if (DISABLE_SUBDOMAIN_MULTI_TENANT) {

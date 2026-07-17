@@ -12,15 +12,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { useAdminPermissions } from "@/contexts/admin-permissions-context"
-import {
-  GLOBAL_ROLE_LABELS,
-  GLOBAL_ROLE_NAMES,
-} from "@/lib/memberships/roles"
+import { GLOBAL_ROLE_LABELS, GLOBAL_ROLE_NAMES } from "@/lib/memberships/roles"
 import type { UserRole } from "@/lib/types/user"
 import { setUserGlobalRoleAction } from "../actions"
 
-export function UserGlobalRoleControl({
+// StoresLayout gates the whole console on super_admin, so the selector is always
+// live here — it needs no per-viewer permission check. A super_admin still can't
+// demote themselves (guarded server-side too), so their own row shows a badge
+// instead of an editable select.
+export function UserGlobalRoleSelect({
   userId,
   role,
   currentUserId,
@@ -29,15 +29,12 @@ export function UserGlobalRoleControl({
   role: UserRole
   currentUserId: string
 }) {
-  const { isSuperAdmin } = useAdminPermissions()
   const [current, setCurrent] = useState<UserRole>(role)
   const [isPending, startTransition] = useTransition()
 
-  if (!isSuperAdmin) {
-    return <GlobalRoleBadge role={role} />
+  if (userId === currentUserId) {
+    return <Badge variant="default">{GLOBAL_ROLE_LABELS[current]}</Badge>
   }
-
-  const isSelf = userId === currentUserId
 
   function handleChange(value: string) {
     const nextRole = value as UserRole
@@ -58,7 +55,7 @@ export function UserGlobalRoleControl({
 
   return (
     <div className="flex items-center gap-2">
-      <Select value={current} onValueChange={handleChange} disabled={isPending || isSelf}>
+      <Select value={current} onValueChange={handleChange} disabled={isPending}>
         <SelectTrigger className="h-9 w-[160px]">
           <SelectValue />
         </SelectTrigger>
@@ -73,9 +70,4 @@ export function UserGlobalRoleControl({
       {isPending && <Loader2 className="h-4 w-4 shrink-0 animate-spin text-muted-foreground" />}
     </div>
   )
-}
-
-function GlobalRoleBadge({ role }: { role: UserRole }) {
-  const variant = role === "super_admin" ? "default" : role === "admin" ? "secondary" : "outline"
-  return <Badge variant={variant}>{GLOBAL_ROLE_LABELS[role]}</Badge>
 }

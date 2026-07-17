@@ -82,13 +82,26 @@ describe("admin access resolver", () => {
     });
   });
 
-  it("returns admin for a global admin that manages no store", async () => {
+  // The role pass is what lets a membership-less super_admin through the
+  // admin-host proxy gate to his own console.
+  it("returns admin for a super_admin that manages no store", async () => {
+    getUserMock.mockResolvedValue({ data: { user: { id: "super-admin-1" } }, error: null });
+    stubRest({ profile: profileRole("super_admin"), storeAccess: managesAnyStore(false) });
+    const { resolveAdminAccess } = await import("@/lib/supabase/admin-access");
+
+    await expect(resolveAdminAccess(makeRequest())).resolves.toEqual({
+      status: "admin",
+      userId: "super-admin-1",
+    });
+  });
+
+  it("returns non_admin for the retired global 'admin' role without membership", async () => {
     getUserMock.mockResolvedValue({ data: { user: { id: "admin-1" } }, error: null });
     stubRest({ profile: profileRole("admin"), storeAccess: managesAnyStore(false) });
     const { resolveAdminAccess } = await import("@/lib/supabase/admin-access");
 
     await expect(resolveAdminAccess(makeRequest())).resolves.toEqual({
-      status: "admin",
+      status: "non_admin",
       userId: "admin-1",
     });
   });

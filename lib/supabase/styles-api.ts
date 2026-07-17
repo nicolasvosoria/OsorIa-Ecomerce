@@ -3,7 +3,7 @@ import { ECOMMERCE_SCHEMA, ECOMMERCE_TABLES, ECOMMERCE_VIEWS } from "./contract"
 import type { ComponentStyle } from "./types";
 import { requireAdmin } from "./permissions-api";
 import { getAdminRequestHeaders } from "./admin-request-headers";
-import { getRuntimeStoreId } from "@/lib/utils/store";
+import { getRuntimeStoreId, normalizeRuntimeStoreId } from "@/lib/utils/store";
 
 function mapLegacyStyle(row: any): ComponentStyle {
   return {
@@ -34,21 +34,28 @@ async function resolveDefaultComponentStyleStoreId(
   return data.id as string;
 }
 
+// `storeIdOverride` lets the theme editor read the ACTIVE store (D10) instead of
+// the host: the storefront omits it and stays host-scoped, so switching stores
+// no longer reads one store while the writes target another (#2345).
 async function resolveComponentStyleStoreId(
   supabase: ReturnType<typeof getSupabaseEcommerce>,
+  storeIdOverride?: string,
 ): Promise<string | null> {
+  const overrideStoreId = normalizeRuntimeStoreId(storeIdOverride);
+  if (overrideStoreId) return overrideStoreId;
+
   const runtimeStoreId = await getRuntimeStoreId();
   if (runtimeStoreId) return runtimeStoreId;
 
   return resolveDefaultComponentStyleStoreId(supabase);
 }
 
-export async function getComponentStyles() {
+export async function getComponentStyles(storeId?: string): Promise<ComponentStyle[]> {
   const supabase = getSupabaseEcommerce();
   if (!supabase) return [];
 
-  const storeId = await resolveComponentStyleStoreId(supabase);
-  if (!storeId) {
+  const resolvedStoreId = await resolveComponentStyleStoreId(supabase, storeId);
+  if (!resolvedStoreId) {
     console.warn("[v0] No store_id available, returning empty array");
     return [];
   }
@@ -56,7 +63,7 @@ export async function getComponentStyles() {
   const { data, error } = await supabase
     .from(ECOMMERCE_VIEWS.componentStylesLegacy)
     .select("*")
-    .eq("store_id", storeId)
+    .eq("store_id", resolvedStoreId)
     .order("component_name");
 
   if (error) {

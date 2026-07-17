@@ -244,7 +244,7 @@ export async function currentUserMustChangePassword(): Promise<boolean> {
 
 /**
  * Obtiene el rol del usuario actual
- * @returns El rol del usuario ('user' o 'admin'), o null si no está autenticado
+ * @returns El rol del usuario ('user' o 'super_admin'), o null si no está autenticado
  */
 export async function getCurrentUserRole(): Promise<UserRole | null> {
   const authClient = getSupabaseBrowserClient()

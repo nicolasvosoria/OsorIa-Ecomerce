@@ -1,20 +1,15 @@
 import type React from "react";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
 import { ShieldAlert } from "lucide-react";
 
 import { AdminAuthGuard } from "@/components/admin/admin-auth-guard";
 import { AdminShell } from "@/components/admin/shell/admin-shell";
 import { AdminActiveStoreProvider } from "@/contexts/admin-active-store-context";
-import { FORCE_PASSWORD_CHANGE_PATH } from "@/lib/auth-return-intent";
 import { authorizeActiveStoreAdmin } from "@/lib/supabase/active-store";
+import { redirectIfPasswordChangeRequired } from "@/lib/admin/password-change-gate";
 import { SIDEBAR_PIN_COOKIE, isSidebarPinned } from "@/lib/admin/sidebar-pin-cookie";
-import {
-  listStoresForUser,
-  requiresPasswordChange,
-  type StoreSummary,
-} from "@/lib/supabase/memberships-api";
+import { listStoresForUser, type StoreSummary } from "@/lib/supabase/memberships-api";
 import {
   Card,
   CardContent,
@@ -65,11 +60,6 @@ export default async function AdminLayout({
   );
 }
 
-// A minted owner (D21) still on the temporary password is forced to the change
-// screen (FORCE_PASSWORD_CHANGE_PATH) before any admin use. That screen lives
-// outside /admin, so this layout never wraps it — otherwise the guard would
-// redirect it onto itself in a loop.
-//
 // A 403 means the session is authenticated but does not manage this host's store
 // (D6: el host manda, sin fallback). Surfacing it as a clear message is D14 — a
 // silent empty shell left such an admin with no explanation. A 500 is a broken
@@ -89,9 +79,7 @@ async function resolveAdminStoreContext(): Promise<AdminStoreContext> {
     return { forbidden: false, stores: [], activeStoreId: "" };
   }
 
-  if (await requiresPasswordChange(authorization.userId, authorization.supabase)) {
-    redirect(FORCE_PASSWORD_CHANGE_PATH);
-  }
+  await redirectIfPasswordChangeRequired(authorization.userId, authorization.supabase);
 
   const stores = await listStoresForUser(authorization.userId);
   return { forbidden: false, stores, activeStoreId: authorization.storeId };

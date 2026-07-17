@@ -18,8 +18,17 @@ const input: CreateStoreFormValues = {
   ownerLastName: "Pérez",
 }
 
-function serviceWith(rpc: ReturnType<typeof vi.fn>) {
-  return { rpc }
+function serviceWith(rpc: ReturnType<typeof vi.fn>, from?: any) {
+  return from ? { rpc, from } : { rpc }
+}
+
+// The signup_store_id write (D8) runs through service.from(...).update(...).eq(...);
+// only the tests exercising a freshly-minted owner need this chain mocked.
+function updateChain(result: { error: unknown } = { error: null }) {
+  const eq = vi.fn().mockResolvedValue(result)
+  const update = vi.fn(() => ({ eq }))
+  const from = vi.fn(() => ({ update }))
+  return { from, update, eq }
 }
 
 beforeEach(() => {
@@ -57,8 +66,9 @@ describe("createTenant provisioning order", () => {
       tempPassword: "temp-secret-24-chars",
     })
     const rpc = vi.fn().mockResolvedValue({ data: "store-2", error: null })
+    const { from } = updateChain()
 
-    const result = await createTenant(input, serviceWith(rpc))
+    const result = await createTenant(input, serviceWith(rpc, from))
 
     expect(result).toEqual({
       success: true,
@@ -109,6 +119,53 @@ describe("createTenant provisioning order", () => {
     expect(result).toEqual({
       success: false,
       error: "permission denied for function provision_store",
+    })
+  })
+})
+
+describe("createTenant owner signup origin (D8)", () => {
+  it("records the provisioned store as signup_store_id for a freshly-minted owner", async () => {
+    ensurePlatformUserByEmail.mockResolvedValue({
+      userId: "new-uid",
+      created: true,
+      tempPassword: "temp-secret-24-chars",
+    })
+    const rpc = vi.fn().mockResolvedValue({ data: "store-3", error: null })
+    const { from, update, eq } = updateChain()
+
+    await createTenant(input, serviceWith(rpc, from))
+
+    expect(from).toHaveBeenCalledWith("user_profiles")
+    expect(update).toHaveBeenCalledWith({ signup_store_id: "store-3" })
+    expect(eq).toHaveBeenCalledWith("id", "new-uid")
+  })
+
+  it("leaves an existing owner's signup_store_id untouched", async () => {
+    ensurePlatformUserByEmail.mockResolvedValue({ userId: "owner-uid", created: false })
+    const rpc = vi.fn().mockResolvedValue({ data: "store-4", error: null })
+    const from = vi.fn()
+
+    const result = await createTenant(input, serviceWith(rpc, from))
+
+    expect(result).toEqual({ success: true, storeId: "store-4" })
+    expect(from).not.toHaveBeenCalled()
+  })
+
+  it("still returns success when the best-effort origin write fails", async () => {
+    ensurePlatformUserByEmail.mockResolvedValue({
+      userId: "new-uid",
+      created: true,
+      tempPassword: "temp-secret-24-chars",
+    })
+    const rpc = vi.fn().mockResolvedValue({ data: "store-5", error: null })
+    const { from } = updateChain({ error: { message: "permission denied" } })
+
+    const result = await createTenant(input, serviceWith(rpc, from))
+
+    expect(result).toEqual({
+      success: true,
+      storeId: "store-5",
+      tempPassword: "temp-secret-24-chars",
     })
   })
 })

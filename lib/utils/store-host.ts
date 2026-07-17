@@ -95,3 +95,54 @@ export function resolveStoreLookupSubdomain(
 ): string {
   return resolveStoreSubdomain(host) ?? DEFAULT_STORE_SUBDOMAIN;
 }
+
+// The platform console lives on the reserved `admin` label (never a store:
+// lib/stores/schemas.ts RESERVED_SUBDOMAINS keeps it off tenants).
+const PLATFORM_ADMIN_SUBDOMAIN = "admin";
+
+export function isPlatformAdminHost(host: string | null | undefined): boolean {
+  return resolveStoreSubdomain(host) === PLATFORM_ADMIN_SUBDOMAIN;
+}
+
+/**
+ * The deployment's root host: the current host with any storefront label
+ * (store subdomain, `www`, the `admin` console label) stripped, port preserved.
+ * Local hosts and IPs collapse to `localhost` so `admin.<root>` keeps resolving
+ * to loopback in development.
+ */
+export function resolveDeploymentRootHost(
+  host: string | null | undefined,
+): string {
+  const rawHost = host?.trim().toLowerCase() ?? "";
+  const port = extractPort(rawHost);
+  const rootHostname = stripStorefrontLabels(normalizeHostname(rawHost));
+  return port ? `${rootHostname}:${port}` : rootHostname;
+}
+
+/**
+ * The platform console host derived from the current one, port preserved:
+ * tienda2.localhost:3000 → admin.localhost:3000, www.dominio.com →
+ * admin.dominio.com, tienda2.<proyecto>.vercel.app → admin.<proyecto>.vercel.app.
+ */
+export function toPlatformAdminHost(host: string | null | undefined): string {
+  return `${PLATFORM_ADMIN_SUBDOMAIN}.${resolveDeploymentRootHost(host)}`;
+}
+
+function stripStorefrontLabels(hostname: string): string {
+  if (!hostname || isLocalHostname(hostname)) return "localhost";
+
+  const withoutWww = hostname.startsWith("www.")
+    ? hostname.slice("www.".length)
+    : hostname;
+  const subdomain = resolveStoreSubdomain(withoutWww);
+  return subdomain ? withoutWww.slice(`${subdomain}.`.length) : withoutWww;
+}
+
+function extractPort(rawHost: string): string | null {
+  const bracketEnd = rawHost.indexOf("]");
+  const portSeparatorIndex = rawHost.indexOf(":", bracketEnd + 1);
+  if (portSeparatorIndex === -1) return null;
+
+  const port = rawHost.slice(portSeparatorIndex + 1);
+  return /^\d+$/.test(port) ? port : null;
+}

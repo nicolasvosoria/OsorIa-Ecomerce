@@ -1,71 +1,18 @@
-"use client"
+import { redirect } from "next/navigation"
 
-import { Suspense, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { useAdminPermissions } from "@/contexts/admin-permissions-context"
+import { authorizeActiveStoreAdmin } from "@/lib/supabase/active-store"
 import { ThemeCustomEditor } from "@/components/theme/theme-custom-editor"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Loader2, ShieldAlert } from "lucide-react"
-import Link from "next/link"
 
-function AdminThemePageContent() {
-  const { isAdmin, loading, hasChecked } = useAdminPermissions()
-  const router = useRouter()
-
-  const hasAccess = isAdmin
-
-  useEffect(() => {
-    if (hasChecked && !loading && !hasAccess) {
-      router.push("/")
-    }
-  }, [hasAccess, loading, hasChecked, router])
-
-  if (loading || !hasChecked) {
-    return (
-      <div className="editor-chrome flex flex-col items-center justify-center h-screen gap-4 bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-foreground" />
-        <p className="text-sm text-muted-foreground">
-          Verificando permisos de administrador...
-        </p>
-      </div>
-    )
-  }
-
-  if (!hasAccess && hasChecked) {
-    return (
-      <div className="editor-chrome flex items-center justify-center h-screen p-4 bg-background">
-        <Card className="max-w-md w-full">
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <ShieldAlert className="h-5 w-5 text-destructive" />
-              <CardTitle>Acceso Denegado</CardTitle>
-            </div>
-            <CardDescription>
-              No tienes permisos para acceder a esta página.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild className="w-full">
-              <Link href="/">Volver al Inicio</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    )
+// Server gate (D10): a session that cannot manage the ACTIVE store is denied
+// here — not merely bounced by a client curtain — so a global super_admin with
+// no managing role on the active store is turned away server-side (privilege
+// separation). AdminShell renders this route full-bleed (isThemeEditorRoute),
+// and the editor reads/writes that same active store, so the two agree.
+export default async function AdminThemePage() {
+  const authorization = await authorizeActiveStoreAdmin()
+  if ("error" in authorization) {
+    redirect("/")
   }
 
   return <ThemeCustomEditor />
-}
-
-export default function AdminThemePage() {
-  return (
-    <Suspense fallback={
-      <div className="editor-chrome flex items-center justify-center h-screen bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-foreground" />
-      </div>
-    }>
-      <AdminThemePageContent />
-    </Suspense>
-  )
 }

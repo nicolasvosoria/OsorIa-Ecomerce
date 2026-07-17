@@ -7,7 +7,10 @@ vi.mock("@supabase/supabase-js", () => ({ createClient }));
 import {
   addStoreMember,
   clearMustChangePassword,
+  grantSupportMembership,
+  listStoreMembers,
   listStoresForUser,
+  removeMembership,
   requiresPasswordChange,
   upsertMembershipRole,
 } from "@/lib/supabase/memberships-api";
@@ -52,44 +55,279 @@ describe("listStoresForUser", () => {
     process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role-key";
   });
 
-  it("lists every non-deleted store for a super_admin, ignoring store_users", async () => {
-    const allStores = [{ id: "store-a", store_name: "A", subdomain: "a" }];
+  // Membership is the only path: the global role is never consulted, so a
+  // super_admin with no memberships manages no store (D3/D5).
+  it("gives a super_admin without memberships no stores instead of every store", async () => {
     const { from } = mockService({
-      user_profiles: { data: { role: "super_admin" } },
-      stores: { data: allStores },
+      store_users: { data: [] },
     });
 
-    const stores = await listStoresForUser("admin-1");
+    const stores = await listStoresForUser("super-admin-1");
 
-    expect(stores).toEqual(allStores);
-    expect(from).not.toHaveBeenCalledWith("store_users");
+    expect(stores).toEqual([]);
+    expect(from).not.toHaveBeenCalledWith("user_profiles");
+    expect(from).not.toHaveBeenCalledWith("stores");
   });
 
-  it("lists only the stores the user has a store_users membership in", async () => {
+  it("lists only the stores where the user holds a managing membership", async () => {
     const memberStores = [{ id: "store-b", store_name: "B", subdomain: "b" }];
     const { chains } = mockService({
-      user_profiles: { data: { role: "admin" } },
-      store_users: { data: [{ store_id: "store-b" }] },
+      store_users: {
+        data: [{ store_id: "store-b", store_user_roles: [{ roles: { role_name: "owner" } }] }],
+      },
       stores: { data: memberStores },
     });
 
     const stores = await listStoresForUser("member-1");
 
     expect(stores).toEqual(memberStores);
+    expect(chains.store_users.select).toHaveBeenCalledWith(
+      "store_id, store_user_roles(roles(role_name))",
+    );
     expect(chains.store_users.eq).toHaveBeenCalledWith("user_id", "member-1");
     expect(chains.stores.in).toHaveBeenCalledWith("id", ["store-b"]);
   });
 
-  it("returns no stores without querying stores when the user has no memberships", async () => {
+  // Mirrors ecommerce.can_user_manage_store: a store_users row without an
+  // 'owner'/'admin' role link grants nothing.
+  it("does not count memberships without a managing role", async () => {
     const { from } = mockService({
-      user_profiles: { data: { role: "admin" } },
-      store_users: { data: [] },
+      store_users: {
+        data: [
+          { store_id: "store-c", store_user_roles: [] },
+          { store_id: "store-d", store_user_roles: null },
+          { store_id: "store-e", store_user_roles: [{ roles: { role_name: "viewer" } }] },
+        ],
+      },
     });
 
     const stores = await listStoresForUser("member-2");
 
     expect(stores).toEqual([]);
     expect(from).not.toHaveBeenCalledWith("stores");
+  });
+
+  it("returns no stores without querying stores when the user has no memberships", async () => {
+    const { from } = mockService({
+      store_users: { data: [] },
+    });
+
+    const stores = await listStoresForUser("member-3");
+
+    expect(stores).toEqual([]);
+    expect(from).not.toHaveBeenCalledWith("stores");
+  });
+
+  // The support self-grant mints an 'admin' membership (A1): the same join that
+  // mirrors can_user_manage_store must count it, or "Entrar a tienda" stays dead.
+  it("counts a support membership ('admin' role) as a managed store", async () => {
+    const supportStore = [{ id: "store-s", store_name: "Soporte", subdomain: "soporte" }];
+    const { chains } = mockService({
+      store_users: {
+        data: [{ store_id: "store-s", store_user_roles: [{ roles: { role_name: "admin" } }] }],
+      },
+      stores: { data: supportStore },
+    });
+
+    const stores = await listStoresForUser("super-1");
+
+    expect(stores).toEqual(supportStore);
+    expect(chains.stores.in).toHaveBeenCalledWith("id", ["store-s"]);
+  });
+});
+
+describe("grantSupportMembership (super_admin self-grant, D2)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function mockSupportGrantService(existingMembershipId: string | null) {
+    const membershipInsert = vi.fn(() => ({
+      select: () => ({ single: async () => ({ data: { id: "su-9" }, error: null }) }),
+    }));
+    const roleQueryFilters: unknown[][] = [];
+    const roleLinkInsert = vi.fn().mockResolvedValue({ error: null });
+
+    const from = vi.fn((table: string) => {
+      if (table === "store_users") {
+        return {
+          select: () => ({
+            eq: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({
+                  data: existingMembershipId ? { id: existingMembershipId } : null,
+                  error: null,
+                }),
+              }),
+            }),
+          }),
+          insert: membershipInsert,
+        };
+      }
+      if (table === "roles") {
+        return {
+          select: () => ({
+            eq: (...first: unknown[]) => {
+              roleQueryFilters.push(first);
+              return {
+                eq: (...second: unknown[]) => {
+                  roleQueryFilters.push(second);
+                  return {
+                    maybeSingle: async () => ({ data: { id: "role-admin" }, error: null }),
+                  };
+                },
+              };
+            },
+          }),
+        };
+      }
+      if (table === "store_user_roles") {
+        return {
+          delete: () => ({ eq: vi.fn().mockResolvedValue({ error: null }) }),
+          insert: roleLinkInsert,
+        };
+      }
+      throw new Error(`unexpected table ${table}`);
+    });
+
+    return { service: { from }, membershipInsert, roleLinkInsert, roleQueryFilters };
+  }
+
+  it("creates the membership with granted_by = the actor and the 'admin' store role (A1)", async () => {
+    const { service, membershipInsert, roleLinkInsert, roleQueryFilters } =
+      mockSupportGrantService(null);
+
+    const result = await grantSupportMembership("store-1", "super-1", service);
+
+    expect(result).toEqual({ success: true });
+    expect(membershipInsert).toHaveBeenCalledWith({
+      store_id: "store-1",
+      user_id: "super-1",
+      granted_by: "super-1",
+    });
+    expect(roleQueryFilters).toContainEqual(["role_name", "admin"]);
+    expect(roleLinkInsert).toHaveBeenCalledWith({ store_user_id: "su-9", role_id: "role-admin" });
+  });
+
+  // Idempotent: re-granting to someone already on the team changes nothing — an
+  // 'owner' membership is never downgraded and no duplicate row appears.
+  it("leaves an existing membership and its role untouched", async () => {
+    const { service, membershipInsert, roleLinkInsert } = mockSupportGrantService("su-1");
+
+    const result = await grantSupportMembership("store-1", "super-1", service);
+
+    expect(result).toEqual({ success: true });
+    expect(membershipInsert).not.toHaveBeenCalled();
+    expect(roleLinkInsert).not.toHaveBeenCalled();
+  });
+
+  it("surfaces the underlying failure instead of granting blind", async () => {
+    const service = {
+      from: vi.fn(() => ({
+        select: () => ({
+          eq: () => ({
+            eq: () => ({
+              maybeSingle: async () => ({ data: null, error: { message: "permission denied" } }),
+            }),
+          }),
+        }),
+      })),
+    };
+
+    const result = await grantSupportMembership("store-1", "super-1", service);
+
+    expect(result).toEqual({ success: false, error: "permission denied" });
+  });
+});
+
+describe("listStoreMembers support signal", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role-key";
+  });
+
+  // Only the support self-grant writes granted_by today (D2), so its presence is
+  // the honest signal the owner's team table labels as "Acceso de soporte".
+  it("selects granted_by and marks only those rows as support access", async () => {
+    const { chains } = mockService({
+      store_users: {
+        data: [
+          {
+            user_id: "super-1",
+            granted_by: "super-1",
+            user_profiles: { email: "soporte@osoria.tech", first_name: "Sole", last_name: "Soporte" },
+            store_user_roles: [{ roles: { role_name: "admin" } }],
+          },
+          {
+            user_id: "owner-1",
+            granted_by: null,
+            user_profiles: { email: "duena@correo.com", first_name: "Ana", last_name: "Pérez" },
+            store_user_roles: [{ roles: { role_name: "owner" } }],
+          },
+        ],
+      },
+    });
+
+    const members = await listStoreMembers("store-1");
+
+    expect(chains.store_users.select).toHaveBeenCalledWith(
+      "user_id, granted_by, user_profiles(email, first_name, last_name), store_user_roles(roles(role_name))",
+    );
+    expect(members).toEqual([
+      expect.objectContaining({ userId: "super-1", role: "admin", isSupportAccess: true }),
+      expect.objectContaining({ userId: "owner-1", role: "owner", isSupportAccess: false }),
+    ]);
+  });
+});
+
+describe("removeMembership on a support-granted row", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  // D2: the owner revokes support access like any other membership — the deletes
+  // key on the membership id alone, granted_by never filters the row out.
+  it("drops the role links and the membership row", async () => {
+    const roleLinkDeleteEq = vi.fn().mockResolvedValue({ error: null });
+    const membershipDeleteFilters: unknown[][] = [];
+    const service = {
+      from: vi.fn((table: string) => {
+        if (table === "store_users") {
+          return {
+            select: () => ({
+              eq: () => ({
+                eq: () => ({ maybeSingle: async () => ({ data: { id: "su-9" }, error: null }) }),
+              }),
+            }),
+            delete: () => ({
+              eq: (...first: unknown[]) => {
+                membershipDeleteFilters.push(first);
+                return {
+                  eq: async (...second: unknown[]) => {
+                    membershipDeleteFilters.push(second);
+                    return { error: null };
+                  },
+                };
+              },
+            }),
+          };
+        }
+        if (table === "store_user_roles") {
+          return { delete: () => ({ eq: roleLinkDeleteEq }) };
+        }
+        throw new Error(`unexpected table ${table}`);
+      }),
+    };
+
+    const result = await removeMembership("store-1", "super-1", service);
+
+    expect(result).toEqual({ success: true });
+    expect(roleLinkDeleteEq).toHaveBeenCalledWith("store_user_id", "su-9");
+    expect(membershipDeleteFilters).toEqual([
+      ["id", "su-9"],
+      ["store_id", "store-1"],
+    ]);
   });
 });
 

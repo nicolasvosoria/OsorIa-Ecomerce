@@ -1,7 +1,7 @@
 import { getSupabaseEcommerce } from "./client";
 import { ECOMMERCE_TABLES, ECOMMERCE_VIEWS } from "./contract";
 import type { HomeSectionEntry } from "./types";
-import { getRuntimeStoreId } from "@/lib/utils/store";
+import { getRuntimeStoreId, normalizeRuntimeStoreId } from "@/lib/utils/store";
 import { resolveHomeComposition } from "@/lib/sections/home-composition";
 import { requireAdmin } from "./permissions-api";
 import { getAdminRequestHeaders } from "./admin-request-headers";
@@ -25,9 +25,16 @@ async function resolveDefaultHomeCompositionStoreId(
   return data.id as string;
 }
 
+// `storeIdOverride` lets the theme editor read the ACTIVE store's saved layout
+// (D10) instead of the host's, so reads follow the store its writes target
+// (#2345). The storefront omits it and stays host-scoped.
 async function resolveHomeCompositionStoreId(
   supabase: ReturnType<typeof getSupabaseEcommerce>,
+  storeIdOverride?: string,
 ): Promise<string | null> {
+  const overrideStoreId = normalizeRuntimeStoreId(storeIdOverride);
+  if (overrideStoreId) return overrideStoreId;
+
   const runtimeStoreId = await getRuntimeStoreId();
   if (runtimeStoreId) return runtimeStoreId;
 
@@ -38,11 +45,11 @@ async function resolveHomeCompositionStoreId(
 // resolved default composition (today's home, unchanged) when the store
 // hasn't saved a layout yet, when no store can be resolved, or when the
 // lookup itself fails.
-export async function getHomeComposition(): Promise<HomeSectionEntry[]> {
+export async function getHomeComposition(storeId?: string): Promise<HomeSectionEntry[]> {
   const supabase = getSupabaseEcommerce();
   if (!supabase) return resolveHomeComposition(null);
 
-  const resolvedStoreId = await resolveHomeCompositionStoreId(supabase);
+  const resolvedStoreId = await resolveHomeCompositionStoreId(supabase, storeId);
   if (!resolvedStoreId) return resolveHomeComposition(null);
 
   const { data, error } = await supabase

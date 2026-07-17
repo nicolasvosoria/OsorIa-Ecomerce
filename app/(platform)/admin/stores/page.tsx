@@ -6,6 +6,7 @@ import { AdminPageContainer } from "@/components/admin/page-container";
 import { AdminPageHeader } from "@/components/admin/page-header";
 import { Button } from "@/components/ui/button";
 import { authorizeSuperAdmin } from "@/lib/supabase/active-store";
+import { listStoresForUser } from "@/lib/supabase/memberships-api";
 import {
   EMPTY_TENANT_METRICS,
   getTenantMetrics,
@@ -19,7 +20,12 @@ export default async function AdminStoresPage() {
     redirect("/admin");
   }
 
-  const list = await loadTenants();
+  // "Entrar a tienda" exige membresía gestora incluso al super_admin (D3): la
+  // tabla recibe sus tiendas gestionadas y en el resto ofrece "Obtener acceso".
+  const [list, managedStores] = await Promise.all([
+    loadTenants(),
+    listStoresForUser(authorization.userId),
+  ]);
 
   return (
     <AdminPageContainer>
@@ -36,7 +42,11 @@ export default async function AdminStoresPage() {
         }
       />
 
-      <TenantsTable rows={list.state === "ready" ? list.tenants : []} state={list.state} />
+      <TenantsTable
+        rows={list.state === "ready" ? list.tenants : []}
+        state={list.state}
+        managedStoreIds={managedStores.map((store) => store.id)}
+      />
     </AdminPageContainer>
   );
 }

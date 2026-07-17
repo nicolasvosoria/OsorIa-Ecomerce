@@ -1,11 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { getSupabaseBrowserClient, getSupabaseEcommerce } from '@/lib/supabase/client'
+import { getRuntimeStoreId } from '@/lib/utils/store'
 import { mockSupabaseClient } from '../__mocks__/supabase'
 
 // Mock del cliente de Supabase
 vi.mock('@/lib/supabase/client', () => ({
   getSupabaseBrowserClient: vi.fn(),
   getSupabaseEcommerce: vi.fn(),
+}))
+
+// Mock de la resolución de tienda (D8): cada prueba fija qué tienda "resuelve"
+// el host, en vez de depender del cookie real del entorno jsdom.
+vi.mock('@/lib/utils/store', () => ({
+  getRuntimeStoreId: vi.fn(),
 }))
 
 // Mock de getUserProfile
@@ -35,6 +42,7 @@ describe('signUp - Creación de cuentas nuevas', () => {
     vi.clearAllMocks()
     vi.mocked(getSupabaseBrowserClient).mockReturnValue(mockSupabaseClient as any)
     vi.mocked(getSupabaseEcommerce).mockReturnValue(mockSupabaseClient as any)
+    vi.mocked(getRuntimeStoreId).mockResolvedValue(null)
     mockProfileLookup({
       id: 'user-123',
       email: 'test@example.com',
@@ -180,6 +188,8 @@ describe('signUp - Creación de cuentas nuevas', () => {
       error: 'Perfil no encontrado',
     })
 
+    vi.mocked(getRuntimeStoreId).mockResolvedValue('store-abc-123')
+
     // Mock de insert exitoso
     const mockInsert = vi.fn().mockReturnValue({
       error: null,
@@ -204,6 +214,45 @@ describe('signUp - Creación de cuentas nuevas', () => {
     // En este caso, el código intentará crear el perfil manualmente
     // pero como el mock no está completo, verificamos que al menos se intentó
     expect(mockSupabaseClient.auth.signUp).toHaveBeenCalled()
+    // El perfil creado manualmente carga la tienda desde la que se registró (D8)
+    expect(fromChain.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ signup_store_id: 'store-abc-123' })
+    )
+  })
+
+  it('debe registrar signup_store_id null cuando no hay tienda resuelta (host admin o sin store real)', async () => {
+    const mockUser = {
+      id: 'user-no-store',
+      email: 'sin-tienda@example.com',
+    }
+
+    vi.mocked(mockSupabaseClient.auth.signUp).mockResolvedValue({
+      data: {
+        user: mockUser,
+        session: { user: mockUser, access_token: 'token' },
+      },
+      error: null,
+    })
+
+    vi.mocked(authApi.getUserProfile).mockResolvedValue({
+      success: false,
+      error: 'Perfil no encontrado',
+    })
+
+    // Sin host resoluble (o el placeholder 'default'), getRuntimeStoreId ya lo
+    // normaliza a null: nunca debe grabarse un store_id inventado.
+    vi.mocked(getRuntimeStoreId).mockResolvedValue(null)
+
+    const fromChain = {
+      insert: vi.fn().mockResolvedValue({ error: null }),
+    }
+    vi.mocked(mockSupabaseClient.from).mockReturnValue(fromChain as any)
+
+    await signUp('sin-tienda@example.com', 'password123')
+
+    expect(fromChain.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ signup_store_id: null })
+    )
   })
 
   it('debe retornar emailSent cuando no hay sesión (confirmación requerida)', async () => {

@@ -9,7 +9,7 @@
 // exercises orchestration only, not the section design/content UI (covered
 // elsewhere).
 
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -17,10 +17,26 @@ import { ThemeCustomEditor } from "@/components/theme/theme-custom-editor";
 import { THEME_PREVIEW_SELECT_SOURCE } from "@/lib/theme-font/preview-mode";
 import type { ThemeColors, ThemeDefinition } from "@/lib/types/theme";
 
-const { changeThemeCustom, changePairing, updateComponentStyle } = vi.hoisted(() => ({
+const ACTIVE_STORE_ID = "store-active";
+
+const {
+  changeThemeCustom,
+  changePairing,
+  updateComponentStyle,
+  getComponentStyles,
+  getActiveTheme,
+  getHomeComposition,
+  updateHomeComposition,
+  useAdminActiveStoreId,
+} = vi.hoisted(() => ({
   changeThemeCustom: vi.fn(),
   changePairing: vi.fn(),
   updateComponentStyle: vi.fn(),
+  getComponentStyles: vi.fn(),
+  getActiveTheme: vi.fn(),
+  getHomeComposition: vi.fn(),
+  updateHomeComposition: vi.fn(),
+  useAdminActiveStoreId: vi.fn(),
 }));
 
 const fakeColors: ThemeColors = {
@@ -80,15 +96,22 @@ vi.mock("@/contexts/font-context", () => ({
   useFont: () => ({ pairings: [], changePairing }),
 }));
 
-vi.mock("@/contexts/styles-context", () => ({
-  useStyles: () => ({
-    styles: new Map([["hero", heroPersistedStyles]]),
-    refreshStyles: vi.fn(),
-  }),
+vi.mock("@/contexts/admin-active-store-context", () => ({
+  useAdminActiveStoreId,
 }));
 
 vi.mock("@/lib/supabase/styles-api", () => ({
+  getComponentStyles,
   updateComponentStyle,
+}));
+
+vi.mock("@/lib/supabase/themes-api", () => ({
+  getActiveTheme,
+}));
+
+vi.mock("@/lib/supabase/home-composition-api", () => ({
+  getHomeComposition,
+  updateHomeComposition,
 }));
 
 // Sidebar tabs are irrelevant to publish orchestration; stub them out so
@@ -137,8 +160,21 @@ function selectHeroSection() {
 describe("ThemeCustomEditor handleApply (D16 unified publish)", () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    updateComponentStyle.mockResolvedValue(undefined);
     heroPersistedStyles = { title: "Título guardado", keepMe: "unchanged" };
+    updateComponentStyle.mockResolvedValue(undefined);
+    useAdminActiveStoreId.mockReturnValue(ACTIVE_STORE_ID);
+    getActiveTheme.mockResolvedValue(activeTheme);
+    getComponentStyles.mockImplementation(async () => [
+      {
+        id: "style-hero",
+        component_name: "hero",
+        store_id: ACTIVE_STORE_ID,
+        variables: heroPersistedStyles,
+        updated_at: "2026-01-01T00:00:00.000Z",
+      },
+    ]);
+    getHomeComposition.mockResolvedValue([]);
+    updateHomeComposition.mockResolvedValue([]);
   });
 
   it("writes staged content merged over persisted variables BEFORE publishing the theme", async () => {
@@ -198,5 +234,21 @@ describe("ThemeCustomEditor handleApply (D16 unified publish)", () => {
       keepMe: "unchanged",
     });
     expect(await screen.findByText("No se pudo publicar el diseño")).toBeInTheDocument();
+  });
+
+  // #2345 regression: reads once followed the host while writes followed the
+  // active store, so editing from store A's subdomain with store B active would
+  // overwrite B with A's data. All three editor reads must now take the active
+  // store id, matching where the writes go.
+  it("reads theme, styles, and home composition from the ACTIVE store, not the host (#2345)", async () => {
+    useAdminActiveStoreId.mockReturnValue("store-b");
+
+    render(<ThemeCustomEditor />);
+
+    await waitFor(() => {
+      expect(getActiveTheme).toHaveBeenCalledWith("store-b");
+      expect(getComponentStyles).toHaveBeenCalledWith("store-b");
+      expect(getHomeComposition).toHaveBeenCalledWith("store-b");
+    });
   });
 });

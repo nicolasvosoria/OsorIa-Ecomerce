@@ -29,7 +29,6 @@ const ADMIN_ROUTES: Record<string, AdminRoute> = {
   "/admin/chatbot": { kind: "static", label: "Chatbot" },
   "/admin/home-discount-popup": { kind: "static", label: "Popup" },
   "/admin/settings": { kind: "static", label: "Configuración" },
-  "/admin/stores": { kind: "static", label: "Tiendas" },
 }
 
 const DYNAMIC_ROUTE_PATTERNS = Object.keys(ADMIN_ROUTES).filter((pattern) =>

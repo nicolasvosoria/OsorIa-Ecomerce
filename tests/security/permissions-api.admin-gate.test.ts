@@ -47,11 +47,11 @@ describe("isCurrentUserAdmin", () => {
     await expect(isCurrentUserAdmin()).resolves.toBe(false)
   })
 
-  it("admits a global admin that manages no store", async () => {
+  it("keeps out the retired global 'admin' role when it manages no store", async () => {
     profileRole("admin")
     managesAnyStore(false)
 
-    await expect(isCurrentUserAdmin()).resolves.toBe(true)
+    await expect(isCurrentUserAdmin()).resolves.toBe(false)
   })
 
   it("admits a global super_admin that manages no store", async () => {

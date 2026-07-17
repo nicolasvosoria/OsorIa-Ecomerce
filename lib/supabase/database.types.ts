@@ -1912,6 +1912,7 @@ export type Database = {
       store_users: {
         Row: {
           created_at: string | null
+          granted_by: string | null
           id: string
           store_id: string
           updated_at: string | null
@@ -1919,6 +1920,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          granted_by?: string | null
           id?: string
           store_id: string
           updated_at?: string | null
@@ -1926,12 +1928,20 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          granted_by?: string | null
           id?: string
           store_id?: string
           updated_at?: string | null
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "store_users_granted_by_fkey"
+            columns: ["granted_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "store_users_store_id_fkey"
             columns: ["store_id"]
@@ -2003,6 +2013,7 @@ export type Database = {
           last_name: string | null
           must_change_password: boolean
           role: string
+          signup_store_id: string | null
           updated_at: string | null
         }
         Insert: {
@@ -2013,6 +2024,7 @@ export type Database = {
           last_name?: string | null
           must_change_password?: boolean
           role?: string
+          signup_store_id?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -2023,9 +2035,25 @@ export type Database = {
           last_name?: string | null
           must_change_password?: boolean
           role?: string
+          signup_store_id?: string | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_profiles_signup_store_id_fkey"
+            columns: ["signup_store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_profiles_signup_store_id_fkey"
+            columns: ["signup_store_id"]
+            isOneToOne: false
+            referencedRelation: "stores_legacy"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

@@ -2,6 +2,7 @@ import type { UserProfile, AuthResult } from '@/lib/types/user'
 import { getSupabaseBrowserClient, getSupabaseEcommerce } from './client'
 import { ECOMMERCE_TABLES } from './contract'
 import { getUrl } from '@/lib/utils/url'
+import { getRuntimeStoreId } from '@/lib/utils/store'
 
 // Helper para manejar timeouts
 async function withTimeout<T>(
@@ -73,6 +74,12 @@ export async function signUp(
       } else {
         const profilesClient = getSupabaseEcommerce()
         if (profilesClient) {
+          // The store this profile is born in: the storefront the user is
+          // registering ON, resolved by host (D8). getRuntimeStoreId() already
+          // collapses the "no real default store" placeholder to null, so a
+          // registration with no resolvable store (e.g. no host match) records
+          // no origin instead of a bogus default.
+          const signupStoreId = await getRuntimeStoreId()
           const { error: insertError } = await profilesClient
             .from(ECOMMERCE_TABLES.userProfiles)
             .insert({
@@ -80,6 +87,7 @@ export async function signUp(
               email: data.user!.email || email,
               first_name: firstName || null,
               last_name: lastName || null,
+              signup_store_id: signupStoreId,
             })
           if (!insertError) {
             userProfile = {

@@ -3,6 +3,8 @@ import nextTypescript from "eslint-config-next/typescript";
 import prettierConfig from "eslint-config-prettier";
 
 const eslintConfig = [
+  // Worktrees de sesiones paralelas viven bajo .claude/; no son código del repo.
+  { ignores: [".claude/**"] },
   ...nextCoreWebVitals,
   ...nextTypescript,
   prettierConfig,

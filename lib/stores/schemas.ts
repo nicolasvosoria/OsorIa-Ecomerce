@@ -47,3 +47,13 @@ export const createStoreSchema = z.object({
 })
 
 export type CreateStoreFormValues = z.infer<typeof createStoreSchema>
+
+// D7(b): the platform console can edit a tenant's name and currency, never its
+// subdomain — reusing the field validators above keeps both forms behind the
+// exact same rules instead of redefining them.
+export const updateTenantSettingsSchema = createStoreSchema.pick({
+  storeName: true,
+  currencyCode: true,
+})
+
+export type UpdateTenantSettingsValues = z.infer<typeof updateTenantSettingsSchema>

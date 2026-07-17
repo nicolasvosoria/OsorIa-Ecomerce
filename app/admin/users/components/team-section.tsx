@@ -51,9 +51,16 @@ function buildColumns(currentUserId: string): Column<StoreMember>[] {
     {
       key: "member",
       header: "Miembro",
+      // La membresía que un super_admin se autoasignó (D2) se declara aquí:
+      // el dueño la ve como cualquier fila de su equipo, nunca como acceso oculto.
       cell: (member) => (
         <div>
-          <div className="font-medium">{member.name}</div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-medium">{member.name}</span>
+            {member.isSupportAccess ? (
+              <Badge variant="outline">Acceso de soporte</Badge>
+            ) : null}
+          </div>
           <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
             <Mail className="h-3.5 w-3.5" />
             <span>{member.email}</span>

@@ -14,7 +14,7 @@ import { FormField } from "@/components/ui/form-field"
 import { Input } from "@/components/ui/input"
 import { TempPasswordReveal } from "@/components/admin/temp-password-reveal"
 import { createStoreSchema, type CreateStoreFormValues } from "@/lib/stores/schemas"
-import { createTenantAction } from "@/app/admin/stores/actions"
+import { createTenantAction } from "@/app/(platform)/admin/stores/actions"
 
 const STORES_PATH = "/admin/stores"
 

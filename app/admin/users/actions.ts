@@ -2,20 +2,16 @@
 
 import { revalidatePath } from "next/cache"
 
-import {
-  authorizeActiveStoreAdmin,
-  authorizeSuperAdmin,
-} from "@/lib/supabase/active-store"
+import { authorizeActiveStoreAdmin } from "@/lib/supabase/active-store"
 import {
   addStoreMember,
   findUserIdByEmail,
   removeMembership,
-  setUserGlobalRole,
   upsertMembershipRole,
   type AddStoreMemberResult,
   type MembershipResult,
 } from "@/lib/supabase/memberships-api"
-import { isGlobalRoleName, isStoreRoleName } from "@/lib/memberships/roles"
+import { isStoreRoleName } from "@/lib/memberships/roles"
 
 const USERS_PATH = "/admin/users"
 const SELF_ROLE_CHANGE_ERROR = "No puedes cambiar tu propio rol"
@@ -92,31 +88,6 @@ export async function removeMembershipAction(userId: string): Promise<Membership
 
   const { supabase, storeId } = authorization
   const result = await removeMembership(storeId, userId, supabase)
-  if (result.success) {
-    revalidatePath(USERS_PATH)
-  }
-
-  return result
-}
-
-export async function setUserGlobalRoleAction(
-  userId: string,
-  role: string,
-): Promise<MembershipResult> {
-  const authorization = await authorizeSuperAdmin()
-  if ("error" in authorization) {
-    return { success: false, error: authorization.error }
-  }
-
-  if (!isGlobalRoleName(role)) {
-    return { success: false, error: "Rol no válido" }
-  }
-
-  if (userId === authorization.userId && role !== "super_admin") {
-    return { success: false, error: "No puedes quitarte a ti mismo el rol de super_admin" }
-  }
-
-  const result = await setUserGlobalRole(userId, role, authorization.supabase)
   if (result.success) {
     revalidatePath(USERS_PATH)
   }

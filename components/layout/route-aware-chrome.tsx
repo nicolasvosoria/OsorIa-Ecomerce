@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation"
 import { EditableWrapper } from "@/components/admin/editable-wrapper"
 import { MainContentWrapper } from "@/components/admin/main-content-wrapper"
 import { isRouteOrDescendant } from "@/lib/admin/routes"
+import { isPlatformAdminHost } from "@/lib/utils/store-host"
 import { FloatingContactButton } from "@/components/ui/floating-contact-button"
 import { Header } from "@/components/layout/header"
 import { FooterNew } from "@/components/sections/footer-new"
@@ -27,7 +28,12 @@ export function isAdminChromeRoute(pathname: string | null): boolean {
 export function RouteAwareChrome({ children }: RouteAwareChromeProps) {
   const pathname = usePathname()
   const hasHydrated = useHasHydrated()
-  const isStorefrontRoute = hasHydrated && !isAdminChromeRoute(pathname)
+  // El host admin (Plan 12) no tiene storefront: allí el proxy sirve la consola
+  // bajo rutas limpias (/, /create), así que el pathname no delata al admin y el
+  // host — que solo se conoce en el cliente, igual que este chrome, pospuesto ya
+  // a la hidratación — es lo que aparta el header y footer de tienda.
+  const isStorefrontHost = hasHydrated && !isPlatformAdminHost(window.location.host)
+  const isStorefrontRoute = isStorefrontHost && !isAdminChromeRoute(pathname)
   // The header and footer stay selectable inside the preview iframe (they reuse
   // the same `EditableWrapper`), while the rest of the storefront chrome — the
   // contact button — is edit-mode-only UI that has no place inside the customizer preview.

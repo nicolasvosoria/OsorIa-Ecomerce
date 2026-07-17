@@ -3,14 +3,9 @@ import userEvent from "@testing-library/user-event"
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
 
 let mockedPathname = "/admin"
-let mockedIsSuperAdmin = false
 
 vi.mock("next/navigation", () => ({
   usePathname: () => mockedPathname,
-}))
-
-vi.mock("@/contexts/admin-permissions-context", () => ({
-  useAdminPermissions: () => ({ isSuperAdmin: mockedIsSuperAdmin }),
 }))
 
 import { AdminSidebar } from "@/components/admin/shell/admin-sidebar"
@@ -63,7 +58,6 @@ beforeAll(() => {
 
 beforeEach(() => {
   mockedPathname = "/admin"
-  mockedIsSuperAdmin = false
 })
 
 describe("AdminSidebar highlight", () => {
@@ -113,22 +107,12 @@ describe("AdminSidebar highlight", () => {
     expect(activeNavLabel()).toBe(null)
   })
 
-  it("hides the stores entry from a plain admin and shows it to a super admin", () => {
-    const { unmount } = render(
-      <SidebarProvider>
-        <AdminSidebar />
-      </SidebarProvider>,
-    )
-    expect(screen.queryByRole("link", { name: "Tiendas" })).not.toBeInTheDocument()
-    unmount()
+  // La consola de plataforma (Plan 12) vive en su propio host: el sidebar de
+  // tienda no la enlaza para nadie, ni siquiera para un super admin.
+  it("never offers a stores entry, the platform console lives on its own host", () => {
+    renderSidebar()
 
-    mockedIsSuperAdmin = true
-    render(
-      <SidebarProvider>
-        <AdminSidebar />
-      </SidebarProvider>,
-    )
-    expect(screen.getByRole("link", { name: "Tiendas" })).toBeInTheDocument()
+    expect(screen.queryByRole("link", { name: "Tiendas" })).not.toBeInTheDocument()
   })
 })
 

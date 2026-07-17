@@ -1,26 +1,21 @@
 import { describe, expect, it } from "vitest"
-import { canAccessAdmin, isAdminRole } from "@/lib/memberships/roles"
+import { canAccessAdmin, isSuperAdminRole } from "@/lib/memberships/roles"
 
-describe("isAdminRole", () => {
-  it("treats 'admin' as an admin, case-insensitively", () => {
-    expect(isAdminRole("admin")).toBe(true)
-    expect(isAdminRole("ADMIN")).toBe(true)
-    expect(isAdminRole("Admin")).toBe(true)
+describe("isSuperAdminRole", () => {
+  it("treats 'super_admin' as super admin, case-insensitively", () => {
+    expect(isSuperAdminRole("super_admin")).toBe(true)
+    expect(isSuperAdminRole("SUPER_ADMIN")).toBe(true)
+    expect(isSuperAdminRole("Super_Admin")).toBe(true)
   })
 
-  it("treats 'super_admin' as an admin, case-insensitively", () => {
-    expect(isAdminRole("super_admin")).toBe(true)
-    expect(isAdminRole("SUPER_ADMIN")).toBe(true)
-    expect(isAdminRole("Super_Admin")).toBe(true)
-  })
-
-  it("rejects 'user', null, undefined, and garbage values", () => {
-    expect(isAdminRole("user")).toBe(false)
-    expect(isAdminRole(null)).toBe(false)
-    expect(isAdminRole(undefined)).toBe(false)
-    expect(isAdminRole(123)).toBe(false)
-    expect(isAdminRole({})).toBe(false)
-    expect(isAdminRole("")).toBe(false)
+  it("rejects the retired 'admin' role along with 'user' and garbage values", () => {
+    expect(isSuperAdminRole("admin")).toBe(false)
+    expect(isSuperAdminRole("user")).toBe(false)
+    expect(isSuperAdminRole(null)).toBe(false)
+    expect(isSuperAdminRole(undefined)).toBe(false)
+    expect(isSuperAdminRole(123)).toBe(false)
+    expect(isSuperAdminRole({})).toBe(false)
+    expect(isSuperAdminRole("")).toBe(false)
   })
 })
 
@@ -34,8 +29,14 @@ describe("canAccessAdmin", () => {
     expect(canAccessAdmin({ globalRole: null, managesAnyStore: false })).toBe(false)
   })
 
-  it("admits global admins and super_admins with no membership", () => {
-    expect(canAccessAdmin({ globalRole: "admin", managesAnyStore: false })).toBe(true)
+  // Without the role pass, a super_admin with no memberships could never reach
+  // his own console behind the admin-host proxy gate.
+  it("admits a super_admin with no membership by role", () => {
     expect(canAccessAdmin({ globalRole: "super_admin", managesAnyStore: false })).toBe(true)
+  })
+
+  it("no longer honors the retired global 'admin' role without membership", () => {
+    expect(canAccessAdmin({ globalRole: "admin", managesAnyStore: false })).toBe(false)
+    expect(canAccessAdmin({ globalRole: "admin", managesAnyStore: true })).toBe(true)
   })
 })

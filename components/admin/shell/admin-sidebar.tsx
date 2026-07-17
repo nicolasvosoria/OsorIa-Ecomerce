@@ -11,12 +11,10 @@ import {
   Palette,
   Settings,
   ShoppingBag,
-  Store,
   Users,
   type LucideIcon,
 } from "lucide-react"
 
-import { useAdminPermissions } from "@/contexts/admin-permissions-context"
 import { isRouteOrDescendant } from "@/lib/admin/routes"
 import {
   Sidebar,
@@ -36,7 +34,9 @@ interface AdminNavItem {
   icon: LucideIcon
 }
 
-const BASE_NAV_ITEMS: AdminNavItem[] = [
+// Solo secciones de la tienda activa: la consola de plataforma (Plan 12) vive
+// en su propio host y no se navega desde este sidebar.
+const NAV_ITEMS: AdminNavItem[] = [
   { label: "Dashboard", href: "/admin", icon: LayoutDashboard },
   { label: "Pedidos", href: "/admin/orders", icon: ShoppingBag },
   { label: "Productos", href: "/admin/products", icon: Package },
@@ -47,9 +47,6 @@ const BASE_NAV_ITEMS: AdminNavItem[] = [
   { label: "Editor de tema", href: "/admin/theme", icon: Palette },
   { label: "Configuración", href: "/admin/settings", icon: Settings },
 ]
-
-const SUPER_ADMIN_NAV_ITEM: AdminNavItem = { label: "Tiendas", href: "/admin/stores", icon: Store }
-const ALL_NAV_ITEMS = [...BASE_NAV_ITEMS, SUPER_ADMIN_NAV_ITEM]
 
 export function AdminSidebar() {
   return (
@@ -71,10 +68,8 @@ export function AdminSidebar() {
 
 function AdminNavList() {
   const pathname = usePathname() ?? ""
-  const { isSuperAdmin } = useAdminPermissions()
   const { isMobile, setOpenMobile } = useSidebar()
-  const items = isSuperAdmin ? ALL_NAV_ITEMS : BASE_NAV_ITEMS
-  const activeHref = activeNavHref(pathname, items)
+  const activeHref = activeNavHref(pathname, NAV_ITEMS)
 
   const closeDrawerOnMobile = () => {
     if (isMobile) setOpenMobile(false)
@@ -82,7 +77,7 @@ function AdminNavList() {
 
   return (
     <SidebarMenu>
-      {items.map(({ label, href, icon: Icon }) => (
+      {NAV_ITEMS.map(({ label, href, icon: Icon }) => (
         <SidebarMenuItem key={href}>
           <SidebarMenuButton asChild isActive={activeHref === href} tooltip={label}>
             <Link

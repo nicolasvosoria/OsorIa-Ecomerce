@@ -58,14 +58,14 @@ on conflict (store_user_id, role_id) do nothing;
 
 -- One admin per store. Nothing creates ecommerce.user_profiles for these accounts: the only
 -- trigger on auth.users belongs to another app sharing this project, so the profile is seeded here.
--- The global role must be 'admin', not 'user': 'admin' is what opens /admin (isAdminRole), while
--- can_user_manage_store grants its ambient all-stores shortcut only to a strict 'super_admin'.
--- So an 'admin' falls through to the membership branch below and reaches its own store alone.
+-- The global role stays 'user' — the global 'admin' role no longer exists: /admin opens by
+-- managing membership (can_user_manage_store), so each account reaches its own store alone
+-- through the 'owner' membership seeded below.
 
 insert into ecommerce.user_profiles (id, email, role)
 values
-  ('90e1f83c-7b56-4a35-a52e-662456c5c766'::uuid, 'default@gmail.com', 'admin'),
-  ('511a1d0b-0612-45bf-ac81-4e41e57a2f12'::uuid, 'tienda2@gmail.com', 'admin')
+  ('90e1f83c-7b56-4a35-a52e-662456c5c766'::uuid, 'default@gmail.com', 'user'),
+  ('511a1d0b-0612-45bf-ac81-4e41e57a2f12'::uuid, 'tienda2@gmail.com', 'user')
 on conflict (id) do nothing;
 
 insert into ecommerce.roles (store_id, role_name, is_system)

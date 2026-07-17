@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation"
 import { useTheme } from "@/contexts/theme-context"
 import { useMode } from "@/contexts/mode-context"
 import { useFont } from "@/contexts/font-context"
-import { useStyles } from "@/contexts/styles-context"
+import { useAdminActiveStoreId } from "@/contexts/admin-active-store-context"
 import type { AppTheme, ThemeColors, ThemeDefinition, ThemeMode } from "@/lib/types/theme"
 import type { AppFontPairing } from "@/lib/types/font"
 import { resolveThemeDefinition } from "@/lib/theme-font/theme-presets"
@@ -20,7 +20,8 @@ import {
   parseThemePreviewSelectMessage,
 } from "@/lib/theme-font/preview-mode"
 import { deferStateUpdate } from "@/lib/react/defer-state-update"
-import { updateComponentStyle } from "@/lib/supabase/styles-api"
+import { getComponentStyles, updateComponentStyle } from "@/lib/supabase/styles-api"
+import { getActiveTheme } from "@/lib/supabase/themes-api"
 import { getHomeComposition, updateHomeComposition } from "@/lib/supabase/home-composition-api"
 import type { HomeSectionEntry } from "@/lib/supabase/types"
 import {
@@ -115,10 +116,13 @@ function buildPreviewRuntimeTheme(definition: ThemeDefinition): RuntimeTheme {
 }
 
 export function ThemeCustomEditor() {
-  const { themes, activeTheme, loading, changeThemeCustom, revertToVersion } = useTheme()
+  // `themes` is the shared preset catalog (store-agnostic); the store-scoped
+  // reads below take the ACTIVE store instead of the host so the editor shows
+  // and merges the same store its writes target (D10, #2345).
+  const { themes, loading: catalogLoading, changeThemeCustom, revertToVersion } = useTheme()
   const { isDark } = useMode()
   const { pairings, changePairing } = useFont()
-  const { styles: globalStyles } = useStyles()
+  const activeStoreId = useAdminActiveStoreId()
   const iframeRef = useRef<HTMLIFrameElement>(null)
 
   const [selectedBaseName, setSelectedBaseName] = useState<string | null>(null)
@@ -144,12 +148,44 @@ export function ThemeCustomEditor() {
   // to it and a successful `handleApply` advances it to the saved value.
   const [workingComposition, setWorkingComposition] = useState<HomeSectionEntry[]>([])
   const [compositionBaseline, setCompositionBaseline] = useState<HomeSectionEntry[]>([])
+  // The active store's published design (base theme + persisted component
+  // styles), read for `activeStoreId` — the same store `handleApply` writes to.
+  const [activeStoreTheme, setActiveStoreTheme] = useState<AppTheme | null>(null)
+  const [activeStoreStyles, setActiveStoreStyles] =
+    useState<Map<string, Record<string, any>>>(new Map())
+  const [designLoading, setDesignLoading] = useState(true)
 
-  // Load the store's saved composition once on mount so the Secciones tab
-  // starts from what's actually published, not from the composable defaults.
+  const loading = catalogLoading || designLoading
+
+  const fetchActiveStoreDesign = useCallback(async () => {
+    const [theme, styles] = await Promise.all([
+      getActiveTheme(activeStoreId),
+      getComponentStyles(activeStoreId),
+    ])
+    return {
+      theme,
+      styles: new Map(styles.map((style) => [style.component_name, style.variables])),
+    }
+  }, [activeStoreId])
+
   useEffect(() => {
     let cancelled = false
-    getHomeComposition().then((composition) => {
+    fetchActiveStoreDesign().then(({ theme, styles }) => {
+      if (cancelled) return
+      setActiveStoreTheme(theme)
+      setActiveStoreStyles(styles)
+      setDesignLoading(false)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [fetchActiveStoreDesign])
+
+  // Load the store's saved composition on mount so the Secciones tab starts from
+  // what's actually published for the ACTIVE store, not the composable defaults.
+  useEffect(() => {
+    let cancelled = false
+    getHomeComposition(activeStoreId).then((composition) => {
       if (cancelled) return
       setWorkingComposition(composition)
       setCompositionBaseline(composition)
@@ -157,21 +193,21 @@ export function ThemeCustomEditor() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [activeStoreId])
 
   // Seed the working definition once the base list resolves: defaults to the
-  // store's currently active theme, falling back to the first preset.
+  // active store's currently published theme, falling back to the first preset.
   useEffect(() => {
     if (selectedBaseName || loading || themes.length === 0) return
 
-    const defaultBase = activeTheme ?? themes[0]
+    const defaultBase = activeStoreTheme ?? themes[0]
     const baseDefinition = resolveBaseDefinition(defaultBase)
     deferStateUpdate(() => {
       setSelectedBaseName(defaultBase.theme_name)
       setWorkingDefinition(baseDefinition)
       setSelectedPairingId(pairingIdFromDefinition(baseDefinition.fontPairingId))
     })
-  }, [activeTheme, loading, themes, selectedBaseName])
+  }, [activeStoreTheme, loading, themes, selectedBaseName])
 
   const handleSelectBase = useCallback(
     (themeName: string) => {
@@ -192,7 +228,7 @@ export function ThemeCustomEditor() {
     // Discard undoes EVERYTHING unpublished — including a base switch made
     // while exploring — so it must revert to the real active base (persisted
     // in DB), not merely to whichever base the selector currently shows.
-    const activeBase = activeTheme ?? themes[0]
+    const activeBase = activeStoreTheme ?? themes[0]
     if (!activeBase) return
     const baseDefinition = resolveBaseDefinition(activeBase)
     setSelectedBaseName(activeBase.theme_name)
@@ -205,7 +241,7 @@ export function ThemeCustomEditor() {
     // iframe had received; onLoad re-posts the theme (content starts empty,
     // so the preview falls back to the real saved content — no ghost edits).
     iframeRef.current?.contentWindow?.location.reload()
-  }, [activeTheme, themes, compositionBaseline])
+  }, [activeStoreTheme, themes, compositionBaseline])
 
   const updateDefinition = useCallback((updater: DefinitionUpdater) => {
     setWorkingDefinition((prev) => (prev ? updater(prev) : prev))
@@ -401,7 +437,7 @@ export function ThemeCustomEditor() {
       for (const [componentName, edits] of Object.entries(workingContent)) {
         // Merge over the CURRENT persisted variables so untouched keys for
         // that component survive.
-        const mergedContent = { ...(globalStyles.get(componentName) ?? {}), ...edits }
+        const mergedContent = { ...(activeStoreStyles.get(componentName) ?? {}), ...edits }
         try {
           await updateComponentStyle(componentName, mergedContent)
         } catch (err) {
@@ -435,11 +471,14 @@ export function ThemeCustomEditor() {
         setHistoryRefreshToken((token) => token + 1)
         setWorkingContent({})
         setDirty(false)
-        // Content is already persisted (written above) and changeThemeCustom's
-        // finalizeThemeActivation already refreshed the styles baseline; a
-        // reload drops the iframe's ephemeral componentEdits overlay so the
-        // preview shows exactly the saved state, not a stale staged overlay
-        // (mirrors handleDiscard's reload).
+        // Re-read the active store's persisted design so the section panels show
+        // the values just saved (the global styles context tracks the host, not
+        // this store). A reload then drops the iframe's ephemeral componentEdits
+        // overlay so the preview shows exactly the saved state, not a stale
+        // staged overlay (mirrors handleDiscard's reload).
+        const { theme, styles } = await fetchActiveStoreDesign()
+        setActiveStoreTheme(theme)
+        setActiveStoreStyles(styles)
         iframeRef.current?.contentWindow?.location.reload()
       }
 
@@ -461,12 +500,13 @@ export function ThemeCustomEditor() {
     selectedBaseName,
     applying,
     workingContent,
-    globalStyles,
+    activeStoreStyles,
     workingComposition,
     compositionBaseline,
     changeThemeCustom,
     selectedPairing,
     changePairing,
+    fetchActiveStoreDesign,
   ])
 
   // Clear the publish result once the user edits again, so a stale "publicado"
@@ -508,7 +548,7 @@ export function ThemeCustomEditor() {
             onSelectPairing={handleSelectPairing}
             selectedSection={selectedSection}
             onBackToGeneral={handleBackToGeneral}
-            persistedContent={selectedSection ? globalStyles.get(selectedSection) ?? {} : {}}
+            persistedContent={selectedSection ? activeStoreStyles.get(selectedSection) ?? {} : {}}
             stagedContent={selectedSection ? workingContent[selectedSection] ?? {} : {}}
             onContentFieldChange={handleSectionContentChange}
             sectionEntries={workingComposition}

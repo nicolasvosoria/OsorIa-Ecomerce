@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs"
 import { describe, expect, it } from "vitest"
 
-const ADMIN_ROOTS = ["app/admin", "components/admin"]
+const ADMIN_ROOTS = ["app/admin", "app/(platform)/admin", "components/admin"]
 const CHROME_CLASS = "editor-chrome"
 
 // Estos primitivos de Radix montan su contenido en un portal colgado del <body>,

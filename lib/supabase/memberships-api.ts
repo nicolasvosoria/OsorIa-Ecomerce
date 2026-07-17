@@ -3,7 +3,7 @@ import { randomBytes } from "node:crypto";
 import { getSupabaseServiceClient } from "./admin-store";
 import { getServiceAuthAdminClient } from "./service-client";
 import { ECOMMERCE_TABLES } from "./contract";
-import { isStoreRoleName, isSuperAdminRole, type StoreRoleName } from "@/lib/memberships/roles";
+import { isStoreRoleName, type StoreRoleName } from "@/lib/memberships/roles";
 import type { UserRole } from "@/lib/types/user";
 
 export type StoreSummary = {
@@ -17,6 +17,10 @@ export type StoreMember = {
   email: string;
   name: string;
   role: StoreRoleName | null;
+  // True when the membership carries granted_by: today only the super_admin
+  // support self-grant writes that column (D2), so the owner's team table can
+  // honestly label the row as support access.
+  isSupportAccess: boolean;
 };
 
 export type MembershipResult = { success: boolean; error?: string };
@@ -37,59 +41,48 @@ export type EnsurePlatformUserResult =
   | { userId: string; created: false }
   | { userId: string; created: true; tempPassword: string };
 
+// A reset must hand the temp password to the operator even when the flag write
+// fails after the password already changed — throwing it away would lock the
+// owner behind a credential nobody knows. That half-applied case stays on the
+// success arm, with `flagWarning` naming exactly what did and did not happen.
+export type ResetOwnerCredentialResult =
+  | { success: true; tempPassword: string; ownerEmail: string; flagWarning: string | null }
+  | { success: false; error: string };
+
 type PlatformUserNames = { firstName?: string; lastName?: string };
 
 const FOREIGN_PLATFORM_ACCOUNT_ERROR =
   "Ese correo ya pertenece a una cuenta de la plataforma pero no del ecommerce. Usa otro correo.";
 
-// Stores a user can act as admin for: every store for a super_admin/global
-// admin, otherwise only the stores they hold a store_users membership in.
+type StoreRoleLinks = { roles: { role_name: string } | null }[] | null;
+
+type ManagedMembershipRow = {
+  store_id: string;
+  store_user_roles: StoreRoleLinks;
+};
+
+// Stores a user can act as admin for: only those where they hold a managing
+// membership ('owner'/'admin'), mirroring ecommerce.can_user_manage_store —
+// a super_admin with no memberships gets none, and a store_users row without a
+// managing role does not count.
 export async function listStoresForUser(userId: string): Promise<StoreSummary[]> {
   const service = getSupabaseServiceClient();
   if (!service) {
     return [];
   }
 
-  return (await isGlobalAdmin(service, userId))
-    ? listAllStores(service)
-    : listMemberStores(service, userId);
-}
-
-async function isGlobalAdmin(service: any, userId: string): Promise<boolean> {
-  const { data } = await service
-    .from(ECOMMERCE_TABLES.userProfiles)
-    .select("role")
-    .eq("id", userId)
-    .single();
-
-  return isSuperAdminRole(data?.role);
-}
-
-async function listAllStores(service: any): Promise<StoreSummary[]> {
-  const { data, error } = await service
-    .from(ECOMMERCE_TABLES.stores)
-    .select("id, store_name, subdomain")
-    .is("deleted_at", null)
-    .order("store_name");
-
-  if (error) {
-    throw new Error(`No se pudieron listar las tiendas: ${error.message}`);
-  }
-
-  return data ?? [];
-}
-
-async function listMemberStores(service: any, userId: string): Promise<StoreSummary[]> {
   const { data: memberships, error: membershipsError } = await service
     .from(ECOMMERCE_TABLES.storeUsers)
-    .select("store_id")
+    .select("store_id, store_user_roles(roles(role_name))")
     .eq("user_id", userId);
 
   if (membershipsError) {
     throw new Error(`No se pudieron listar las tiendas: ${membershipsError.message}`);
   }
 
-  const storeIds = (memberships ?? []).map((membership: { store_id: string }) => membership.store_id);
+  const storeIds = ((memberships ?? []) as ManagedMembershipRow[])
+    .filter((membership) => findManagingRole(membership.store_user_roles) !== null)
+    .map((membership) => membership.store_id);
   if (storeIds.length === 0) {
     return [];
   }
@@ -108,14 +101,19 @@ async function listMemberStores(service: any, userId: string): Promise<StoreSumm
   return data ?? [];
 }
 
+function findManagingRole(links: StoreRoleLinks): StoreRoleName | null {
+  return (links ?? []).map((link) => link.roles?.role_name).find(isStoreRoleName) ?? null;
+}
+
 type StoreUserRow = {
   user_id: string;
+  granted_by: string | null;
   user_profiles: {
     email: string;
     first_name: string | null;
     last_name: string | null;
   } | null;
-  store_user_roles: { roles: { role_name: string } | null }[] | null;
+  store_user_roles: StoreRoleLinks;
 };
 
 // The active store's team: members joined to their profile and store role.
@@ -133,7 +131,7 @@ export async function listStoreMembers(
   const { data, error } = await service
     .from(ECOMMERCE_TABLES.storeUsers)
     .select(
-      "user_id, user_profiles(email, first_name, last_name), store_user_roles(roles(role_name))",
+      "user_id, granted_by, user_profiles(email, first_name, last_name), store_user_roles(roles(role_name))",
     )
     .eq("store_id", storeId);
 
@@ -142,6 +140,18 @@ export async function listStoreMembers(
   }
 
   return (data ?? []).map(toStoreMember);
+}
+
+// The store's owner(s): the members holding the 'owner' role. The credential
+// reset targets exactly these — resolved server-side from the storeId, never
+// from a client-supplied email or userId, because auth.users is shared across
+// platform apps (#2347) and an arbitrary target could reach a foreign account.
+export async function listStoreOwners(
+  storeId: string,
+  supabaseOverride?: any,
+): Promise<StoreMember[]> {
+  const members = await listStoreMembers(storeId, supabaseOverride);
+  return members.filter((member) => member.role === "owner");
 }
 
 // Adds a member to the store by email. An email with an ecommerce profile is
@@ -276,6 +286,36 @@ async function insertInvitedProfile(
 
   if (error) {
     throw new Error(`No se pudo crear el perfil de ecommerce: ${error.message}`);
+  }
+}
+
+// The legitimate support path (D2): a super_admin self-assigns an 'admin'
+// membership (A1), recording themselves in granted_by so the owner's team table
+// shows the row as support access and the owner can revoke it like any other
+// membership. Already a member: nothing changes — the existing role (possibly
+// 'owner') and any previous granted_by stand.
+export async function grantSupportMembership(
+  storeId: string,
+  userId: string,
+  supabaseOverride?: any,
+): Promise<MembershipResult> {
+  const service = supabaseOverride ?? getSupabaseServiceClient();
+  if (!service) {
+    return { success: false, error: "Supabase no configurado" };
+  }
+
+  try {
+    const existingMembership = await findStoreUserId(service, storeId, userId);
+    if (existingMembership) {
+      return { success: true };
+    }
+
+    const storeUserId = await ensureStoreUser(service, storeId, userId, { grantedBy: userId });
+    const roleId = await resolveStoreRoleId(service, storeId, "admin");
+    await assignSingleRole(service, storeUserId, roleId);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: toMembershipErrorMessage(error) };
   }
 }
 
@@ -416,17 +456,89 @@ export async function clearMustChangePassword(
   return { success: true };
 }
 
-function toStoreMember(row: StoreUserRow): StoreMember {
-  const role =
-    (row.store_user_roles ?? [])
-      .map((link) => link.roles?.role_name)
-      .find(isStoreRoleName) ?? null;
+// Support reset (D7): regenerates the store owner's password as a new temporary
+// one and re-arms the forced change, so the super_admin unlocks the owner
+// without entering the store. Ordered password-first, flag-second: a failed
+// password update changes nothing, and the flag is only ever armed for a
+// password this call actually set. The reverse order could brand a credential
+// as temporary when it never changed.
+export async function resetOwnerCredential(
+  storeId: string,
+  supabaseOverride?: any,
+): Promise<ResetOwnerCredentialResult> {
+  const service = supabaseOverride ?? getSupabaseServiceClient();
+  const authAdmin = getServiceAuthAdminClient();
+  if (!service || !authAdmin) {
+    return { success: false, error: "Supabase no configurado" };
+  }
 
+  try {
+    const owner = await resolveSingleOwner(storeId, service);
+    const tempPassword = generateTempPassword();
+    await replaceUserPassword(authAdmin, owner.userId, tempPassword);
+    const flagWarning = await armMustChangePassword(service, owner.userId);
+
+    return { success: true, tempPassword, ownerEmail: owner.email, flagWarning };
+  } catch (error) {
+    return { success: false, error: toMembershipErrorMessage(error) };
+  }
+}
+
+const NO_OWNER_ERROR =
+  "La tienda no tiene ningún miembro con rol de dueño; no hay credencial que restablecer.";
+const MULTIPLE_OWNERS_ERROR =
+  "La tienda tiene más de un dueño y esta acción solo admite uno.";
+
+async function resolveSingleOwner(storeId: string, service: any): Promise<StoreMember> {
+  const owners = await listStoreOwners(storeId, service);
+  if (owners.length === 0) {
+    throw new Error(NO_OWNER_ERROR);
+  }
+  if (owners.length > 1) {
+    throw new Error(MULTIPLE_OWNERS_ERROR);
+  }
+
+  return owners[0];
+}
+
+async function replaceUserPassword(
+  authAdmin: any,
+  userId: string,
+  password: string,
+): Promise<void> {
+  const { error } = await authAdmin.auth.admin.updateUserById(userId, { password });
+  if (error) {
+    throw new Error(`No se pudo restablecer la contraseña: ${error.message}`);
+  }
+}
+
+// Runs only after the password already changed: a failure here must NOT throw,
+// or the fresh temp password would be lost with the owner locked out behind it.
+// It comes back as a warning that tells the operator the reset DID happen.
+async function armMustChangePassword(service: any, userId: string): Promise<string | null> {
+  const { error } = await service
+    .from(ECOMMERCE_TABLES.userProfiles)
+    .update({ must_change_password: true })
+    .eq("id", userId);
+
+  if (!error) {
+    return null;
+  }
+
+  return (
+    "La contraseña sí se restableció y la anterior ya no funciona, pero no se pudo " +
+    `forzar el cambio en el próximo inicio de sesión: ${error.message}. Comparte la ` +
+    "contraseña temporal y vuelve a ejecutar el restablecimiento para forzarlo."
+  );
+}
+
+function toStoreMember(row: StoreUserRow): StoreMember {
   return {
     userId: row.user_id,
     email: row.user_profiles?.email ?? "",
     name: formatMemberName(row.user_profiles),
-    role,
+    role: findManagingRole(row.store_user_roles),
+    isSupportAccess: row.granted_by != null,
   };
 }
 
@@ -478,10 +590,13 @@ async function findStoreUserId(
   return data?.id ?? null;
 }
 
+// `grantedBy` is only ever set by the support self-grant (D2); every other
+// caller leaves the column untouched so its presence stays a truthful signal.
 async function ensureStoreUser(
   service: any,
   storeId: string,
   userId: string,
+  { grantedBy }: { grantedBy?: string } = {},
 ): Promise<string> {
   const existing = await findStoreUserId(service, storeId, userId);
   if (existing) {
@@ -490,7 +605,7 @@ async function ensureStoreUser(
 
   const { data, error } = await service
     .from(ECOMMERCE_TABLES.storeUsers)
-    .insert({ store_id: storeId, user_id: userId })
+    .insert({ store_id: storeId, user_id: userId, ...(grantedBy ? { granted_by: grantedBy } : {}) })
     .select("id")
     .single();
 

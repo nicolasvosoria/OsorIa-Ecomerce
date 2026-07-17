@@ -20,9 +20,17 @@ vi.mock("@/lib/supabase/client", () => ({
   getSupabaseBrowserClient: vi.fn(),
 }));
 
-vi.mock("@/lib/utils/store", () => ({
-  getRuntimeStoreId: vi.fn(),
-}));
+vi.mock("@/lib/utils/store", async () => {
+  const actual =
+    await vi.importActual<typeof import("@/lib/utils/store")>(
+      "@/lib/utils/store",
+    );
+
+  return {
+    ...actual,
+    getRuntimeStoreId: vi.fn(),
+  };
+});
 
 const mockedRequireAdmin = vi.mocked(requireAdmin);
 const mockedGetSupabaseBrowserClient = vi.mocked(getSupabaseBrowserClient);

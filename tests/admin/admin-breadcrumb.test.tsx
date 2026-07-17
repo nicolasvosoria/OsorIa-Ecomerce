@@ -29,8 +29,11 @@ describe("adminBreadcrumbTrail", () => {
     expect(labelsOf("/admin/products")).toEqual(["Admin", "Productos"])
   })
 
-  it("nests the super_admin stores console under the admin root", () => {
-    expect(labelsOf("/admin/stores")).toEqual(["Admin", "Tiendas"])
+  // La consola de plataforma (Plan 12) vive en su propio host con rutas limpias
+  // (/, /create): jamás se pinta bajo /admin/stores, así que no tiene entrada y
+  // el rastro nunca ofrece un enlace de vuelta al shell de tienda.
+  it("leaves the platform console out of the store admin registry", () => {
+    expect(labelsOf("/admin/stores")).toEqual(["Admin"])
   })
 
   it("nests a static child under its section", () => {

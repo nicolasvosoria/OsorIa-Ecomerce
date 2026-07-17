@@ -13,11 +13,10 @@ export const STORE_ROLE_LABELS: Record<StoreRoleName, string> = {
 
 // Global platform roles stored in user_profiles.role. Editing these is
 // super_admin-only authority, never granted by the per-store gate.
-export const GLOBAL_ROLE_NAMES = ["user", "admin", "super_admin"] as const satisfies readonly UserRole[]
+export const GLOBAL_ROLE_NAMES = ["user", "super_admin"] as const satisfies readonly UserRole[]
 
 export const GLOBAL_ROLE_LABELS: Record<UserRole, string> = {
   user: "Usuario",
-  admin: "Administrador",
   super_admin: "Super Admin",
 }
 
@@ -37,18 +36,15 @@ export function isSuperAdminRole(role: unknown): boolean {
   return normalizeRoleName(role) === "super_admin"
 }
 
-export function isAdminRole(role: unknown): boolean {
-  return normalizeRoleName(role) === "admin" || isSuperAdminRole(role)
-}
-
 // Single definition of "can enter the admin". Membership is an async question to
 // ecommerce.user_manages_any_store, so each surface fetches it over its own
-// transport (edge REST, browser client) and decides here.
+// transport (edge REST, browser client) and decides here. The super_admin passes
+// by role: without it, one with no memberships could never reach his own console.
 export type AdminAccessClaims = {
   globalRole: unknown
   managesAnyStore: boolean
 }
 
 export function canAccessAdmin({ globalRole, managesAnyStore }: AdminAccessClaims): boolean {
-  return isAdminRole(globalRole) || managesAnyStore
+  return isSuperAdminRole(globalRole) || managesAnyStore
 }

@@ -24,25 +24,28 @@ beforeEach(() => {
 })
 
 describe("StoreSwitcher with a single store", () => {
-  it("shows the store name for a plain admin instead of rendering nothing", () => {
-    render(<StoreSwitcher stores={[STORE_A]} activeStoreId={STORE_A.id} isSuperAdmin={false} />)
+  // No super-admin bypass: the switcher only ever offers managed memberships,
+  // so one store is a fact, not a dropdown.
+  it("shows the store name as a static badge instead of a dropdown", () => {
+    render(<StoreSwitcher stores={[STORE_A]} activeStoreId={STORE_A.id} />)
 
     expect(screen.getByText("Tienda A")).toBeInTheDocument()
     expect(screen.queryByRole("button")).not.toBeInTheDocument()
   })
+})
 
-  it("still renders an interactive switcher for a super admin", () => {
-    render(<StoreSwitcher stores={[STORE_A]} activeStoreId={STORE_A.id} isSuperAdmin={true} />)
+describe("StoreSwitcher with no stores", () => {
+  it("shows a neutral badge instead of an empty clickable dropdown", () => {
+    render(<StoreSwitcher stores={[]} activeStoreId="" />)
 
-    expect(screen.getByRole("button", { name: /Tienda A/ })).toBeInTheDocument()
+    expect(screen.getByText("Sin tienda asignada")).toBeInTheDocument()
+    expect(screen.queryByRole("button")).not.toBeInTheDocument()
   })
 })
 
 describe("StoreSwitcher with multiple stores", () => {
   it("marks the active store as selected in the dropdown", async () => {
-    render(
-      <StoreSwitcher stores={[STORE_A, STORE_B]} activeStoreId={STORE_A.id} isSuperAdmin={false} />,
-    )
+    render(<StoreSwitcher stores={[STORE_A, STORE_B]} activeStoreId={STORE_A.id} />)
 
     await userEvent.click(screen.getByRole("button", { name: /Tienda A/ }))
 
@@ -57,9 +60,7 @@ describe("StoreSwitcher with multiple stores", () => {
   })
 
   it("switches the active store on selection", async () => {
-    render(
-      <StoreSwitcher stores={[STORE_A, STORE_B]} activeStoreId={STORE_A.id} isSuperAdmin={false} />,
-    )
+    render(<StoreSwitcher stores={[STORE_A, STORE_B]} activeStoreId={STORE_A.id} />)
 
     await userEvent.click(screen.getByRole("button", { name: /Tienda A/ }))
     await userEvent.click(screen.getByRole("menuitemradio", { name: "Tienda B" }))

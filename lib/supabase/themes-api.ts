@@ -220,13 +220,17 @@ export async function getThemes(): Promise<AppTheme[]> {
   }
 }
 
-export async function getActiveTheme(): Promise<AppTheme | null> {
+// `storeIdOverride` lets the theme editor read the ACTIVE store's publication
+// (D10) rather than the host's, so the base it seeds matches the store its
+// writes target (#2345). The storefront omits it and stays host-scoped.
+export async function getActiveTheme(storeIdOverride?: string): Promise<AppTheme | null> {
   const supabase = getSupabaseEcommerce();
   if (!supabase) {
     return null;
   }
 
-  let storeId = normalizeRuntimeStoreId(await getStoreId());
+  let storeId =
+    normalizeRuntimeStoreId(storeIdOverride) ?? normalizeRuntimeStoreId(await getStoreId());
   if (!storeId) {
     const { data: defaultStore } = await supabase
       .from(ECOMMERCE_VIEWS.storesLegacy)

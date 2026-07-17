@@ -24,11 +24,9 @@ const STORE_NAME_CLASSNAME = "max-w-[110px] truncate sm:max-w-[160px]"
 export function StoreSwitcher({
   stores,
   activeStoreId,
-  isSuperAdmin,
 }: {
   stores: StoreSummary[]
   activeStoreId: string
-  isSuperAdmin: boolean
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -36,11 +34,13 @@ export function StoreSwitcher({
   const activeStoreName =
     stores.find((store) => store.id === activeStoreId)?.store_name ?? "Selecciona tienda"
 
-  if (stores.length <= 1 && !isSuperAdmin) {
+  if (stores.length <= 1) {
     return (
       <Badge variant="outline" className="gap-1.5 font-normal normal-case">
         <Store className="h-3.5 w-3.5" aria-hidden="true" />
-        <span className={STORE_NAME_CLASSNAME}>{activeStoreName}</span>
+        <span className={STORE_NAME_CLASSNAME}>
+          {stores[0]?.store_name ?? "Sin tienda asignada"}
+        </span>
       </Badge>
     )
   }
