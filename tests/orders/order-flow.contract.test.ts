@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { NextRequest } from "next/server";
 
 import {
   createOrder,
@@ -10,18 +9,24 @@ import {
   type CreateOrderData,
 } from "@/lib/supabase/orders-api";
 import { loadSuccessPageFallbackOrder } from "@/app/checkout/success/fallback-order";
-import { POST as postOrder } from "@/app/api/orders/route";
+import { placeCheckoutOrder } from "@/app/checkout/actions";
+import { enabledPaymentMethodIds } from "@/lib/checkout/payment-methods";
+import { checkoutOrderSchema, type CheckoutOrderInput } from "@/lib/checkout/schemas";
 
 const {
   getSupabaseEcommerceMock,
   getStoreIdMock,
   getServiceEcommerceClientMock,
   sendEmailMock,
+  getUserMock,
+  afterMock,
 } = vi.hoisted(() => ({
   getSupabaseEcommerceMock: vi.fn(),
   getStoreIdMock: vi.fn(),
   getServiceEcommerceClientMock: vi.fn(),
   sendEmailMock: vi.fn(),
+  getUserMock: vi.fn(),
+  afterMock: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase/client", () => ({
@@ -41,14 +46,20 @@ vi.mock("@/lib/supabase/service-client", () => ({
   getServiceEcommerceClient: getServiceEcommerceClientMock,
 }));
 
-vi.mock("next/headers", () => ({
-  cookies: async () => ({ get: () => undefined }),
+// La action resuelve la identidad desde la sesión por cookies (getSupabaseAuthClient)
+// y el origen del correo desde headers(); after() se captura para poder invocar
+// el callback diferido y verificar el envío fuera del camino crítico.
+vi.mock("@/lib/supabase/admin-route-auth", () => ({
+  getSupabaseAuthClient: async () => ({ auth: { getUser: getUserMock } }),
 }));
 
-vi.mock("@supabase/ssr", () => ({
-  createServerClient: () => ({
-    auth: { getUser: async () => ({ data: { user: null }, error: null }) },
-  }),
+vi.mock("next/headers", () => ({
+  headers: async () => new Headers({ host: "localhost" }),
+}));
+
+vi.mock("next/server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/server")>()),
+  after: afterMock,
 }));
 
 type ScriptedResponse = { data?: any; error?: any; count?: number };
@@ -204,11 +215,33 @@ const baseOrderData: CreateOrderData = {
   ],
 };
 
+// Payload como el que arma el checkout: solo datos del cliente, sin los campos
+// que la action fuerza (customer_type, user_id, payment_status, totales).
+const baseCheckoutInput: CheckoutOrderInput = {
+  customer_email: "buyer@example.com",
+  customer_first_name: "Ada",
+  customer_last_name: "Lovelace",
+  shipping_address: "Calle 123",
+  shipping_city: "Bogotá",
+  shipping_postal_code: "110111",
+  payment_method: "cash_on_delivery",
+  items: [
+    {
+      product_id: "store-item-1",
+      product_name: "Campera",
+      unit_price: 100000,
+      quantity: 1,
+      total_price: 100000,
+    },
+  ],
+};
+
 describe("orders-api live order contract", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getStoreIdMock.mockResolvedValue(null);
     sendEmailMock.mockResolvedValue({ success: true });
+    getUserMock.mockResolvedValue({ data: { user: null }, error: null });
   });
 
   it("creates live order graph with store_id, explicit item UUIDs, and shipping address row", async () => {
@@ -1304,7 +1337,7 @@ describe("orders-api live order contract", () => {
     expect(created?.items[0].total_price).toBe(80000);
   });
 
-  it("POST /api/orders forces payment_status=pending and a whitelisted payment_method even when the client sends inflated totals and payment_status=paid", async () => {
+  it("placeCheckoutOrder forces payment_status=pending and a whitelisted payment_method even when the client sends inflated totals and payment_status=paid", async () => {
     const state = new MockSupabaseState({
       "store_items:select": [
         {
@@ -1372,40 +1405,36 @@ describe("orders-api live order contract", () => {
 
     getServiceEcommerceClientMock.mockReturnValue({ from: state.from, rpc: state.rpc });
 
-    const request = new NextRequest("http://localhost/api/orders", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        customer_type: "guest",
-        customer_email: "buyer@example.com",
-        customer_first_name: "Ada",
-        customer_last_name: "Lovelace",
-        shipping_address: "Calle 123",
-        shipping_city: "Bogotá",
-        shipping_postal_code: "110111",
-        payment_status: "paid",
-        payment_method: "credit_card",
-        payment_reference: "fake-ref",
-        subtotal: 999999,
-        total_amount: 999999,
-        items: [
-          {
-            product_id: "store-item-trust-1",
-            product_name: "Reloj",
-            unit_price: 999999,
-            quantity: 1,
-            total_price: 999999,
-          },
-        ],
-      }),
+    const result = await placeCheckoutOrder({
+      ...baseCheckoutInput,
+      // Campos forzados que un cliente malicioso intenta decidir: el schema los
+      // descarta y la action los fija desde la sesión y el repricing.
+      customer_type: "user",
+      user_id: "attacker-user",
+      payment_status: "paid",
+      payment_method: "credit_card",
+      payment_reference: "fake-ref",
+      subtotal: 999999,
+      total_amount: 999999,
+      items: [
+        {
+          product_id: "store-item-trust-1",
+          product_name: "Reloj",
+          unit_price: 999999,
+          quantity: 1,
+          total_price: 999999,
+        },
+      ],
     });
 
-    const response = await postOrder(request);
-    const body = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(body.order).toBeTruthy();
+    expect(result).toMatchObject({
+      success: true,
+      orderNumber: "A-TRUST-1",
+      orderId: "order-trust-1",
+    });
     expect(state.inserts.orders?.[0]).toMatchObject({
+      customer_type: "guest",
+      user_id: null,
       payment_status: "pending",
       payment_method: "cash_on_delivery",
       payment_reference: null,
@@ -1414,7 +1443,7 @@ describe("orders-api live order contract", () => {
     });
   });
 
-  it("sends the order confirmation email after creating the order successfully", async () => {
+  it("defers the confirmation email with after() and only sends it when the deferred callback runs", async () => {
     const state = new MockSupabaseState({
       "store_items:select": [
         {
@@ -1471,28 +1500,27 @@ describe("orders-api live order contract", () => {
 
     getServiceEcommerceClientMock.mockReturnValue({ from: state.from, rpc: state.rpc });
 
-    const request = new NextRequest("http://localhost/api/orders", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        ...baseOrderData,
-        items: [
-          {
-            product_id: "store-item-email-1",
-            product_name: "Reloj",
-            unit_price: 45000,
-            quantity: 1,
-            total_price: 45000,
-          },
-        ],
-        subtotal: 45000,
-        total_amount: 45000,
-      }),
+    const result = await placeCheckoutOrder({
+      ...baseCheckoutInput,
+      items: [
+        {
+          product_id: "store-item-email-1",
+          product_name: "Reloj",
+          unit_price: 45000,
+          quantity: 1,
+          total_price: 45000,
+        },
+      ],
     });
 
-    const response = await postOrder(request);
+    expect(result).toMatchObject({ success: true, orderNumber: "A-EMAIL-1" });
+    // El correo queda fuera del camino crítico: la action responde sin haberlo
+    // enviado y solo lo dispara el callback diferido de after().
+    expect(sendEmailMock).not.toHaveBeenCalled();
+    expect(afterMock).toHaveBeenCalledTimes(1);
 
-    expect(response.status).toBe(200);
+    await afterMock.mock.calls[0][0]();
+
     expect(sendEmailMock).toHaveBeenCalledTimes(1);
     expect(sendEmailMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1561,30 +1589,247 @@ describe("orders-api live order contract", () => {
 
     getServiceEcommerceClientMock.mockReturnValue({ from: state.from, rpc: state.rpc });
 
-    const request = new NextRequest("http://localhost/api/orders", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        ...baseOrderData,
-        items: [
-          {
-            product_id: "store-item-email-2",
-            product_name: "Reloj",
-            unit_price: 45000,
-            quantity: 1,
-            total_price: 45000,
-          },
-        ],
-        subtotal: 45000,
-        total_amount: 45000,
-      }),
+    const result = await placeCheckoutOrder({
+      ...baseCheckoutInput,
+      items: [
+        {
+          product_id: "store-item-email-2",
+          product_name: "Reloj",
+          unit_price: 45000,
+          quantity: 1,
+          total_price: 45000,
+        },
+      ],
     });
 
-    const response = await postOrder(request);
-    const body = await response.json();
+    expect(result).toMatchObject({
+      success: true,
+      orderId: "order-email-flow-2",
+    });
+    // El callback diferido traga el fallo de SMTP: no revienta ni afecta al
+    // pedido que ya se respondió como creado.
+    await expect(afterMock.mock.calls[0][0]()).resolves.toBeUndefined();
+  });
 
-    expect(response.status).toBe(200);
-    expect(body.order?.id).toBe("order-email-flow-2");
+  it("rejects malformed checkout input via safeParse without touching Supabase", async () => {
+    const result = await placeCheckoutOrder({
+      customer_email: "no-es-un-correo",
+      items: [],
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error:
+        "Los datos del pedido no son válidos. Revisa el formulario e intenta de nuevo.",
+    });
+    expect(getServiceEcommerceClientMock).not.toHaveBeenCalled();
+    expect(afterMock).not.toHaveBeenCalled();
+  });
+
+  it("normalizes an out-of-registry payment_method to the default enabled method", () => {
+    const parsed = checkoutOrderSchema.parse({
+      ...baseCheckoutInput,
+      payment_method: "bitcoin",
+    });
+
+    expect(parsed.payment_method).toBe("cash_on_delivery");
+    expect(enabledPaymentMethodIds()).toContain(parsed.payment_method);
+  });
+
+  it("stamps customer_type and user_id from the session cookie, not from the client payload", async () => {
+    getUserMock.mockResolvedValue({
+      data: { user: { id: "session-user-1" } },
+      error: null,
+    });
+
+    const state = new MockSupabaseState({
+      "store_items:select": [
+        {
+          data: [
+            { id: "store-item-1", base_price: 100000, currency_code: "COP" },
+          ],
+          error: null,
+        },
+        {
+          data: {
+            track_inventory: false,
+            inventory_quantity: 10,
+            is_available_for_sale: true,
+            is_active: true,
+          },
+          error: null,
+        },
+        {
+          data: {
+            store_id: "store-uuid-session-1",
+            track_inventory: false,
+            inventory_quantity: 10,
+          },
+          error: null,
+        },
+        {
+          data: {
+            track_inventory: false,
+            inventory_quantity: 10,
+            is_available_for_sale: true,
+            is_active: true,
+          },
+          error: null,
+        },
+      ],
+      "orders:insert": [
+        {
+          data: {
+            id: "order-session-1",
+            order_number: "A-SESSION-1",
+            payment_method: "cash_on_delivery",
+            payment_status: "pending",
+            payment_reference: null,
+            created_at: "2026-01-01T00:00:00.000Z",
+            updated_at: "2026-01-01T00:00:00.000Z",
+            ...baseOrderData,
+          },
+          error: null,
+        },
+      ],
+      "order_items:insert": [{ data: [{ id: "item-session-1" }], error: null }],
+      "order_addresses:insert": [
+        { data: [{ id: "addr-session-1" }], error: null },
+      ],
+    });
+
+    getServiceEcommerceClientMock.mockReturnValue({ from: state.from, rpc: state.rpc });
+
+    const result = await placeCheckoutOrder({
+      ...baseCheckoutInput,
+      // El cliente intenta hacerse pasar por invitado y por otro usuario.
+      customer_type: "guest",
+      user_id: "attacker-user",
+    });
+
+    expect(result).toMatchObject({ success: true, orderNumber: "A-SESSION-1" });
+    expect(state.inserts.orders?.[0]).toMatchObject({
+      customer_type: "user",
+      user_id: "session-user-1",
+    });
+  });
+
+  it("returns the 409-style validationResult in the action result when inventory runs short", async () => {
+    const state = new MockSupabaseState({
+      "store_items:select": [
+        {
+          data: [
+            { id: "store-item-shortage", base_price: 100000, currency_code: "COP" },
+          ],
+          error: null,
+        },
+        {
+          data: {
+            track_inventory: true,
+            inventory_quantity: 5,
+            is_available_for_sale: true,
+            is_active: true,
+          },
+          error: null,
+        },
+        {
+          data: {
+            store_id: "store-uuid-shortage",
+            track_inventory: true,
+            inventory_quantity: 5,
+          },
+          error: null,
+        },
+      ],
+      "orders:insert": [
+        {
+          data: {
+            id: "order-shortage-2",
+            order_number: "A-SHORTAGE-2",
+            payment_method: "cash_on_delivery",
+            payment_status: "pending",
+            payment_reference: null,
+            created_at: "2026-01-01T00:00:00.000Z",
+            updated_at: "2026-01-01T00:00:00.000Z",
+            ...baseOrderData,
+          },
+          error: null,
+        },
+      ],
+      "order_items:insert": [
+        {
+          data: [
+            {
+              id: "item-shortage-2",
+              order_id: "order-shortage-2",
+              product_id: "store-item-shortage",
+              product_name: "Campera",
+              quantity: 5,
+              unit_price: 100000,
+              total_price: 500000,
+              currency_code: "COP",
+              created_at: "2026-01-01T00:00:00.000Z",
+              updated_at: "2026-01-01T00:00:00.000Z",
+            },
+          ],
+          error: null,
+        },
+      ],
+      "order_addresses:insert": [
+        { data: [{ id: "addr-shortage-2" }], error: null },
+      ],
+      "orders:delete": [{ error: null }],
+      "rpc:decrement_inventory": [
+        {
+          data: [
+            {
+              variant_id: null,
+              product_id: "store-item-shortage",
+              requested: 5,
+              available: 2,
+            },
+          ],
+          error: null,
+        },
+      ],
+    });
+
+    getServiceEcommerceClientMock.mockReturnValue({ from: state.from, rpc: state.rpc });
+
+    const result = await placeCheckoutOrder({
+      ...baseCheckoutInput,
+      items: [
+        {
+          product_id: "store-item-shortage",
+          product_name: "Campera",
+          unit_price: 100000,
+          quantity: 5,
+          total_price: 500000,
+        },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+    if (result.success) {
+      throw new Error("la action debía reportar el faltante de stock");
+    }
+    expect(result.error).toContain("No hay suficiente stock disponible");
+    expect(result.validationResult).toEqual({
+      isValid: false,
+      errors: [
+        {
+          product_name: "Campera",
+          product_id: "store-item-shortage",
+          requested_quantity: 5,
+          available_quantity: 2,
+          message: "Solo hay 2 unidades disponibles de Campera. Solicitaste 5",
+        },
+      ],
+    });
+    expect(state.deletes.orders).toEqual([
+      { column: "id", value: "order-shortage-2" },
+    ]);
+    expect(afterMock).not.toHaveBeenCalled();
   });
 
   it("reads live orders table for id/number/admin paths with payment compatibility fallback", async () => {
@@ -1834,7 +2079,7 @@ describe("orders-api live order contract", () => {
     expect(state.fromCalls).not.toContain("orders_legacy");
   });
 
-  it("hydrates success-page fallback from server order lookup when local state is missing", async () => {
+  it("hydrates success-page fallback (items, total, payment method) from the guest server order lookup when local state is missing", async () => {
     const orderRow = {
       id: "order-success-1",
       order_number: "A-3001",
@@ -1856,8 +2101,8 @@ describe("orders-api live order contract", () => {
       discount_amount: 0,
       total_amount: 50000,
       currency_code: "COP",
-      payment_method: null,
-      payment_status: null,
+      payment_method: "cash_on_delivery",
+      payment_status: "pending",
       payment_reference: null,
       created_at: "2026-01-01T00:00:00.000Z",
       updated_at: "2026-01-01T00:00:00.000Z",
@@ -1865,22 +2110,55 @@ describe("orders-api live order contract", () => {
 
     const state = new MockSupabaseState({
       "orders:select": [{ data: orderRow, error: null }],
-      "order_items:select": [{ data: [], error: null }],
+      "order_items:select": [
+        {
+          data: [
+            {
+              id: "item-success-1",
+              order_id: "order-success-1",
+              product_name: "Campera",
+              quantity: 2,
+              unit_price: 25000,
+              total_price: 50000,
+              currency_code: "COP",
+            },
+          ],
+          error: null,
+        },
+      ],
       "order_addresses:select": [{ data: [], error: null }],
     });
 
-    getSupabaseEcommerceMock.mockReturnValue({ from: state.from, rpc: state.rpc });
+    // La rama de invitado consulta con el service client (D7): el ANON client
+    // por defecto no debería tocarse en este camino.
+    getServiceEcommerceClientMock.mockReturnValue({ from: state.from, rpc: state.rpc });
 
     const fallback = await loadSuccessPageFallbackOrder("A-3001", {
       storeId: "store-success-1",
       email: "fallback@example.com",
     });
 
+    expect(getSupabaseEcommerceMock).not.toHaveBeenCalled();
     expect(fallback.orderNumber).toBe("A-3001");
     expect(fallback.customerData?.firstName).toBe("Grace");
     expect(fallback.customerData?.lastName).toBe("Hopper");
     expect(fallback.customerData?.email).toBe("fallback@example.com");
     expect(fallback.customerData?.address).toBe("Calle Fallback 10");
+    expect(fallback.orderSummary).toEqual({
+      items: [
+        {
+          id: "item-success-1",
+          productName: "Campera",
+          quantity: 2,
+          unitPrice: 25000,
+          totalPrice: 50000,
+          currencyCode: "COP",
+        },
+      ],
+      totalAmount: 50000,
+      currencyCode: "COP",
+      paymentMethod: "cash_on_delivery",
+    });
   });
 
   it("keeps payment fields non-misleading when provider transaction payload exists", async () => {

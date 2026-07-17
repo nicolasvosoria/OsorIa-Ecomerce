@@ -8,6 +8,7 @@ import {
   getErrorMessage,
   resolveSmtpConfig,
 } from "@/lib/security/email-runtime-guards";
+import { PAYMENT_METHODS } from "@/lib/checkout/payment-methods";
 
 /**
  * Calcula rango de fechas estimado de entrega (7-18 días hábiles desde la fecha del pedido)
@@ -38,17 +39,15 @@ function getEstimatedDeliveryRange(orderDate: string): {
 }
 
 /**
- * Convierte el método de pago a un label legible
+ * Convierte el método de pago a un label legible, tomando el label del
+ * registro único de métodos de pago (lib/checkout/payment-methods.ts).
  */
 function getPaymentLabel(method: string | null | undefined): string {
   if (!method) return "Pago";
-  const map: Record<string, string> = {
-    credit_card: "Tarjeta",
-    debit_card: "Tarjeta",
-    cash_on_delivery: "Contra entrega",
-    transfer: "Transferencia",
-  };
-  return map[method] || method;
+  return (
+    PAYMENT_METHODS.find((paymentMethod) => paymentMethod.id === method)
+      ?.label ?? method
+  );
 }
 
 /**
@@ -187,7 +186,7 @@ export function generateInvoiceEmailHTML(
                         <td style="width: 50px;"></td>
                         <td style="width: 72px; font-size: 13px; color: #374151; padding-top: 2px;" align="center" valign="top">En camino</td>
                         <td style="width: 50px;"></td>
-                        <td style="width: 72px; font-size: 13px; color: #374151; padding-top: 2px; line-height: 1.3;" align="center" valign="top">Entregado<br><span style="font-size: 11px; font-weight: normal; color: #6b7280;">7 - 8 días hábiles</span></td>
+                        <td style="width: 72px; font-size: 13px; color: #374151; padding-top: 2px; line-height: 1.3;" align="center" valign="top">Entregado<br><span style="font-size: 11px; font-weight: normal; color: #6b7280;">${safeDaysText}</span></td>
                       </tr>
                     </table>
                   </td>
@@ -215,7 +214,7 @@ export function generateInvoiceEmailHTML(
               <table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom: 24px;">
                 <tr><td style="padding: 8px 0; font-size: 14px; color: #9ca3af;">Total de artículos</td><td style="padding: 8px 0; text-align: right; width: 110px; font-size: 14px; color: #111;">${formatPrice(order.subtotal?.toString() || "0", order.currency_code)}</td></tr>
                 <tr><td colspan="2" style="padding: 0;"><div style="height: 1px; background: #e5e7eb;"></div></td></tr>
-                <tr><td style="padding: 8px 0; font-size: 14px; color: #9ca3af;">Envío</td><td style="padding: 8px 0; text-align: right; font-size: 14px; color: #111;">${Number(order.shipping_cost) > 0 ? formatPrice(order.shipping_cost.toString(), order.currency_code) : "GRATIS"}</td></tr>
+                <tr><td style="padding: 8px 0; font-size: 14px; color: #9ca3af;">Envío</td><td style="padding: 8px 0; text-align: right; font-size: 14px; color: #111;">${Number(order.shipping_cost) > 0 ? formatPrice(order.shipping_cost.toString(), order.currency_code) : "El costo de envío lo confirma la tienda al coordinar la entrega"}</td></tr>
                 <tr><td colspan="2" style="padding: 0;"><div style="height: 1px; background: #e5e7eb;"></div></td></tr>
                 <tr><td style="padding: 12px 0 0; font-size: 16px; font-weight: 700; color: #111;">Total del pedido:</td><td style="padding: 12px 0 0; text-align: right; font-size: 16px; font-weight: 700; color: #111;">${formatPrice(order.total_amount?.toString() || "0", order.currency_code)}</td></tr>
                 <tr><td colspan="2" style="padding: 0;"><div style="height: 1px; background: #e5e7eb; margin-top: 12px;"></div></td></tr>
@@ -233,8 +232,7 @@ export function generateInvoiceEmailHTML(
               <div style="text-align: center; margin-top: 16px;">
                 <p style="margin: 0 0 2px; font-size: 11px; line-height: 1.25; font-weight: 600; color: #9ca3af;">NOTA: Este es un email generado automáticamente, no lo respondas.</p>
                 <p style="margin: 0 0 2px; font-size: 11px; line-height: 1.25; font-weight: 600; color: #9ca3af;">Iconos de ubicación, método de pago y redes: <a href="https://www.flaticon.es" style="color: #9ca3af; text-decoration: none; font-weight: 600;">www.flaticon.es</a></p>
-                <p style="margin: 0 0 2px; font-size: 11px; line-height: 1.25; font-weight: 600; color: #9ca3af;">Dirección de la oficina: 6 Raffles Quay, #14-06, Singapore (Postal 048580)</p>
-                <p style="margin: 0; font-size: 11px; line-height: 1.25; font-weight: 600; color: #9ca3af;">Ten en cuenta que las devoluciones no se aceptarán en esta dirección. Si deseas devolver artículos, solicita una devolución y utiliza la etiqueta correspondiente. <a href="${safeHomepage}" style="color: #16a34a; text-decoration: none; font-weight: 600;">Haz clic para ver más detalles</a>.</p>
+                <p style="margin: 0; font-size: 11px; line-height: 1.25; font-weight: 600; color: #9ca3af;">Si deseas devolver artículos, solicita una devolución y utiliza la etiqueta correspondiente. <a href="${safeHomepage}" style="color: #16a34a; text-decoration: none; font-weight: 600;">Haz clic para ver más detalles</a>.</p>
               </div>
             </td>
           </tr>

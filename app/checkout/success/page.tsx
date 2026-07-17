@@ -16,13 +16,14 @@ export default async function CheckoutSuccessPage(
   const email = Array.isArray(emailParam) ? emailParam[0] : emailParam;
 
   const storeId = await getStoreIdServer();
-  const auth = storeId && email ? { storeId, email } : null;
-  const fallback = await loadSuccessPageFallbackOrder(orderNumber, auth);
+  const guestAuth = storeId && email ? { storeId, email } : null;
+  const fallback = await loadSuccessPageFallbackOrder(orderNumber, guestAuth);
 
   return (
     <CheckoutSuccessClient
       initialOrderNumber={fallback.orderNumber}
       initialCustomerData={fallback.customerData}
+      initialOrderSummary={fallback.orderSummary}
     />
   );
 }

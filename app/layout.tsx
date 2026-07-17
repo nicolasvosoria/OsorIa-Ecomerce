@@ -29,7 +29,6 @@ import { StoreProvider } from "@/contexts/store-context"
 import { AdminRedirect } from "@/components/admin/admin-redirect"
 import { DynamicTitle } from "@/components/dynamic-title"
 import { DynamicFavicon } from "@/components/dynamic-favicon"
-import { DynamicLang } from "@/components/dynamic-lang"
 import { LanguageProvider } from "@/contexts/language-context"
 import { RouteAwareChrome } from "@/components/layout/route-aware-chrome"
 import { metadataBaseFromEnvironment } from "@/lib/metadata/metadata-base"
@@ -150,7 +149,6 @@ export default async function RootLayout({
         <ApplyStylesScript />
         <LanguageProvider>
           <StoreProvider>
-            <DynamicLang />
             <DynamicTitle />
             <DynamicFavicon />
             <StylesProvider>

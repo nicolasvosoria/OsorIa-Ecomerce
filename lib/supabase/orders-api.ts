@@ -192,7 +192,7 @@ export interface OrderWithItems extends Order {
 }
 
 // Resultado de validación de inventario
-interface InventoryValidationResult {
+export interface InventoryValidationResult {
   isValid: boolean;
   errors: Array<{
     product_name: string;
@@ -1511,9 +1511,10 @@ export interface OrderByNumberAuth {
 export async function getOrderByNumber(
   orderNumber: string,
   auth: OrderByNumberAuth,
+  supabaseOverride?: any,
 ): Promise<OrderWithItems | null> {
   try {
-    const supabase = getSupabaseEcommerce();
+    const supabase = supabaseOverride ?? getSupabaseEcommerce();
     if (!supabase) {
       console.error("[Orders] Supabase no configurado");
       return null;
@@ -1533,6 +1534,53 @@ export async function getOrderByNumber(
 
     if (orderResult.error || !orderResult.data) {
       console.error("[Orders] Error al obtener pedido:", orderResult.error);
+      return null;
+    }
+
+    return await hydrateOrderGraph(supabase, orderResult.data);
+  } catch (error: any) {
+    console.error("[Orders] Error inesperado al obtener pedido:", error);
+    return null;
+  }
+}
+
+/**
+ * Obtener un pedido por número de pedido para el usuario autenticado de la
+ * sesión (pantalla de éxito de checkout tras refrescar). El caller debe pasar
+ * el cliente con la sesión del usuario: RLS (orders_owner_or_admin_read) solo
+ * expone filas con user_id = auth.uid(), así que no depende de un email en la
+ * URL como el flujo de invitado.
+ */
+export async function getOrderByNumberForUser(
+  orderNumber: string,
+  userId: string,
+  supabaseOverride?: any,
+): Promise<OrderWithItems | null> {
+  try {
+    const supabase = supabaseOverride ?? getSupabaseEcommerce();
+    if (!supabase) {
+      console.error("[Orders] Supabase no configurado");
+      return null;
+    }
+
+    const orderResult = (await withTimeout(
+      supabase
+        .from(ECOMMERCE_TABLES.orders)
+        .select("*")
+        .eq("order_number", orderNumber)
+        .eq("user_id", userId)
+        .single(),
+      15000,
+      "getOrderByNumberForUser",
+    )) as { data: any; error: any };
+
+    // PGRST116 (ninguna fila) es el resultado esperado cuando el pedido no es
+    // del usuario de la sesión, no un error a registrar.
+    if (orderResult.error && orderResult.error.code !== "PGRST116") {
+      console.error("[Orders] Error al obtener pedido:", orderResult.error);
+    }
+
+    if (orderResult.error || !orderResult.data) {
       return null;
     }
 
@@ -1677,6 +1725,97 @@ export async function getOrdersByEmail(
     return ordersWithItems;
   } catch (error: any) {
     console.error("[Orders] Error inesperado al obtener pedidos:", error);
+    return [];
+  }
+}
+
+/**
+ * Obtener el pedido más reciente de un usuario autenticado (prefill de
+ * checkout). El caller debe pasar el cliente con la sesión del usuario: RLS
+ * (orders_owner_or_admin_read) solo expone filas con user_id = auth.uid(), así
+ * que un llamador anónimo o sin ese cliente no obtiene ningún pedido.
+ */
+export async function getMostRecentOrderByUserId(
+  userId: string,
+  supabaseOverride?: any,
+): Promise<OrderWithItems | null> {
+  try {
+    const supabase = supabaseOverride ?? getSupabaseEcommerce();
+    if (!supabase) {
+      console.error("[Orders] Supabase no configurado");
+      return null;
+    }
+
+    const orderResult = (await withTimeout(
+      supabase
+        .from(ECOMMERCE_TABLES.orders)
+        .select("*")
+        .eq("user_id", userId)
+        .order("order_date", { ascending: false })
+        .limit(1)
+        .single(),
+      15000,
+      "getMostRecentOrderByUserId",
+    )) as { data: any; error: any };
+
+    // PGRST116 (ninguna fila) es el resultado esperado para un cliente sin
+    // pedidos previos, no un error a registrar.
+    if (orderResult.error && orderResult.error.code !== "PGRST116") {
+      console.error("[Orders] Error al obtener el último pedido:", orderResult.error);
+    }
+
+    if (orderResult.error || !orderResult.data) {
+      return null;
+    }
+
+    return await hydrateOrderGraph(supabase, applyPaymentCompatibility(orderResult.data));
+  } catch (error: any) {
+    console.error("[Orders] Error inesperado al obtener el último pedido:", error);
+    return null;
+  }
+}
+
+/**
+ * Obtener el historial de pedidos de un usuario autenticado (pantalla "Mis
+ * pedidos" del storefront). El caller debe pasar el cliente con la sesión del
+ * usuario: RLS (orders_owner_or_admin_read) solo expone filas con
+ * user_id = auth.uid(), así que un llamador anónimo o sin ese cliente no
+ * obtiene ningún pedido.
+ */
+export async function getOrdersForUser(
+  userId: string,
+  supabaseOverride?: any,
+): Promise<OrderWithItems[]> {
+  try {
+    const supabase = supabaseOverride ?? getSupabaseEcommerce();
+    if (!supabase) {
+      console.error("[Orders] Supabase no configurado");
+      return [];
+    }
+
+    const ordersResult = (await withTimeout(
+      supabase
+        .from(ECOMMERCE_TABLES.orders)
+        .select("*")
+        .eq("user_id", userId)
+        .order("order_date", { ascending: false })
+        .limit(50),
+      15000,
+      "getOrdersForUser",
+    )) as { data: any[] | null; error: any };
+
+    if (ordersResult.error) {
+      console.error("[Orders] Error al obtener los pedidos del usuario:", ordersResult.error);
+      return [];
+    }
+
+    const orders = ((ordersResult.data || []) as Order[]).map((order) =>
+      applyPaymentCompatibility(order),
+    );
+
+    return await Promise.all(orders.map((order) => hydrateOrderGraph(supabase, order)));
+  } catch (error: any) {
+    console.error("[Orders] Error inesperado al obtener los pedidos del usuario:", error);
     return [];
   }
 }

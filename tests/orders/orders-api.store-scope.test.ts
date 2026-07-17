@@ -1,10 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  getMostRecentOrderByUserId,
   getOrderById,
   getOrderByNumber,
+  getOrderByNumberForUser,
   getOrders,
   getOrdersByEmail,
+  getOrdersForUser,
   updateOrderStatus,
 } from "@/lib/supabase/orders-api";
 
@@ -23,6 +26,7 @@ const ORDER_ROW = {
   status: "pending",
   payment_status: "pending",
   customer_email: "buyer@example.com",
+  user_id: "user-1",
   total_amount: 1000,
   currency_code: "COP",
   created_at: "2026-01-01T00:00:00Z",
@@ -84,6 +88,14 @@ function emailFilterFor(
 ) {
   return eqCalls.filter(
     (call) => call.table === "orders" && call.column === "customer_email",
+  );
+}
+
+function userIdFilterFor(
+  eqCalls: Array<{ table: string; column?: string; value?: unknown }>,
+) {
+  return eqCalls.filter(
+    (call) => call.table === "orders" && call.column === "user_id",
   );
 }
 
@@ -205,5 +217,112 @@ describe("orders-api store scoping", () => {
     expect(wrongStore).toBeNull();
     expect(wrongEmail).toBeNull();
     expect(owner?.id).toBe("order-1");
+  });
+
+  it("uses the provided supabaseOverride client for getOrderByNumber instead of the default client", async () => {
+    const { client, eqCalls } = makeRecordingClient();
+
+    const order = await getOrderByNumber(
+      "A-1",
+      { storeId: "store-1", email: "buyer@example.com" },
+      client,
+    );
+
+    expect(getSupabaseEcommerceMock).not.toHaveBeenCalled();
+    expect(storeFilterFor(eqCalls)).toEqual([
+      { table: "orders", column: "store_id", value: "store-1" },
+    ]);
+    expect(emailFilterFor(eqCalls)).toEqual([
+      { table: "orders", column: "customer_email", value: "buyer@example.com" },
+    ]);
+    expect(order?.id).toBe("order-1");
+  });
+
+  it("scopes getOrderByNumberForUser by the caller's user_id (checkout success, D7)", async () => {
+    const { client, eqCalls } = makeRecordingClient();
+
+    const order = await getOrderByNumberForUser("A-1", "user-1", client);
+
+    expect(getSupabaseEcommerceMock).not.toHaveBeenCalled();
+    expect(userIdFilterFor(eqCalls)).toEqual([
+      { table: "orders", column: "user_id", value: "user-1" },
+    ]);
+    expect(order?.id).toBe("order-1");
+  });
+
+  it("does not return an order from getOrderByNumberForUser when order_number is guessed but user_id does not match", async () => {
+    const client = makeAuthorizingClient();
+
+    const attacker = await getOrderByNumberForUser("A-1", "attacker-user", client);
+    const owner = await getOrderByNumberForUser("A-1", "user-1", client);
+
+    expect(attacker).toBeNull();
+    expect(owner?.id).toBe("order-1");
+  });
+
+  it("scopes getMostRecentOrderByUserId by the caller's user_id (checkout prefill, D4)", async () => {
+    const { client, eqCalls } = makeRecordingClient();
+
+    const order = await getMostRecentOrderByUserId("user-1", client);
+
+    expect(userIdFilterFor(eqCalls)).toEqual([
+      { table: "orders", column: "user_id", value: "user-1" },
+    ]);
+    expect(order?.id).toBe("order-1");
+  });
+
+  it("scopes getOrdersForUser by the caller's user_id (order history, D5)", async () => {
+    const { client, eqCalls } = makeRecordingClient();
+
+    const orders = await getOrdersForUser("user-1", client);
+
+    expect(getSupabaseEcommerceMock).not.toHaveBeenCalled();
+    expect(userIdFilterFor(eqCalls)).toEqual([
+      { table: "orders", column: "user_id", value: "user-1" },
+    ]);
+    expect(orders).toHaveLength(1);
+    expect(orders[0]?.id).toBe("order-1");
+  });
+
+  it("returns an empty list from getOrdersForUser when the customer has no previous orders", async () => {
+    const noOrdersClient = {
+      from: vi.fn(() => {
+        const builder: any = {
+          select: vi.fn(() => builder),
+          eq: vi.fn(() => builder),
+          order: vi.fn(() => builder),
+          limit: vi.fn(() => builder),
+          then: (onFulfilled: any, onRejected: any) =>
+            Promise.resolve({ data: [], error: null }).then(onFulfilled, onRejected),
+        };
+        return builder;
+      }),
+    };
+
+    const orders = await getOrdersForUser("user-without-orders", noOrdersClient);
+
+    expect(orders).toEqual([]);
+  });
+
+  it("returns null from getMostRecentOrderByUserId when the customer has no previous orders", async () => {
+    const noOrdersClient = {
+      from: vi.fn(() => {
+        const builder: any = {
+          select: vi.fn(() => builder),
+          eq: vi.fn(() => builder),
+          order: vi.fn(() => builder),
+          limit: vi.fn(() => builder),
+          single: vi.fn(async () => ({
+            data: null,
+            error: { code: "PGRST116", message: "No rows found" },
+          })),
+        };
+        return builder;
+      }),
+    };
+
+    const order = await getMostRecentOrderByUserId("user-without-orders", noOrdersClient);
+
+    expect(order).toBeNull();
   });
 });

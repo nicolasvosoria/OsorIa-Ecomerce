@@ -31,7 +31,7 @@ export const FOOTER_DEFAULTS = {
   ] satisfies FooterLink[],
   group2Title: "Atención al cliente",
   group2Links: [
-    { label: "Mis pedidos", url: "/dashboard" },
+    { label: "Mis pedidos", url: "/orders" },
     { label: "Lista de deseos", url: "/wishlist" },
   ] satisfies FooterLink[],
   group3Title: "Nuestra empresa",

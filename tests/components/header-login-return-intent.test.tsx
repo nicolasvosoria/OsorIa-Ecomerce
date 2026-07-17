@@ -4,7 +4,7 @@ import {
   adminPermissionsContextMock,
   authApiMock,
   cartContextMock,
-  checkoutOptionsDialogMock,
+  checkoutLoginIntentContextMock,
   fontSelectorModalMock,
   lucideReactMock,
   modeContextMock,
@@ -72,9 +72,6 @@ vi.mock("@/contexts/language-context", () => ({
         welcomeAdminMessage: "Admin creado",
         accountCreatedSuccess: "Cuenta creada",
         errorCreatingAccount: "Error al crear cuenta",
-        loginRequired: "Login requerido",
-        loginRequiredDescription: "Debes iniciar sesión",
-        loginRequiredDescription2: "Continúa para comprar",
       },
       cart: { checkout: "Checkout" },
       nav: { wishlist: "Wishlist", cart: "Cart" },
@@ -83,7 +80,7 @@ vi.mock("@/contexts/language-context", () => ({
 }));
 vi.mock("@/components/theme/theme-selector-modal", () => themeSelectorModalMock);
 vi.mock("@/components/font/font-selector-modal", () => fontSelectorModalMock);
-vi.mock("@/components/cart/checkout-options-dialog", () => checkoutOptionsDialogMock);
+vi.mock("@/contexts/checkout-login-intent-context", () => checkoutLoginIntentContextMock);
 vi.mock("sonner", () => sonnerMock);
 vi.mock("@/lib/supabase/auth-api", () => authApiMock);
 vi.mock("@/lib/supabase/permissions-api", () => ({

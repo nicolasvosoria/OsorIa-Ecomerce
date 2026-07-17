@@ -4,7 +4,7 @@ import {
   adminPermissionsContextMock,
   authApiMock,
   cartContextMock,
-  checkoutOptionsDialogMock,
+  checkoutLoginIntentContextMock,
   fontSelectorModalMock,
   lucideReactMock,
   nextImageMock,
@@ -80,7 +80,7 @@ vi.mock("@/contexts/language-context", () => ({
 }))
 vi.mock("@/components/theme/theme-selector-modal", () => themeSelectorModalMock)
 vi.mock("@/components/font/font-selector-modal", () => fontSelectorModalMock)
-vi.mock("@/components/cart/checkout-options-dialog", () => checkoutOptionsDialogMock)
+vi.mock("@/contexts/checkout-login-intent-context", () => checkoutLoginIntentContextMock)
 vi.mock("sonner", () => sonnerMock)
 vi.mock("@/lib/supabase/auth-api", () => authApiMock)
 vi.mock("@/lib/products/featured-product", () => ({ resolveFeaturedProductId: vi.fn().mockResolvedValue(null) }))

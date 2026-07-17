@@ -96,7 +96,6 @@ export interface Translations {
     emptyDescription: string
     subtotal: string
     shipping: string
-    tax: string
     discount: string
     total: string
     checkout: string
@@ -104,23 +103,10 @@ export interface Translations {
     products: string
     itemsCount: string
     quantityLabel: string
-    calculatedAtCheckout: string
     combo: string
     continueShopping: string
     remove: string
     update: string
-    selectPaymentMethod: string
-    selectPaymentMethodDescription: string
-    purchaseProcessed: string
-    purchaseProcessedDescription: string
-    howToContinue: string
-    chooseOptionToFinish: string
-    continueAsGuest: string
-    continueAsGuestDescription: string
-    createAccountAndContinue: string
-    createAccountAndContinueDescription: string
-    alreadyHaveAccount: string
-    loginHere: string
   }
   // Checkout
   checkout: {
@@ -136,6 +122,9 @@ export interface Translations {
     country: string
     notes: string
     paymentMethod: string
+    shippingConfirmedByStore: string
+    guestLoginCta: string
+    unitPrice: string
   }
   // Pedidos
   orders: {
@@ -149,12 +138,18 @@ export interface Translations {
     downloadExcel: string
     generatingExcel: string
     noOrders: string
+    emptyDescription: string
+    itemsCount: string
+    paymentStatusColumn: string
+    guestTitle: string
+    guestDescription: string
     statusLabels: {
       pending: string
       confirmed: string
       processing: string
       shipped: string
       delivered: string
+      returned: string
       cancelled: string
     }
     paymentStatus: {
@@ -237,9 +232,6 @@ export interface Translations {
       viewAllResults: string
     showPassword: string
     hidePassword: string
-    loginRequired: string
-    loginRequiredDescription: string
-    loginRequiredDescription2: string
     forgotPasswordTitle: string
     forgotPasswordDescription: string
     forgotPasswordDescription2: string
@@ -269,7 +261,6 @@ export interface Translations {
     sessionClosedDescription: string
     productRemoved: string
     productRemovedDescription: string
-    confirmPayment: string
   }
 }
 
@@ -286,7 +277,7 @@ export const translations: Record<Language, Translations> = {
       account: 'Cuenta',
       admin: 'Administrador',
       dashboard: 'Panel',
-      orders: 'Pedidos',
+      orders: 'Mis pedidos',
       products: 'Productos',
       users: 'Usuarios',
       stats: 'Estadísticas',
@@ -364,7 +355,6 @@ export const translations: Record<Language, Translations> = {
       emptyDescription: 'Agrega productos a tu carrito para comenzar',
       subtotal: 'Subtotal',
       shipping: 'Envío',
-      tax: 'Impuestos',
       discount: 'Descuento',
       total: 'Total',
       checkout: 'Finalizar compra',
@@ -372,23 +362,10 @@ export const translations: Record<Language, Translations> = {
       products: 'Productos',
       itemsCount: '{count} artículos',
       quantityLabel: 'Cantidad',
-      calculatedAtCheckout: 'Calculado al finalizar',
       combo: 'combo',
       continueShopping: 'Continuar comprando',
       remove: 'Eliminar',
       update: 'Actualizar',
-      selectPaymentMethod: 'Selecciona un medio de pago',
-      selectPaymentMethodDescription: 'Por favor, elige cómo deseas pagar',
-      purchaseProcessed: 'Compra procesada',
-      purchaseProcessedDescription: 'Tu pedido ha sido procesado exitosamente con {method}',
-      howToContinue: '¿Cómo deseas continuar?',
-      chooseOptionToFinish: 'Elige una opción para finalizar tu compra',
-      continueAsGuest: 'Continuar como Invitado',
-      continueAsGuestDescription: 'Completa tu compra sin crear una cuenta. Podrás crear una cuenta más tarde si lo deseas.',
-      createAccountAndContinue: 'Crear Cuenta y Continuar',
-      createAccountAndContinueDescription: 'Crea una cuenta gratuita para guardar tus pedidos, recibir ofertas exclusivas y más.',
-      alreadyHaveAccount: '¿Ya tienes una cuenta?',
-      loginHere: 'Inicia sesión aquí',
     },
     checkout: {
       title: 'Finalizar compra',
@@ -403,6 +380,9 @@ export const translations: Record<Language, Translations> = {
       country: 'País',
       notes: 'Notas',
       paymentMethod: 'Método de pago',
+      shippingConfirmedByStore: 'El costo de envío lo confirma la tienda al coordinar la entrega',
+      guestLoginCta: 'Inicia sesión',
+      unitPrice: 'Precio unitario',
     },
     orders: {
       title: 'Pedidos',
@@ -415,12 +395,18 @@ export const translations: Record<Language, Translations> = {
       downloadExcel: 'Descargar Excel',
       generatingExcel: 'Generando Excel...',
       noOrders: 'No hay pedidos',
+      emptyDescription: 'Cuando hagas tu primera compra, la verás aquí.',
+      itemsCount: '{count} artículos',
+      paymentStatusColumn: 'Pago',
+      guestTitle: 'Inicia sesión para ver tus pedidos',
+      guestDescription: 'Crea una cuenta o inicia sesión para consultar el historial de tus compras.',
       statusLabels: {
         pending: 'Pendiente',
         confirmed: 'Confirmado',
         processing: 'Procesando',
         shipped: 'Enviado',
         delivered: 'Entregado',
+        returned: 'Devuelto',
         cancelled: 'Cancelado',
       },
       paymentStatus: {
@@ -499,9 +485,6 @@ export const translations: Record<Language, Translations> = {
       viewAllResults: 'Ver todos los resultados para "{query}"',
       showPassword: 'Mostrar contraseña',
       hidePassword: 'Ocultar contraseña',
-      loginRequired: 'Iniciar sesión requerido',
-      loginRequiredDescription: 'Para continuar con tu compra, necesitas iniciar sesión en tu cuenta.',
-      loginRequiredDescription2: 'Si no tienes una cuenta, puedes crear una fácilmente.',
       forgotPasswordTitle: 'Recuperar Contraseña',
       forgotPasswordDescription: 'Ingresa tu correo electrónico y te enviaremos un link para restablecer tu contraseña',
       forgotPasswordDescription2: 'Revisa tu correo electrónico para restablecer tu contraseña',
@@ -531,7 +514,6 @@ export const translations: Record<Language, Translations> = {
       sessionClosedDescription: 'Has cerrado sesión exitosamente',
       productRemoved: 'Producto eliminado',
       productRemovedDescription: '{name} ha sido eliminado del carrito',
-      confirmPayment: 'Confirmar Pago',
     },
   },
   en: {
@@ -546,7 +528,7 @@ export const translations: Record<Language, Translations> = {
       account: 'Account',
       admin: 'Admin',
       dashboard: 'Dashboard',
-      orders: 'Orders',
+      orders: 'My orders',
       products: 'Products',
       users: 'Users',
       stats: 'Statistics',
@@ -624,7 +606,6 @@ export const translations: Record<Language, Translations> = {
       emptyDescription: 'Add products to your cart to get started',
       subtotal: 'Subtotal',
       shipping: 'Shipping',
-      tax: 'Tax',
       discount: 'Discount',
       total: 'Total',
       checkout: 'Checkout',
@@ -632,23 +613,10 @@ export const translations: Record<Language, Translations> = {
       products: 'Products',
       itemsCount: '{count} items',
       quantityLabel: 'Quantity',
-      calculatedAtCheckout: 'Calculated at checkout',
       combo: 'combo',
       continueShopping: 'Continue shopping',
       remove: 'Remove',
       update: 'Update',
-      selectPaymentMethod: 'Select a payment method',
-      selectPaymentMethodDescription: 'Please choose how you want to pay',
-      purchaseProcessed: 'Purchase processed',
-      purchaseProcessedDescription: 'Your order has been successfully processed with {method}',
-      howToContinue: 'How would you like to continue?',
-      chooseOptionToFinish: 'Choose an option to complete your purchase',
-      continueAsGuest: 'Continue as Guest',
-      continueAsGuestDescription: 'Complete your purchase without creating an account. You can create an account later if you wish.',
-      createAccountAndContinue: 'Create Account and Continue',
-      createAccountAndContinueDescription: 'Create a free account to save your orders, receive exclusive offers and more.',
-      alreadyHaveAccount: 'Already have an account?',
-      loginHere: 'Log in here',
     },
     checkout: {
       title: 'Checkout',
@@ -663,6 +631,9 @@ export const translations: Record<Language, Translations> = {
       country: 'Country',
       notes: 'Notes',
       paymentMethod: 'Payment method',
+      shippingConfirmedByStore: 'The store confirms the shipping cost when coordinating delivery',
+      guestLoginCta: 'Log in',
+      unitPrice: 'Unit price',
     },
     orders: {
       title: 'Orders',
@@ -675,12 +646,18 @@ export const translations: Record<Language, Translations> = {
       downloadExcel: 'Download Excel',
       generatingExcel: 'Generating Excel...',
       noOrders: 'No orders',
+      emptyDescription: 'Once you place your first order, you will see it here.',
+      itemsCount: '{count} items',
+      paymentStatusColumn: 'Payment',
+      guestTitle: 'Log in to see your orders',
+      guestDescription: 'Create an account or log in to check your purchase history.',
       statusLabels: {
         pending: 'Pending',
         confirmed: 'Confirmed',
         processing: 'Processing',
         shipped: 'Shipped',
         delivered: 'Delivered',
+        returned: 'Returned',
         cancelled: 'Cancelled',
       },
       paymentStatus: {
@@ -759,9 +736,6 @@ export const translations: Record<Language, Translations> = {
       viewAllResults: 'View all results for "{query}"',
       showPassword: 'Show password',
       hidePassword: 'Hide password',
-      loginRequired: 'Login required',
-      loginRequiredDescription: 'To continue with your purchase, you need to log in to your account.',
-      loginRequiredDescription2: "If you don't have an account, you can easily create one.",
       forgotPasswordTitle: 'Recover Password',
       forgotPasswordDescription: 'Enter your email address and we will send you a link to reset your password',
       forgotPasswordDescription2: 'Check your email to reset your password',
@@ -791,7 +765,6 @@ export const translations: Record<Language, Translations> = {
       sessionClosedDescription: 'You have successfully logged out',
       productRemoved: 'Product removed',
       productRemovedDescription: '{name} has been removed from cart',
-      confirmPayment: 'Confirm Payment',
     },
   },
   pt: {
@@ -806,7 +779,7 @@ export const translations: Record<Language, Translations> = {
       account: 'Conta',
       admin: 'Administrador',
       dashboard: 'Painel',
-      orders: 'Pedidos',
+      orders: 'Meus pedidos',
       products: 'Produtos',
       users: 'Usuários',
       stats: 'Estatísticas',
@@ -884,7 +857,6 @@ export const translations: Record<Language, Translations> = {
       emptyDescription: 'Adicione produtos ao seu carrinho para começar',
       subtotal: 'Subtotal',
       shipping: 'Frete',
-      tax: 'Impostos',
       discount: 'Desconto',
       total: 'Total',
       checkout: 'Finalizar compra',
@@ -892,23 +864,10 @@ export const translations: Record<Language, Translations> = {
       products: 'Produtos',
       itemsCount: '{count} itens',
       quantityLabel: 'Quantidade',
-      calculatedAtCheckout: 'Calculado ao finalizar',
       combo: 'combo',
       continueShopping: 'Continuar comprando',
       remove: 'Remover',
       update: 'Atualizar',
-      selectPaymentMethod: 'Selecione um método de pagamento',
-      selectPaymentMethodDescription: 'Por favor, escolha como deseja pagar',
-      purchaseProcessed: 'Compra processada',
-      purchaseProcessedDescription: 'Seu pedido foi processado com sucesso com {method}',
-      howToContinue: 'Como deseja continuar?',
-      chooseOptionToFinish: 'Escolha uma opção para finalizar sua compra',
-      continueAsGuest: 'Continuar como Convidado',
-      continueAsGuestDescription: 'Complete sua compra sem criar uma conta. Você pode criar uma conta mais tarde se desejar.',
-      createAccountAndContinue: 'Criar Conta e Continuar',
-      createAccountAndContinueDescription: 'Crie uma conta gratuita para salvar seus pedidos, receber ofertas exclusivas e mais.',
-      alreadyHaveAccount: 'Já tem uma conta?',
-      loginHere: 'Faça login aqui',
     },
     checkout: {
       title: 'Finalizar compra',
@@ -923,6 +882,9 @@ export const translations: Record<Language, Translations> = {
       country: 'País',
       notes: 'Observações',
       paymentMethod: 'Método de pagamento',
+      shippingConfirmedByStore: 'A loja confirma o custo de frete ao combinar a entrega',
+      guestLoginCta: 'Entrar',
+      unitPrice: 'Preço unitário',
     },
     orders: {
       title: 'Pedidos',
@@ -935,12 +897,18 @@ export const translations: Record<Language, Translations> = {
       downloadExcel: 'Baixar Excel',
       generatingExcel: 'Gerando Excel...',
       noOrders: 'Nenhum pedido',
+      emptyDescription: 'Quando você fizer sua primeira compra, ela vai aparecer aqui.',
+      itemsCount: '{count} itens',
+      paymentStatusColumn: 'Pagamento',
+      guestTitle: 'Entre para ver seus pedidos',
+      guestDescription: 'Crie uma conta ou entre para consultar o histórico das suas compras.',
       statusLabels: {
         pending: 'Pendente',
         confirmed: 'Confirmado',
         processing: 'Processando',
         shipped: 'Enviado',
         delivered: 'Entregue',
+        returned: 'Devolvido',
         cancelled: 'Cancelado',
       },
       paymentStatus: {
@@ -1019,9 +987,6 @@ export const translations: Record<Language, Translations> = {
       viewAllResults: 'Ver todos os resultados para "{query}"',
       showPassword: 'Mostrar senha',
       hidePassword: 'Ocultar senha',
-      loginRequired: 'Login necessário',
-      loginRequiredDescription: 'Para continuar com sua compra, você precisa fazer login em sua conta.',
-      loginRequiredDescription2: 'Se você não tem uma conta, pode criar uma facilmente.',
       forgotPasswordTitle: 'Recuperar Senha',
       forgotPasswordDescription: 'Digite seu endereço de e-mail e enviaremos um link para redefinir sua senha',
       forgotPasswordDescription2: 'Verifique seu e-mail para redefinir sua senha',
@@ -1051,7 +1016,6 @@ export const translations: Record<Language, Translations> = {
       sessionClosedDescription: 'Você saiu com sucesso',
       productRemoved: 'Produto removido',
       productRemovedDescription: '{name} foi removido do carrinho',
-      confirmPayment: 'Confirmar Pagamento',
     },
   },
 }

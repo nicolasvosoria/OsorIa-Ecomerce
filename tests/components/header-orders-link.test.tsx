@@ -9,7 +9,6 @@ import {
   modeContextMock,
   nextImageMock,
   nextLinkMock,
-  sonnerMock,
   storeContextMock,
   themeContextMock,
   themeSelectorModalMock,
@@ -22,7 +21,11 @@ import {
   wishlistContextMock,
 } from "./_helpers/header-test-mocks"
 
+// El link "Mis pedidos" (D5) es visible para cualquier usuario autenticado,
+// sea o no admin — a diferencia de Dashboard/Editor que sólo ve un admin
+// (ver tests/components/header-admin-link.test.tsx).
 const isAdminValue = vi.hoisted(() => ({ current: false }))
+const isAuthenticatedValue = vi.hoisted(() => ({ current: true }))
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
@@ -61,8 +64,8 @@ vi.mock("@/contexts/admin-permissions-context", () => ({
 }))
 vi.mock("@/contexts/auth-context", () => ({
   useAuth: () => ({
-    user: { id: "store-owner-1", email: "gerardo.romero@osoria.tech", role: "user" },
-    isAuthenticated: true,
+    user: isAuthenticatedValue.current ? { id: "user-1", email: "ana@example.com" } : null,
+    isAuthenticated: isAuthenticatedValue.current,
     login: vi.fn(),
     register: vi.fn(),
     logout: vi.fn(),
@@ -74,7 +77,7 @@ vi.mock("@/contexts/language-context", () => ({
     t: {
       auth: { login: "Iniciar sesión", logout: "Cerrar sesión" },
       admin: { pageEditor: "Editor de página", administration: "Administración" },
-      nav: { admin: "Admin", account: "Mi cuenta", dashboard: "Dashboard", home: "Inicio", wishlist: "Wishlist", cart: "Cart" },
+      nav: { admin: "Admin", account: "Mi cuenta", dashboard: "Dashboard", orders: "Mis pedidos", home: "Inicio", wishlist: "Wishlist", cart: "Cart" },
       header: { menu: "Menú", loadingCategories: "Cargando", welcome: "Hola {name}", welcomeAdmin: "Hola admin" },
       cart: { checkout: "Checkout" },
     },
@@ -83,36 +86,49 @@ vi.mock("@/contexts/language-context", () => ({
 vi.mock("@/components/theme/theme-selector-modal", () => themeSelectorModalMock)
 vi.mock("@/components/font/font-selector-modal", () => fontSelectorModalMock)
 vi.mock("@/contexts/checkout-login-intent-context", () => checkoutLoginIntentContextMock)
-vi.mock("sonner", () => sonnerMock)
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 vi.mock("@/lib/supabase/auth-api", () => authApiMock)
 
 import { Header } from "@/components/layout/header"
 
-function adminLinks() {
-  return screen.queryAllByRole("link", { name: "Editor de página" })
+function ordersLinks() {
+  return screen.queryAllByRole("link", { name: "Mis pedidos" })
 }
 
-describe("Header admin link", () => {
+describe("Header orders link", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify([]), { status: 200 })))
   })
 
-  it("shows the admin editor link to a store owner whose global role is 'user'", async () => {
-    isAdminValue.current = true
-
-    render(<Header />)
-    await screen.findByTestId("header-desktop-classic")
-
-    expect(adminLinks().length).toBeGreaterThan(0)
-  })
-
-  it("hides the admin editor link from a 'user' that manages no store", async () => {
+  it("shows 'Mis pedidos' to an authenticated customer who is not an admin", async () => {
+    isAuthenticatedValue.current = true
     isAdminValue.current = false
 
     render(<Header />)
     await screen.findByTestId("header-desktop-classic")
 
-    expect(adminLinks()).toHaveLength(0)
+    expect(ordersLinks().length).toBeGreaterThan(0)
+    expect(ordersLinks()[0]).toHaveAttribute("href", "/orders")
+  })
+
+  it("also shows 'Mis pedidos' to an authenticated admin", async () => {
+    isAuthenticatedValue.current = true
+    isAdminValue.current = true
+
+    render(<Header />)
+    await screen.findByTestId("header-desktop-classic")
+
+    expect(ordersLinks().length).toBeGreaterThan(0)
+  })
+
+  it("hides 'Mis pedidos' from a guest", async () => {
+    isAuthenticatedValue.current = false
+    isAdminValue.current = false
+
+    render(<Header />)
+    await screen.findByTestId("header-desktop-classic")
+
+    expect(ordersLinks()).toHaveLength(0)
   })
 })

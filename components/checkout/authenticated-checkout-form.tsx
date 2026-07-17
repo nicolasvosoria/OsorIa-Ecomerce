@@ -1,57 +1,77 @@
 "use client"
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Loader } from "@/components/ui/loader"
+import { useEffect } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
 import { toast } from "sonner"
+
+import { PaymentMethodSection } from "@/components/checkout/payment-method-section"
+import { SubmitOrderButton } from "@/components/checkout/submit-order-button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { FormField } from "@/components/ui/form-field"
+import { Input } from "@/components/ui/input"
+import { enabledPaymentMethodIds } from "@/lib/checkout/payment-methods"
+import {
+  authenticatedCheckoutFormSchema,
+  type AuthenticatedCheckoutFormValues,
+} from "@/lib/checkout/schemas"
 import type { UserProfile } from "@/lib/types/user"
+import type { CheckoutPrefill } from "@/app/checkout/actions"
 
 interface AuthenticatedCheckoutFormProps {
   user: UserProfile
-  onComplete: (data: { phone: string; address: string }) => void
+  onComplete: (data: { phone: string; address: string; paymentMethod: string }) => void
   isLoading?: boolean
+  // Llega de forma asíncrona (D4): el formulario nunca espera por esto para
+  // renderizarse, solo aplica los valores cuando lleguen.
+  prefill?: CheckoutPrefill
+}
+
+const DEFAULT_VALUES: AuthenticatedCheckoutFormValues = {
+  customer_phone: "",
+  shipping_address: "",
+  payment_method: enabledPaymentMethodIds()[0],
 }
 
 export function AuthenticatedCheckoutForm({
   user,
   onComplete,
   isLoading = false,
+  prefill,
 }: AuthenticatedCheckoutFormProps) {
-  const [phone, setPhone] = useState("")
-  const [address, setAddress] = useState("")
-  const [errors, setErrors] = useState<{ phone?: string; address?: string }>({})
+  const { register, handleSubmit, formState, setValue } = useForm<AuthenticatedCheckoutFormValues>({
+    resolver: zodResolver(authenticatedCheckoutFormSchema),
+    defaultValues: DEFAULT_VALUES,
+  })
+  const { dirtyFields } = formState
 
-  const validateForm = (): boolean => {
-    const newErrors: { phone?: string; address?: string } = {}
+  // No pisa lo que el usuario ya haya escrito: solo completa un campo si el
+  // pedido más reciente trae un valor y ese campo sigue como llegó (sin tocar).
+  useEffect(() => {
+    if (!prefill) return
 
-    if (!phone.trim()) {
-      newErrors.phone = "El teléfono es requerido"
+    if (prefill.phone && !dirtyFields.customer_phone) {
+      setValue("customer_phone", prefill.phone)
     }
-
-    if (!address.trim()) {
-      newErrors.address = "La dirección es requerida"
+    if (prefill.address && !dirtyFields.shipping_address) {
+      setValue("shipping_address", prefill.address)
     }
+  }, [prefill, dirtyFields.customer_phone, dirtyFields.shipping_address, setValue])
 
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
+  const submitValidatedForm = (values: AuthenticatedCheckoutFormValues) => {
+    onComplete({
+      phone: values.customer_phone,
+      address: values.shipping_address,
+      paymentMethod: values.payment_method,
+    })
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-
-    if (!validateForm()) {
-      toast.error("Por favor, completa todos los campos requeridos")
-      return
-    }
-
-    onComplete({ phone: phone.trim(), address: address.trim() })
+  const rejectInvalidForm = () => {
+    toast.error("Por favor, completa todos los campos requeridos")
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit(submitValidatedForm, rejectInvalidForm)} className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle>Información de Envío</CardTitle>
@@ -60,7 +80,6 @@ export function AuthenticatedCheckoutForm({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Información del usuario (solo lectura) */}
           <div className="p-4 bg-muted rounded-lg space-y-2">
             <p className="text-sm font-medium text-muted-foreground">Información de tu cuenta:</p>
             <div className="space-y-1">
@@ -73,74 +92,46 @@ export function AuthenticatedCheckoutForm({
             </div>
           </div>
 
-          {/* Teléfono */}
-          <div className="space-y-2">
-            <Label htmlFor="phone">
-              Teléfono / Celular <span className="text-destructive">*</span>
-            </Label>
-            <Input
-              id="phone"
-              type="tel"
-              value={phone}
-              onChange={(e) => {
-                setPhone(e.target.value)
-                if (errors.phone) {
-                  setErrors((prev) => ({ ...prev, phone: undefined }))
-                }
-              }}
-              placeholder="+57 300 123 4567"
-              disabled={isLoading}
-              className={errors.phone ? "border-destructive" : ""}
-            />
-            {errors.phone && (
-              <p className="text-sm text-destructive">{errors.phone}</p>
+          <FormField
+            id="customer_phone"
+            label="Teléfono / Celular *"
+            error={formState.errors.customer_phone?.message}
+          >
+            {(fieldProps) => (
+              <Input
+                {...fieldProps}
+                type="tel"
+                placeholder="+57 300 123 4567"
+                disabled={isLoading}
+                {...register("customer_phone")}
+              />
             )}
-          </div>
+          </FormField>
 
-          {/* Dirección */}
-          <div className="space-y-2">
-            <Label htmlFor="address">
-              Dirección de Envío <span className="text-destructive">*</span>
-            </Label>
-            <Input
-              id="address"
-              type="text"
-              value={address}
-              onChange={(e) => {
-                setAddress(e.target.value)
-                if (errors.address) {
-                  setErrors((prev) => ({ ...prev, address: undefined }))
-                }
-              }}
-              placeholder="Calle 123 #45-67"
-              disabled={isLoading}
-              className={errors.address ? "border-destructive" : ""}
-            />
-            {errors.address && (
-              <p className="text-sm text-destructive">{errors.address}</p>
+          <FormField
+            id="shipping_address"
+            label="Dirección de Envío *"
+            error={formState.errors.shipping_address?.message}
+          >
+            {(fieldProps) => (
+              <Input
+                {...fieldProps}
+                placeholder="Calle 123 #45-67"
+                disabled={isLoading}
+                {...register("shipping_address")}
+              />
             )}
-          </div>
+          </FormField>
         </CardContent>
       </Card>
 
-      <div className="flex justify-end gap-4">
-        <Button
-          type="submit"
-          size="lg"
-          disabled={isLoading}
-          className="min-w-[200px]"
-        >
-          {isLoading ? (
-            <>
-              <Loader size="default" className="mr-2" />
-              Procesando...
-            </>
-          ) : (
-            "Continuar con el Pago"
-          )}
-        </Button>
-      </div>
+      <PaymentMethodSection
+        register={register}
+        name="payment_method"
+        error={formState.errors.payment_method?.message}
+      />
+
+      <SubmitOrderButton isLoading={isLoading} />
     </form>
   )
 }
-

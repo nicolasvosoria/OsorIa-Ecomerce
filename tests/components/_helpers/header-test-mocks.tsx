@@ -32,6 +32,7 @@ export const lucideReactMock = {
   Wallet: () => <span aria-hidden="true" />,
   LayoutDashboard: () => <span aria-hidden="true" />,
   Edit: () => <span aria-hidden="true" />,
+  Package: () => <span aria-hidden="true" />,
   Trash2: () => <span aria-hidden="true" />,
   Plus: () => <span aria-hidden="true" />,
   Minus: () => <span aria-hidden="true" />,
@@ -112,6 +113,8 @@ export const adminPermissionsContextMock = {
 
 export const themeSelectorModalMock = { ThemeSelectorModal: () => null }
 export const fontSelectorModalMock = { FontSelectorModal: () => null }
-export const checkoutOptionsDialogMock = { CheckoutOptionsDialog: () => null }
+export const checkoutLoginIntentContextMock = {
+  useCheckoutLoginIntent: () => ({ loginRequestCount: 0, requestLogin: vi.fn() }),
+}
 export const sonnerMock = { toast: { success: vi.fn(), error: vi.fn() } }
 export const authApiMock = { resetPassword: vi.fn() }

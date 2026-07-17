@@ -1,7 +1,7 @@
 import type { CartItem as LocalCartItem } from '@/contexts/cart-context';
 import type { Language } from '@/lib/i18n/translations';
 
-const LANGUAGE_LOCALES: Record<Language, string> = {
+export const LANGUAGE_LOCALES: Record<Language, string> = {
   es: 'es-CO',
   en: 'en-US',
   pt: 'pt-BR',

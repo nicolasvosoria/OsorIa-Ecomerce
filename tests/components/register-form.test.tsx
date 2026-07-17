@@ -4,6 +4,7 @@ import { Header } from '@/components/layout/header'
 import { AdminPermissionsProvider } from '@/contexts/admin-permissions-context'
 import { AuthProvider } from '@/contexts/auth-context'
 import { CartProvider } from '@/contexts/cart-context'
+import { CheckoutLoginIntentProvider } from '@/contexts/checkout-login-intent-context'
 import { FontProvider } from '@/contexts/font-context'
 import { LanguageProvider } from '@/contexts/language-context'
 import { ModeProvider } from '@/contexts/mode-context'
@@ -103,7 +104,9 @@ describe('Formulario de Registro - Componente Header', () => {
                     <FontProvider>
                       <CartProvider>
                         <WishlistProvider>
-                          <Header />
+                          <CheckoutLoginIntentProvider>
+                            <Header />
+                          </CheckoutLoginIntentProvider>
                         </WishlistProvider>
                       </CartProvider>
                     </FontProvider>

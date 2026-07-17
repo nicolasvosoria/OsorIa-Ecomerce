@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { useCart as useLocalCart } from "@/contexts/cart-context"
+import { useCart as useLocalCart, type CartItem } from "@/contexts/cart-context"
 import { GuestCheckoutForm, GuestCustomerData } from "@/components/checkout/guest-checkout-form"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -13,6 +13,10 @@ import { toast } from "sonner"
 import Link from "next/link"
 import { useAuth } from "@/contexts/auth-context"
 import { AuthenticatedCheckoutForm } from "@/components/checkout/authenticated-checkout-form"
+import { GuestLoginBanner } from "@/components/checkout/guest-login-banner"
+import { getCheckoutPrefill, placeCheckoutOrder, type CheckoutPrefill } from "@/app/checkout/actions"
+import { enabledPaymentMethodIds } from "@/lib/checkout/payment-methods"
+import type { CheckoutOrderInput } from "@/lib/checkout/schemas"
 
 export default function CheckoutPage() {
   const router = useRouter()
@@ -21,6 +25,7 @@ export default function CheckoutPage() {
   const { language, t } = useLanguage()
   const [customerData, setCustomerData] = useState<GuestCustomerData | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [prefill, setPrefill] = useState<CheckoutPrefill>(null)
 
   // Limpiar datos previos del checkout al cargar la página
   // Esto asegura que siempre se muestre el formulario para una nueva compra
@@ -30,6 +35,21 @@ export default function CheckoutPage() {
     // no queremos mostrar datos de la compra anterior
     localStorage.removeItem("guest_customer_data")
   }, [])
+
+  // El formulario nunca espera esto para renderizarse (D4): se pide en cuanto
+  // hay sesión y los valores llegan al formulario cuando resuelva la promesa.
+  useEffect(() => {
+    if (!isAuthenticated) return
+
+    let cancelled = false
+    getCheckoutPrefill().then((result) => {
+      if (!cancelled) setPrefill(result)
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [isAuthenticated])
 
   const hasLocalItems = localCart.items.length > 0
   const localSummary = buildLocalCartSummary({
@@ -52,7 +72,11 @@ export default function CheckoutPage() {
   // Para usuarios invitados, mostrar formulario completo
 
   // Función para procesar checkout de usuario autenticado
-  const handleAuthenticatedCheckoutComplete = async (data: { phone: string; address: string }) => {
+  const handleAuthenticatedCheckoutComplete = async (data: {
+    phone: string
+    address: string
+    paymentMethod: string
+  }) => {
     if (!user || !hasLocalItems) return
 
     setIsProcessing(true)
@@ -69,87 +93,38 @@ export default function CheckoutPage() {
         postalCode: "",
         country: "Colombia",
         notes: "",
+        paymentMethod: data.paymentMethod,
       }
 
-      // Crear el pedido con datos del usuario autenticado
-      await processOrder(customerDataForOrder, user.id)
+      // Crear el pedido con datos del usuario autenticado; la sesión del
+      // servidor decide user_id/customer_type, no este componente
+      await processOrder(customerDataForOrder)
     } catch (error: any) {
       console.error("Error procesando checkout autenticado:", error)
-      
-      // Si el error ya tiene un mensaje específico de stock, no mostrar mensaje genérico adicional
-      if (error.message && error.message.includes("stock")) {
-        // El mensaje ya fue mostrado en processOrder
-      } else {
+
+      // Si el error ya tiene un mensaje específico de stock, el mensaje ya fue
+      // mostrado en processOrder: no mostrar uno genérico adicional
+      if (!error.message?.includes("stock")) {
         toast.error(error.message || "Hubo un error al procesar tu pedido. Por favor, intenta de nuevo.")
       }
-      
+
       setIsProcessing(false)
     }
   }
 
   // Función compartida para procesar el pedido
-  const processOrder = async (data: GuestCustomerData, userId?: string | null) => {
+  const processOrder = async (data: GuestCustomerData) => {
     if (!hasLocalItems) {
       throw new Error("El carrito está vacío")
     }
 
     // Preparar los items del pedido desde el carrito local
-    const orderItems = await Promise.all(localCart.items.map(async (item) => {
-      if (item.itemKind === "combo" && item.comboId) {
-        const { buildComboOrderSnapshotById } = await import("@/lib/supabase/combos-api")
-        const snapshot = await buildComboOrderSnapshotById(item.comboId, item.quantity)
-        if (!snapshot || !snapshot.availability.isAvailable) {
-          throw new Error(`No hay suficiente stock disponible para el combo ${item.name}`)
-        }
-
-        return {
-          product_id: undefined,
-          product_name: item.name,
-          product_sku: undefined,
-          variant_id: undefined,
-          variant_title: "Combo",
-          unit_price: snapshot.chargedUnitPrice,
-          quantity: item.quantity,
-          total_price: snapshot.chargedLineTotal,
-          currency_code: snapshot.pricing.currencyCode,
-          product_image_url: item.image || undefined,
-          product_slug: item.productSlug,
-          selected_options: {},
-          metadata: {
-            item_kind: "combo",
-            combo_id: item.comboId,
-            combo_snapshot: snapshot,
-          },
-        }
-      }
-
-      const itemSubtotal = localCart.getItemSubtotal(item)
-      const unitPrice = item.quantity > 0 ? itemSubtotal / item.quantity : 0
-      return {
-        product_id: item.productId || (typeof item.id === "string" ? item.id : undefined),
-        product_name: item.name,
-        product_sku: undefined,
-        variant_id: item.variantId,
-        variant_title: undefined,
-        unit_price: unitPrice,
-        quantity: item.quantity,
-        total_price: itemSubtotal,
-        currency_code: item.currencyCode || "COP",
-        product_image_url: item.image || undefined,
-        product_slug: item.productSlug,
-        selected_options: {},
-      }
-    }))
-    const subtotal = orderItems.reduce((sum, item) => sum + item.total_price, 0)
-    const total = subtotal
-    const currencyCode = orderItems[0]?.currency_code || "COP"
-
-    // Crear el pedido
+    const orderItems = await buildOrderItemsFromCart(localCart.items, localCart.getItemSubtotal)
+    // Crear el pedido. La identidad (sesión), el estado de pago y los totales
+    // los fuerza la server action; el cliente solo envía sus datos y el carrito.
     let order
     try {
-      const orderPayload = {
-        customer_type: userId ? "user" : "guest",
-        user_id: userId || null,
+      const orderPayload: CheckoutOrderInput = {
         customer_email: data.email,
         customer_first_name: data.firstName,
         customer_last_name: data.lastName,
@@ -159,39 +134,20 @@ export default function CheckoutPage() {
         shipping_postal_code: data.postalCode || "",
         shipping_country: data.country,
         shipping_notes: data.notes || undefined,
-        payment_method: "cash_on_delivery", // Por defecto, se puede cambiar
-        payment_status: "pending",
-        subtotal: subtotal,
-        shipping_cost: 0, // Se puede calcular después
-        tax_amount: 0,
-        discount_amount: 0,
-        total_amount: total,
-        currency_code: currencyCode,
+        payment_method: data.paymentMethod || enabledPaymentMethodIds()[0],
         items: orderItems,
       }
 
-      const response = await fetch("/api/orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(orderPayload),
-      })
-
-      const payload = await response.json().catch(() => ({}))
-      if (!response.ok) {
-        const error = new Error(
-          payload?.error || "No se pudo crear el pedido",
-        )
-        if (payload?.validationResult) {
-          ;(error as any).validationResult = payload.validationResult
+      const result = await placeCheckoutOrder(orderPayload)
+      if (!result.success) {
+        const error = new Error(result.error || "No se pudo crear el pedido")
+        if (result.validationResult) {
+          ;(error as any).validationResult = result.validationResult
         }
         throw error
       }
 
-      order = payload.order
-
-      if (!order) {
-        throw new Error("No se pudo crear el pedido")
-      }
+      order = result
     } catch (error: any) {
       // Manejar errores de validación de stock
       if (error.message && error.message.includes("No hay suficiente stock disponible")) {
@@ -221,14 +177,14 @@ export default function CheckoutPage() {
     }
 
     // Guardar el número de pedido en localStorage
-    localStorage.setItem("last_order_number", order.order_number)
-    localStorage.setItem("last_order_id", order.id)
+    localStorage.setItem("last_order_number", order.orderNumber)
+    localStorage.setItem("last_order_id", order.orderId)
 
-    toast.success(`Pedido creado: ${order.order_number}`)
+    toast.success(`Pedido creado: ${order.orderNumber}`)
 
     // Redirigir a la página de éxito
     router.push(
-      `/checkout/success?order=${encodeURIComponent(order.order_number)}&email=${encodeURIComponent(data.email)}`,
+      `/checkout/success?order=${encodeURIComponent(order.orderNumber)}&email=${encodeURIComponent(data.email)}`,
     )
   }
 
@@ -241,17 +197,16 @@ export default function CheckoutPage() {
       localStorage.setItem("guest_customer_data", JSON.stringify(data))
 
       // Procesar el pedido
-      await processOrder(data, null)
+      await processOrder(data)
     } catch (error: any) {
       console.error("Error procesando checkout:", error)
-      
-      // Si el error ya tiene un mensaje específico de stock, no mostrar mensaje genérico adicional
-      if (error.message && error.message.includes("stock")) {
-        // El mensaje ya fue mostrado en processOrder
-      } else {
+
+      // Si el error ya tiene un mensaje específico de stock, el mensaje ya fue
+      // mostrado en processOrder: no mostrar uno genérico adicional
+      if (!error.message?.includes("stock")) {
         toast.error(error.message || "Hubo un error al procesar tu pedido. Por favor, intenta de nuevo.")
       }
-      
+
       // Limpiar el estado si hay un error para que se muestre el formulario nuevamente
       setIsProcessing(false)
       setCustomerData(null)
@@ -327,12 +282,16 @@ export default function CheckoutPage() {
                 user={user}
                 onComplete={handleAuthenticatedCheckoutComplete}
                 isLoading={isProcessing}
+                prefill={prefill}
               />
             ) : (
-              <GuestCheckoutForm
-                onComplete={handleGuestCheckoutComplete}
-                isLoading={isProcessing}
-              />
+              <div className="space-y-6">
+                <GuestLoginBanner />
+                <GuestCheckoutForm
+                  onComplete={handleGuestCheckoutComplete}
+                  isLoading={isProcessing}
+                />
+              </div>
             )
           ) : customerData && isProcessing ? (
             <Card>
@@ -407,16 +366,10 @@ export default function CheckoutPage() {
                   <span className="text-muted-foreground">{t.cart.subtotal}</span>
                   <span>{localSummary.formattedSubtotal}</span>
                 </div>
-                <div className="flex justify-between text-sm">
+                <div className="flex justify-between gap-4 text-sm">
                   <span className="text-muted-foreground">{t.cart.shipping}</span>
-                  <span className="text-muted-foreground">
-                    {t.cart.calculatedAtCheckout}
-                  </span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">{t.cart.tax}</span>
-                  <span className="text-muted-foreground">
-                    {t.cart.calculatedAtCheckout}
+                  <span className="text-right text-muted-foreground">
+                    {t.checkout.shippingConfirmedByStore}
                   </span>
                 </div>
                 <div className="flex justify-between text-lg font-bold pt-2 border-t">
@@ -436,5 +389,61 @@ export default function CheckoutPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+// Combos se repriceean contra su snapshot (buildComboOrderSnapshotById);
+// productos normales usan getItemSubtotal para derivar su unit_price.
+async function buildOrderItemsFromCart(
+  items: CartItem[],
+  getItemSubtotal: (item: CartItem) => number,
+): Promise<CheckoutOrderInput["items"]> {
+  return Promise.all(
+    items.map(async (item) => {
+      if (item.itemKind === "combo" && item.comboId) {
+        const { buildComboOrderSnapshotById } = await import("@/lib/supabase/combos-api")
+        const snapshot = await buildComboOrderSnapshotById(item.comboId, item.quantity)
+        if (!snapshot || !snapshot.availability.isAvailable) {
+          throw new Error(`No hay suficiente stock disponible para el combo ${item.name}`)
+        }
+
+        return {
+          product_id: undefined,
+          product_name: item.name,
+          product_sku: undefined,
+          variant_id: undefined,
+          variant_title: "Combo",
+          unit_price: snapshot.chargedUnitPrice,
+          quantity: item.quantity,
+          total_price: snapshot.chargedLineTotal,
+          currency_code: snapshot.pricing.currencyCode,
+          product_image_url: item.image || undefined,
+          product_slug: item.productSlug,
+          selected_options: {},
+          metadata: {
+            item_kind: "combo",
+            combo_id: item.comboId,
+            combo_snapshot: snapshot,
+          },
+        }
+      }
+
+      const itemSubtotal = getItemSubtotal(item)
+      const unitPrice = item.quantity > 0 ? itemSubtotal / item.quantity : 0
+      return {
+        product_id: item.productId || (typeof item.id === "string" ? item.id : undefined),
+        product_name: item.name,
+        product_sku: undefined,
+        variant_id: item.variantId,
+        variant_title: undefined,
+        unit_price: unitPrice,
+        quantity: item.quantity,
+        total_price: itemSubtotal,
+        currency_code: item.currencyCode || "COP",
+        product_image_url: item.image || undefined,
+        product_slug: item.productSlug,
+        selected_options: {},
+      }
+    }),
   )
 }

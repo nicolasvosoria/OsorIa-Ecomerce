@@ -10,6 +10,7 @@ import { isPlatformAdminHost } from "@/lib/utils/store-host"
 import { FloatingContactButton } from "@/components/ui/floating-contact-button"
 import { Header } from "@/components/layout/header"
 import { FooterNew } from "@/components/sections/footer-new"
+import { CheckoutLoginIntentProvider } from "@/contexts/checkout-login-intent-context"
 import { useHasHydrated } from "@/lib/hooks/use-has-hydrated"
 import { isThemePreviewMode } from "@/lib/theme-font/preview-mode"
 import { sectionLabel } from "@/lib/section-editor/sections-registry"
@@ -61,9 +62,9 @@ export function RouteAwareChrome({ children }: RouteAwareChromeProps) {
   // del pathname (no de la hidratación) para que el árbol del storefront no
   // cambie entre servidor y cliente.
   return (
-    <>
+    <CheckoutLoginIntentProvider>
       {isAdminChromeRoute(pathname) ? pageMain : <MainContentWrapper>{pageMain}</MainContentWrapper>}
       {showStorefrontChrome && <FloatingContactButton />}
-    </>
+    </CheckoutLoginIntentProvider>
   )
 }

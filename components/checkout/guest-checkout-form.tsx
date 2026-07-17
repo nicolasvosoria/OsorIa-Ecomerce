@@ -1,13 +1,20 @@
 "use client"
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Loader } from "@/components/ui/loader"
+import { useForm, type UseFormReturn } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
 import { toast } from "sonner"
 
+import { PaymentMethodSection } from "@/components/checkout/payment-method-section"
+import { SubmitOrderButton } from "@/components/checkout/submit-order-button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { FormField } from "@/components/ui/form-field"
+import { Input } from "@/components/ui/input"
+import { enabledPaymentMethodIds } from "@/lib/checkout/payment-methods"
+import { guestCheckoutFormSchema, type GuestCheckoutFormValues } from "@/lib/checkout/schemas"
+
+// Contrato externo del formulario: lo consumen también la página de checkout y
+// el fallback de la página de éxito, así que se mantiene en camelCase aunque
+// el formulario valide internamente contra el schema compartido (snake_case).
 export interface GuestCustomerData {
   firstName: string
   lastName: string
@@ -18,6 +25,7 @@ export interface GuestCustomerData {
   postalCode?: string
   country?: string
   notes?: string
+  paymentMethod?: string
 }
 
 interface GuestCheckoutFormProps {
@@ -25,278 +33,210 @@ interface GuestCheckoutFormProps {
   isLoading?: boolean
 }
 
+const DEFAULT_VALUES: GuestCheckoutFormValues = {
+  customer_first_name: "",
+  customer_last_name: "",
+  customer_email: "",
+  customer_phone: "",
+  shipping_address: "",
+  shipping_city: "",
+  shipping_postal_code: "",
+  shipping_country: "Colombia",
+  payment_method: enabledPaymentMethodIds()[0],
+}
+
 export function GuestCheckoutForm({ onComplete, isLoading = false }: GuestCheckoutFormProps) {
-  const [formData, setFormData] = useState<GuestCustomerData>({
-    firstName: "",
-    lastName: "",
-    email: "",
-    phone: "",
-    address: "",
-    city: "",
-    postalCode: "",
-    country: "Colombia",
-    notes: "",
+  const form = useForm<GuestCheckoutFormValues>({
+    resolver: zodResolver(guestCheckoutFormSchema),
+    defaultValues: DEFAULT_VALUES,
   })
 
-  const [errors, setErrors] = useState<Partial<Record<keyof GuestCustomerData, string>>>({})
-
-  const validateForm = (): boolean => {
-    const newErrors: Partial<Record<keyof GuestCustomerData, string>> = {}
-
-    if (!formData.firstName.trim()) {
-      newErrors.firstName = "El nombre es requerido"
-    }
-
-    if (!formData.lastName.trim()) {
-      newErrors.lastName = "El apellido es requerido"
-    }
-
-    if (!formData.email.trim()) {
-      newErrors.email = "El correo electrónico es requerido"
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = "El correo electrónico no es válido"
-    }
-
-    if (!formData.phone.trim()) {
-      newErrors.phone = "El teléfono es requerido"
-    }
-
-    if (!formData.address.trim()) {
-      newErrors.address = "La dirección es requerida"
-    }
-
-    setErrors(newErrors)
-    const isValid = Object.keys(newErrors).length === 0
-
-    // Aplicar valores por defecto para campos opcionales antes de enviar
-    if (isValid) {
-      const dataToSubmit = {
-        ...formData,
-        city: formData.city?.trim() || "N/A",
-        postalCode: formData.postalCode?.trim() || "N/A",
-        country: formData.country?.trim() || "Colombia",
-      }
-      setFormData(dataToSubmit)
-    }
-
-    return isValid
+  const submitValidatedForm = (values: GuestCheckoutFormValues) => {
+    onComplete({
+      firstName: values.customer_first_name,
+      lastName: values.customer_last_name,
+      email: values.customer_email,
+      phone: values.customer_phone,
+      address: values.shipping_address,
+      city: values.shipping_city,
+      postalCode: values.shipping_postal_code,
+      country: values.shipping_country,
+      paymentMethod: values.payment_method,
+    })
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-
-    if (!validateForm()) {
-      toast.error("Por favor, completa todos los campos requeridos")
-      return
-    }
-
-    // Asegurar valores por defecto antes de enviar
-    const dataToSubmit: GuestCustomerData = {
-      ...formData,
-      city: formData.city?.trim() || "N/A",
-      postalCode: formData.postalCode?.trim() || "N/A",
-      country: formData.country?.trim() || "Colombia",
-    }
-
-    onComplete(dataToSubmit)
-  }
-
-  const handleChange = (field: keyof GuestCustomerData, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }))
-    // Limpiar error del campo cuando el usuario empiece a escribir
-    if (errors[field]) {
-      setErrors((prev) => ({ ...prev, [field]: undefined }))
-    }
+  const rejectInvalidForm = () => {
+    toast.error("Por favor, completa todos los campos requeridos")
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Información de Contacto</CardTitle>
-          <CardDescription>
-            Completa tus datos para procesar tu pedido
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="firstName">
-                Nombre <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="firstName"
-                type="text"
-                value={formData.firstName}
-                onChange={(e) => handleChange("firstName", e.target.value)}
-                placeholder="Juan"
-                disabled={isLoading}
-                className={errors.firstName ? "border-destructive" : ""}
-              />
-              {errors.firstName && (
-                <p className="text-sm text-destructive">{errors.firstName}</p>
-              )}
-            </div>
+    <form
+      onSubmit={form.handleSubmit(submitValidatedForm, rejectInvalidForm)}
+      className="space-y-6"
+    >
+      <ContactInfoCard form={form} isLoading={isLoading} />
+      <ShippingAddressCard form={form} isLoading={isLoading} />
+      <PaymentMethodSection
+        register={form.register}
+        name="payment_method"
+        error={form.formState.errors.payment_method?.message}
+      />
 
-            <div className="space-y-2">
-              <Label htmlFor="lastName">
-                Apellido <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="lastName"
-                type="text"
-                value={formData.lastName}
-                onChange={(e) => handleChange("lastName", e.target.value)}
-                placeholder="Pérez"
-                disabled={isLoading}
-                className={errors.lastName ? "border-destructive" : ""}
-              />
-              {errors.lastName && (
-                <p className="text-sm text-destructive">{errors.lastName}</p>
-              )}
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="email">
-              Correo Electrónico <span className="text-destructive">*</span>
-            </Label>
-            <Input
-              id="email"
-              type="email"
-              value={formData.email}
-              onChange={(e) => handleChange("email", e.target.value)}
-              placeholder="juan.perez@ejemplo.com"
-              disabled={isLoading}
-              className={errors.email ? "border-destructive" : ""}
-            />
-            {errors.email && (
-              <p className="text-sm text-destructive">{errors.email}</p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="phone">
-              Teléfono <span className="text-destructive">*</span>
-            </Label>
-            <Input
-              id="phone"
-              type="tel"
-              value={formData.phone}
-              onChange={(e) => handleChange("phone", e.target.value)}
-              placeholder="+57 300 123 4567"
-              disabled={isLoading}
-              className={errors.phone ? "border-destructive" : ""}
-            />
-            {errors.phone && (
-              <p className="text-sm text-destructive">{errors.phone}</p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Dirección de Envío</CardTitle>
-          <CardDescription>
-            Ingresa la dirección donde deseas recibir tu pedido
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="address">
-              Dirección <span className="text-destructive">*</span>
-            </Label>
-            <Input
-              id="address"
-              type="text"
-              value={formData.address}
-              onChange={(e) => handleChange("address", e.target.value)}
-              placeholder="Calle 123 #45-67"
-              disabled={isLoading}
-              className={errors.address ? "border-destructive" : ""}
-            />
-            {errors.address && (
-              <p className="text-sm text-destructive">{errors.address}</p>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="city">
-                Ciudad (opcional)
-              </Label>
-              <Input
-                id="city"
-                type="text"
-                value={formData.city || ""}
-                onChange={(e) => handleChange("city", e.target.value)}
-                placeholder="Bogotá"
-                disabled={isLoading}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="postalCode">
-                Código Postal (opcional)
-              </Label>
-              <Input
-                id="postalCode"
-                type="text"
-                value={formData.postalCode || ""}
-                onChange={(e) => handleChange("postalCode", e.target.value)}
-                placeholder="110111"
-                disabled={isLoading}
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="country">
-              País (opcional)
-            </Label>
-            <Input
-              id="country"
-              type="text"
-              value={formData.country || "Colombia"}
-              onChange={(e) => handleChange("country", e.target.value)}
-              placeholder="Colombia"
-              disabled={isLoading}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="flex justify-end gap-4">
-        <Button
-          type="submit"
-          size="lg"
-          disabled={isLoading}
-          className="min-w-[200px]"
-        >
-          {isLoading ? (
-            <>
-              <Loader size="default" className="mr-2" />
-              Procesando...
-            </>
-          ) : (
-            "Continuar con el Pago"
-          )}
-        </Button>
-      </div>
+      <SubmitOrderButton isLoading={isLoading} />
     </form>
   )
 }
 
+function ContactInfoCard({
+  form,
+  isLoading,
+}: {
+  form: UseFormReturn<GuestCheckoutFormValues>
+  isLoading: boolean
+}) {
+  const { register, formState } = form
 
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Información de Contacto</CardTitle>
+        <CardDescription>Completa tus datos para procesar tu pedido</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField
+            id="customer_first_name"
+            label="Nombre *"
+            error={formState.errors.customer_first_name?.message}
+          >
+            {(fieldProps) => (
+              <Input
+                {...fieldProps}
+                placeholder="Juan"
+                disabled={isLoading}
+                {...register("customer_first_name")}
+              />
+            )}
+          </FormField>
 
+          <FormField
+            id="customer_last_name"
+            label="Apellido *"
+            error={formState.errors.customer_last_name?.message}
+          >
+            {(fieldProps) => (
+              <Input
+                {...fieldProps}
+                placeholder="Pérez"
+                disabled={isLoading}
+                {...register("customer_last_name")}
+              />
+            )}
+          </FormField>
+        </div>
 
+        <FormField
+          id="customer_email"
+          label="Correo Electrónico *"
+          error={formState.errors.customer_email?.message}
+        >
+          {(fieldProps) => (
+            <Input
+              {...fieldProps}
+              type="email"
+              placeholder="juan.perez@ejemplo.com"
+              disabled={isLoading}
+              {...register("customer_email")}
+            />
+          )}
+        </FormField>
 
+        <FormField
+          id="customer_phone"
+          label="Teléfono *"
+          error={formState.errors.customer_phone?.message}
+        >
+          {(fieldProps) => (
+            <Input
+              {...fieldProps}
+              type="tel"
+              placeholder="+57 300 123 4567"
+              disabled={isLoading}
+              {...register("customer_phone")}
+            />
+          )}
+        </FormField>
+      </CardContent>
+    </Card>
+  )
+}
 
+function ShippingAddressCard({
+  form,
+  isLoading,
+}: {
+  form: UseFormReturn<GuestCheckoutFormValues>
+  isLoading: boolean
+}) {
+  const { register, formState } = form
 
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Dirección de Envío</CardTitle>
+        <CardDescription>Ingresa la dirección donde deseas recibir tu pedido</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <FormField
+          id="shipping_address"
+          label="Dirección *"
+          error={formState.errors.shipping_address?.message}
+        >
+          {(fieldProps) => (
+            <Input
+              {...fieldProps}
+              placeholder="Calle 123 #45-67"
+              disabled={isLoading}
+              {...register("shipping_address")}
+            />
+          )}
+        </FormField>
 
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField id="shipping_city" label="Ciudad (opcional)">
+            {(fieldProps) => (
+              <Input
+                {...fieldProps}
+                placeholder="Bogotá"
+                disabled={isLoading}
+                {...register("shipping_city")}
+              />
+            )}
+          </FormField>
 
+          <FormField id="shipping_postal_code" label="Código Postal (opcional)">
+            {(fieldProps) => (
+              <Input
+                {...fieldProps}
+                placeholder="110111"
+                disabled={isLoading}
+                {...register("shipping_postal_code")}
+              />
+            )}
+          </FormField>
+        </div>
 
-
-
-
+        <FormField id="shipping_country" label="País (opcional)">
+          {(fieldProps) => (
+            <Input
+              {...fieldProps}
+              placeholder="Colombia"
+              disabled={isLoading}
+              {...register("shipping_country")}
+            />
+          )}
+        </FormField>
+      </CardContent>
+    </Card>
+  )
+}

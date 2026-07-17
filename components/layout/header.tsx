@@ -4,8 +4,7 @@
 import { useState, useMemo, useEffect, useRef } from "react"
 import { useRouter, usePathname, useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { Search, Heart, ShoppingCart, Palette, AlignLeft, Menu, LogIn, LogOut, User, Eye, EyeOff, CreditCard, Building2, Wallet, LayoutDashboard, Edit, X } from "lucide-react"
-import { VisaIcon, MasterCardIcon, AmexIcon } from "@/components/icons/cc-icons"
+import { Search, Heart, ShoppingCart, Palette, AlignLeft, Menu, LogIn, LogOut, User, Eye, EyeOff, LayoutDashboard, Edit, Package, X } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { useComponentStyle } from "@/contexts/styles-context"
@@ -48,16 +47,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -65,9 +54,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { CheckoutOptionsDialog } from "@/components/cart/checkout-options-dialog"
+import { useCheckoutLoginIntent } from "@/contexts/checkout-login-intent-context"
 import { useLanguage } from "@/contexts/language-context"
-import { buildLocalCartSummary, formatCartMoney } from "@/lib/cart/cart-summary"
+import { buildLocalCartSummary } from "@/lib/cart/cart-summary"
 
 /**
  * Single source of truth for the header's editable defaults. Imported by
@@ -116,10 +105,6 @@ export function Header() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [cartOpen, setCartOpen] = useState(false)
   const [loginModalOpen, setLoginModalOpen] = useState(false)
-  const [loginRequiredDialogOpen, setLoginRequiredDialogOpen] = useState(false)
-  const [showCheckoutOptionsDialog, setShowCheckoutOptionsDialog] = useState(false)
-  const [paymentModalOpen, setPaymentModalOpen] = useState(false)
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string | null>(null)
   const [isRegisterMode, setIsRegisterMode] = useState(false)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -133,6 +118,7 @@ export function Header() {
   const [resetEmailSent, setResetEmailSent] = useState(false)
   const [pendingLoginReturnPath, setPendingLoginReturnPath] = useState<string | null>(null)
   const openedLoginReturnIntentRef = useRef<string | null>(null)
+  const handledLoginRequestCountRef = useRef(0)
   const [searchQuery, setSearchQuery] = useState("")
   const [searchSuggestions, setSearchSuggestions] = useState<Array<{ id: string; title: string; slug: string; image?: string }>>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
@@ -150,6 +136,7 @@ export function Header() {
   const { isAdmin } = useAdminPermissions()
   const { store } = useStore()
   const { t, language } = useLanguage()
+  const { loginRequestCount } = useCheckoutLoginIntent()
   const localCartSummary = buildLocalCartSummary({
     items,
     getItemSubtotal,
@@ -221,6 +208,18 @@ export function Header() {
     setIsRegisterMode(false)
     setLoginModalOpen(true)
   }, [searchParams])
+
+  // El banner de invitado en /checkout pide este modal a través del contexto
+  // (D2): cada incremento de loginRequestCount es una nueva solicitud.
+  useEffect(() => {
+    if (handledLoginRequestCountRef.current === loginRequestCount) {
+      return
+    }
+
+    handledLoginRequestCountRef.current = loginRequestCount
+    setIsRegisterMode(false)
+    setLoginModalOpen(true)
+  }, [loginRequestCount])
 
   // Sincronizar el query de búsqueda con la URL cuando esté en /shop
   useEffect(() => {
@@ -540,8 +539,15 @@ export function Header() {
                   : user?.email || "Usuario"}
             </DropdownMenuLabel>
             <DropdownMenuSeparator style={{ backgroundColor: "var(--border)" }} />
+            <DropdownMenuItem asChild style={{ color: "var(--foreground)" }}>
+              <Link href="/orders">
+                <Package className="mr-2 h-4 w-4" />
+                {t.nav.orders}
+              </Link>
+            </DropdownMenuItem>
             {isAdmin && (
               <>
+                <DropdownMenuSeparator style={{ backgroundColor: "var(--border)" }} />
                 <DropdownMenuItem asChild style={{ color: "var(--foreground)" }}>
                   <Link href="/dashboard">
                     <LayoutDashboard className="mr-2 h-4 w-4" />
@@ -859,8 +865,15 @@ export function Header() {
                           : user?.email || "Usuario"}
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator style={{ backgroundColor: "var(--border)" }} />
+                    <DropdownMenuItem asChild style={{ color: "var(--foreground)" }}>
+                      <Link href="/orders">
+                        <Package className="mr-2 h-4 w-4" />
+                        {t.nav.orders}
+                      </Link>
+                    </DropdownMenuItem>
                     {isAdmin && (
                       <>
+                        <DropdownMenuSeparator style={{ backgroundColor: "var(--border)" }} />
                         <DropdownMenuItem asChild style={{ color: "var(--foreground)" }}>
                           <Link href="/dashboard">
                             <LayoutDashboard className="mr-2 h-4 w-4" />
@@ -885,7 +898,7 @@ export function Header() {
                         if (isAdmin && wasOnAdminPage) {
                           router.push('/')
                         }
-                        
+
                         toast.success("Sesión cerrada", {
                           description: "Has cerrado sesión exitosamente",
                           duration: 3000,
@@ -1354,8 +1367,10 @@ export function Header() {
                     e.currentTarget.style.opacity = "1"
                   }}
                   onClick={() => {
-                    // Mostrar diálogo de opciones de checkout (invitado o crear cuenta)
-                    setShowCheckoutOptionsDialog(true)
+                    // D2: la sesión decide el formulario en /checkout, no un
+                    // diálogo intermedio; ambos casos (guest y logueado) navegan directo.
+                    setCartOpen(false)
+                    router.push("/checkout")
                   }}
                 >
                   {t.cart.checkout}
@@ -1763,336 +1778,6 @@ export function Header() {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog de advertencia: Iniciar sesión requerido */}
-      <AlertDialog open={loginRequiredDialogOpen} onOpenChange={setLoginRequiredDialogOpen}>
-        <AlertDialogContent 
-          className="w-[95vw] max-w-[600px] p-8"
-          style={{ backgroundColor: "var(--background)" }}
-        >
-          <AlertDialogHeader className="space-y-4">
-            <AlertDialogTitle 
-              className="text-3xl md:text-4xl font-inter font-bold text-center"
-              style={{ color: "var(--foreground)" }}
-            >
-              {t.header.loginRequired}
-            </AlertDialogTitle>
-            <AlertDialogDescription 
-              className="text-lg md:text-xl text-center mt-4 leading-relaxed"
-              style={{ color: "var(--muted-foreground)" }}
-            >
-              {t.header.loginRequiredDescription}
-              <br />
-              <br />
-              {t.header.loginRequiredDescription2}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="flex-col sm:flex-row gap-3 mt-8">
-            <AlertDialogAction
-              onClick={() => {
-                setLoginRequiredDialogOpen(false)
-                setCartOpen(false)
-                setIsRegisterMode(false)
-                setLoginModalOpen(true)
-              }}
-              className="w-full sm:w-auto text-base px-6 py-3 font-semibold"
-              style={{
-                backgroundColor: "var(--primary)",
-                color: "var(--primary-foreground)",
-              }}
-            >
-              {t.auth.login}
-            </AlertDialogAction>
-            <Button
-              onClick={() => {
-                setLoginRequiredDialogOpen(false)
-                setCartOpen(false)
-                setIsRegisterMode(true)
-                setLoginModalOpen(true)
-              }}
-              className="w-full sm:w-auto text-base px-6 py-3 font-semibold"
-              style={{
-                backgroundColor: "var(--secondary)",
-                color: "var(--secondary-foreground)",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.opacity = "0.9"
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.opacity = "1"
-              }}
-            >
-              Regístrate
-            </Button>
-            <AlertDialogCancel
-              onClick={() => setLoginRequiredDialogOpen(false)}
-              className="w-full sm:w-auto text-base px-6 py-3"
-              style={{
-                borderColor: "var(--border)",
-                color: "var(--foreground)",
-                backgroundColor: "transparent",
-              }}
-            >
-              Cancelar
-            </AlertDialogCancel>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Modal de Medios de Pago */}
-      <Dialog open={paymentModalOpen} onOpenChange={setPaymentModalOpen}>
-        <DialogContent className="w-[95vw] max-w-[500px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-inter font-bold" style={{ color: "var(--foreground)" }}>
-              Seleccionar Medio de Pago
-            </DialogTitle>
-            <DialogDescription className="text-sm" style={{ color: "var(--muted-foreground)" }}>
-              Elige cómo deseas pagar tu compra
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-3 mt-4">
-            {/* Tarjeta de Crédito */}
-            <button
-              type="button"
-              onClick={() => setSelectedPaymentMethod("credit_card")}
-              className={`w-full p-4 rounded-lg border-2 transition-all ${
-                selectedPaymentMethod === "credit_card"
-                  ? "border-primary"
-                  : "border-border"
-              }`}
-              style={{
-                backgroundColor: selectedPaymentMethod === "credit_card" ? "var(--muted)" : "var(--background)",
-                borderColor: selectedPaymentMethod === "credit_card" ? "var(--primary)" : "var(--border)",
-              }}
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-16 h-12 rounded-lg flex items-center justify-center gap-0.5 px-1.5" style={{ backgroundColor: "var(--primary)", opacity: 0.1 }}>
-                  <div className="flex items-center justify-center" style={{ width: "20px", height: "12px" }}>
-                    <VisaIcon className="w-full h-full" style={{ width: "20px", height: "12px" }} />
-                  </div>
-                  <div className="flex items-center justify-center" style={{ width: "20px", height: "12px" }}>
-                    <MasterCardIcon className="w-full h-full" style={{ width: "20px", height: "12px" }} />
-                  </div>
-                  <div className="flex items-center justify-center" style={{ width: "20px", height: "12px" }}>
-                    <AmexIcon className="w-full h-full" style={{ width: "20px", height: "12px" }} />
-                  </div>
-                </div>
-                <div className="flex-1 text-left">
-                  <p className="font-semibold" style={{ color: "var(--foreground)" }}>Tarjeta de Crédito</p>
-                  <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>Visa, Mastercard, American Express</p>
-                </div>
-                {selectedPaymentMethod === "credit_card" && (
-                  <div className="w-5 h-5 rounded-full" style={{ backgroundColor: "var(--primary)" }}>
-                    <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                )}
-              </div>
-            </button>
-
-            {/* Tarjeta de Débito */}
-            <button
-              type="button"
-              onClick={() => setSelectedPaymentMethod("debit_card")}
-              className={`w-full p-4 rounded-lg border-2 transition-all ${
-                selectedPaymentMethod === "debit_card"
-                  ? "border-primary"
-                  : "border-border"
-              }`}
-              style={{
-                backgroundColor: selectedPaymentMethod === "debit_card" ? "var(--muted)" : "var(--background)",
-                borderColor: selectedPaymentMethod === "debit_card" ? "var(--primary)" : "var(--border)",
-              }}
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: "var(--primary)", opacity: 0.1 }}>
-                  <CreditCard className="w-6 h-6" style={{ color: "var(--primary)" }} />
-                </div>
-                <div className="flex-1 text-left">
-                  <p className="font-semibold" style={{ color: "var(--foreground)" }}>Tarjeta de Débito</p>
-                  <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>Pago directo desde tu cuenta</p>
-                </div>
-                {selectedPaymentMethod === "debit_card" && (
-                  <div className="w-5 h-5 rounded-full" style={{ backgroundColor: "var(--primary)" }}>
-                    <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                )}
-              </div>
-            </button>
-
-            {/* PayPal */}
-            <button
-              type="button"
-              onClick={() => setSelectedPaymentMethod("paypal")}
-              className={`w-full p-4 rounded-lg border-2 transition-all ${
-                selectedPaymentMethod === "paypal"
-                  ? "border-primary"
-                  : "border-border"
-              }`}
-              style={{
-                backgroundColor: selectedPaymentMethod === "paypal" ? "var(--muted)" : "var(--background)",
-                borderColor: selectedPaymentMethod === "paypal" ? "var(--primary)" : "var(--border)",
-              }}
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: "#0070ba", opacity: 0.15 }}>
-                  <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M7.076 18.337H2.47a.641.641 0 0 1-.633-.74L4.944.901C5.026.382 5.474 0 5.998 0h7.46c2.57 0 4.578.543 5.69 1.81 1.174 1.305 1.05 2.785.927 3.723l-.122.95c-.061.46-.41.85-.87.85h-2.05c-.276 0-.508.19-.55.46l-.127.99c-.042.33-.31.58-.64.58h-1.48c-.276 0-.508.19-.55.46l-.127.99c-.042.33-.31.58-.64.58h-2.05c-.276 0-.508.19-.55.46l-.127.99c-.042.33-.31.58-.64.58H8.14c-.276 0-.508.19-.55.46l-.127.99c-.042.33-.31.58-.64.58H5.998c-.276 0-.508.19-.55.46l-.127.99c-.042.33-.31.58-.64.58z" fill="#0070ba"/>
-                  </svg>
-                </div>
-                <div className="flex-1 text-left">
-                  <p className="font-semibold" style={{ color: "var(--foreground)" }}>PayPal</p>
-                  <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>Paga con tu cuenta PayPal</p>
-                </div>
-                {selectedPaymentMethod === "paypal" && (
-                  <div className="w-5 h-5 rounded-full" style={{ backgroundColor: "var(--primary)" }}>
-                    <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                )}
-              </div>
-            </button>
-
-            {/* Transferencia Bancaria */}
-            <button
-              type="button"
-              onClick={() => setSelectedPaymentMethod("bank_transfer")}
-              className={`w-full p-4 rounded-lg border-2 transition-all ${
-                selectedPaymentMethod === "bank_transfer"
-                  ? "border-primary"
-                  : "border-border"
-              }`}
-              style={{
-                backgroundColor: selectedPaymentMethod === "bank_transfer" ? "var(--muted)" : "var(--background)",
-                borderColor: selectedPaymentMethod === "bank_transfer" ? "var(--primary)" : "var(--border)",
-              }}
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: "var(--primary)", opacity: 0.1 }}>
-                  <Building2 className="w-6 h-6" style={{ color: "var(--primary)" }} />
-                </div>
-                <div className="flex-1 text-left">
-                  <p className="font-semibold" style={{ color: "var(--foreground)" }}>Transferencia Bancaria</p>
-                  <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>Pago directo desde tu banco</p>
-                </div>
-                {selectedPaymentMethod === "bank_transfer" && (
-                  <div className="w-5 h-5 rounded-full" style={{ backgroundColor: "var(--primary)" }}>
-                    <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                )}
-              </div>
-            </button>
-
-            {/* Efectivo al Recoger */}
-            <button
-              type="button"
-              onClick={() => setSelectedPaymentMethod("cash_on_delivery")}
-              className={`w-full p-4 rounded-lg border-2 transition-all ${
-                selectedPaymentMethod === "cash_on_delivery"
-                  ? "border-primary"
-                  : "border-border"
-              }`}
-              style={{
-                backgroundColor: selectedPaymentMethod === "cash_on_delivery" ? "var(--muted)" : "var(--background)",
-                borderColor: selectedPaymentMethod === "cash_on_delivery" ? "var(--primary)" : "var(--border)",
-              }}
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: "var(--primary)", opacity: 0.1 }}>
-                  <Wallet className="w-6 h-6" style={{ color: "var(--primary)" }} />
-                </div>
-                <div className="flex-1 text-left">
-                  <p className="font-semibold" style={{ color: "var(--foreground)" }}>Efectivo al Recoger</p>
-                  <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>Paga cuando recibas tu pedido</p>
-                </div>
-                {selectedPaymentMethod === "cash_on_delivery" && (
-                  <div className="w-5 h-5 rounded-full" style={{ backgroundColor: "var(--primary)" }}>
-                    <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                )}
-              </div>
-            </button>
-          </div>
-
-          {/* Resumen de compra */}
-          <div className="mt-6 p-4 rounded-lg" style={{ backgroundColor: "var(--muted)" }}>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm" style={{ color: "var(--muted-foreground)" }}>{t.cart.subtotal}:</span>
-              <span className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>
-                {localCartSummary.formattedTotal}
-              </span>
-            </div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm" style={{ color: "var(--muted-foreground)" }}>{t.cart.shipping}:</span>
-              <span className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>
-                {formatCartMoney(0, localCartSummary.currencyCode, language)}
-              </span>
-            </div>
-            <div className="border-t pt-2 mt-2" style={{ borderColor: "var(--border)" }}>
-              <div className="flex items-center justify-between">
-                <span className="text-base font-semibold" style={{ color: "var(--foreground)" }}>{t.cart.total}:</span>
-                <span className="text-xl font-bold" style={{ color: "var(--primary)" }}>
-                  {localCartSummary.formattedTotal}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Botones de acción */}
-          <div className="flex flex-col gap-2 mt-6">
-            <Button
-              onClick={() => {
-                if (!selectedPaymentMethod) {
-                  toast.error(t.cart.selectPaymentMethod, {
-                    description: t.cart.selectPaymentMethodDescription,
-                    duration: 3000,
-                  })
-                  return
-                }
-                // Aquí iría la lógica para procesar el pago
-                toast.success(t.cart.purchaseProcessed, {
-                  description: t.cart.purchaseProcessedDescription.replace('{method}', getPaymentMethodName(selectedPaymentMethod)),
-                  duration: 3000,
-                })
-                setPaymentModalOpen(false)
-                setCartOpen(false)
-                setSelectedPaymentMethod(null)
-              }}
-              className="w-full"
-              style={{
-                backgroundColor: "var(--primary)",
-                color: "var(--primary-foreground)",
-              }}
-              disabled={!selectedPaymentMethod}
-            >
-              {t.header.confirmPayment}
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setPaymentModalOpen(false)
-                setSelectedPaymentMethod(null)
-              }}
-              className="w-full"
-              style={{
-                borderColor: "var(--border)",
-                color: "var(--foreground)",
-              }}
-            >
-              Cancelar
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
       {/* Modal de Recuperación de Contraseña */}
       <Dialog 
         open={forgotPasswordModalOpen} 
@@ -2247,25 +1932,6 @@ export function Header() {
           )}
         </DialogContent>
       </Dialog>
-
-      {/* Diálogo de opciones de checkout */}
-      <CheckoutOptionsDialog
-        open={showCheckoutOptionsDialog}
-        onOpenChange={setShowCheckoutOptionsDialog}
-        onCloseCart={() => setCartOpen(false)}
-      />
     </header>
   )
-}
-
-// Función helper para obtener el nombre del método de pago
-function getPaymentMethodName(method: string): string {
-  const methods: Record<string, string> = {
-    credit_card: "Tarjeta de Crédito",
-    debit_card: "Tarjeta de Débito",
-    paypal: "PayPal",
-    bank_transfer: "Transferencia Bancaria",
-    cash_on_delivery: "Efectivo al Recoger",
-  }
-  return methods[method] || method
 }
