@@ -11,6 +11,8 @@ import { LanguageProvider } from "@/contexts/language-context"
 import type { UserProfile } from "@/lib/types/user"
 
 const SUBMIT_LABEL = "Realizar pedido"
+const FIRST_NAME_LABEL = "Nombre *"
+const LAST_NAME_LABEL = "Apellido *"
 const PHONE_LABEL = "Teléfono / Celular *"
 const ADDRESS_LABEL = "Dirección de Envío *"
 
@@ -21,10 +23,21 @@ const ACCOUNT_USER: UserProfile = {
   last_name: "Lovelace",
 }
 
-function renderAuthenticatedForm(onComplete = vi.fn(), prefill?: CheckoutPrefill) {
+const NAMELESS_ACCOUNT_USER: UserProfile = {
+  id: "user-2",
+  email: "sin-nombre@example.com",
+  first_name: null,
+  last_name: null,
+}
+
+function renderAuthenticatedForm(
+  onComplete = vi.fn(),
+  prefill?: CheckoutPrefill,
+  user: UserProfile = ACCOUNT_USER,
+) {
   const { rerender } = render(
     <LanguageProvider>
-      <AuthenticatedCheckoutForm user={ACCOUNT_USER} onComplete={onComplete} prefill={prefill} />
+      <AuthenticatedCheckoutForm user={user} onComplete={onComplete} prefill={prefill} />
     </LanguageProvider>,
   )
 
@@ -33,20 +46,28 @@ function renderAuthenticatedForm(onComplete = vi.fn(), prefill?: CheckoutPrefill
     rerenderWithPrefill: (nextPrefill: CheckoutPrefill) =>
       rerender(
         <LanguageProvider>
-          <AuthenticatedCheckoutForm user={ACCOUNT_USER} onComplete={onComplete} prefill={nextPrefill} />
+          <AuthenticatedCheckoutForm user={user} onComplete={onComplete} prefill={nextPrefill} />
         </LanguageProvider>,
       ),
   }
 }
 
 describe("AuthenticatedCheckoutForm account data", () => {
-  it("shows the signed-in user's name and email as read-only, with no editable fields for them", () => {
+  it("keeps the email read-only and prefills name inputs from the profile", () => {
     renderAuthenticatedForm()
 
-    expect(screen.getByText(/Ada Lovelace/)).toBeInTheDocument()
     expect(screen.getByText("ada@example.com")).toBeInTheDocument()
-    // Solo teléfono y dirección son editables; nombre/correo vienen de la cuenta.
-    expect(screen.getAllByRole("textbox")).toHaveLength(2)
+    expect(screen.getByLabelText(FIRST_NAME_LABEL)).toHaveValue("Ada")
+    expect(screen.getByLabelText(LAST_NAME_LABEL)).toHaveValue("Lovelace")
+    // Nombre, apellido, teléfono y dirección son editables; solo el correo es de solo lectura.
+    expect(screen.getAllByRole("textbox")).toHaveLength(4)
+  })
+
+  it("renders empty, editable name inputs when the profile has no name", () => {
+    renderAuthenticatedForm(vi.fn(), undefined, NAMELESS_ACCOUNT_USER)
+
+    expect(screen.getByLabelText(FIRST_NAME_LABEL)).toHaveValue("")
+    expect(screen.getByLabelText(LAST_NAME_LABEL)).toHaveValue("")
   })
 })
 
@@ -64,10 +85,49 @@ describe("AuthenticatedCheckoutForm field validation", () => {
       "El teléfono es requerido",
     )
   })
+
+  it("blocks submit and shows required errors when the account has no name", async () => {
+    renderAuthenticatedForm(vi.fn(), undefined, NAMELESS_ACCOUNT_USER)
+
+    fireEvent.change(screen.getByLabelText(PHONE_LABEL), { target: { value: "3001234567" } })
+    fireEvent.change(screen.getByLabelText(ADDRESS_LABEL), { target: { value: "Calle 123" } })
+    fireEvent.click(screen.getByRole("button", { name: SUBMIT_LABEL }))
+
+    const firstName = await screen.findByLabelText(FIRST_NAME_LABEL)
+    const lastName = screen.getByLabelText(LAST_NAME_LABEL)
+    await waitFor(() => expect(firstName).toHaveAttribute("aria-invalid", "true"))
+    expect(lastName).toHaveAttribute("aria-invalid", "true")
+
+    expect(
+      document.getElementById(firstName.getAttribute("aria-describedby") as string),
+    ).toHaveTextContent("El nombre es requerido")
+    expect(
+      document.getElementById(lastName.getAttribute("aria-describedby") as string),
+    ).toHaveTextContent("El apellido es requerido")
+  })
+
+  it("lets a nameless account fill in first and last name and submit successfully", async () => {
+    const { onComplete } = renderAuthenticatedForm(vi.fn(), undefined, NAMELESS_ACCOUNT_USER)
+
+    fireEvent.change(screen.getByLabelText(FIRST_NAME_LABEL), { target: { value: "Sin" } })
+    fireEvent.change(screen.getByLabelText(LAST_NAME_LABEL), { target: { value: "Nombre" } })
+    fireEvent.change(screen.getByLabelText(PHONE_LABEL), { target: { value: "3001234567" } })
+    fireEvent.change(screen.getByLabelText(ADDRESS_LABEL), { target: { value: "Calle 123" } })
+    fireEvent.click(screen.getByRole("button", { name: SUBMIT_LABEL }))
+
+    await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1))
+    expect(onComplete).toHaveBeenCalledWith({
+      firstName: "Sin",
+      lastName: "Nombre",
+      phone: "3001234567",
+      address: "Calle 123",
+      paymentMethod: "cash_on_delivery",
+    })
+  })
 })
 
 describe("AuthenticatedCheckoutForm payment method section", () => {
-  it("renders the enabled method from the registry and forwards it in the payload", async () => {
+  it("renders the enabled method from the registry and forwards the payload with the profile's name", async () => {
     const { onComplete } = renderAuthenticatedForm()
 
     expect(screen.getByRole("radio", { name: /Pago contra entrega/ })).toBeChecked()
@@ -82,6 +142,8 @@ describe("AuthenticatedCheckoutForm payment method section", () => {
 
     await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1))
     expect(onComplete).toHaveBeenCalledWith({
+      firstName: "Ada",
+      lastName: "Lovelace",
       phone: "3001234567",
       address: "Calle 123",
       paymentMethod: "cash_on_delivery",

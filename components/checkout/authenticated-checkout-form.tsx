@@ -20,17 +20,27 @@ import type { CheckoutPrefill } from "@/app/checkout/actions"
 
 interface AuthenticatedCheckoutFormProps {
   user: UserProfile
-  onComplete: (data: { phone: string; address: string; paymentMethod: string }) => void
+  onComplete: (data: {
+    firstName: string
+    lastName: string
+    phone: string
+    address: string
+    paymentMethod: string
+  }) => void
   isLoading?: boolean
   // Llega de forma asíncrona (D4): el formulario nunca espera por esto para
   // renderizarse, solo aplica los valores cuando lleguen.
   prefill?: CheckoutPrefill
 }
 
-const DEFAULT_VALUES: AuthenticatedCheckoutFormValues = {
-  customer_phone: "",
-  shipping_address: "",
-  payment_method: enabledPaymentMethodIds()[0],
+function buildDefaultValues(user: UserProfile): AuthenticatedCheckoutFormValues {
+  return {
+    customer_first_name: user.first_name ?? "",
+    customer_last_name: user.last_name ?? "",
+    customer_phone: "",
+    shipping_address: "",
+    payment_method: enabledPaymentMethodIds()[0],
+  }
 }
 
 export function AuthenticatedCheckoutForm({
@@ -41,13 +51,22 @@ export function AuthenticatedCheckoutForm({
 }: AuthenticatedCheckoutFormProps) {
   const { register, handleSubmit, formState, setValue } = useForm<AuthenticatedCheckoutFormValues>({
     resolver: zodResolver(authenticatedCheckoutFormSchema),
-    defaultValues: DEFAULT_VALUES,
+    defaultValues: buildDefaultValues(user),
   })
   const { dirtyFields } = formState
 
-  // No pisa lo que el usuario ya haya escrito: solo completa un campo si el
-  // pedido más reciente trae un valor y ese campo sigue como llegó (sin tocar).
+  // No pisa lo que el usuario ya haya escrito: solo completa un campo si hay
+  // un valor con el que precargarlo y ese campo sigue como llegó (sin tocar).
+  // El nombre sale del perfil de la cuenta (puede faltar); teléfono y
+  // dirección salen del pedido más reciente, que llega de forma asíncrona.
   useEffect(() => {
+    if (user.first_name && !dirtyFields.customer_first_name) {
+      setValue("customer_first_name", user.first_name)
+    }
+    if (user.last_name && !dirtyFields.customer_last_name) {
+      setValue("customer_last_name", user.last_name)
+    }
+
     if (!prefill) return
 
     if (prefill.phone && !dirtyFields.customer_phone) {
@@ -56,10 +75,20 @@ export function AuthenticatedCheckoutForm({
     if (prefill.address && !dirtyFields.shipping_address) {
       setValue("shipping_address", prefill.address)
     }
-  }, [prefill, dirtyFields.customer_phone, dirtyFields.shipping_address, setValue])
+  }, [
+    user,
+    prefill,
+    dirtyFields.customer_first_name,
+    dirtyFields.customer_last_name,
+    dirtyFields.customer_phone,
+    dirtyFields.shipping_address,
+    setValue,
+  ])
 
   const submitValidatedForm = (values: AuthenticatedCheckoutFormValues) => {
     onComplete({
+      firstName: values.customer_first_name,
+      lastName: values.customer_last_name,
       phone: values.customer_phone,
       address: values.shipping_address,
       paymentMethod: values.payment_method,
@@ -82,14 +111,41 @@ export function AuthenticatedCheckoutForm({
         <CardContent className="space-y-4">
           <div className="p-4 bg-muted rounded-lg space-y-2">
             <p className="text-sm font-medium text-muted-foreground">Información de tu cuenta:</p>
-            <div className="space-y-1">
-              <p className="text-sm">
-                <strong>Nombre:</strong> {user.first_name || ""} {user.last_name || ""}
-              </p>
-              <p className="text-sm">
-                <strong>Correo:</strong> {user.email}
-              </p>
-            </div>
+            <p className="text-sm">
+              <strong>Correo:</strong> {user.email}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField
+              id="customer_first_name"
+              label="Nombre *"
+              error={formState.errors.customer_first_name?.message}
+            >
+              {(fieldProps) => (
+                <Input
+                  {...fieldProps}
+                  placeholder="Juan"
+                  disabled={isLoading}
+                  {...register("customer_first_name")}
+                />
+              )}
+            </FormField>
+
+            <FormField
+              id="customer_last_name"
+              label="Apellido *"
+              error={formState.errors.customer_last_name?.message}
+            >
+              {(fieldProps) => (
+                <Input
+                  {...fieldProps}
+                  placeholder="Pérez"
+                  disabled={isLoading}
+                  {...register("customer_last_name")}
+                />
+              )}
+            </FormField>
           </div>
 
           <FormField

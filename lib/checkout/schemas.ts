@@ -65,10 +65,11 @@ export const guestCheckoutFormSchema = checkoutOrderSchema.omit({ items: true, n
 
 export type GuestCheckoutFormValues = z.input<typeof guestCheckoutFormSchema>
 
-// Lo que edita un usuario autenticado: nombre y correo ya vienen de su cuenta,
-// así que solo pide teléfono, dirección y método de pago.
+// Lo que edita un usuario autenticado: el correo ya viene de su cuenta (es su
+// identidad), pero el nombre puede faltar en el perfil, así que el formulario
+// lo pide igual que el invitado y lo precarga cuando el perfil lo trae.
 export const authenticatedCheckoutFormSchema = checkoutOrderSchema
-  .pick({ shipping_address: true })
+  .pick({ customer_first_name: true, customer_last_name: true, shipping_address: true })
   .extend({
     customer_phone: requiredPhoneField,
     payment_method: paymentMethodField,

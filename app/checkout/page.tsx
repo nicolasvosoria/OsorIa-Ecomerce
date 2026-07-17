@@ -73,6 +73,8 @@ export default function CheckoutPage() {
 
   // Función para procesar checkout de usuario autenticado
   const handleAuthenticatedCheckoutComplete = async (data: {
+    firstName: string
+    lastName: string
     phone: string
     address: string
     paymentMethod: string
@@ -82,10 +84,11 @@ export default function CheckoutPage() {
     setIsProcessing(true)
 
     try {
-      // Preparar datos del cliente desde el perfil del usuario
+      // El nombre lo captura el formulario (el perfil puede no traerlo); el
+      // correo sigue viniendo de la cuenta porque es de solo lectura.
       const customerDataForOrder: GuestCustomerData = {
-        firstName: user.first_name || "",
-        lastName: user.last_name || "",
+        firstName: data.firstName,
+        lastName: data.lastName,
         email: user.email || "",
         phone: data.phone,
         address: data.address,
