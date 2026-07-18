@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72" role="img" aria-label="Cumbre Dorada">
+  <rect width="72" height="72" rx="16" fill="#3B2A1E"/>
+  <circle cx="50" cy="20" r="6.5" fill="#C9A227"/>
+  <path d="M12 54 L30 24 L41 42 L54 20 L66 54 Z" fill="#C9A227"/>
+  <path d="M12 54 L66 54" stroke="#C9A227" stroke-width="3" stroke-linecap="round"/>
+</svg>

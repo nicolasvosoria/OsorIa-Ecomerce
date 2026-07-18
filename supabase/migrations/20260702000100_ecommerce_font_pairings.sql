@@ -88,7 +88,13 @@ join ecommerce.app_fonts bf on bf.font_name = p.body_font_name;
 alter view if exists ecommerce.app_font_pairings_legacy set (security_invoker = true);
 grant select on ecommerce.app_font_pairings_legacy to anon, authenticated, service_role;
 
-update ecommerce.app_fonts set font_axis = 'Inter:wght@400;500;600' where font_name = 'Inter' and font_axis is null;
+-- #2339 reconciliation: 'Inter' (default body font) was hand-inserted on staging,
+-- but no migration creates it, so a fresh db push/reset failed the app_font_pairings
+-- FK below (body_font_name='Inter'). Upsert makes the chain self-contained for new
+-- projects and stays a no-op on staging (where 'Inter' already exists).
+insert into ecommerce.app_fonts (font_name, font_family, font_display_name, google_font_url, css_font_family, font_axis, is_active)
+values ('Inter', '"Inter", sans-serif', 'Inter', 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap', '"Inter", sans-serif', 'Inter:wght@400;500;600', true)
+on conflict (font_name) do update set font_axis = excluded.font_axis;
 
 insert into ecommerce.app_fonts (font_name, font_family, font_display_name, google_font_url, css_font_family, font_axis, is_active)
 values
