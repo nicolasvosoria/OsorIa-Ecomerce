@@ -4,6 +4,7 @@ import {
 } from "@/lib/theme-font/runtime-contract";
 import type { ThemeMode } from "@/lib/types/theme";
 import type { HomeSectionEntry } from "@/lib/supabase/types";
+import { resolveShopConfig, type ShopConfig } from "@/lib/shop/shop-config";
 
 export const THEME_PREVIEW_QUERY_PARAM = "themePreview";
 export const THEME_PREVIEW_MESSAGE_SOURCE = "osoria-theme-preview";
@@ -192,4 +193,31 @@ export function parseThemePreviewCompositionMessage(
   }
 
   return { source: THEME_PREVIEW_COMPOSITION_SOURCE, composition };
+}
+
+export const THEME_PREVIEW_SHOP_CONFIG_SOURCE = "osoria-shop-config-preview";
+
+export interface ThemePreviewShopConfigMessage {
+  source: typeof THEME_PREVIEW_SHOP_CONFIG_SOURCE;
+  config: ShopConfig;
+}
+
+/**
+ * The config is re-validated through `resolveShopConfig` — the same coercion
+ * `getShopConfig` applies to a stored row — so a malformed preview payload
+ * safely resolves to the full defaults instead of reaching the storefront
+ * untyped.
+ */
+export function parseThemePreviewShopConfigMessage(
+  data: unknown,
+): ThemePreviewShopConfigMessage | null {
+  if (typeof data !== "object" || data === null) return null;
+
+  const raw = data as Record<string, unknown>;
+  if (raw.source !== THEME_PREVIEW_SHOP_CONFIG_SOURCE) return null;
+
+  return {
+    source: THEME_PREVIEW_SHOP_CONFIG_SOURCE,
+    config: resolveShopConfig(raw.config),
+  };
 }

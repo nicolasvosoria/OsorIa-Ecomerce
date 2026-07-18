@@ -8,14 +8,17 @@ import {
   parseThemePreviewSelectionMessage,
   parseThemePreviewContentMessage,
   parseThemePreviewCompositionMessage,
+  parseThemePreviewShopConfigMessage,
   THEME_PREVIEW_MESSAGE_SOURCE,
   THEME_PREVIEW_FONT_SOURCE,
   THEME_PREVIEW_SELECT_SOURCE,
   THEME_PREVIEW_SELECTION_SOURCE,
   THEME_PREVIEW_CONTENT_SOURCE,
   THEME_PREVIEW_COMPOSITION_SOURCE,
+  THEME_PREVIEW_SHOP_CONFIG_SOURCE,
 } from "@/lib/theme-font/preview-mode";
 import { DEFAULT_RUNTIME_THEME } from "@/lib/theme-font/runtime-contract";
+import { DEFAULT_SHOP_CONFIG } from "@/lib/shop/shop-config";
 
 function setSearch(search: string) {
   window.history.replaceState(null, "", `/${search}`);
@@ -316,5 +319,53 @@ describe("parseThemePreviewCompositionMessage", () => {
   it("rejects non-object payloads", () => {
     expect(parseThemePreviewCompositionMessage(null)).toBeNull();
     expect(parseThemePreviewCompositionMessage("osoria-theme-composition")).toBeNull();
+  });
+});
+
+describe("parseThemePreviewShopConfigMessage", () => {
+  const validPayload = {
+    source: THEME_PREVIEW_SHOP_CONFIG_SOURCE,
+    config: {
+      defaultSort: "price-asc",
+      filters: { ...DEFAULT_SHOP_CONFIG.filters, enOferta: false },
+    },
+  };
+
+  it("accepts a well-formed shop config message", () => {
+    const parsed = parseThemePreviewShopConfigMessage(validPayload);
+
+    expect(parsed).not.toBeNull();
+    expect(parsed?.config.defaultSort).toBe("price-asc");
+    expect(parsed?.config.filters.enOferta).toBe(false);
+  });
+
+  it("rejects a message with the wrong source", () => {
+    expect(
+      parseThemePreviewShopConfigMessage({ ...validPayload, source: "something-else" }),
+    ).toBeNull();
+  });
+
+  it("normalizes a malformed config through resolveShopConfig instead of rejecting it", () => {
+    const parsed = parseThemePreviewShopConfigMessage({
+      source: THEME_PREVIEW_SHOP_CONFIG_SOURCE,
+      config: { defaultSort: "bogus-sort", filters: "nope" },
+    });
+
+    expect(parsed).not.toBeNull();
+    expect(parsed?.config).toEqual(DEFAULT_SHOP_CONFIG);
+  });
+
+  it("resolves a missing config to the full defaults", () => {
+    const parsed = parseThemePreviewShopConfigMessage({
+      source: THEME_PREVIEW_SHOP_CONFIG_SOURCE,
+    });
+
+    expect(parsed).not.toBeNull();
+    expect(parsed?.config).toEqual(DEFAULT_SHOP_CONFIG);
+  });
+
+  it("rejects non-object payloads", () => {
+    expect(parseThemePreviewShopConfigMessage(null)).toBeNull();
+    expect(parseThemePreviewShopConfigMessage("osoria-shop-config-preview")).toBeNull();
   });
 });

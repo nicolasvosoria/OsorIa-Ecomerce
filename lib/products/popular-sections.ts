@@ -12,7 +12,8 @@
  */
 import { formatCommercePrice } from "@/lib/products/pricing"
 import { toCommerceProductCard } from "@/lib/products/adapter"
-import { getCategories, getItemById, getItems } from "@/lib/supabase/products-api"
+import { getCategories, getItems } from "@/lib/supabase/products-api"
+import { getItemById } from "@/lib/supabase/products-read"
 import { getTopSellingProductIds } from "@/lib/supabase/stats-api"
 import { getRuntimeStoreId } from "@/lib/utils/store"
 import type { CommerceProductCard, GetItemsParams, ItemCategory } from "@/lib/types/products"
@@ -76,7 +77,7 @@ async function buildCategoryTile(category: ItemCategory, imageOverride?: string)
     imageUrl: imageOverride || category.category_image_url || undefined,
     startingPriceLabel: startingPrice.label,
     startingPriceAmount: startingPrice.amount,
-    href: `/catalog/${slug}`,
+    href: `/shop/${slug}`,
   }
 }
 

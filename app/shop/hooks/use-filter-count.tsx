@@ -1,12 +1,15 @@
 'use client';
 
-import { useQueryState, parseAsArrayOf, parseAsString } from 'nuqs';
+import { useQueryState, parseAsArrayOf, parseAsInteger, parseAsString } from 'nuqs';
 import { useParams } from 'next/navigation';
 
 export function useFilterCount() {
   const params = useParams<{ collection: string }>();
   const [color] = useQueryState('fcolor', parseAsArrayOf(parseAsString).withDefault([]));
   const [kind] = useQueryState('kind', parseAsString.withDefault('all'));
+  const [oferta] = useQueryState('oferta', parseAsString.withDefault(''));
+  const [priceMin] = useQueryState('price_min', parseAsInteger);
+  const [priceMax] = useQueryState('price_max', parseAsInteger);
 
   // Count active filters
   let count = 0;
@@ -17,6 +20,14 @@ export function useFilterCount() {
   }
 
   if (kind === 'combo') {
+    count += 1;
+  }
+
+  if (oferta === '1') {
+    count += 1;
+  }
+
+  if (priceMin !== null || priceMax !== null) {
     count += 1;
   }
 

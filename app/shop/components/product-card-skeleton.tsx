@@ -1,5 +1,11 @@
 export const ProductCardSkeleton = () => {
   return (
-    <div className="aspect-square animate-pulse bg-gradient-to-br from-neutral-200 to-neutral-200/30 odd:bg-gradient-to-br odd:from-neutral-200/30 odd:to-neutral-200" />
-  );
-};
+    <div className="animate-pulse overflow-hidden rounded-card bg-muted">
+      <div className="aspect-square bg-background" />
+      <div className="space-y-3 p-4 sm:p-5">
+        <div className="h-4 w-3/4 rounded bg-background/60" />
+        <div className="h-5 w-1/3 rounded bg-background/60" />
+      </div>
+    </div>
+  )
+}

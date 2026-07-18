@@ -108,7 +108,7 @@ export function CategoryForm({
       <CardHeader>
         <CardTitle>Datos de la categoría</CardTitle>
         <CardDescription>
-          El slug define la URL pública de la categoría (/catalog/&lt;slug&gt;); si lo cambias, los
+          El slug define la URL pública de la categoría (/shop/&lt;slug&gt;); si lo cambias, los
           enlaces antiguos dejan de funcionar.
         </CardDescription>
       </CardHeader>

@@ -91,7 +91,7 @@ async function ProductContent({ slug }: { slug: string }) {
     
     // Si no se encuentra por slug, intentar buscar por ID (en caso de que el slug sea un UUID)
     if (!product) {
-      const { getItemById } = await import('@/lib/supabase/products-api');
+      const { getItemById } = await import('@/lib/supabase/products-read');
       // Solo intentar por ID si el slug parece ser un UUID
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       if (uuidRegex.test(slug)) {

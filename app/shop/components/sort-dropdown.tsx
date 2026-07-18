@@ -31,12 +31,12 @@ export function SortDropdown({ className }: SortDropdownProps) {
           className
         )}
       >
-        <SelectValue placeholder="Sort by" />
+        <SelectValue placeholder="Ordenar por" />
       </SelectTrigger>
       <SelectContent align="end">
         <SelectGroup>
           <div className="flex justify-between items-center pr-1">
-            <SelectLabel className="text-xs">Sort</SelectLabel>
+            <SelectLabel className="text-xs">Ordenar</SelectLabel>
             <Button
               type="button"
               variant="ghost"
@@ -44,7 +44,7 @@ export function SortDropdown({ className }: SortDropdownProps) {
               className="px-1 h-5 text-xs text-muted-foreground"
               onClick={() => setSort(null)}
             >
-              Clear
+              Limpiar
             </Button>
           </div>
           <SelectSeparator />

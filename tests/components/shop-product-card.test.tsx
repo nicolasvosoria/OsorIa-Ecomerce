@@ -16,10 +16,6 @@ vi.mock('@/components/cart/add-to-cart', () => ({
   AddToCartButton: () => <button type="button">Agregar al carrito</button>,
 }));
 
-vi.mock('@/app/shop/components/product-card/product-image', () => ({
-  ProductImage: () => <div data-testid="product-image" />,
-}));
-
 vi.mock('@/app/shop/components/variant-selector', () => ({
   VariantSelector: () => <div data-testid="variant-selector" />,
 }));
@@ -74,5 +70,14 @@ describe('shop ProductCard combo behavior', () => {
     expect(detailLink).toHaveAttribute('href', '/products/combo-cafe');
     expect(screen.getByRole('button', { name: /agregar al carrito/i })).toBeInTheDocument();
     expect(screen.queryByTestId('variant-selector')).not.toBeInTheDocument();
+    expect(screen.getByText('Combo')).toBeInTheDocument();
+  });
+
+  it('renders through the themed VisualProductCard (rounded-card, bg-muted, shadow-card)', () => {
+    const { container } = render(<ProductCard product={comboProduct} />);
+
+    const card = container.querySelector('article');
+    expect(card).toHaveClass('rounded-card', 'bg-muted');
+    expect(card?.className).toContain('shadow-[var(--shadow-card,none)]');
   });
 });

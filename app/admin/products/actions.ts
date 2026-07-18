@@ -6,11 +6,11 @@ import type { AdminActionResult } from "@/lib/admin/action-result"
 import { authorizeActiveStoreAdmin } from "@/lib/supabase/active-store"
 import {
   createItem,
-  getItemById,
   updateItem,
   type CreateItemData,
   type UpdateItemData,
 } from "@/lib/supabase/products-api"
+import { getItemById } from "@/lib/supabase/products-read"
 import { getValidCompareAtPrice } from "@/lib/products/pricing"
 import type { ProductFormValues } from "@/lib/products/schemas"
 

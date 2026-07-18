@@ -41,6 +41,23 @@ const nextConfig = {
       exclude: ['error', 'warn'],
     } : false,
   },
+  // /catalog es el catálogo legacy, retirado en favor de /shop (mismo esquema de
+  // slug persistido). Redirects de next.config corren antes que proxy.ts, así que
+  // no compiten con el gate de tienda del proxy.
+  async redirects() {
+    return [
+      {
+        source: '/catalog',
+        destination: '/shop',
+        permanent: true,
+      },
+      {
+        source: '/catalog/:category',
+        destination: '/shop/:category',
+        permanent: true,
+      },
+    ]
+  },
 };
 
 export default nextConfig;

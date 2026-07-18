@@ -11,10 +11,12 @@ import { useAuth } from "@/contexts/auth-context";
 import { isCurrentUserAdmin } from "@/lib/supabase/permissions-api";
 import type { HeroLayerId } from "@/lib/hero/hero-layer-model";
 import type { HomeSectionEntry } from "@/lib/supabase/types";
+import type { ShopConfig } from "@/lib/shop/shop-config";
 import {
   isThemePreviewMode,
   parseThemePreviewContentMessage,
   parseThemePreviewCompositionMessage,
+  parseThemePreviewShopConfigMessage,
 } from "@/lib/theme-font/preview-mode";
 
 interface AdminContextType {
@@ -30,6 +32,7 @@ interface AdminContextType {
   setSelectedHeroHotspotId: (hotspotId: string | null) => void;
   componentEdits: Map<string, Record<string, any>>;
   previewComposition: HomeSectionEntry[] | null;
+  previewShopConfig: ShopConfig | null;
   updateComponentEdit: (componentName: string, key: string, value: any) => void;
   scheduleComponentEdit: (
     componentName: string,
@@ -63,6 +66,9 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   const [previewComposition, setPreviewComposition] = useState<
     HomeSectionEntry[] | null
   >(null);
+  const [previewShopConfig, setPreviewShopConfig] = useState<ShopConfig | null>(
+    null,
+  );
   const [isAdmin, setIsAdmin] = useState(false);
   const { isAuthenticated, user } = useAuth();
   const pendingEditsRef = useState(
@@ -107,9 +113,10 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   }, [isAuthenticated, user]);
 
   // Preview mode: the theme customizer's parent window (components/theme/
-  // theme-custom-editor.tsx) pushes staged CONTENT edits and the staged home
-  // composition (order/visibility) over postMessage for live preview.
-  // Applied directly via `setComponentEdits`/`setPreviewComposition`,
+  // theme-custom-editor.tsx) pushes staged CONTENT edits, the staged home
+  // composition (order/visibility), and the staged /shop config over
+  // postMessage for live preview. Applied directly via
+  // `setComponentEdits`/`setPreviewComposition`/`setPreviewShopConfig`,
   // bypassing the `isAdmin` gate below entirely — mirrors the preview-message
   // listeners in theme-context.tsx/font-context.tsx and never runs outside
   // the customizer iframe (`isThemePreviewMode()`), so the real storefront's
@@ -135,6 +142,12 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       );
       if (compositionMessage) {
         setPreviewComposition(compositionMessage.composition);
+        return;
+      }
+
+      const shopConfigMessage = parseThemePreviewShopConfigMessage(event.data);
+      if (shopConfigMessage) {
+        setPreviewShopConfig(shopConfigMessage.config);
       }
     };
 
@@ -324,6 +337,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
         setSelectedHeroHotspotId,
         componentEdits,
         previewComposition,
+        previewShopConfig,
         updateComponentEdit,
         scheduleComponentEdit,
         flushScheduledEdits,
@@ -354,6 +368,7 @@ export function useAdmin() {
       setSelectedHeroHotspotId: () => {},
       componentEdits: new Map(),
       previewComposition: null,
+      previewShopConfig: null,
       updateComponentEdit: () => {},
       scheduleComponentEdit: () => {},
       flushScheduledEdits: () => {},

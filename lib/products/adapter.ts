@@ -288,7 +288,7 @@ export function adaptSupabaseProduct(item: StoreItemWithDetails): Product {
  */
 export function adaptSupabaseCategory(category: ItemCategory): Collection {
   return {
-    handle: category.category_name.toLowerCase().replace(/\s+/g, '-'),
+    handle: category.slug,
     title: category.category_name,
     description: category.category_description || '',
     seo: {
@@ -297,7 +297,7 @@ export function adaptSupabaseCategory(category: ItemCategory): Collection {
     },
     parentCategoryTree: [],
     updatedAt: category.updated_at,
-    path: `/shop/${category.category_name.toLowerCase().replace(/\s+/g, '-')}`,
+    path: `/shop/${category.slug}`,
   };
 }
 

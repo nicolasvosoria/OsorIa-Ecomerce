@@ -9,7 +9,7 @@
 // exercises orchestration only, not the section design/content UI (covered
 // elsewhere).
 
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -27,6 +27,8 @@ const {
   getActiveTheme,
   getHomeComposition,
   updateHomeComposition,
+  getShopConfig,
+  updateShopConfig,
   useAdminActiveStoreId,
 } = vi.hoisted(() => ({
   changeThemeCustom: vi.fn(),
@@ -36,8 +38,15 @@ const {
   getActiveTheme: vi.fn(),
   getHomeComposition: vi.fn(),
   updateHomeComposition: vi.fn(),
+  getShopConfig: vi.fn(),
+  updateShopConfig: vi.fn(),
   useAdminActiveStoreId: vi.fn(),
 }));
+
+const DEFAULT_SHOP_CONFIG = {
+  defaultSort: null,
+  filters: { category: true, color: true, tipo: true, sort: true, price: true, enOferta: true },
+};
 
 const fakeColors: ThemeColors = {
   primary: "#111111",
@@ -114,6 +123,11 @@ vi.mock("@/lib/supabase/home-composition-api", () => ({
   updateHomeComposition,
 }));
 
+vi.mock("@/lib/supabase/shop-config-api", () => ({
+  getShopConfig,
+  updateShopConfig,
+}));
+
 // Sidebar tabs are irrelevant to publish orchestration; stub them out so
 // rendering doesn't pull in their own heavy dependencies (product pickers,
 // image uploads, etc).
@@ -175,6 +189,8 @@ describe("ThemeCustomEditor handleApply (D16 unified publish)", () => {
     ]);
     getHomeComposition.mockResolvedValue([]);
     updateHomeComposition.mockResolvedValue([]);
+    getShopConfig.mockResolvedValue(DEFAULT_SHOP_CONFIG);
+    updateShopConfig.mockResolvedValue(DEFAULT_SHOP_CONFIG);
   });
 
   it("writes staged content merged over persisted variables BEFORE publishing the theme", async () => {
@@ -250,5 +266,60 @@ describe("ThemeCustomEditor handleApply (D16 unified publish)", () => {
       expect(getComponentStyles).toHaveBeenCalledWith("store-b");
       expect(getHomeComposition).toHaveBeenCalledWith("store-b");
     });
+  });
+
+  // Slice 11: the Vitrina tab seeds from getShopConfig and folds into the same
+  // unified Apply — a changed shop_config persists via updateShopConfig, an
+  // unchanged one never calls it, and the /shop header copy rides the existing
+  // content channel (updateComponentStyle "shop").
+  it("seeds the Vitrina tab from getShopConfig for the active store", async () => {
+    render(<ThemeCustomEditor />);
+
+    await waitFor(() => expect(getShopConfig).toHaveBeenCalledWith(ACTIVE_STORE_ID));
+  });
+
+  it("persists a changed shop_config via updateShopConfig on Apply", async () => {
+    changeThemeCustom.mockResolvedValue({ success: true, activeTheme });
+
+    render(<ThemeCustomEditor />);
+
+    await userEvent.click(await screen.findByRole("tab", { name: "Tienda" }));
+    await userEvent.click(await screen.findByLabelText("Categoría"));
+
+    await userEvent.click(screen.getByRole("button", { name: /Aplicar/i }));
+    await screen.findByText("Tema publicado para todas las visitas.");
+
+    expect(updateShopConfig).toHaveBeenCalledTimes(1);
+    expect(updateShopConfig.mock.calls[0][0].filters.category).toBe(false);
+  });
+
+  it("does not call updateShopConfig when the shop_config is unchanged", async () => {
+    changeThemeCustom.mockResolvedValue({ success: true, activeTheme });
+
+    render(<ThemeCustomEditor />);
+
+    await userEvent.click(screen.getByRole("button", { name: /Aplicar/i }));
+    await screen.findByText("Tema publicado para todas las visitas.");
+
+    expect(updateShopConfig).not.toHaveBeenCalled();
+  });
+
+  it("saves the /shop header copy through updateComponentStyle 'shop'", async () => {
+    changeThemeCustom.mockResolvedValue({ success: true, activeTheme });
+
+    render(<ThemeCustomEditor />);
+
+    await userEvent.click(await screen.findByRole("tab", { name: "Tienda" }));
+    fireEvent.change(await screen.findByLabelText("Título"), {
+      target: { value: "Nuestra tienda" },
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: /Aplicar/i }));
+    await screen.findByText("Tema publicado para todas las visitas.");
+
+    expect(updateComponentStyle).toHaveBeenCalledWith(
+      "shop",
+      expect.objectContaining({ title: "Nuestra tienda" }),
+    );
   });
 });

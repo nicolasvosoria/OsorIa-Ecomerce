@@ -13,6 +13,9 @@ const { getCategoriesMock, getItemsMock, getItemByIdMock, getTopSellingProductId
 vi.mock("@/lib/supabase/products-api", () => ({
   getCategories: getCategoriesMock,
   getItems: getItemsMock,
+}))
+
+vi.mock("@/lib/supabase/products-read", () => ({
   getItemById: getItemByIdMock,
 }))
 
@@ -86,14 +89,14 @@ describe("getPopularCategoryTiles", () => {
       name: "Bocinas Bluetooth",
       slug: "bocinas-bluetooth",
       imageUrl: "/speakers.webp",
-      href: "/catalog/bocinas-bluetooth",
+      href: "/shop/bocinas-bluetooth",
     })
     expect(tiles[0].startingPriceLabel).toContain("356.000")
     expect(tiles[0].startingPriceAmount).toBe(356000)
     expect(tiles[1]).toMatchObject({
       id: "cat-earphones",
       slug: "auriculares-y-audifonos",
-      href: "/catalog/auriculares-y-audifonos",
+      href: "/shop/auriculares-y-audifonos",
       startingPriceAmount: 29000,
     })
   })
@@ -108,7 +111,7 @@ describe("getPopularCategoryTiles", () => {
 
     const [tile] = await getPopularCategoryTiles()
 
-    expect(tile).toMatchObject({ name: "Bocinas Bluetooth", slug: "speakers", href: "/catalog/speakers" })
+    expect(tile).toMatchObject({ name: "Bocinas Bluetooth", slug: "speakers", href: "/shop/speakers" })
   })
 
   it("respects the requested limit and queries the cheapest item per category", async () => {

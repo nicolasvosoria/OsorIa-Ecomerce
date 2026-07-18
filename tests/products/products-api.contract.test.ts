@@ -3,11 +3,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createItem,
   getCategories,
-  getProductStock,
-  getVariantStock,
   incrementItemViewCount,
   updateItem,
 } from "@/lib/supabase/products-api";
+import { getProductStock, getVariantStock } from "@/lib/supabase/products-read";
 import { buildProductImageRows } from "@/lib/supabase/product-image-rows";
 
 const { getSupabaseEcommerceMock, getStoreIdMock } = vi.hoisted(() => ({

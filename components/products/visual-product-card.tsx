@@ -120,14 +120,14 @@ export function VisualProductCard({
 
   return (
     <article
-      className={`${cardGroupClass} relative overflow-hidden ${radiusClass} ${CARD_STYLE_CLASS[cardStyle]} ${cardBackground ? "" : "bg-muted"} text-card-foreground transition-transform duration-300 ${cardHoverClass} focus-within:ring-2 focus-within:ring-primary/50 ${className}`}
+      className={`${cardGroupClass} relative flex h-full flex-col overflow-hidden ${radiusClass} ${CARD_STYLE_CLASS[cardStyle]} ${cardBackground ? "" : "bg-muted"} text-card-foreground transition-transform duration-300 ${cardHoverClass} focus-within:ring-2 focus-within:ring-primary/50 ${className}`}
       style={cardBackground ? { backgroundColor: cardBackground } : undefined}
     >
       {mediaPosition === "top" ? media : null}
 
-      <div className="space-y-3 p-4 sm:p-5">
+      <div className="flex flex-1 flex-col gap-3 p-4 sm:p-5">
         <Link href={product.href} className="block focus-visible:outline-none">
-          <h3 className="line-clamp-2 text-base font-semibold leading-snug transition-colors hover:text-primary md:text-lg">
+          <h3 className="line-clamp-2 min-h-[2.75rem] text-base font-semibold leading-snug transition-colors hover:text-primary md:min-h-[3.1rem] md:text-lg">
             {product.title}
           </h3>
         </Link>
@@ -145,7 +145,7 @@ export function VisualProductCard({
         ) : null}
 
         {showPrice ? (
-          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <div className="flex min-h-[1.75rem] flex-wrap items-baseline gap-x-3 gap-y-1">
             {product.price.compareAtLabel ? (
               <span className="text-sm font-medium text-muted-foreground line-through">
                 {product.price.compareAtLabel}
@@ -160,12 +160,12 @@ export function VisualProductCard({
           </div>
         ) : null}
 
-        {actionSlot ? <div>{actionSlot}</div> : null}
+        {actionSlot ? <div className="mt-auto">{actionSlot}</div> : null}
 
         {showCta && product.ctaLabel ? (
           <Link
             href={product.href}
-            className="inline-flex min-h-[44px] w-full items-center justify-center rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="mt-auto inline-flex min-h-[44px] w-full items-center justify-center rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             {product.ctaLabel}
           </Link>

@@ -6,5 +6,9 @@ interface ResultsCountProps {
 }
 
 export function ResultsCount({ count, className }: ResultsCountProps) {
-  return <span className={cn('place-self-center text-sm text-foreground/50', className)}>{count} results</span>;
+  return (
+    <span className={cn('place-self-center text-sm text-foreground/50', className)}>
+      {count} {count === 1 ? 'resultado' : 'resultados'}
+    </span>
+  );
 }

@@ -2,7 +2,8 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 
 export interface Color {
-  name: string;
+  key: string;
+  label: string;
   value: string;
 }
 
@@ -28,7 +29,7 @@ export function ColorSwatch({
   atLeastOneColorSelected,
 }: ColorSwatchProps) {
   const isDualColor = Array.isArray(color);
-  const displayName = isDualColor ? `${color[0].name} & ${color[1].name}` : color.name;
+  const displayName = isDualColor ? `${color[0].label} & ${color[1].label}` : color.label;
 
   return (
     <button

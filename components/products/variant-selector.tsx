@@ -1,7 +1,7 @@
 'use client';
 
 import { cva, type VariantProps } from 'class-variance-authority';
-import { CartProduct, Product, ProductOption, ProductVariant, SelectedOptions } from '@/lib/commerce/types';
+import { Product, ProductOption, ProductVariant } from '@/lib/commerce/types';
 import { startTransition, useMemo } from 'react';
 import { useQueryState, parseAsString } from 'nuqs';
 import { useParams, useSearchParams } from 'next/navigation';
@@ -95,10 +95,10 @@ export function VariantOptionSelectorComponent({
                 color={
                   Array.isArray(color)
                     ? [
-                        { name: name[0], value: color[0] },
-                        { name: name[1], value: color[1] },
+                        { key: name[0], label: name[0], value: color[0] },
+                        { key: name[1], label: name[1], value: color[1] },
                       ]
-                    : { name: name[0], value: color }
+                    : { key: name[0], label: name[0], value: color }
                 }
                 isSelected={isActive}
                 onColorChange={() => onSelect?.(value.name)}
@@ -115,7 +115,7 @@ export function VariantOptionSelectorComponent({
               variant={isActive ? 'default' : 'outline'}
               size="sm"
               disabled={!isAvailableForSale}
-              title={`${option.name} ${value.name}${!isAvailableForSale ? ' (Out of Stock)' : ''}`}
+              title={`${option.name} ${value.name}${!isAvailableForSale ? ' (Agotado)' : ''}`}
               className="min-w-[40px]"
             >
               {value.name}
@@ -196,75 +196,4 @@ export const useSelectedVariant = (product: Product) => {
   }, [product, selectedOptions]);
 
   return selectedVariant;
-};
-
-export const useProductImages = (product: Product | CartProduct, selectedOptions?: SelectedOptions) => {
-  const images = useMemo(() => {
-    return Array.isArray(product.images) ? product.images : [];
-  }, [product.images]);
-
-  const optionsObject = useMemo(() => {
-    return selectedOptions?.reduce(
-      (acc, option) => {
-        acc[option.name.toLowerCase()] = option.value.toLowerCase();
-        return acc;
-      },
-      {} as Record<string, string>
-    );
-  }, [selectedOptions]);
-
-  // Try to match images by alt text with selected variant values
-  // This enables products to show different images when variants are selected
-  // by matching the image alt text with variant names (e.g., "Red Shirt" shows when Red is selected)
-  const variantImagesByAlt = useMemo(() => {
-    if (!optionsObject || Object.keys(optionsObject).length === 0) return [];
-
-    const selectedValues = Object.values(optionsObject);
-
-    return images.filter(image => {
-      if (!image.altText) return false;
-
-      const altTextLower = image.altText.toLowerCase();
-
-      // Check if any selected variant value is mentioned in the alt text
-      return selectedValues.some(value => altTextLower.includes(value.toLowerCase()));
-    });
-  }, [optionsObject, images]);
-
-  // Original logic for images with selectedOptions metadata
-  const variantImages = useMemo(() => {
-    if (!optionsObject) return [];
-
-    return images.filter(image => {
-      return Object.entries(optionsObject || {}).every(([key, value]) =>
-        image.selectedOptions?.some(option => option.name === key && option.value === value)
-      );
-    });
-  }, [optionsObject, images]);
-
-  const defaultImages = images.filter(image => !image.selectedOptions);
-  const featuredImage = product.featuredImage;
-
-  // Prioritize images with selectedOptions metadata first
-  if (variantImages.length > 0) {
-    return variantImages;
-  }
-
-  // Then try images matched by alt text (for products with 2+ variants)
-  if (variantImagesByAlt.length > 0) {
-    return variantImagesByAlt;
-  }
-
-  // Fall back to default images
-  if (defaultImages.length > 0) {
-    return defaultImages;
-  }
-
-  // Final fallback to featured image
-  if (featuredImage) {
-    return [featuredImage];
-  }
-
-  // Ultimate fallback - return first image or empty array
-  return images.length > 0 ? [images[0]] : [];
 };

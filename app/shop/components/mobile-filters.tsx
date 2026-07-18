@@ -1,75 +1,91 @@
-'use client';
+'use client'
 
-import React from 'react';
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { Collection } from '@/lib/commerce/types';
-import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer';
-import { CategoryFilter } from './category-filter';
-import { ColorFilter } from './color-filter';
-import { ComboFilter } from './combo-filter';
-import { useFilterCount } from '../hooks/use-filter-count';
-import { useProducts } from '../providers/products-provider';
-import { ResultsCount } from './results-count';
-import { SortDropdown } from './sort-dropdown';
-import Link from 'next/link';
+import React from 'react'
+import { SlidersHorizontalIcon } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+import { Collection } from '@/lib/commerce/types'
+import { DEFAULT_SHOP_CONFIG, type ShopConfig } from '@/lib/shop/shop-config'
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer'
+import { CategoryFilter } from './category-filter'
+import { ColorFilter } from './color-filter'
+import { ComboFilter } from './combo-filter'
+import { OnSaleFilter } from './on-sale-filter'
+import { PriceFilter } from './price-filter'
+import { useFilterCount } from '../hooks/use-filter-count'
+import { useProducts } from '../providers/products-provider'
+import { useEffectiveShopConfig } from '../hooks/use-effective-shop-config'
+import { ResultsCount } from './results-count'
+import { SortDropdown } from './sort-dropdown'
+import Link from 'next/link'
 
 interface MobileFiltersProps {
-  collections: Collection[];
-  className?: string;
+  collections: Collection[]
+  config?: ShopConfig
+  className?: string
 }
 
-export function MobileFilters({ collections, className }: MobileFiltersProps) {
-  const filterCount = useFilterCount();
-  const { products, originalProducts } = useProducts();
+export function MobileFilters({ collections, config = DEFAULT_SHOP_CONFIG, className }: MobileFiltersProps) {
+  const filterCount = useFilterCount()
+  const { loadedProducts, total } = useProducts()
+  const effectiveConfig = useEffectiveShopConfig(config)
 
   return (
-    <div className="pt-top-spacing bg-background md:hidden overflow-x-clip">
+    <div className="bg-background pt-4 md:hidden overflow-x-clip">
       <Drawer>
         {/* 3 main items: Filters, Results count, Sort by */}
         <div className="grid grid-cols-3 items-center px-4 py-3">
           {/* Filters */}
           <DrawerTrigger asChild>
-            <Button variant="ghost" size="sm" className="justify-self-start text-sm font-semibold text-foreground">
-              Filters {filterCount > 0 && <span className="text-foreground/50">({filterCount})</span>}
+            <Button
+              variant="outline"
+              size="sm"
+              className="justify-self-start gap-1.5 rounded-[var(--button-radius)] font-medium"
+            >
+              <SlidersHorizontalIcon className="size-3.5" />
+              Filtros
+              {filterCount > 0 && <span className="text-muted-foreground">({filterCount})</span>}
             </Button>
           </DrawerTrigger>
 
           {/* Results count */}
-          <ResultsCount count={products.length} />
+          <ResultsCount count={total} />
 
           {/* Sort by */}
-          <SortDropdown className="justify-self-end" />
+          {effectiveConfig.filters.sort && <SortDropdown className="justify-self-end" />}
         </div>
 
         {/* Drawer content */}
         <DrawerContent className={cn('h-[80vh]', className)}>
           <DrawerHeader className="flex justify-between items-center">
-            <DrawerTitle>
-              Filters {filterCount > 0 && <span className="text-muted-foreground">({filterCount})</span>}
+            <DrawerTitle className="font-heading text-xl font-normal">
+              Filtros{' '}
+              {filterCount > 0 && <span className="text-muted-foreground">({filterCount})</span>}
             </DrawerTitle>
             <Button
               size="sm"
               variant="ghost"
               className={cn(
-                'font-medium text-foreground/50 hover:text-foreground/60 transition-opacity',
+                'font-medium text-muted-foreground hover:text-foreground transition-opacity',
                 filterCount === 0 && 'opacity-0 pointer-events-none'
               )}
               disabled={filterCount === 0}
               asChild={filterCount > 0}
             >
               <Link href="/shop" prefetch>
-                Clear
+                Limpiar
               </Link>
             </Button>
           </DrawerHeader>
           <div className="overflow-y-auto flex-1 px-4 pb-4 space-y-6">
-            <CategoryFilter collections={collections} />
-            <ComboFilter />
-            <ColorFilter products={originalProducts} />
+            {effectiveConfig.filters.category && <CategoryFilter collections={collections} />}
+            {effectiveConfig.filters.tipo && <ComboFilter />}
+            {effectiveConfig.filters.enOferta && <OnSaleFilter />}
+            {effectiveConfig.filters.price && <PriceFilter />}
+            {effectiveConfig.filters.color && <ColorFilter products={loadedProducts} />}
           </div>
         </DrawerContent>
       </Drawer>
     </div>
-  );
+  )
 }

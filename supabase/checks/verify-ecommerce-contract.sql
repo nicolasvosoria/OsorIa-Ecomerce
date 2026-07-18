@@ -161,7 +161,7 @@ begin
   end if;
 end $$;
 
--- /catalog/<slug> resolves a category by this column, so a store with two
+-- /shop/<slug> resolves a category by this column, so a store with two
 -- categories on one slug would serve whichever row came back first.
 do $$
 begin

@@ -31,6 +31,7 @@ export const ECOMMERCE_TABLES = {
   productComboComponents: "product_combo_components",
   productCombos: "product_combos",
   roles: "roles",
+  shopConfig: "shop_config",
   storeBranding: "store_branding",
   storeIntegrations: "store_integrations",
   storeItems: "store_items",

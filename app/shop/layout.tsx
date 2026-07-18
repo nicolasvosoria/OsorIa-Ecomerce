@@ -1,26 +1,22 @@
-import { DesktopFilters } from './components/shop-filters';
-import { Suspense } from 'react';
-import { getCollections } from '@/lib/products';
-import { MobileFilters } from './components/mobile-filters';
-import { ProductsProvider } from './providers/products-provider';
+import { Suspense } from 'react'
+import { getCollections } from '@/lib/products'
+import { getShopConfig } from '@/lib/supabase/shop-config-api'
+import { MobileFilters } from './components/mobile-filters'
+import { ProductsProvider } from './providers/products-provider'
 
 // Cache is handled via 'use cache' directive in getCollections()
 export default async function ShopLayout({ children }: { children: React.ReactNode }) {
-  const collections = await getCollections();
+  const collections = await getCollections()
+  const config = await getShopConfig()
 
   return (
     <ProductsProvider>
-      <div className="flex flex-col md:grid grid-cols-12 md:gap-sides">
-        <Suspense fallback={null}>
-          <DesktopFilters collections={collections} className="col-span-3 max-md:hidden" />
-        </Suspense>
-        <Suspense fallback={null}>
-          <MobileFilters collections={collections} />
-        </Suspense>
-        <div className="col-span-9 flex flex-col h-full md:pt-top-spacing">
-          <Suspense fallback={null}>{children}</Suspense>
-        </div>
+      <Suspense fallback={null}>
+        <MobileFilters collections={collections} config={config} />
+      </Suspense>
+      <div className="container mx-auto flex flex-col gap-6 px-4 py-5 md:py-10">
+        <Suspense fallback={null}>{children}</Suspense>
       </div>
     </ProductsProvider>
-  );
+  )
 }

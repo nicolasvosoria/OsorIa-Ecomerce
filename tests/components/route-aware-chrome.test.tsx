@@ -66,7 +66,6 @@ describe("isAdminChromeRoute", () => {
   it.each([
     "/",
     "/shop",
-    "/catalog",
     "/products/alfajor-artesanal",
     "/products/torta-de-chocolate",
     "/admin-preview",

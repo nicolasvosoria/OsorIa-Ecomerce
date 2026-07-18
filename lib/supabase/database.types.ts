@@ -1551,6 +1551,42 @@ export type Database = {
           },
         ]
       }
+      shop_config: {
+        Row: {
+          config: Json
+          id: number
+          store_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          config?: Json
+          id?: number
+          store_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          config?: Json
+          id?: number
+          store_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_config_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: true
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shop_config_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: true
+            referencedRelation: "stores_legacy"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       store_branding: {
         Row: {
           favicon_url: string | null
@@ -1717,6 +1753,7 @@ export type Database = {
           is_active: boolean | null
           is_available_for_sale: boolean | null
           is_featured: boolean | null
+          is_on_sale: boolean | null
           item_code: string | null
           item_description: string | null
           item_description_html: string | null
@@ -1745,6 +1782,7 @@ export type Database = {
           is_active?: boolean | null
           is_available_for_sale?: boolean | null
           is_featured?: boolean | null
+          is_on_sale?: boolean | null
           item_code?: string | null
           item_description?: string | null
           item_description_html?: string | null
@@ -1773,6 +1811,7 @@ export type Database = {
           is_active?: boolean | null
           is_available_for_sale?: boolean | null
           is_featured?: boolean | null
+          is_on_sale?: boolean | null
           item_code?: string | null
           item_description?: string | null
           item_description_html?: string | null
@@ -2308,6 +2347,7 @@ export type Database = {
           is_active: boolean | null
           is_available_for_sale: boolean | null
           is_featured: boolean | null
+          is_on_sale: boolean | null
           item_code: string | null
           item_description: string | null
           item_description_html: string | null

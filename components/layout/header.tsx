@@ -250,7 +250,7 @@ export function Header() {
       setIsSearching(true)
       try {
         // Usar directamente searchItems de Supabase (funciona en cliente)
-        const { searchItems } = await import('@/lib/supabase/products-api')
+        const { searchItems } = await import('@/lib/supabase/products-read')
         const items = await searchItems(query, 5) // Limitar a 5 sugerencias
         setSearchSuggestions(
           items.map(item => ({
@@ -660,7 +660,7 @@ export function Header() {
         return (
           <Link
             key={category.id}
-            href={`/catalog/${category.slug}`}
+            href={`/shop/${category.slug}`}
             className={cn(linkTextClass, "font-inter font-medium tracking-wide transition-opacity hover:opacity-70")}
             style={{ color: header.linkColor || "var(--foreground)" }}
             {...(withMegaMenu
@@ -705,7 +705,7 @@ export function Header() {
           <div className="container mx-auto px-4">
             <HeaderMegaMenu
               categoryName={category.category_name}
-              categoryHref={`/catalog/${category.slug}`}
+              categoryHref={`/shop/${category.slug}`}
               description={header.megaMenuDescription}
               viewAllText={header.viewAllText}
               featuredProductId={categoryFeaturedProductId[category.id] ?? null}
@@ -1061,7 +1061,7 @@ export function Header() {
                   return (
                     <Link
                       key={category.id}
-                      href={`/catalog/${category.slug}`}
+                      href={`/shop/${category.slug}`}
                       className="text-base font-inter font-medium py-3 px-4 rounded-lg transition-colors"
                       style={{ color: "var(--foreground)" }}
                       onMouseEnter={(e) => {

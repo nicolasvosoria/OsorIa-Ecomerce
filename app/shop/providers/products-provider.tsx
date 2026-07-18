@@ -3,21 +3,21 @@
 import { Product } from '@/lib/commerce/types';
 import { createContext, useContext, useState, ReactNode } from 'react';
 
-interface ProductsContextType {
-  products: Product[];
-  setProducts: (products: Product[]) => void;
-  originalProducts: Product[];
-  setOriginalProducts: (products: Product[]) => void;
+interface ProductsContextValue {
+  loadedProducts: Product[];
+  setLoadedProducts: (products: Product[]) => void;
+  total: number;
+  setTotal: (total: number) => void;
 }
 
-const ProductsContext = createContext<ProductsContextType | undefined>(undefined);
+const ProductsContext = createContext<ProductsContextValue | undefined>(undefined);
 
 export function ProductsProvider({ children }: { children: ReactNode }) {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [originalProducts, setOriginalProducts] = useState<Product[]>([]);
+  const [loadedProducts, setLoadedProducts] = useState<Product[]>([]);
+  const [total, setTotal] = useState(0);
 
   return (
-    <ProductsContext.Provider value={{ products, setProducts, originalProducts, setOriginalProducts }}>
+    <ProductsContext.Provider value={{ loadedProducts, setLoadedProducts, total, setTotal }}>
       {children}
     </ProductsContext.Provider>
   );

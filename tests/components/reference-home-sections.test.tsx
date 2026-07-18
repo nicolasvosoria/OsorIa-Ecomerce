@@ -45,7 +45,7 @@ vi.mock("@/contexts/admin-context", () => ({
   useAdmin: () => mockUseAdmin(),
 }));
 
-vi.mock("@/lib/supabase/products-api", () => ({
+vi.mock("@/lib/supabase/products-read", () => ({
   getItemById: getItemByIdMock,
 }));
 

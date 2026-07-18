@@ -1,4 +1,4 @@
-import { getItemsByCategory } from "@/lib/supabase/products-api"
+import { getItemsByCategory } from "@/lib/supabase/products-read"
 import type { StoreItemWithDetails } from "@/lib/types/products"
 
 function pickFeaturedItem(items: StoreItemWithDetails[]): StoreItemWithDetails | undefined {

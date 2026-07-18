@@ -27,8 +27,9 @@ async function resolveDefaultHomeCompositionStoreId(
 
 // `storeIdOverride` lets the theme editor read the ACTIVE store's saved layout
 // (D10) instead of the host's, so reads follow the store its writes target
-// (#2345). The storefront omits it and stays host-scoped.
-async function resolveHomeCompositionStoreId(
+// (#2345). The storefront omits it and stays host-scoped. Shared with
+// shop-config-api so per-store shop config resolves the store the same way.
+export async function resolveHomeCompositionStoreId(
   supabase: ReturnType<typeof getSupabaseEcommerce>,
   storeIdOverride?: string,
 ): Promise<string | null> {

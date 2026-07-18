@@ -37,7 +37,7 @@ const speakerTile: PopularCategoryTile = {
   imageUrl: "/speakers.webp",
   startingPriceLabel: "Desde $ 356.000",
   startingPriceAmount: 356000,
-  href: "/catalog/bocinas-bluetooth",
+  href: "/shop/bocinas-bluetooth",
 }
 
 const earphonesTile: PopularCategoryTile = {
@@ -46,7 +46,7 @@ const earphonesTile: PopularCategoryTile = {
   slug: "auriculares-y-audifonos",
   startingPriceLabel: "Desde $ 29.000",
   startingPriceAmount: 29000,
-  href: "/catalog/auriculares-y-audifonos",
+  href: "/shop/auriculares-y-audifonos",
 }
 
 describe("PopularItems", () => {
@@ -58,18 +58,18 @@ describe("PopularItems", () => {
     mockGetAdminRequestHeaders.mockResolvedValue({})
   })
 
-  it("renders one tile per category with name, starting price, and a link to its catalog page (live path)", () => {
+  it("renders one tile per category with name, starting price, and a link to its shop page (live path)", () => {
     render(<PopularItems initialTiles={[speakerTile, earphonesTile]} />)
 
     expect(screen.getByText("Bocinas Bluetooth")).toBeInTheDocument()
     expect(screen.getByText("Desde $ 356.000")).toBeInTheDocument()
     expect(screen.getByRole("link", { name: /bocinas bluetooth/i })).toHaveAttribute(
       "href",
-      "/catalog/bocinas-bluetooth",
+      "/shop/bocinas-bluetooth",
     )
     expect(screen.getByRole("link", { name: /auriculares y audífonos/i })).toHaveAttribute(
       "href",
-      "/catalog/auriculares-y-audifonos",
+      "/shop/auriculares-y-audifonos",
     )
   })
 

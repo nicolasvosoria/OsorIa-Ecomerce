@@ -1,6 +1,10 @@
 import '@testing-library/jest-dom'
 import { vi } from 'vitest'
 
+// `server-only` aborts on import outside a React Server environment; vitest runs
+// under jsdom without the `react-server` condition, so stub it to an empty module.
+vi.mock('server-only', () => ({}))
+
 function createMemoryStorage(): Storage {
   const entries = new Map<string, string>()
 

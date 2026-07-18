@@ -3,7 +3,7 @@ import type { StoreItemWithDetails } from "@/lib/types/products"
 
 const getItemsByCategoryMock = vi.hoisted(() => vi.fn())
 
-vi.mock("@/lib/supabase/products-api", () => ({
+vi.mock("@/lib/supabase/products-read", () => ({
   getItemsByCategory: getItemsByCategoryMock,
 }))
 

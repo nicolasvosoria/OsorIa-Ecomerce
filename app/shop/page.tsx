@@ -1,7 +1,6 @@
 import ProductList from './components/product-list';
 import { Metadata } from 'next';
 import { Suspense } from 'react';
-import ResultsControls from './components/results-controls';
 import { ProductGrid } from './components/product-grid';
 import { ProductCardSkeleton } from './components/product-card-skeleton';
 import { resolveStoreNameForMetadata } from '@/lib/metadata/store-name';
@@ -24,14 +23,11 @@ export default async function Shop(props: {
     <>
       <Suspense
         fallback={
-          <>
-            <ResultsControls className="max-md:hidden" collections={[]} products={[]} />
-            <ProductGrid>
-              {Array.from({ length: 12 }).map((_, index) => (
-                <ProductCardSkeleton key={index} />
-              ))}
-            </ProductGrid>
-          </>
+          <ProductGrid>
+            {Array.from({ length: 12 }).map((_, index) => (
+              <ProductCardSkeleton key={index} />
+            ))}
+          </ProductGrid>
         }
       >
         <ProductList collection="" searchParams={searchParams} />

@@ -37,6 +37,21 @@ export type Product = {
   availableForSale: boolean;
 };
 
+export type ProductsPage = {
+  products: Product[];
+  total: number;
+  hasMore: boolean;
+};
+
+export type ShopServerFilters = {
+  collection: string;
+  sort?: string;
+  search?: string;
+  onSale: boolean;
+  priceMin?: number;
+  priceMax?: number;
+};
+
 export type ProductSortKey =
   | 'RELEVANCE'
   | 'BEST_SELLING'
@@ -97,5 +112,3 @@ export type SEO = {
   title: string;
   description: string;
 };
-
-export type CartProduct = Product;

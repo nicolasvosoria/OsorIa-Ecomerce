@@ -1,3 +1,4 @@
+import "server-only"
 import { getSupabaseEcommerce } from './client'
 import { ECOMMERCE_FUNCTIONS, ECOMMERCE_SCHEMA, ECOMMERCE_TABLES, ECOMMERCE_VIEWS } from './contract'
 import type {
@@ -9,43 +10,20 @@ import type {
   GetItemsParams,
   GetItemsResult,
 } from '@/lib/types/products'
-import {
-  comboToStoreItem,
-  getComboById,
-  getComboBySlug,
-  getComboStock as getDerivedComboStock,
-  listCombos,
-} from './combos-api'
+import { comboToStoreItem, getComboBySlug, listCombos } from './combos-api'
 import { buildProductImageRows } from './product-image-rows'
 import { isDefaultStoreAlias, resolveDefaultStoreId } from './store-alias'
-import { sanitizeIlikeSearchTerm } from '@/lib/security/postgrest-search'
 import { MAX_ADDITIONAL_PRODUCT_IMAGES, MAX_PRODUCT_IMAGES } from '@/lib/products/images'
+import { sanitizeIlikeSearchTerm } from '@/lib/security/postgrest-search'
+import { getStoreId } from '@/lib/utils/store'
+import { withTimeout } from './with-timeout'
+import { STORE_ITEMS_SELECT, comboItemsMatching, mapStoreItemRow, sortStoreItems } from './store-items-query'
 
 const MAX_PRODUCT_IMAGES_ERROR =
   `Solo se permiten máximo ${MAX_PRODUCT_IMAGES} imágenes por producto (1 principal + ${MAX_ADDITIONAL_PRODUCT_IMAGES} adicionales)`
 
-// Importación dinámica de getStoreId para evitar problemas con análisis estático de Next.js
-async function getStoreId(): Promise<string | null> {
-  const { getStoreId: getStoreIdFn } = await import('@/lib/utils/store')
-  return getStoreIdFn()
-}
-
 // Re-exportar GetItemsParams para uso externo
 export type { GetItemsParams, GetItemsResult }
-
-// Helper para manejar timeouts
-async function withTimeout<T>(
-  promise: Promise<T>,
-  timeoutMs: number = 15000,
-  operation: string = 'operation'
-): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error(`Timeout después de ${timeoutMs}ms en ${operation}`)), timeoutMs)
-    ),
-  ])
-}
 
 /**
  * Obtener todas las categorías activas
@@ -102,7 +80,7 @@ export async function getCategories(
 }
 
 /**
- * Obtener productos con filtros y paginación
+ * Obtener productos con filtros y paginación (lectura masiva con override de store_id)
  */
 export async function getItems(
   params: GetItemsParams = {},
@@ -120,6 +98,9 @@ export async function getItems(
       is_active = true,
       is_featured,
       is_available_for_sale = true,
+      on_sale,
+      price_min,
+      price_max,
       search,
       tags,
       limit = 20,
@@ -132,7 +113,7 @@ export async function getItems(
     // Obtener store_id si no se proporciona en params
     // Si store_id es null explícitamente, no llamar a getStoreId() (para evitar problemas con 'use cache')
     let currentStoreId: string | null = store_id || null
-    
+
     if (currentStoreId === null && store_id === undefined) {
       try {
         currentStoreId = await getStoreId()
@@ -150,7 +131,7 @@ export async function getItems(
         }
       }
     }
-    
+
     // Si no hay store_id, intentar obtenerlo del subdominio (solo en servidor)
     if (!currentStoreId && typeof window === 'undefined') {
       try {
@@ -159,7 +140,7 @@ export async function getItems(
         const { createServerClient } = await import('@supabase/ssr')
         const headersList = await headers()
         const hostname = headersList.get('host') || ''
-        
+
         // Extraer subdominio del hostname
         let subdomain: string | null = null
         if (hostname.includes('localhost') || hostname.includes('127.0.0.1')) {
@@ -180,12 +161,12 @@ export async function getItems(
             }
           }
         }
-        
+
         if (subdomain) {
           // Usar cliente de servidor para consultar Supabase
           const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
           const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-          
+
           if (supabaseUrl && supabaseKey) {
             const cookieStore = await cookies()
             const serverSupabase = createServerClient(supabaseUrl, supabaseKey, {
@@ -201,7 +182,7 @@ export async function getItems(
                 },
               },
             })
-            
+
             const { data: store } = await serverSupabase
               .schema(ECOMMERCE_SCHEMA)
               .from(ECOMMERCE_VIEWS.storesLegacy)
@@ -210,7 +191,7 @@ export async function getItems(
               .eq('is_active', true)
               .is('deleted_at', null)
               .single()
-            
+
             if (store?.id) {
               console.log('[Products] Store ID obtenido de subdominio:', subdomain, '->', store.id)
               currentStoreId = store.id
@@ -224,7 +205,7 @@ export async function getItems(
         }
       }
     }
-    
+
     // Si aún no hay store_id (por ejemplo, durante build time), intentar obtener el UUID de la tienda por defecto
     if (isDefaultStoreAlias(currentStoreId)) {
       currentStoreId = await resolveDefaultStoreId(supabase, 'getItems')
@@ -239,19 +220,31 @@ export async function getItems(
 
     if (shouldFetchProducts) {
       let query = supabase
-      .from(ECOMMERCE_VIEWS.storeItemsLegacy)
-      .select('*, item_categories(*)', { count: 'exact' })
-      .eq('store_id', currentStoreId!) // Filtrar por tienda (currentStoreId ya está validado)
-      .eq('is_active', is_active)
-      .eq('is_available_for_sale', is_available_for_sale)
+        .from(ECOMMERCE_VIEWS.storeItemsLegacy)
+        .select(STORE_ITEMS_SELECT, { count: 'exact' })
+        .eq('store_id', currentStoreId!) // Filtrar por tienda (currentStoreId ya está validado)
+        .eq('is_active', is_active)
+        .eq('is_available_for_sale', is_available_for_sale)
 
-    // Filtros opcionales
+      // Filtros opcionales
       if (category_id) {
         query = query.eq('category_id', category_id)
       }
 
       if (is_featured !== undefined) {
         query = query.eq('is_featured', is_featured)
+      }
+
+      if (on_sale) {
+        query = query.eq('is_on_sale', true)
+      }
+
+      if (price_min !== undefined) {
+        query = query.gte('base_price', price_min)
+      }
+
+      if (price_max !== undefined) {
+        query = query.lte('base_price', price_max)
       }
 
       const sanitizedSearch = sanitizeIlikeSearchTerm(search)
@@ -277,15 +270,8 @@ export async function getItems(
         return { items: [], total: 0, has_more: false }
       }
 
-      const items = (data as any[]) || []
       total = count || 0
-
-      // Transformar datos para incluir categoría
-      itemsWithDetails = items.map((item: any) => ({
-        ...item,
-        item_kind: 'product',
-        category: item.item_categories ? (item.item_categories as ItemCategory) : undefined,
-      }))
+      itemsWithDetails = ((data as any[]) || []).map(mapStoreItemRow)
     }
 
     if (shouldFetchCombos && is_featured === undefined) {
@@ -294,30 +280,19 @@ export async function getItems(
         category_id,
         includeInactive: is_active === false,
       })
-      const comboItems = combos
-        .filter((combo) => (is_available_for_sale === false ? !combo.availability.isAvailable : combo.availability.isAvailable))
-        .filter((combo) => {
-          if (!search) return true
-          const normalizedSearch = search.toLowerCase()
-          return (
-            combo.name.toLowerCase().includes(normalizedSearch) ||
-            (combo.description || '').toLowerCase().includes(normalizedSearch)
-          )
-        })
-        .map(comboToStoreItem)
+      const comboItems = comboItemsMatching(combos, {
+        isAvailableForSale: is_available_for_sale,
+        search,
+        onSale: on_sale,
+        priceMin: price_min,
+        priceMax: price_max,
+      })
 
       itemsWithDetails = [...itemsWithDetails, ...comboItems]
       total += comboItems.length
     }
 
-    const sortedItems = [...itemsWithDetails].sort((a, b) => {
-      const direction = order_direction === 'asc' ? 1 : -1
-      const aValue = a[order_by] ?? 0
-      const bValue = b[order_by] ?? 0
-      if (typeof aValue === 'number' && typeof bValue === 'number') return (aValue - bValue) * direction
-      return String(aValue).localeCompare(String(bValue)) * direction
-    })
-
+    const sortedItems = sortStoreItems(itemsWithDetails, order_by, order_direction)
     const pagedItems = shouldFetchProducts ? sortedItems : sortedItems.slice(offset, offset + limit)
     const has_more = offset + limit < total
 
@@ -346,7 +321,7 @@ export async function getItemBySlug(slug: string, storeId?: string | null): Prom
     // Si storeId es null explícitamente, no llamar a getStoreId() (para evitar problemas con 'use cache')
     // Si storeId es undefined, intentar obtenerlo (pero puede fallar en build time)
     let currentStoreId = storeId
-    
+
     if (currentStoreId === undefined) {
       try {
         // Intentar obtener storeId, pero puede fallar en build time
@@ -364,7 +339,7 @@ export async function getItemBySlug(slug: string, storeId?: string | null): Prom
         }
       }
     }
-    
+
     // Si no hay store_id, intentar obtenerlo del subdominio (solo en servidor)
     if (!currentStoreId && typeof window === 'undefined') {
       try {
@@ -373,7 +348,7 @@ export async function getItemBySlug(slug: string, storeId?: string | null): Prom
         const { createServerClient } = await import('@supabase/ssr')
         const headersList = await headers()
         const hostname = headersList.get('host') || ''
-        
+
         // Extraer subdominio del hostname
         let subdomain: string | null = null
         if (hostname.includes('localhost') || hostname.includes('127.0.0.1')) {
@@ -394,12 +369,12 @@ export async function getItemBySlug(slug: string, storeId?: string | null): Prom
             }
           }
         }
-        
+
         if (subdomain) {
           // Usar cliente de servidor para consultar Supabase
           const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
           const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-          
+
           if (supabaseUrl && supabaseKey) {
             const cookieStore = await cookies()
             const serverSupabase = createServerClient(supabaseUrl, supabaseKey, {
@@ -415,7 +390,7 @@ export async function getItemBySlug(slug: string, storeId?: string | null): Prom
                 },
               },
             })
-            
+
             const { data: store } = await serverSupabase
               .schema(ECOMMERCE_SCHEMA)
               .from(ECOMMERCE_VIEWS.storesLegacy)
@@ -424,7 +399,7 @@ export async function getItemBySlug(slug: string, storeId?: string | null): Prom
               .eq('is_active', true)
               .is('deleted_at', null)
               .single()
-            
+
             if (store?.id) {
               console.log('[Products] Store ID obtenido de subdominio para getItemBySlug:', subdomain, '->', store.id)
               currentStoreId = store.id
@@ -438,7 +413,7 @@ export async function getItemBySlug(slug: string, storeId?: string | null): Prom
         }
       }
     }
-    
+
     // Si aún no hay store_id (por ejemplo, durante build time), intentar obtener el UUID de la tienda por defecto
     if (isDefaultStoreAlias(currentStoreId)) {
       currentStoreId = await resolveDefaultStoreId(supabase, 'getItemBySlug')
@@ -449,7 +424,7 @@ export async function getItemBySlug(slug: string, storeId?: string | null): Prom
     const result = await withTimeout(
       supabase
         .from(ECOMMERCE_VIEWS.storeItemsLegacy)
-        .select('*, item_categories(*)')
+        .select(STORE_ITEMS_SELECT)
         .eq('item_slug', slug)
         .eq('store_id', currentStoreId) // Filtrar por tienda
         .single(),
@@ -527,89 +502,6 @@ export async function getItemBySlug(slug: string, storeId?: string | null): Prom
   }
 }
 
-/**
- * Obtener un producto por ID
- */
-export async function getItemById(
-  itemId: string,
-  storeId?: string,
-  supabaseOverride?: any,
-): Promise<StoreItemWithDetails | null> {
-  try {
-    const supabase = supabaseOverride ?? getSupabaseEcommerce()
-    if (!supabase) {
-      return null
-    }
-
-    // Obtener store_id si no se proporciona
-    let currentStoreId = storeId || await getStoreId()
-    
-    // Si no hay store_id (por ejemplo, durante build time), intentar obtener el UUID de la tienda por defecto
-    if (isDefaultStoreAlias(currentStoreId)) {
-      currentStoreId = await resolveDefaultStoreId(supabase, 'getItemById')
-      if (!currentStoreId) return null
-    }
-
-    const result = await withTimeout(
-      supabase
-        .from(ECOMMERCE_VIEWS.storeItemsLegacy)
-        .select('*, item_categories(*)')
-        .eq('id', itemId)
-        .eq('store_id', currentStoreId) // Filtrar por tienda
-        .single(),
-      15000,
-      'getItemById'
-    ) as { data: any; error: any }
-    const { data: itemData, error: itemError } = result
-
-    // Verificar si hay un error real (con propiedades) o si no se encontró el producto
-    if (itemError) {
-      // Verificar si el error tiene información útil
-      const hasErrorInfo = itemError && typeof itemError === 'object' && Object.keys(itemError).length > 0
-      if (hasErrorInfo) {
-        console.error('[Products] Error al obtener producto por ID:', {
-          message: itemError.message || 'Error desconocido',
-          code: itemError.code,
-          details: itemError.details,
-          hint: itemError.hint,
-          itemId,
-        })
-      } else {
-        // Si el error está vacío, probablemente el producto no existe
-        console.log(`[Products] Producto no encontrado con ID: "${itemId}"`)
-      }
-      const comboFallback = await getComboById(itemId)
-      return comboFallback ? comboToStoreItem(comboFallback) : null
-    }
-
-    if (!itemData) {
-      console.log(`[Products] No se encontró producto con ID: "${itemId}"`)
-      const comboFallback = await getComboById(itemId)
-      return comboFallback ? comboToStoreItem(comboFallback) : null
-    }
-
-    const item = itemData as any
-
-    // Obtener variantes, imágenes y opciones (similar a getItemBySlug)
-    const [variantsResult, imagesResult, optionsResult] = await Promise.all([
-      supabase.from(ECOMMERCE_TABLES.itemVariants).select('*').eq('item_id', item.id).order('display_order', { ascending: true }),
-      supabase.from(ECOMMERCE_TABLES.itemImages).select('*').eq('item_id', item.id).order('display_order', { ascending: true }),
-      supabase.from(ECOMMERCE_VIEWS.itemOptionsLegacy).select('*').eq('item_id', item.id).order('display_order', { ascending: true }),
-    ])
-
-    return {
-      ...item,
-      category: item.item_categories ? (item.item_categories as ItemCategory) : undefined,
-      variants: (variantsResult.data as ItemVariant[]) || [],
-      images: (imagesResult.data as ItemImage[]) || [],
-      options: (optionsResult.data as ItemOption[]) || [],
-    } as StoreItemWithDetails
-  } catch (error: any) {
-    console.error('[Products] Error inesperado al obtener producto:', error)
-    return null
-  }
-}
-
 export async function getVariantsByItemIds(
   itemIds: string[],
   supabaseOverride?: any,
@@ -639,34 +531,6 @@ export async function getVariantsByItemIds(
   }
 
   return variantsByItemId
-}
-
-/**
- * Buscar productos por término de búsqueda
- */
-export async function searchItems(searchTerm: string, limit: number = 20): Promise<StoreItemWithDetails[]> {
-  const result = await getItems({
-    search: searchTerm,
-    limit,
-    order_by: 'created_at',
-    order_direction: 'desc',
-  })
-
-  return result.items
-}
-
-/**
- * Obtener productos por categoría
- */
-export async function getItemsByCategory(categoryId: string, limit: number = 20): Promise<StoreItemWithDetails[]> {
-  const result = await getItems({
-    category_id: categoryId,
-    limit,
-    order_by: 'display_order',
-    order_direction: 'asc',
-  })
-
-  return result.items
 }
 
 /**
@@ -812,7 +676,7 @@ export async function createItem(
 
     // Obtener store_id
     let storeId = data.store_id || await getStoreId()
-    
+
     // Si no hay store_id, obtener el UUID de la tienda por defecto
     if (!storeId) {
       try {
@@ -823,7 +687,7 @@ export async function createItem(
           .eq('is_active', true)
           .is('deleted_at', null)
           .single()
-        
+
         if (defaultStore?.id) {
           storeId = defaultStore.id
         } else {
@@ -890,8 +754,8 @@ export async function createItem(
     // Si hay item_description, envolverlo en <p> para item_description_html
     const description = data.item_description?.trim() || null
     // Convertir saltos de línea en <br> y envolver en <p>
-    const descriptionHtml = description 
-      ? `<p>${description.replace(/\n/g, '<br>')}</p>` 
+    const descriptionHtml = description
+      ? `<p>${description.replace(/\n/g, '<br>')}</p>`
       : null
 
     // Preparar datos del producto
@@ -1094,7 +958,7 @@ export async function updateItem(
 
     // Preparar datos de actualización (solo campos que se proporcionaron)
     const updateData: any = {}
-    
+
     if (data.item_code !== undefined) updateData.item_code = data.item_code || null
     if (data.item_name !== undefined) updateData.item_name = data.item_name
     if (data.item_description !== undefined) {
@@ -1102,8 +966,8 @@ export async function updateItem(
       updateData.item_description = description
       // Generar item_description_html automáticamente desde item_description
       // Convertir saltos de línea en <br> y envolver en <p>
-      updateData.item_description_html = description 
-        ? `<p>${description.replace(/\n/g, '<br>')}</p>` 
+      updateData.item_description_html = description
+        ? `<p>${description.replace(/\n/g, '<br>')}</p>`
         : null
     }
     // No permitir actualizar item_description_html directamente, se genera automáticamente
@@ -1230,93 +1094,5 @@ export async function incrementItemViewCount(itemId: string): Promise<boolean> {
   } catch (error: any) {
     console.error('[Products] Error inesperado al incrementar vistas:', error)
     return false
-  }
-}
-
-/**
- * Obtener stock disponible de un producto
- * Retorna null si el producto no rastrea inventario o no existe
- */
-export async function getProductStock(productId: string): Promise<number | null> {
-  try {
-    const supabase = getSupabaseEcommerce()
-    if (!supabase) {
-      return null
-    }
-
-    const result = await withTimeout(
-      supabase
-        .from(ECOMMERCE_TABLES.storeItems)
-        .select('track_inventory, inventory_quantity, is_available_for_sale, is_active')
-        .eq('id', productId)
-        .single(),
-      10000,
-      'getProductStock'
-    ) as { data: any; error: any }
-
-    if (result.error || !result.data) {
-      return getDerivedComboStock(productId)
-    }
-
-    const product = result.data
-
-    // Si no rastrea inventario, retornar null (stock ilimitado)
-    if (!product.track_inventory) {
-      return null
-    }
-
-    // Si no está disponible, retornar 0
-    if (!product.is_available_for_sale || !product.is_active) {
-      return 0
-    }
-
-    return product.inventory_quantity || 0
-  } catch (error: any) {
-    console.error('[Products] Error al obtener stock del producto:', error)
-    return null
-  }
-}
-
-/**
- * Obtener stock disponible de una variante
- * Retorna null si la variante no rastrea inventario o no existe
- */
-export async function getVariantStock(variantId: string): Promise<number | null> {
-  try {
-    const supabase = getSupabaseEcommerce()
-    if (!supabase) {
-      return null
-    }
-
-    const result = await withTimeout(
-      supabase
-        .from(ECOMMERCE_TABLES.itemVariants)
-        .select('track_inventory, inventory_quantity, is_available')
-        .eq('id', variantId)
-        .single(),
-      10000,
-      'getVariantStock'
-    ) as { data: any; error: any }
-
-    if (result.error || !result.data) {
-      return null
-    }
-
-    const variant = result.data
-
-    // Si no rastrea inventario, retornar null (stock ilimitado)
-    if (!variant.track_inventory) {
-      return null
-    }
-
-    // Si no está disponible, retornar 0
-    if (!variant.is_available) {
-      return 0
-    }
-
-    return variant.inventory_quantity || 0
-  } catch (error: any) {
-    console.error('[Products] Error al obtener stock de la variante:', error)
-    return null
   }
 }

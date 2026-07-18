@@ -3,7 +3,8 @@ import { notFound, redirect } from "next/navigation"
 import { AdminPageContainer } from "@/components/admin/page-container"
 import { AdminPageHeader } from "@/components/admin/page-header"
 import { authorizeActiveStoreAdmin } from "@/lib/supabase/active-store"
-import { getCategories, getItemById } from "@/lib/supabase/products-api"
+import { getCategories } from "@/lib/supabase/products-api"
+import { getItemById } from "@/lib/supabase/products-read"
 import { EditProductForm } from "./components/edit-product-form"
 
 // The product and its categories are loaded here, not in the form: a browser

@@ -15,7 +15,8 @@ const {
 }))
 
 vi.mock("@/lib/supabase/active-store", () => ({ authorizeActiveStoreAdmin }))
-vi.mock("@/lib/supabase/products-api", () => ({ createItem, updateItem, getItemById }))
+vi.mock("@/lib/supabase/products-api", () => ({ createItem, updateItem }))
+vi.mock("@/lib/supabase/products-read", () => ({ getItemById }))
 vi.mock("next/cache", () => ({ revalidatePath }))
 
 import {

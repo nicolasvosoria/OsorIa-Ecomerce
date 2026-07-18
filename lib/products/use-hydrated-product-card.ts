@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getItemById } from "@/lib/supabase/products-api";
+import { getItemById } from "@/lib/supabase/products-read";
 import { toCommerceProductCard } from "@/lib/products/adapter";
 import type { CommerceProductCard } from "@/lib/types/products";
 

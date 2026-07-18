@@ -17,12 +17,15 @@ import {
   THEME_PREVIEW_SELECTION_SOURCE,
   THEME_PREVIEW_CONTENT_SOURCE,
   THEME_PREVIEW_COMPOSITION_SOURCE,
+  THEME_PREVIEW_SHOP_CONFIG_SOURCE,
   parseThemePreviewSelectMessage,
 } from "@/lib/theme-font/preview-mode"
 import { deferStateUpdate } from "@/lib/react/defer-state-update"
 import { getComponentStyles, updateComponentStyle } from "@/lib/supabase/styles-api"
 import { getActiveTheme } from "@/lib/supabase/themes-api"
 import { getHomeComposition, updateHomeComposition } from "@/lib/supabase/home-composition-api"
+import { getShopConfig, updateShopConfig } from "@/lib/supabase/shop-config-api"
+import type { ShopConfig } from "@/lib/shop/shop-config"
 import type { HomeSectionEntry } from "@/lib/supabase/types"
 import {
   addSectionEntry,
@@ -56,12 +59,21 @@ import { SectionContentPanel } from "@/components/theme/theme-editor-section-con
 import { SectionsManager } from "@/components/theme/theme-editor-sections-manager"
 import { FuentesTab } from "@/components/theme/theme-editor-fonts-tab"
 import { HistorialTab } from "@/components/theme/theme-editor-history-tab"
+import { ThemeEditorShopTab } from "@/components/theme/theme-editor-shop-tab"
 import { ThemeEditorContextBar } from "@/components/theme/theme-editor-context-bar"
 import { ArrowLeft, History, Loader2, Monitor, RotateCcw, Smartphone, Tablet } from "lucide-react"
 
 const PREVIEW_HOME_PATH = "/?themePreview=1"
+// The Vitrina tab edits /shop, so its preview points the iframe at the shop —
+// the surface the shop-config/copy edits actually change (mirrors how every
+// other tab previews against the home surface it edits).
+const PREVIEW_SHOP_PATH = "/shop?themePreview=1"
 const TABLET_STAGE_WIDTH = "768px"
 const MOBILE_STAGE_WIDTH = "390px"
+
+// The /shop header copy lives in `component_styles` under this name (D6), so it
+// stages and saves through the editor's existing content channel.
+const SHOP_COPY_COMPONENT_NAME = "shop"
 
 type PreviewWidth = "desktop" | "tablet" | "mobile"
 
@@ -70,6 +82,7 @@ const SIDEBAR_TABS = [
   { value: "forma", label: "Forma" },
   { value: "fuentes", label: "Fuentes" },
   { value: "sections", label: "Secciones" },
+  { value: "vitrina", label: "Tienda" },
 ] as const
 
 const SECTION_PANEL_TABS = [
@@ -148,6 +161,14 @@ export function ThemeCustomEditor() {
   // to it and a successful `handleApply` advances it to the saved value.
   const [workingComposition, setWorkingComposition] = useState<HomeSectionEntry[]>([])
   const [compositionBaseline, setCompositionBaseline] = useState<HomeSectionEntry[]>([])
+  // The active store's staged /shop config (default sort + filter visibility),
+  // seeded from and saved back through its own endpoint (`updateShopConfig`),
+  // just like `workingComposition`. `null` until the seed load resolves.
+  const [workingShopConfig, setWorkingShopConfig] = useState<ShopConfig | null>(null)
+  const [shopConfigBaseline, setShopConfigBaseline] = useState<ShopConfig | null>(null)
+  // Which sidebar tab is open — lifted from the Tabs so the Stage can point the
+  // preview iframe at /shop while the Vitrina tab is active.
+  const [activeSidebarTab, setActiveSidebarTab] = useState<string>(SIDEBAR_TABS[0].value)
   // The active store's published design (base theme + persisted component
   // styles), read for `activeStoreId` — the same store `handleApply` writes to.
   const [activeStoreTheme, setActiveStoreTheme] = useState<AppTheme | null>(null)
@@ -195,6 +216,20 @@ export function ThemeCustomEditor() {
     }
   }, [activeStoreId])
 
+  // Seed the Vitrina tab from the ACTIVE store's saved /shop config (falls back
+  // to today's defaults when unset), mirroring the composition seed above.
+  useEffect(() => {
+    let cancelled = false
+    getShopConfig(activeStoreId).then((config) => {
+      if (cancelled) return
+      setWorkingShopConfig(config)
+      setShopConfigBaseline(config)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [activeStoreId])
+
   // Seed the working definition once the base list resolves: defaults to the
   // active store's currently published theme, falling back to the first preset.
   useEffect(() => {
@@ -236,15 +271,21 @@ export function ThemeCustomEditor() {
     setSelectedPairingId(pairingIdFromDefinition(baseDefinition.fontPairingId))
     setWorkingContent({})
     setWorkingComposition(compositionBaseline)
+    setWorkingShopConfig(shopConfigBaseline)
     setDirty(false)
     // A reload clears any applied preview pairing and any staged content the
     // iframe had received; onLoad re-posts the theme (content starts empty,
     // so the preview falls back to the real saved content — no ghost edits).
     iframeRef.current?.contentWindow?.location.reload()
-  }, [activeStoreTheme, themes, compositionBaseline])
+  }, [activeStoreTheme, themes, compositionBaseline, shopConfigBaseline])
 
   const updateDefinition = useCallback((updater: DefinitionUpdater) => {
     setWorkingDefinition((prev) => (prev ? updater(prev) : prev))
+    setDirty(true)
+  }, [])
+
+  const updateShopConfigDraft = useCallback((updater: (prev: ShopConfig) => ShopConfig) => {
+    setWorkingShopConfig((prev) => (prev ? updater(prev) : prev))
     setDirty(true)
   }, [])
 
@@ -337,6 +378,27 @@ export function ThemeCustomEditor() {
     }))
   }, [])
 
+  // The Vitrina tab's copy fields reuse the section-content channel: current
+  // values are staged edits merged over the persisted "shop" styles, and each
+  // change stages through the same `workingContent` path — so it previews live
+  // (shop-header reads `componentEdits.get("shop")`) and saves via handleApply's
+  // content loop (`updateComponentStyle`), no separate copy plumbing (D6).
+  const shopCopy = useMemo(
+    () => ({
+      ...activeStoreStyles.get(SHOP_COPY_COMPONENT_NAME),
+      ...workingContent[SHOP_COPY_COMPONENT_NAME],
+    }),
+    [activeStoreStyles, workingContent],
+  )
+
+  const handleShopCopyChange = useCallback(
+    (key: "title" | "subtitle", value: string) => {
+      handleContentFieldChange(SHOP_COPY_COMPONENT_NAME, key, value)
+      setDirty(true)
+    },
+    [handleContentFieldChange],
+  )
+
   // Pushes the staged home composition (order/visibility) over its own
   // channel (`THEME_PREVIEW_COMPOSITION_SOURCE`); the in-iframe admin-context
   // bridge applies it onto `previewComposition`, which `HomeComposition`
@@ -353,12 +415,34 @@ export function ThemeCustomEditor() {
     postCompositionPreviewMessage()
   }, [postCompositionPreviewMessage])
 
+  // Pushes the staged /shop config over its own channel
+  // (`THEME_PREVIEW_SHOP_CONFIG_SOURCE`); the in-iframe admin-context bridge
+  // applies it onto `previewShopConfig`, which /shop's `useEffectiveShopConfig`
+  // overlays over the server config, so sort/filter edits preview live.
+  const postShopConfigPreviewMessage = useCallback(() => {
+    if (!workingShopConfig) return
+    postToPreview({ source: THEME_PREVIEW_SHOP_CONFIG_SOURCE, config: workingShopConfig })
+  }, [workingShopConfig, postToPreview])
+
+  // Re-post on every working-shop-config change (mirrors the sends above);
+  // `handleIframeLoad` covers the initial load/reload.
+  useEffect(() => {
+    postShopConfigPreviewMessage()
+  }, [postShopConfigPreviewMessage])
+
   const handleIframeLoad = useCallback(() => {
     postPreviewMessage()
     postFontPreviewMessage()
     postContentPreviewMessages()
     postCompositionPreviewMessage()
-  }, [postPreviewMessage, postFontPreviewMessage, postContentPreviewMessages, postCompositionPreviewMessage])
+    postShopConfigPreviewMessage()
+  }, [
+    postPreviewMessage,
+    postFontPreviewMessage,
+    postContentPreviewMessages,
+    postCompositionPreviewMessage,
+    postShopConfigPreviewMessage,
+  ])
 
   // Secciones tab seam: reorder/hide-show/remove all stage onto
   // `workingComposition` only — `handleApply` below is what actually
@@ -460,6 +544,18 @@ export function ThemeCustomEditor() {
         }
       }
 
+      const shopConfigUnchanged = JSON.stringify(workingShopConfig) === JSON.stringify(shopConfigBaseline)
+      if (workingShopConfig && !shopConfigUnchanged) {
+        try {
+          const savedShopConfig = await updateShopConfig(workingShopConfig)
+          setShopConfigBaseline(savedShopConfig)
+        } catch (err) {
+          const reason = err instanceof Error ? err.message : "Error desconocido"
+          setApplyResult(buildPublishFailure(`No se pudo guardar la vitrina (${reason}).`))
+          return
+        }
+      }
+
       const result = await changeThemeCustom(selectedBaseName, workingDefinition)
       // Fonts are a parallel axis — activate the chosen pairing through its
       // own system so the published theme also carries the typography.
@@ -503,6 +599,8 @@ export function ThemeCustomEditor() {
     activeStoreStyles,
     workingComposition,
     compositionBaseline,
+    workingShopConfig,
+    shopConfigBaseline,
     changeThemeCustom,
     selectedPairing,
     changePairing,
@@ -514,6 +612,12 @@ export function ThemeCustomEditor() {
   useEffect(() => {
     deferStateUpdate(() => setApplyResult(null))
   }, [workingDefinition, selectedPairingId])
+
+  // The Vitrina tab previews against /shop; every other tab (and any selected
+  // home section) previews against home. A section is only ever selected from
+  // the home preview, so this never fights the section panel.
+  const previewPath =
+    activeSidebarTab === "vitrina" && !selectedSection ? PREVIEW_SHOP_PATH : PREVIEW_HOME_PATH
 
   return (
     // Outer wrapper is the horizontal scroll boundary for the two-panel
@@ -556,9 +660,16 @@ export function ThemeCustomEditor() {
             onToggleSection={handleToggleSection}
             onRemoveSection={handleRemoveSection}
             onAddSection={handleAddSection}
+            activeTab={activeSidebarTab}
+            onTabChange={setActiveSidebarTab}
+            shopConfig={workingShopConfig}
+            onUpdateShopConfig={updateShopConfigDraft}
+            shopCopy={shopCopy}
+            onShopCopyChange={handleShopCopyChange}
           />
           <Stage
             iframeRef={iframeRef}
+            previewPath={previewPath}
             previewWidth={previewWidth}
             onTogglePreviewWidth={setPreviewWidth}
             onIframeLoad={handleIframeLoad}
@@ -724,6 +835,12 @@ interface SidebarProps {
   onToggleSection: (key: string) => void
   onRemoveSection: (key: string) => void
   onAddSection: (key: string) => void
+  activeTab: string
+  onTabChange: (value: string) => void
+  shopConfig: ShopConfig | null
+  onUpdateShopConfig: (updater: (prev: ShopConfig) => ShopConfig) => void
+  shopCopy: { title?: string; subtitle?: string }
+  onShopCopyChange: (key: "title" | "subtitle", value: string) => void
 }
 
 function Sidebar({
@@ -745,6 +862,12 @@ function Sidebar({
   onToggleSection,
   onRemoveSection,
   onAddSection,
+  activeTab,
+  onTabChange,
+  shopConfig,
+  onUpdateShopConfig,
+  shopCopy,
+  onShopCopyChange,
 }: SidebarProps) {
   const activeColors = definition
     ? editingColorSet === "dark"
@@ -773,8 +896,8 @@ function Sidebar({
       <ThemeEditorContextBar mode="general" />
 
       <div className="p-4 pt-3">
-        <Tabs defaultValue={SIDEBAR_TABS[0].value}>
-          <TabsList className="custom-scrollbar flex w-full flex-nowrap gap-1 overflow-x-auto">
+        <Tabs value={activeTab} onValueChange={onTabChange}>
+          <TabsList className="custom-scrollbar flex w-full flex-nowrap justify-start gap-1 overflow-x-auto">
             {SIDEBAR_TABS.map((tab) => (
               <TabsTrigger key={tab.value} value={tab.value} className="shrink-0 text-xs">
                 {tab.label}
@@ -819,6 +942,19 @@ function Sidebar({
               onRemove={onRemoveSection}
               onAdd={onAddSection}
             />
+          </TabsContent>
+
+          <TabsContent value="vitrina">
+            {shopConfig ? (
+              <ThemeEditorShopTab
+                config={shopConfig}
+                onUpdateConfig={onUpdateShopConfig}
+                copy={shopCopy}
+                onCopyChange={onShopCopyChange}
+              />
+            ) : (
+              <p className="pt-3 text-sm text-muted-foreground">Cargando configuración de la tienda…</p>
+            )}
           </TabsContent>
         </Tabs>
       </div>
@@ -908,6 +1044,7 @@ function SectionPanel({
 
 interface StageProps {
   iframeRef: RefObject<HTMLIFrameElement | null>
+  previewPath: string
   previewWidth: PreviewWidth
   onTogglePreviewWidth: (width: PreviewWidth) => void
   onIframeLoad: () => void
@@ -920,11 +1057,12 @@ const STAGE_WIDTH_BY_PREVIEW: Record<PreviewWidth, string> = {
   mobile: MOBILE_STAGE_WIDTH,
 }
 
-function Stage({ iframeRef, previewWidth, onTogglePreviewWidth, onIframeLoad, editingColorSet }: StageProps) {
+function Stage({ iframeRef, previewPath, previewWidth, onTogglePreviewWidth, onIframeLoad, editingColorSet }: StageProps) {
+  const surfaceLabel = previewPath === PREVIEW_SHOP_PATH ? "Tienda" : "Inicio"
   return (
     <main className="flex flex-1 flex-col overflow-y-auto p-4 sm:p-6">
       <div className="mb-3 flex items-center justify-between gap-2">
-        <span className="text-sm font-medium text-muted-foreground">Inicio</span>
+        <span className="text-sm font-medium text-muted-foreground">{surfaceLabel}</span>
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground">Vista: {COLOR_SET_LABELS[editingColorSet]}</span>
           <div className="flex items-center gap-1 rounded-md border bg-background p-1">
@@ -974,7 +1112,7 @@ function Stage({ iframeRef, previewWidth, onTogglePreviewWidth, onIframeLoad, ed
           </div>
           <iframe
             ref={iframeRef}
-            src={PREVIEW_HOME_PATH}
+            src={previewPath}
             title="Vista previa de la tienda"
             className="w-full min-h-0 flex-1 bg-background"
             onLoad={onIframeLoad}

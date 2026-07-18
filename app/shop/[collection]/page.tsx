@@ -36,7 +36,7 @@ export async function generateMetadata(props: { params: Promise<{ collection: st
 
   return {
     title: `${storeName} | ${collection.seo?.title || collection.title}`,
-    description: collection.seo?.description || collection.description || `${collection.title} products`,
+    description: collection.seo?.description || collection.description || `Productos de ${collection.title}`,
   };
 }
 

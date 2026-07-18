@@ -93,7 +93,7 @@ export function AddToCartButton({
 
       // Validar stock antes de agregar al carrito
       try {
-        const { getProductStock, getVariantStock } = await import('@/lib/supabase/products-api');
+        const { getProductStock, getVariantStock } = await import('@/lib/supabase/products-read');
 
         let stock: number | null = null;
 

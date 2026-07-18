@@ -22,7 +22,7 @@ describe("HeaderMegaMenu", () => {
     render(
       <HeaderMegaMenu
         categoryName="Parlantes"
-        categoryHref="/catalog/parlantes"
+        categoryHref="/shop/parlantes"
         description="Descripción compartida de la tienda."
         viewAllText="Ver todos los productos"
         featuredProductId={null}
@@ -33,7 +33,7 @@ describe("HeaderMegaMenu", () => {
     expect(screen.getByText("Descripción compartida de la tienda.")).toBeInTheDocument()
     expect(screen.getByRole("link", { name: "Ver todos los productos" })).toHaveAttribute(
       "href",
-      "/catalog/parlantes",
+      "/shop/parlantes",
     )
   })
 
@@ -53,7 +53,7 @@ describe("HeaderMegaMenu", () => {
     render(
       <HeaderMegaMenu
         categoryName="Parlantes"
-        categoryHref="/catalog/parlantes"
+        categoryHref="/shop/parlantes"
         description="Descripción compartida de la tienda."
         viewAllText="Ver todos los productos"
         featuredProductId="product-1"
@@ -72,7 +72,7 @@ describe("HeaderMegaMenu", () => {
     render(
       <HeaderMegaMenu
         categoryName="Parlantes"
-        categoryHref="/catalog/parlantes"
+        categoryHref="/shop/parlantes"
         description="Descripción compartida de la tienda."
         viewAllText="Ver todos los productos"
         featuredProductId="product-1"
@@ -89,7 +89,7 @@ describe("HeaderMegaMenu", () => {
     render(
       <HeaderMegaMenu
         categoryName="Soportes"
-        categoryHref="/catalog/soportes"
+        categoryHref="/shop/soportes"
         description="Descripción compartida de la tienda."
         viewAllText="Ver todos los productos"
         featuredProductId={null}
@@ -116,7 +116,7 @@ describe("HeaderMegaMenu", () => {
     render(
       <HeaderMegaMenu
         categoryName="Parlantes"
-        categoryHref="/catalog/parlantes"
+        categoryHref="/shop/parlantes"
         description="Descripción compartida de la tienda."
         viewAllText="Ver todos los productos"
         featuredProductId="product-1"

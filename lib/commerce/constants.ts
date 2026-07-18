@@ -1,6 +1,8 @@
 export const sortOptions = [
-  { label: 'Price-Low', value: 'price-asc' },
-  { label: 'Price-High', value: 'price-desc' },
-  { label: 'Newest', value: 'newest' },
-  { label: 'Oldest', value: 'oldest' },
+  { label: 'Precio: menor a mayor', value: 'price-asc' },
+  { label: 'Precio: mayor a menor', value: 'price-desc' },
+  { label: 'Más recientes', value: 'newest' },
+  { label: 'Más antiguos', value: 'oldest' },
 ];
+
+export const SHOP_PAGE_SIZE = 20;

@@ -27,7 +27,6 @@ export const FOOTER_DEFAULTS = {
   group1Links: [
     { label: "Inicio", url: "/" },
     { label: "Tienda", url: "/shop" },
-    { label: "Catálogo", url: "/catalog" },
   ] satisfies FooterLink[],
   group2Title: "Atención al cliente",
   group2Links: [

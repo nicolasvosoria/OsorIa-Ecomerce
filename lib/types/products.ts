@@ -136,6 +136,9 @@ export interface GetItemsParams {
   is_active?: boolean
   is_featured?: boolean
   is_available_for_sale?: boolean
+  on_sale?: boolean
+  price_min?: number
+  price_max?: number
   search?: string
   tags?: string[]
   limit?: number
