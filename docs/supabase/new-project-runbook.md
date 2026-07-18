@@ -25,6 +25,8 @@ El compartido tiene migraciones aplicadas **a mano** que no están reflejadas en
 2. Crear los archivos de migración que falten para las diferencias aplicadas a mano.
 3. Verificar en local: `pnpm supabase:start && supabase db reset && pnpm supabase:verify` en verde.
 
+**Estado (verificado local):** el chain **ya aplica desde cero en verde**. El único hueco encontrado era la fuente `'Inter'` (metida a mano en staging, no en archivos) → arreglado con un upsert idempotente en `20260702000100_ecommerce_font_pairings.sql`. Además se dropearon 2 views legacy muertas (`orders_legacy`, `app_themes_legacy`). **Pendiente único de #2339:** incorporar `shop_config` (llega con Plan 7) y mantener `schema_migrations` sincronizado. Tras Plan 7, re-correr `db reset` + `supabase:verify` para confirmar el chain final.
+
 ---
 
 ## Paso 1 — Crear la org Free + el proyecto (dashboard)
