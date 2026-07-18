@@ -81,7 +81,7 @@ declare
   v_missing text[];
 begin
   select array_agg(required_view order by required_view) into v_missing
-  from (values ('app_font_pairings_legacy'),('app_fonts_legacy'),('app_themes_legacy'),('component_styles_legacy'),('item_options_legacy'),('orders_legacy'),('store_items_legacy'),('stores_legacy')) req(required_view)
+  from (values ('app_font_pairings_legacy'),('app_fonts_legacy'),('component_styles_legacy'),('item_options_legacy'),('store_items_legacy'),('stores_legacy')) req(required_view)
   where to_regclass(format('ecommerce.%I', req.required_view)) is null;
 
   if v_missing is not null then
