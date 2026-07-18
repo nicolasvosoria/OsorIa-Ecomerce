@@ -47,15 +47,19 @@ supabase db push        # SOLO contra el proyecto NUEVO y vacío
 ```
 Reconstruye schema `ecommerce`, RLS, funciones (`provision_store`, `decrement_inventory`, etc.), triggers y los buckets `products` / `component-images` / `marketing-assets`. Cero datos.
 
-## Paso 4 — Seed: tienda default de café (script de provisioning)
+## Paso 4 — Seed: tienda default de café (`scripts/seed-default-store.mjs`)
 
-`scripts/seed-default-store.mjs` (service_role), idempotente:
-1. Crea usuarios: superadmin `johnjulin2@gmail.com` (role `super_admin`) y admin `default@gmail.com` (role `admin`, owner) vía `auth.admin.createUser` (password temporal + `must_change_password`).
-2. `provision_store(subdominio, nombre, owner, ...)` → tienda + rol owner + membresía en una transacción.
-3. Branding / contact / commerce / seo de la tienda; categorías; productos de café con variantes 250g/454g; combo "trilogía".
-4. Sube las imágenes de café de `public/` (bolsas honey/natural/washed, trilogía, plantación Huila, retratos) al bucket `products` y las cablea a `store_items` / `item_images`.
+Script idempotente, **dry-run por defecto** (imprime el plan sin tocar la DB); escribe solo con `--apply --confirm`. Marca "Cumbre Dorada Café" (Huila).
+1. Crea usuarios (`auth.admin.createUser`, password temporal impreso una sola vez): superadmin `johnjulin2@gmail.com` (role global `super_admin`) y `default@gmail.com` (role global `user` + `must_change_password`, **owner** de la tienda default por membresía — por Plan 12 no existe rol global `admin`: gestionar una tienda = membresía).
+2. `provision_store('default', ...)` → tienda + rol owner + membresía en una transacción; luego la publica (`is_public=true`).
+3. Branding / contact / commerce / seo; 2 categorías; 3 cafés de origen (honey/natural/washed) con variantes 250g/454g; combo "Trilogía".
+4. Sube las imágenes de café de `public/` al bucket `products` (paths deterministas `{store_id}/seed/…`, upsert) y las cablea a `store_items` / `item_images`.
 
-Correr contra el remoto nuevo (con su service_role) o en local tras `db reset`.
+```bash
+pnpm seed:default                                   # dry-run: revisa el plan
+node scripts/seed-default-store.mjs --apply --confirm   # aplica (con env del proyecto NUEVO)
+```
+Correr contra el remoto nuevo (con su `SUPABASE_SERVICE_ROLE_KEY`). Guarda el password temporal que imprime.
 
 ## Paso 5 — Reconectar la app (operador pone los valores de env)
 
