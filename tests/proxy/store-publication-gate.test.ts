@@ -8,6 +8,7 @@ import {
   type MockInstance,
 } from "vitest";
 import { NextRequest } from "next/server";
+import { resetProxyModulesAndEnv } from "@/tests/fixtures/proxy-store";
 
 const resolveAdminAccessMock = vi.fn();
 
@@ -54,13 +55,8 @@ describe("proxy store publication gate", () => {
   let errorSpy: MockInstance;
 
   beforeEach(() => {
-    vi.resetModules();
+    resetProxyModulesAndEnv();
     errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "test-anon-key";
-    process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role";
-    delete process.env.DISABLE_SUBDOMAIN_MULTI_TENANT;
-    delete process.env.DEFAULT_STORE_ID;
     resolveAdminAccessMock.mockReset();
     resolveAdminAccessMock.mockResolvedValue({ status: "admin", userId: "owner-1" });
   });
