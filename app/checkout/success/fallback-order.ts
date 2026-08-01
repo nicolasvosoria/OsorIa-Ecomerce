@@ -5,7 +5,10 @@ import {
   type OrderByNumberAuth,
   type OrderWithItems,
 } from "@/lib/supabase/orders-api";
-import { resolveServerAuthSession } from "@/lib/supabase/server-auth-session";
+import {
+  ecommerceForSession,
+  resolveServerAuthSession,
+} from "@/lib/supabase/server-auth-session";
 import { getServiceEcommerceClient } from "@/lib/supabase/service-client";
 
 export interface SuccessPageOrderItem {
@@ -60,7 +63,11 @@ async function loadOrderForSessionUser(
     return null;
   }
 
-  return getOrderByNumberForUser(orderNumber, session.userId, session.client);
+  return getOrderByNumberForUser(
+    orderNumber,
+    session.userId,
+    ecommerceForSession(session.client),
+  );
 }
 
 // Un invitado no tiene sesión: el filtro store_id + email es toda la prueba de

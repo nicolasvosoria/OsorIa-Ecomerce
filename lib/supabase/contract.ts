@@ -38,6 +38,7 @@ export const ECOMMERCE_TABLES = {
   storeUserRoles: "store_user_roles",
   storeUsers: "store_users",
   stores: "stores",
+  userAddresses: "user_addresses",
   userProfiles: "user_profiles",
 } as const satisfies Record<string, EcommerceTableName>;
 
@@ -53,6 +54,7 @@ export const ECOMMERCE_VIEWS = {
 } as const satisfies Record<string, EcommerceViewName>;
 
 export const ECOMMERCE_FUNCTIONS = {
+  canUserManageStore: "can_user_manage_store",
   decrementInventory: "decrement_inventory",
   incrementItemViews: "increment_item_views",
   isComponentStylesAdmin: "is_component_styles_admin",

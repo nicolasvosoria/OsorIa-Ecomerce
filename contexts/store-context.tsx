@@ -35,12 +35,26 @@ interface StoreContextType {
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
 
-export function StoreProvider({ children }: { children: ReactNode }) {
+export function StoreProvider({
+  children,
+  isUnknownTenant = false,
+}: {
+  children: ReactNode;
+  isUnknownTenant?: boolean;
+}) {
   const [store, setStore] = useState<Store | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const loadStore = async () => {
+    // Un subdominio sin tienda detrás no tiene identidad que cargar, y el
+    // fallback de más abajo inventaría "Tienda Principal": el aviso saldría
+    // vestido de una tienda que no es la suya (D3).
+    if (isUnknownTenant) {
+      setIsLoading(false);
+      return;
+    }
+
     try {
       setIsLoading(true);
       setError(null);
@@ -141,6 +155,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }, 0);
 
     return () => window.clearTimeout(timeoutId);
+    // loadStore se recrea en cada render; listarlo como dependencia recargaría
+    // la tienda en bucle. La señal que lee (isUnknownTenant) es fija por request.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const refreshStore = async () => {

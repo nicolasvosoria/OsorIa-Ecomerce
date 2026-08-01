@@ -1,5 +1,5 @@
+import { resolveStoreCustomerOrdersSession } from "@/lib/orders/store-customer-session";
 import { getOrdersForUser, type Order, type OrderWithItems } from "@/lib/supabase/orders-api";
-import { resolveServerAuthSession } from "@/lib/supabase/server-auth-session";
 
 export interface OrdersListItem {
   orderNumber: string;
@@ -12,20 +12,22 @@ export interface OrdersListItem {
 }
 
 export type OrdersPageView =
-  | { authenticated: false }
-  | { authenticated: true; orders: OrdersListItem[] };
+  | { status: "guest" }
+  | { status: "storeUnresolved" }
+  | { status: "history"; orders: OrdersListItem[] };
 
 // El invitado nunca dispara una lectura de pedidos (sesión primero, query
 // después): si no hay cliente de sesión o no hay user_id, la página muestra
-// el estado de invitado sin haber tocado la base de datos.
+// el estado de invitado sin haber tocado la base de datos. Y si la tienda del
+// host no se resuelve, la página lo dice en vez de fingir un historial vacío.
 export async function loadOrdersPageView(): Promise<OrdersPageView> {
-  const session = await resolveServerAuthSession();
-  if (!session) {
-    return { authenticated: false };
+  const session = await resolveStoreCustomerOrdersSession();
+  if (session.status !== "ready") {
+    return session;
   }
 
-  const orders = await getOrdersForUser(session.userId, session.client);
-  return { authenticated: true, orders: orders.map(toOrdersListItem) };
+  const orders = await getOrdersForUser(session.auth, session.ecommerce);
+  return { status: "history", orders: orders.map(toOrdersListItem) };
 }
 
 function toOrdersListItem(order: OrderWithItems): OrdersListItem {

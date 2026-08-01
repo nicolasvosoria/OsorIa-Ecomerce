@@ -6,8 +6,19 @@ import {
   resolveStoreSubdomain,
   toPlatformAdminHost,
 } from '@/lib/utils/store-host'
-import { normalizeSafeAdminPath, resolveAdminAccess } from '@/lib/supabase/admin-access'
+import {
+  normalizeSafeAdminPath,
+  requesterManagesStore,
+  resolveAdminAccess,
+} from '@/lib/supabase/admin-access'
+import { isThemePreviewSearch } from '@/lib/theme-font/preview-mode'
 import { isRouteOrDescendant } from '@/lib/admin/routes'
+import {
+  NEUTRAL_PAGE_HEADER,
+  NEUTRAL_PAGE_KIND,
+  UNKNOWN_TENANT_HEADER,
+  UNKNOWN_TENANT_VALUE,
+} from '@/lib/stores/neutral-page'
 
 // Variable de entorno para deshabilitar multi-tenant temporalmente
 const DISABLE_SUBDOMAIN_MULTI_TENANT = process.env.DISABLE_SUBDOMAIN_MULTI_TENANT === 'true'
@@ -22,6 +33,68 @@ interface Store {
   domain: string
   is_active: boolean
   is_public: boolean
+}
+
+// ── Headers minteados por el proxy (frontera de confianza) ──────────────────
+// x-store-* es identidad que MINTA el proxy a partir de la tienda que resolvió.
+// x-osoria-neutral-page y x-osoria-unknown-tenant son los marcadores que el
+// propio proxy escribe para /store-inactive y /store-not-found (D3). El
+// servidor los lee de los headers de REQUEST (getStoreId, store-api,
+// /api/chat, TenantScopedShell), así que cualquiera de ellos enviado a mano
+// por el cliente haría que un host renderizara el catálogo o el tema de otro
+// tenant, o que un aviso ajeno apagara el chrome del storefront. Por eso se
+// borran todos al entrar y solo el proxy vuelve a escribirlos: ninguna página
+// ni route handler puede observar un header minteado por el proxy que el
+// proxy no haya puesto en esta misma pasada. Los redirects quedan fuera del
+// invariante: no renderizan ninguna petición, no hay request que llevar.
+const TENANT_IDENTITY_HEADERS = {
+  id: 'x-store-id',
+  subdomain: 'x-store-subdomain',
+  name: 'x-store-name',
+} as const
+
+const PROXY_MINTED_HEADERS = [
+  ...Object.values(TENANT_IDENTITY_HEADERS),
+  NEUTRAL_PAGE_HEADER,
+  UNKNOWN_TENANT_HEADER,
+]
+
+interface TenantIdentity {
+  id: string
+  subdomain: string
+  name: string
+}
+
+function stripInboundProxyMintedHeaders(request: NextRequest): Headers {
+  const headers = new Headers(request.headers)
+  PROXY_MINTED_HEADERS.forEach(name => headers.delete(name))
+  return headers
+}
+
+function applyTenantIdentity(headers: Headers, identity: TenantIdentity): void {
+  headers.set(TENANT_IDENTITY_HEADERS.id, identity.id)
+  headers.set(TENANT_IDENTITY_HEADERS.subdomain, identity.subdomain)
+  headers.set(TENANT_IDENTITY_HEADERS.name, identity.name)
+}
+
+function toTenantIdentity(store: Store): TenantIdentity {
+  return { id: store.id, subdomain: store.subdomain, name: store.store_name }
+}
+// ── Fin de los headers minteados por el proxy ───────────────────────────────
+
+// La cookie de tienda se emite sin `domain` a propósito: con un dominio padre el
+// navegador la mandaría a todos los subdominios y la tienda de un tenant pisaría
+// la del otro. Es la sesión de tienda del visitante, así que sus atributos se
+// escriben en un solo sitio.
+const TENANT_COOKIE_NAME = 'store_id'
+const TENANT_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 7 // 7 días
+
+function persistTenantCookie(response: NextResponse, storeId: string): void {
+  response.cookies.set(TENANT_COOKIE_NAME, storeId, {
+    path: '/',
+    maxAge: TENANT_COOKIE_MAX_AGE_SECONDS,
+    sameSite: 'lax',
+  })
 }
 
 // Caché simple en memoria para las tiendas (evita consultas repetidas)
@@ -56,6 +129,24 @@ async function applyAdminRouteGate(request: NextRequest, response: NextResponse)
     access.status === 'error' ? 'error' : 'denied',
   )
   return NextResponse.redirect(redirectUrl)
+}
+
+// Servir el storefront de un tenant es siempre la misma secuencia. La identidad
+// se escribe dos veces porque son dos canales distintos: los headers de REQUEST
+// son los que la página lee con headers(), y los de RESPONSE dejan visible en la
+// respuesta qué tienda resolvió el proxy.
+async function serveTenantStorefront(
+  request: NextRequest,
+  requestHeaders: Headers,
+  identity: TenantIdentity,
+) {
+  applyTenantIdentity(requestHeaders, identity)
+
+  const response = NextResponse.next({ request: { headers: requestHeaders } })
+  applyTenantIdentity(response.headers, identity)
+  persistTenantCookie(response, identity.id)
+
+  return applyAdminRouteGate(request, response)
 }
 
 // Resuelve la tienda por subdominio con la SERVICE KEY, no la anon key: la RLS de
@@ -131,6 +222,28 @@ function isAdminJourneyPath(pathname: string): boolean {
   return ADMIN_JOURNEY_ROOTS.some(root => isRouteOrDescendant(pathname, root))
 }
 
+// El editor de tema (/admin/theme) previsualiza el storefront en un iframe a
+// `/?themePreview=1`, así que una tienda todavía sin publicar le mostraría a su
+// dueño el aviso de inactiva en vez de lo que está configurando. La vista previa
+// atraviesa el aviso, pero solo para quien gestiona ESTA tienda: la puerta es
+// can_user_manage_store contra la tienda que resolvió el host, nunca "gestiona
+// alguna tienda", que dejaría al dueño de cualquier tenant mirar el catálogo,
+// los precios y los borradores pre-lanzamiento de los demás.
+// El marcador se mira PRIMERO y corta antes de cualquier await: así el tráfico
+// anónimo de una tienda despublicada (visitantes, crawlers, escáneres) no paga
+// ni autenticación ni RPC. Y el marcador solo por sí mismo no abre nada: va en
+// la query string, cualquiera puede escribirlo, la autoridad la da la sesión.
+async function isThemePreviewByStoreManager(
+  request: NextRequest,
+  storeId: string,
+): Promise<boolean> {
+  if (!isThemePreviewSearch(request.nextUrl.searchParams)) {
+    return false
+  }
+
+  return requesterManagesStore(request, storeId)
+}
+
 // ── Host admin (Plan 12, separación de privilegios) ─────────────────────────
 // admin.<dominio> sirve SOLO el tier plataforma (D1/D4): la consola de tenants
 // con rutas limpias (`/` consola, `/create` alta, `/<uuid>` ficha — su página
@@ -153,13 +266,17 @@ function resolvePlatformConsolePath(pathname: string): string | null {
   return STORE_ID_SEGMENT.test(segment) ? `${PLATFORM_CONSOLE_BASE}/${segment}` : null
 }
 
-async function handlePlatformAdminHost(request: NextRequest, hostname: string) {
+async function handlePlatformAdminHost(
+  request: NextRequest,
+  hostname: string,
+  requestHeaders: Headers,
+) {
   const { pathname } = request.nextUrl
 
   // El auth journey se sirve en este mismo host: la sesión de Supabase es una
   // cookie host-only, así que loguearse en otro host no valdría aquí.
   if (isRouteOrDescendant(pathname, '/auth') || isRouteOrDescendant(pathname, '/dashboard')) {
-    return NextResponse.next()
+    return NextResponse.next({ request: { headers: requestHeaders } })
   }
 
   const consolePath = resolvePlatformConsolePath(pathname)
@@ -198,13 +315,14 @@ async function handlePlatformAdminHost(request: NextRequest, hostname: string) {
   // sabe); authorizeSuperAdmin en las páginas decide el acceso real.
   const rewriteUrl = request.nextUrl.clone()
   rewriteUrl.pathname = consolePath
-  return NextResponse.rewrite(rewriteUrl)
+  return NextResponse.rewrite(rewriteUrl, { request: { headers: requestHeaders } })
 }
 // ── Fin del host admin ──────────────────────────────────────────────────────
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
   const hostname = request.headers.get('host') || ''
+  const requestHeaders = stripInboundProxyMintedHeaders(request)
 
   // Rutas que no requieren verificación de tienda
   const publicPaths = [
@@ -215,7 +333,7 @@ export async function proxy(request: NextRequest) {
   ]
 
   if (publicPaths.some(path => pathname.startsWith(path))) {
-    return NextResponse.next()
+    return NextResponse.next({ request: { headers: requestHeaders } })
   }
 
   // ── Host admin (Plan 12): corre antes del flag DISABLE_SUBDOMAIN_MULTI_TENANT
@@ -235,27 +353,17 @@ export async function proxy(request: NextRequest) {
   }
 
   if (isPlatformAdminHost(hostname)) {
-    return handlePlatformAdminHost(request, hostname)
+    return handlePlatformAdminHost(request, hostname, requestHeaders)
   }
   // ── Fin del host admin ──
 
   // Si multi-tenant está deshabilitado, usar store_id por defecto sin consultar BD
   if (DISABLE_SUBDOMAIN_MULTI_TENANT) {
-    const response = NextResponse.next()
-    const storeId = DEFAULT_STORE_ID || 'default'
-    
-    response.headers.set('x-store-id', storeId)
-    response.headers.set('x-store-subdomain', 'default')
-    response.headers.set('x-store-name', 'Default Store')
-
-    // Agregar cookie para persistir la tienda
-    response.cookies.set('store_id', storeId, {
-      path: '/',
-      maxAge: 60 * 60 * 24 * 7, // 7 días
-      sameSite: 'lax',
+    return serveTenantStorefront(request, requestHeaders, {
+      id: DEFAULT_STORE_ID || 'default',
+      subdomain: 'default',
+      name: 'Default Store',
     })
-
-    return applyAdminRouteGate(request, response)
   }
 
   // Extraer subdominio
@@ -268,44 +376,35 @@ export async function proxy(request: NextRequest) {
     
     if (defaultStore && isStoreLive(defaultStore)) {
       // Usar tienda por defecto si existe
-      const response = NextResponse.next()
-      response.headers.set('x-store-id', defaultStore.id)
-      response.headers.set('x-store-subdomain', 'default')
-      response.headers.set('x-store-name', defaultStore.store_name)
-      
-      response.cookies.set('store_id', defaultStore.id, {
-        path: '/',
-        maxAge: 60 * 60 * 24 * 7, // 7 días
-        sameSite: 'lax',
+      return serveTenantStorefront(request, requestHeaders, {
+        id: defaultStore.id,
+        subdomain: 'default',
+        name: defaultStore.store_name,
       })
-      
-      return applyAdminRouteGate(request, response)
     }
-    
+
     // Si no existe tienda por defecto, permitir continuar con valores por defecto
     // (esto permite que la aplicación funcione incluso sin configuración)
-    const response = NextResponse.next()
-    response.headers.set('x-store-id', 'default')
-    response.headers.set('x-store-subdomain', 'default')
-    response.headers.set('x-store-name', 'Tienda Principal')
-    
-    response.cookies.set('store_id', 'default', {
-      path: '/',
-      maxAge: 60 * 60 * 24 * 7, // 7 días
-      sameSite: 'lax',
+    return serveTenantStorefront(request, requestHeaders, {
+      id: 'default',
+      subdomain: 'default',
+      name: 'Tienda Principal',
     })
-    
-    return applyAdminRouteGate(request, response)
   }
 
   // Obtener información de la tienda
   const store = await getStoreBySubdomain(subdomain)
 
   if (!store) {
-    // La tienda no existe (o está borrada): no encontrada
+    // La tienda no existe (o está borrada): no encontrada. Sin tienda no hay
+    // identidad que propagar, así que marcamos el tenant como desconocido: si el
+    // aviso se renderizara sin señal, getStoreId() lo resolvería como la tienda
+    // `default` y el aviso saldría vestido de otro tenant.
     const url = request.nextUrl.clone()
     url.pathname = '/store-not-found'
-    return NextResponse.rewrite(url)
+    requestHeaders.set(UNKNOWN_TENANT_HEADER, UNKNOWN_TENANT_VALUE)
+    requestHeaders.set(NEUTRAL_PAGE_HEADER, NEUTRAL_PAGE_KIND.storeNotFound)
+    return NextResponse.rewrite(url, { request: { headers: requestHeaders } })
   }
 
   // Una tienda que existe pero no está live esconde su storefront, pero su dueño
@@ -313,26 +412,26 @@ export async function proxy(request: NextRequest) {
   // cambiar su clave temporal: dejamos pasar ese recorrido (el gate de servidor
   // sigue decidiendo la membresía en /admin) y solo reescribimos el storefront a
   // /store-inactive.
-  if (!isStoreLive(store) && !isAdminJourneyPath(pathname)) {
+  const hidesStorefront =
+    !isStoreLive(store) &&
+    !isAdminJourneyPath(pathname) &&
+    !(await isThemePreviewByStoreManager(request, store.id))
+
+  if (hidesStorefront) {
     const url = request.nextUrl.clone()
     url.pathname = '/store-inactive'
-    return NextResponse.rewrite(url)
+    // La identidad viaja como headers de REQUEST, no de response: la página que
+    // renderiza el aviso los lee con headers(), y en una reescritura solo llegan
+    // los que se pasan en el segundo argumento.
+    applyTenantIdentity(requestHeaders, toTenantIdentity(store))
+    requestHeaders.set(NEUTRAL_PAGE_HEADER, NEUTRAL_PAGE_KIND.storeInactive)
+
+    const response = NextResponse.rewrite(url, { request: { headers: requestHeaders } })
+    persistTenantCookie(response, store.id)
+    return response
   }
 
-  // Tienda válida, agregar headers para uso en la aplicación
-  const response = NextResponse.next()
-  response.headers.set('x-store-id', store.id)
-  response.headers.set('x-store-subdomain', store.subdomain)
-  response.headers.set('x-store-name', store.store_name)
-
-  // Agregar cookie para persistir la tienda (opcional)
-  response.cookies.set('store_id', store.id, {
-    path: '/',
-    maxAge: 60 * 60 * 24 * 7, // 7 días
-    sameSite: 'lax',
-  })
-
-  return applyAdminRouteGate(request, response)
+  return serveTenantStorefront(request, requestHeaders, toTenantIdentity(store))
 }
 
 // Configurar qué rutas deben ejecutar el proxy

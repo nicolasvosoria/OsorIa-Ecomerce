@@ -22,12 +22,19 @@ interface StylesContextType {
   styles: Map<string, Record<string, any>>;
   loading: boolean;
   error: string | null;
+  isUnknownTenant: boolean;
   refreshStyles: () => Promise<void>;
 }
 
 const StylesContext = createContext<StylesContextType | undefined>(undefined);
 
-export function StylesProvider({ children }: { children: ReactNode }) {
+export function StylesProvider({
+  children,
+  isUnknownTenant = false,
+}: {
+  children: ReactNode;
+  isUnknownTenant?: boolean;
+}) {
   const [styles, setStyles] = useState<Map<string, Record<string, any>>>(
     new Map(),
   );
@@ -43,6 +50,14 @@ export function StylesProvider({ children }: { children: ReactNode }) {
   };
 
   const refreshStyles = async () => {
+    // Sin tienda detrás del subdominio no hay store_id que filtre, y
+    // getComponentStyles() caería en la tienda cuyo subdominio es `default`:
+    // el aviso heredaría los estilos de otro inquilino (D3).
+    if (isUnknownTenant) {
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
@@ -224,7 +239,9 @@ export function StylesProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <StylesContext.Provider value={{ styles, loading, error, refreshStyles }}>
+    <StylesContext.Provider
+      value={{ styles, loading, error, isUnknownTenant, refreshStyles }}
+    >
       {children}
     </StylesContext.Provider>
   );
@@ -241,6 +258,7 @@ export function useStyles() {
       styles: new Map(),
       loading: false,
       error: "Not in StylesProvider",
+      isUnknownTenant: false,
       refreshStyles: async () => {},
     };
   }
@@ -251,7 +269,7 @@ export function useComponentStyle(
   componentName: string,
   defaultStyles: Record<string, any> = {},
 ) {
-  const { styles, loading } = useStyles();
+  const { styles, loading, isUnknownTenant } = useStyles();
 
   // Memoizar defaultStyles para evitar re-renders infinitos
   const defaultStylesKey = JSON.stringify(defaultStyles);
@@ -296,6 +314,11 @@ export function useComponentStyle(
       });
     }
 
+    // La suscripción realtime también resuelve la tienda `default` cuando no hay
+    // store_id: sin tienda detrás del subdominio abriría un canal a los estilos
+    // de otro inquilino (D3).
+    if (isUnknownTenant) return;
+
     let channel: any = null;
 
     try {
@@ -330,7 +353,7 @@ export function useComponentStyle(
         channel.unsubscribe();
       }
     };
-  }, [componentName, styles, memoizedDefaults]);
+  }, [componentName, styles, memoizedDefaults, isUnknownTenant]);
 
   return { styles: componentStyles, loading };
 }

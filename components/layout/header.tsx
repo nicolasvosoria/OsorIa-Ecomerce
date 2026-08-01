@@ -29,7 +29,7 @@ import { useWishlist } from "@/contexts/wishlist-context"
 import { useAuth } from "@/contexts/auth-context"
 import { Trash2, Plus, Minus } from "lucide-react"
 import { toast } from "sonner"
-import { resetPassword } from "@/lib/supabase/auth-api"
+import { PasswordRecoveryDialog } from "@/components/auth/password-recovery-dialog"
 import { deferStateUpdate } from "@/lib/react/defer-state-update"
 import { ADMIN_ACCESS_DENIED_PATH, FORCE_PASSWORD_CHANGE_PATH, getAuthReturnPath, resolvePostAuthDestination } from "@/lib/auth-return-intent"
 import { currentUserMustChangePassword, isCurrentUserAdminOrUnverified } from "@/lib/supabase/permissions-api"
@@ -114,8 +114,6 @@ export function Header() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [forgotPasswordModalOpen, setForgotPasswordModalOpen] = useState(false)
-  const [resetEmail, setResetEmail] = useState("")
-  const [resetEmailSent, setResetEmailSent] = useState(false)
   const [pendingLoginReturnPath, setPendingLoginReturnPath] = useState<string | null>(null)
   const openedLoginReturnIntentRef = useRef<string | null>(null)
   const handledLoginRequestCountRef = useRef(0)
@@ -540,6 +538,12 @@ export function Header() {
             </DropdownMenuLabel>
             <DropdownMenuSeparator style={{ backgroundColor: "var(--border)" }} />
             <DropdownMenuItem asChild style={{ color: "var(--foreground)" }}>
+              <Link href="/auth/cuenta">
+                <User className="mr-2 h-4 w-4" />
+                {t.nav.account}
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild style={{ color: "var(--foreground)" }}>
               <Link href="/orders">
                 <Package className="mr-2 h-4 w-4" />
                 {t.nav.orders}
@@ -780,7 +784,7 @@ export function Header() {
             {renderCategoryNavArea(
               <div className="flex items-center justify-between gap-3 lg:gap-6" data-testid="header-row">
                 {renderDesktopLogo("h-11 lg:h-14", "max-w-[180px]")}
-                {renderCategoryLinks("flex items-center gap-6 lg:gap-8", true, "text-base lg:text-[17px]")}
+                {renderCategoryLinks("flex items-center gap-6 lg:gap-8", true, "text-base")}
               </div>,
               "relative",
             )}
@@ -819,7 +823,7 @@ export function Header() {
 
             <div className="flex justify-center">
               <div className="flex justify-center" data-testid="header-row">
-                {renderCategoryLinks("flex items-center justify-center gap-6 lg:gap-8", false, "text-base lg:text-[17px]")}
+                {renderCategoryLinks("flex items-center justify-center gap-6 lg:gap-8", false, "text-base")}
               </div>
             </div>
           </div>
@@ -865,6 +869,12 @@ export function Header() {
                           : user?.email || "Usuario"}
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator style={{ backgroundColor: "var(--border)" }} />
+                    <DropdownMenuItem asChild style={{ color: "var(--foreground)" }}>
+                      <Link href="/auth/cuenta">
+                        <User className="mr-2 h-4 w-4" />
+                        {t.nav.account}
+                      </Link>
+                    </DropdownMenuItem>
                     <DropdownMenuItem asChild style={{ color: "var(--foreground)" }}>
                       <Link href="/orders">
                         <Package className="mr-2 h-4 w-4" />
@@ -1778,160 +1788,14 @@ export function Header() {
         </DialogContent>
       </Dialog>
 
-      {/* Modal de Recuperación de Contraseña */}
-      <Dialog 
-        open={forgotPasswordModalOpen} 
-        onOpenChange={(open) => {
-          setForgotPasswordModalOpen(open)
-          if (!open) {
-            setResetEmail("")
-            setResetEmailSent(false)
-          }
+      <PasswordRecoveryDialog
+        open={forgotPasswordModalOpen}
+        onOpenChange={setForgotPasswordModalOpen}
+        onBackToSignIn={() => {
+          setForgotPasswordModalOpen(false)
+          setLoginModalOpen(true)
         }}
-      >
-        <DialogContent className="w-[95vw] max-w-[450px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-inter font-semibold" style={{ color: "var(--foreground)" }}>
-              {resetEmailSent ? t.header.emailSent : t.header.forgotPasswordTitle}
-            </DialogTitle>
-            <DialogDescription className="text-sm" style={{ color: "var(--muted-foreground)" }}>
-              {resetEmailSent 
-                ? t.header.forgotPasswordDescription2
-                : t.header.forgotPasswordDescription}
-            </DialogDescription>
-          </DialogHeader>
-
-          {!resetEmailSent ? (
-            <form
-              onSubmit={async (e) => {
-                e.preventDefault()
-                if (!resetEmail) {
-                    toast.error(t.common.error, {
-                      description: t.header.enterEmail,
-                    duration: 3000,
-                  })
-                  return
-                }
-
-                const result = await resetPassword(resetEmail)
-                if (result.success) {
-                  setResetEmailSent(true)
-                  toast.success("Email enviado", {
-                    description: t.header.checkEmail,
-                    duration: 5000,
-                  })
-                } else {
-                  toast.error("Error al enviar email", {
-                    description: result.error || "Por favor, intenta nuevamente",
-                    duration: 5000,
-                  })
-                }
-              }}
-              className="space-y-4 mt-4"
-            >
-              <div className="space-y-2">
-                <label
-                  htmlFor="resetEmail"
-                  className="text-sm font-medium"
-                  style={{ color: "var(--foreground)" }}
-                >
-                  {t.auth.email}
-                </label>
-                <Input
-                  id="resetEmail"
-                  type="email"
-                  placeholder="tu@email.com"
-                  value={resetEmail}
-                  onChange={(e) => setResetEmail(e.target.value)}
-                  required
-                  className="w-full placeholder:opacity-50"
-                  style={{
-                    backgroundColor: "var(--background)",
-                    borderColor: "var(--border)",
-                    color: "var(--foreground)",
-                  }}
-                />
-              </div>
-
-              <div className="flex flex-col gap-2 pt-4">
-                <Button
-                  type="submit"
-                  className="w-full"
-                  style={{
-                    backgroundColor: "var(--primary)",
-                    color: "var(--primary-foreground)",
-                  }}
-                >
-                  Enviar link de recuperación
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => {
-                    setForgotPasswordModalOpen(false)
-                    setResetEmail("")
-                  }}
-                  style={{
-                    borderColor: "var(--border)",
-                    color: "var(--foreground)",
-                  }}
-                >
-                  Cancelar
-                </Button>
-              </div>
-            </form>
-          ) : (
-            <div className="space-y-4 mt-4">
-              <div className="p-4 rounded-lg text-center" style={{ backgroundColor: "var(--muted)" }}>
-                <p className="text-sm" style={{ color: "var(--foreground)" }}>
-                  Hemos enviado un link de recuperación a:
-                </p>
-                <p className="text-sm font-semibold mt-2" style={{ color: "var(--primary)" }}>
-                  {resetEmail}
-                </p>
-                <p className="text-xs mt-4" style={{ color: "var(--muted-foreground)" }}>
-                  Si no recibes el email, verifica tu carpeta de spam o intenta nuevamente.
-                </p>
-              </div>
-
-              <div className="flex flex-col gap-2 pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => {
-                    setForgotPasswordModalOpen(false)
-                    setResetEmail("")
-                    setResetEmailSent(false)
-                    setLoginModalOpen(true)
-                  }}
-                  style={{
-                    borderColor: "var(--border)",
-                    color: "var(--foreground)",
-                  }}
-                >
-                  {t.header.backToLogin}
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="w-full"
-                  onClick={() => {
-                    setResetEmail("")
-                    setResetEmailSent(false)
-                  }}
-                  style={{
-                    color: "var(--primary)",
-                  }}
-                >
-                  {t.header.sendToAnotherEmail}
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      />
     </header>
   )
 }

@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react"
 import { usePathname } from "next/navigation"
 
+import type { StoreServingState } from "@/lib/stores/serving-state"
 import type { StoreSummary } from "@/lib/supabase/memberships-api"
 import { isRouteOrDescendant } from "@/lib/admin/routes"
 import { sidebarPinCookie } from "@/lib/admin/sidebar-pin-cookie"
@@ -22,11 +23,13 @@ export function AdminShell({
   children,
   stores,
   activeStoreId,
+  servingState,
   defaultPinned,
 }: {
   children: ReactNode
   stores: StoreSummary[]
   activeStoreId: string
+  servingState: StoreServingState | null
   defaultPinned: boolean
 }) {
   const pathname = usePathname() ?? ""
@@ -49,7 +52,7 @@ export function AdminShell({
     >
       <AdminSidebar />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <AdminTopbar stores={stores} activeStoreId={activeStoreId} />
+        <AdminTopbar stores={stores} activeStoreId={activeStoreId} servingState={servingState} />
         {/* `relative` no es cosmético: Radix monta los controles nativos ocultos de
             Select y Checkbox como `position: absolute`. Sin un ancestro posicionado
             su bloque contenedor es el ICB, así que escapan del recorte de este

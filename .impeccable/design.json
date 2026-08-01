@@ -1,0 +1,420 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-28T00:00:00.000Z",
+  "title": "Design System: Osoria",
+  "extensions": {
+    "colorMeta": {
+      "pizarra-serena": {
+        "role": "primary",
+        "displayName": "Pizarra Serena",
+        "canonical": "oklch(0.404 0.035 255)",
+        "tonalRamp": [
+          "oklch(0.15 0.035 255)",
+          "oklch(0.26 0.035 255)",
+          "oklch(0.34 0.035 255)",
+          "oklch(0.404 0.035 255)",
+          "oklch(0.52 0.033 255)",
+          "oklch(0.66 0.028 255)",
+          "oklch(0.82 0.018 255)",
+          "oklch(0.95 0.008 255)"
+        ]
+      },
+      "agua-clara": {
+        "role": "secondary",
+        "displayName": "Agua Clara",
+        "canonical": "oklch(0.662 0.075 185)",
+        "tonalRamp": [
+          "oklch(0.15 0.075 185)",
+          "oklch(0.28 0.075 185)",
+          "oklch(0.42 0.075 185)",
+          "oklch(0.55 0.075 185)",
+          "oklch(0.662 0.075 185)",
+          "oklch(0.78 0.062 185)",
+          "oklch(0.88 0.042 185)",
+          "oklch(0.95 0.02 185)"
+        ]
+      },
+      "papel": {
+        "role": "neutral",
+        "displayName": "Papel",
+        "canonical": "#ffffff",
+        "tonalRamp": [
+          "oklch(0.15 0 0)",
+          "oklch(0.26 0 0)",
+          "oklch(0.4 0 0)",
+          "oklch(0.55 0 0)",
+          "oklch(0.7 0 0)",
+          "oklch(0.85 0 0)",
+          "oklch(0.95 0 0)",
+          "oklch(1 0 0)"
+        ]
+      },
+      "tinta": {
+        "role": "neutral",
+        "displayName": "Tinta",
+        "canonical": "oklch(0.205 0 0)",
+        "tonalRamp": [
+          "oklch(0.15 0 0)",
+          "oklch(0.205 0 0)",
+          "oklch(0.3 0 0)",
+          "oklch(0.42 0 0)",
+          "oklch(0.56 0 0)",
+          "oklch(0.72 0 0)",
+          "oklch(0.86 0 0)",
+          "oklch(0.95 0 0)"
+        ]
+      },
+      "superficie-tenue": {
+        "role": "neutral",
+        "displayName": "Superficie Tenue",
+        "canonical": "oklch(0.977 0.005 247)",
+        "tonalRamp": [
+          "oklch(0.16 0.008 247)",
+          "oklch(0.28 0.008 247)",
+          "oklch(0.42 0.008 247)",
+          "oklch(0.56 0.008 247)",
+          "oklch(0.7 0.007 247)",
+          "oklch(0.85 0.006 247)",
+          "oklch(0.93 0.005 247)",
+          "oklch(0.977 0.005 247)"
+        ]
+      },
+      "tinta-tenue": {
+        "role": "neutral",
+        "displayName": "Tinta Tenue",
+        "canonical": "oklch(0.582 0.031 257)",
+        "tonalRamp": [
+          "oklch(0.16 0.031 257)",
+          "oklch(0.28 0.031 257)",
+          "oklch(0.42 0.031 257)",
+          "oklch(0.582 0.031 257)",
+          "oklch(0.7 0.026 257)",
+          "oklch(0.82 0.018 257)",
+          "oklch(0.9 0.011 257)",
+          "oklch(0.96 0.005 257)"
+        ]
+      },
+      "filete": {
+        "role": "neutral",
+        "displayName": "Filete",
+        "canonical": "oklch(0.913 0.011 258)",
+        "tonalRamp": [
+          "oklch(0.16 0.011 258)",
+          "oklch(0.28 0.011 258)",
+          "oklch(0.42 0.011 258)",
+          "oklch(0.56 0.011 258)",
+          "oklch(0.7 0.011 258)",
+          "oklch(0.83 0.011 258)",
+          "oklch(0.913 0.011 258)",
+          "oklch(0.96 0.006 258)"
+        ]
+      },
+      "exito": {
+        "role": "tertiary",
+        "displayName": "Éxito",
+        "canonical": "oklch(0.596 0.17 145)",
+        "tonalRamp": [
+          "oklch(0.15 0.17 145)",
+          "oklch(0.28 0.17 145)",
+          "oklch(0.42 0.17 145)",
+          "oklch(0.596 0.17 145)",
+          "oklch(0.72 0.14 145)",
+          "oklch(0.83 0.1 145)",
+          "oklch(0.91 0.06 145)",
+          "oklch(0.96 0.025 145)"
+        ]
+      },
+      "destructivo": {
+        "role": "tertiary",
+        "displayName": "Destructivo",
+        "canonical": "oklch(0.577 0.245 27.325)",
+        "tonalRamp": [
+          "oklch(0.15 0.245 27.325)",
+          "oklch(0.28 0.245 27.325)",
+          "oklch(0.42 0.245 27.325)",
+          "oklch(0.577 0.245 27.325)",
+          "oklch(0.7 0.2 27.325)",
+          "oklch(0.82 0.14 27.325)",
+          "oklch(0.9 0.08 27.325)",
+          "oklch(0.96 0.03 27.325)"
+        ]
+      },
+      "consola-superficie": {
+        "role": "neutral",
+        "displayName": "Consola Superficie",
+        "canonical": "oklch(0.977 0.003 258)",
+        "tonalRamp": [
+          "oklch(0.16 0.004 258)",
+          "oklch(0.28 0.004 258)",
+          "oklch(0.42 0.004 258)",
+          "oklch(0.56 0.004 258)",
+          "oklch(0.7 0.004 258)",
+          "oklch(0.85 0.003 258)",
+          "oklch(0.93 0.003 258)",
+          "oklch(0.977 0.003 258)"
+        ]
+      },
+      "consola-tinta": {
+        "role": "neutral",
+        "displayName": "Consola Tinta",
+        "canonical": "oklch(0.243 0.009 258)",
+        "tonalRamp": [
+          "oklch(0.15 0.009 258)",
+          "oklch(0.243 0.009 258)",
+          "oklch(0.34 0.009 258)",
+          "oklch(0.46 0.009 258)",
+          "oklch(0.6 0.008 258)",
+          "oklch(0.74 0.006 258)",
+          "oklch(0.87 0.004 258)",
+          "oklch(0.95 0.002 258)"
+        ]
+      },
+      "consola-primary": {
+        "role": "primary",
+        "displayName": "Consola Primary",
+        "canonical": "oklch(0.511 0.243 277)",
+        "tonalRamp": [
+          "oklch(0.15 0.243 277)",
+          "oklch(0.26 0.243 277)",
+          "oklch(0.38 0.243 277)",
+          "oklch(0.511 0.243 277)",
+          "oklch(0.64 0.2 277)",
+          "oklch(0.77 0.14 277)",
+          "oklch(0.88 0.08 277)",
+          "oklch(0.95 0.035 277)"
+        ]
+      },
+      "consola-filete": {
+        "role": "neutral",
+        "displayName": "Consola Filete",
+        "canonical": "oklch(0.877 0.007 258)",
+        "tonalRamp": [
+          "oklch(0.16 0.008 258)",
+          "oklch(0.28 0.008 258)",
+          "oklch(0.42 0.008 258)",
+          "oklch(0.56 0.008 258)",
+          "oklch(0.7 0.008 258)",
+          "oklch(0.8 0.007 258)",
+          "oklch(0.877 0.007 258)",
+          "oklch(0.95 0.004 258)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Titulares de página en el storefront. Usa font-heading, que cada tienda puede sustituir."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Cabeceras de sección y títulos de las tarjetas de aviso."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Título de tarjeta, con tracking negativo."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Texto corrido y valor de los campos. Baja a 0.875rem en pantallas medianas."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Etiquetas de formulario, descripciones y texto de apoyo."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "Identificadores, números de pedido y valores técnicos."
+      },
+      "micro": {
+        "displayName": "Micro",
+        "purpose": "Contador numérico dentro de una insignia de ícono (carrito, wishlist), un círculo de 16px. No es un tamaño para texto de lectura."
+      }
+    },
+    "shadows": [
+      {
+        "name": "shadow-card",
+        "value": "none",
+        "purpose": "Reposo de tarjetas y superficies de contenido. Lo redefine el preset de la tienda; ninguna pantalla lo escribe a mano."
+      },
+      {
+        "name": "shadow-elevated",
+        "value": "none",
+        "purpose": "Superficies que flotan sobre el contenido: menús, popovers, hojas. Lo redefine el preset."
+      },
+      {
+        "name": "shadow-xs",
+        "value": "0 1px 2px 0 rgb(0 0 0 / 0.05)",
+        "purpose": "Único uso directo y acotado: separar apenas botones y campos del fondo."
+      },
+      {
+        "name": "preset-minimal-elevated",
+        "value": "0 0 0 1px var(--border)",
+        "purpose": "Minimal sustituye la sombra por un filete de 1px: profundidad sin difuminado."
+      },
+      {
+        "name": "preset-bold-card",
+        "value": "4px 4px 0 var(--border)",
+        "purpose": "Bold usa desplazamiento duro sin difuminar, de carácter gráfico."
+      },
+      {
+        "name": "preset-suave-card",
+        "value": "0 8px 24px -6px rgba(158,101,110,.22)",
+        "purpose": "Suave difunde una sombra cálida y teñida bajo las tarjetas."
+      },
+      {
+        "name": "preset-boutique-card",
+        "value": "0 6px 18px -6px rgba(74,53,39,.2)",
+        "purpose": "Boutique usa una sombra terrosa y contenida."
+      }
+    ],
+    "motion": [
+      {
+        "name": "button-transition",
+        "value": "transition-all",
+        "purpose": "Los botones transicionan todas sus propiedades: cubre fondo, borde y anillo de foco a la vez."
+      },
+      {
+        "name": "input-transition",
+        "value": "transition-[color,box-shadow]",
+        "purpose": "Los campos transicionan solo color y sombra, para que el cambio de borde en foco no arrastre geometría."
+      }
+    ],
+    "breakpoints": [
+      { "name": "touch-target", "value": "768px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" }
+    ],
+    "density": [
+      { "name": "default", "value": "1", "purpose": "Tech y el estado sin tema: resuelve --spacing a 0.25rem exacto." },
+      { "name": "minimal", "value": "1.14", "purpose": "Minimal expande el ritmo entero de la interfaz." },
+      { "name": "suave", "value": "1.06", "purpose": "Suave afloja levemente." },
+      { "name": "boutique", "value": "1.05", "purpose": "Boutique afloja levemente." },
+      { "name": "bold", "value": "0.97", "purpose": "Bold comprime." },
+      { "name": "console", "value": "1", "purpose": "La administración fija la densidad: una consola que cambia de ritmo no se puede aprender." }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Acción principal de cualquier pantalla. El radio lo decide el preset de la tienda.",
+      "html": "<button class=\"ds-btn-primary\">Guardar cambios</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 36px; padding: 8px 12px; font-family: var(--font-family-sans, system-ui, sans-serif); font-size: 1rem; font-weight: 600; line-height: 1.25; color: var(--primary-foreground, #ffffff); background: var(--primary, #4a5568); border: 1px solid transparent; border-radius: var(--button-radius, 0.375rem); box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); cursor: pointer; transition: all 0.15s ease; } .ds-btn-primary:hover { background: color-mix(in oklab, var(--primary, #4a5568) 90%, transparent); } .ds-btn-primary:focus-visible { outline: none; border-color: var(--ring, #4a5568); box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring, #4a5568) 50%, transparent); } .ds-btn-primary:disabled { opacity: 0.5; pointer-events: none; }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Acción secundaria. Gana la superficie de acento al hover.",
+      "html": "<button class=\"ds-btn-outline\">Cancelar</button>",
+      "css": ".ds-btn-outline { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 36px; padding: 8px 12px; font-family: var(--font-family-sans, system-ui, sans-serif); font-size: 1rem; font-weight: 600; color: var(--foreground, #1a1a1a); background: var(--background, #ffffff); border: 1px solid var(--border, #e2e8f0); border-radius: var(--button-radius, 0.375rem); box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); cursor: pointer; transition: all 0.15s ease; } .ds-btn-outline:hover { background: var(--accent, #5daba8); color: var(--accent-foreground, #ffffff); } .ds-btn-outline:focus-visible { outline: none; border-color: var(--ring, #4a5568); box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring, #4a5568) 50%, transparent); }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Acción terciaria. Texto atenuado que sólo gana fondo al hover.",
+      "html": "<button class=\"ds-btn-ghost\">Ver detalle</button>",
+      "css": ".ds-btn-ghost { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 36px; padding: 8px 12px; font-family: var(--font-family-sans, system-ui, sans-serif); font-size: 1rem; font-weight: 500; color: color-mix(in oklab, var(--foreground, #1a1a1a) 50%, transparent); background: transparent; border: none; border-radius: var(--button-radius, 0.375rem); cursor: pointer; transition: all 0.15s ease; } .ds-btn-ghost:hover { background: var(--accent, #5daba8); color: color-mix(in oklab, var(--foreground, #1a1a1a) 70%, transparent); } .ds-btn-ghost:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring, #4a5568) 50%, transparent); }"
+    },
+    {
+      "name": "Input Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Campo de formulario. Fondo transparente, filete de 1px y anillo de foco de 3px.",
+      "html": "<input class=\"ds-input\" type=\"email\" placeholder=\"tu@correo.com\" aria-label=\"Correo electrónico\" />",
+      "css": ".ds-input { display: block; width: 100%; min-width: 0; height: 36px; padding: 4px 12px; font-family: var(--font-family-sans, system-ui, sans-serif); font-size: 1rem; color: var(--foreground, #1a1a1a); background: transparent; border: 1px solid var(--input, #e2e8f0); border-radius: var(--radius-md, 0.375rem); box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); outline: none; transition: color 0.15s ease, box-shadow 0.15s ease; } .ds-input::placeholder { color: var(--muted-foreground, #718096); } .ds-input:focus-visible { border-color: var(--ring, #4a5568); box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring, #4a5568) 50%, transparent); } .ds-input[aria-invalid='true'] { border-color: var(--destructive, oklch(0.577 0.245 27.325)); box-shadow: 0 0 0 3px color-mix(in oklab, var(--destructive, oklch(0.577 0.245 27.325)) 20%, transparent); } .ds-input:disabled { opacity: 0.5; cursor: not-allowed; }"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Contenedor de contenido. Plano en reposo; la sombra, si existe, llega por token del preset.",
+      "html": "<div class=\"ds-card\"><div class=\"ds-card-header\"><div class=\"ds-card-title\">Pedido #1042</div><div class=\"ds-card-desc\">Confirmado el 24 de julio</div></div><div class=\"ds-card-body\">3 productos · $184.000</div></div>",
+      "css": ".ds-card { background: var(--card, #ffffff); color: var(--card-foreground, #1a1a1a); border-radius: var(--card-radius, 0.375rem); box-shadow: var(--shadow-card, none); } .ds-card-header { display: flex; flex-direction: column; gap: 6px; padding: 16px; } .ds-card-title { font-family: var(--font-family-heading, system-ui, sans-serif); font-size: 1.125rem; font-weight: 600; line-height: 1; letter-spacing: -0.01em; } .ds-card-desc { font-size: 0.875rem; color: var(--muted-foreground, #718096); } .ds-card-body { padding: 0 16px 16px; font-size: 1rem; }"
+    },
+    {
+      "name": "Console Primary Button",
+      "kind": "button",
+      "refersTo": "console-button-primary",
+      "description": "El mismo botón dentro del chrome neutro de administración: paleta propia, geometría fija, sin sombra de preset.",
+      "html": "<div class=\"ds-console-scope\"><button class=\"ds-console-btn\">Publicar tienda</button></div>",
+      "css": ".ds-console-scope { --console-primary: #4f46e5; --console-fg: #ffffff; --console-ring: #4f46e5; padding: 16px; background: #f7f8fa; border-radius: 0.5rem; } .ds-console-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 36px; padding: 8px 12px; font-family: var(--font-family-sans, system-ui, sans-serif); font-size: 1rem; font-weight: 600; color: var(--console-fg); background: var(--console-primary); border: 1px solid transparent; border-radius: 0.5rem; cursor: pointer; transition: all 0.15s ease; } .ds-console-btn:hover { background: color-mix(in oklab, var(--console-primary) 90%, transparent); } .ds-console-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in oklab, var(--console-ring) 50%, transparent); }"
+    },
+    {
+      "name": "Notice Card",
+      "kind": "custom",
+      "refersTo": "card",
+      "description": "Patrón de las pantallas de aviso (tienda inactiva, tienda no encontrada): icono en disco apagado, título, explicación y salida. Sin marca de plataforma, por la Regla del Anfitrión Invisible.",
+      "html": "<div class=\"ds-notice\"><div class=\"ds-notice-icon\"><svg width=\"32\" height=\"32\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><line x1=\"10\" y1=\"15\" x2=\"10\" y2=\"9\"/><line x1=\"14\" y1=\"15\" x2=\"14\" y2=\"9\"/></svg></div><div class=\"ds-notice-title\">Tienda temporalmente inactiva</div><div class=\"ds-notice-desc\">Esta tienda no está disponible en este momento.</div></div>",
+      "css": ".ds-notice { max-width: 28rem; padding: 24px; text-align: center; background: var(--card, #ffffff); color: var(--card-foreground, #1a1a1a); border-radius: var(--card-radius, 0.375rem); box-shadow: var(--shadow-card, none); } .ds-notice-icon { display: flex; align-items: center; justify-content: center; width: 64px; height: 64px; margin: 0 auto 16px; color: var(--muted-foreground, #718096); background: var(--muted, #f7fafc); border-radius: 9999px; } .ds-notice-title { font-family: var(--font-family-heading, system-ui, sans-serif); font-size: 1.5rem; font-weight: 600; line-height: 1.2; letter-spacing: -0.01em; } .ds-notice-desc { margin-top: 8px; font-size: 0.875rem; color: var(--muted-foreground, #718096); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "La Casa de Muchas Casas",
+    "overview": "Osoria no es una tienda: es la estructura que hospeda muchas. Las proporciones, la mecánica de los componentes y el vocabulario de superficies son siempre los mismos; lo que cambia es quién los habita. Cada tienda elige un mundo visual y lo instala a través de variables CSS que el runtime escribe sobre <html> — color, radio, densidad, sombra y tipografía — sin que ninguna pantalla tenga que saber de qué tienda se trata. Quien diseñe algo nuevo aquí trabaja para inquilinos que todavía no conoce: la disciplina no está en elegir bonito, está en no cerrarle la puerta a ninguno.\n\nDe ahí nace la separación más importante del sistema. Hay dos mundos y no deben parecerse. El storefront es de cara al cliente: es la tienda de su dueño, respira su marca, y está hecho para que ese dueño pueda personalizar secciones y componentes con facilidad — el diseño es parte del producto que se le vende. La administración es densa y de trabajo: tablas, formularios, paneles, decisiones rápidas, y un chrome deliberadamente neutro que se blinda del tema de la tienda para que el editor nunca mienta sobre lo que estás editando. Ese blindaje está en el código, no en la intención: .editor-chrome redeclara cada token semántico, geométrico y de sombra que el bootstrap del tema escribe en línea.\n\nLa profundidad se consigue por capas tonales, no por dramatismo: background, card, muted y popover construyen la jerarquía, y la sombra —cuando existe— llega como token del mundo elegido, nunca escrita a mano. Y hay una prohibición que atraviesa todo: la marca de la plataforma no aparece jamás en una pantalla de cara al cliente. El cliente compra en NiCoffe, no en Osoria.",
+    "keyCharacteristics": [
+      "Un contrato de tokens único, cinco mundos preset (Tech, Minimal, Suave, Bold, Boutique)",
+      "Dos registros irreconciliables por diseño: storefront expresivo, administración densa y neutra",
+      "Plano en reposo; la profundidad es tonal y la sombra la decide el preset",
+      "Componentes sobrios y precisos: la personalidad entra por los tokens, nunca por adornos",
+      "Geometría variable de 0px a píldora — ninguna pantalla puede asumir un radio concreto",
+      "Español en toda la interfaz"
+    ],
+    "rules": [
+      {
+        "name": "La Regla de los Dos Mundos",
+        "body": "Ninguna pantalla mezcla los dos registros. Si la ruta es de administración, hereda .editor-chrome y su paleta neutra; si es de cara al cliente, hereda el tema de la tienda. Una pantalla que no sepa a cuál pertenece está mal ubicada, no mal pintada.",
+        "section": "colors"
+      },
+      {
+        "name": "La Regla del Anfitrión Invisible",
+        "body": "La marca de la plataforma no aparece nunca en una pantalla de cara al cliente — ni logo, ni nombre, ni color corporativo. Incluye las pantallas de aviso y de error: el visitante que llega a una tienda apagada tiene que ver esa tienda o nada, jamás otra.",
+        "section": "colors"
+      },
+      {
+        "name": "La Regla del Acento Escaso",
+        "body": "El accent señala una sola cosa por vista. Cuando dos elementos lo reclaman, uno de los dos no era tan importante.",
+        "section": "colors"
+      },
+      {
+        "name": "La Regla de la Voz Prestada",
+        "body": "El titular usa font-heading, nunca una familia literal. Un componente que escriba el nombre de una fuente rompe la personalización de todas las tiendas menos una.",
+        "section": "typography"
+      },
+      {
+        "name": "La Regla del Ancla Única",
+        "body": "El espaciado sale siempre de las utilidades de Tailwind, nunca de píxeles literales. Un padding: 18px escrito a mano se queda fuera del sistema de densidad y delata la pantalla en cuanto una tienda elige Minimal.",
+        "section": "layout"
+      },
+      {
+        "name": "La Regla de la Sombra Ajena",
+        "body": "Ninguna pantalla escribe un box-shadow. Usa --shadow-card o --shadow-elevated, o no usa ninguno. Una sombra literal ignora el mundo de la tienda y rompe los cinco presets a la vez.",
+        "section": "elevation"
+      },
+      {
+        "name": "La Regla del Radio Prestado",
+        "body": "Ningún componente decide su propio radio. Botones usan --button-radius, tarjetas rounded-card, el resto la escala rounded-*. Un rounded-full literal en una tienda Minimal es un error visible desde la primera pantalla.",
+        "section": "shapes"
+      }
+    ],
+    "dos": [
+      "Do decidir primero a qué mundo pertenece la pantalla — cliente o administración — y heredar su chrome. Es la primera pregunta, no la última.",
+      "Do sacar cada color de los tokens semánticos (bg-primary, text-muted-foreground, border-border). Son el único punto por el que entra la identidad de cada tienda.",
+      "Do usar --button-radius, rounded-card y la escala rounded-* para toda geometría.",
+      "Do dejar la profundidad en manos de las capas tonales, y la sombra en manos de --shadow-card / --shadow-elevated.",
+      "Do mantener el español en toda la interfaz, incluidos estados vacíos y mensajes de error.",
+      "Do respetar el mínimo táctil de 44×44px en móvil.",
+      "Do probar cualquier pantalla nueva contra al menos dos presets opuestos — Minimal y Suave — antes de darla por buena. Si solo se ve bien en uno, no está terminada."
+    ],
+    "donts": [
+      "Don't poner marca de la plataforma en ninguna pantalla de cara al cliente, incluidas las de aviso y error. El cliente compra en la tienda, no en Osoria.",
+      "Don't dejar que una pantalla de cliente herede el aspecto denso de la administración, ni al revés. Son dos registros y la mezcla se nota de inmediato.",
+      "Don't escribir colores literales, box-shadow a mano, píxeles de espaciado sueltos ni nombres de fuente en un componente.",
+      "Don't asumir un radio concreto: el sistema va de 0px a píldora según el preset.",
+      "Don't caer en la plantilla genérica de e-commerce — carruseles de héroe con foto de banco, insignias apiladas de envío gratis, cuentas atrás falsas. Cinco identidades distintas dependen de que la estructura no traiga una estética propia.",
+      "Don't modificar una primitiva de components/ui/** para resolver un problema de una sola pantalla: se comparten entre storefront y administración. Acótalo con un selector como ya hace .editor-chrome."
+    ]
+  }
+}

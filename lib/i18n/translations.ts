@@ -143,6 +143,14 @@ export interface Translations {
     paymentStatusColumn: string
     guestTitle: string
     guestDescription: string
+    detailTitle: string
+    viewDetail: string
+    itemsTitle: string
+    backToHistory: string
+    notFoundTitle: string
+    notFoundDescription: string
+    unavailableTitle: string
+    unavailableDescription: string
     statusLabels: {
       pending: string
       confirmed: string
@@ -218,6 +226,67 @@ export interface Translations {
     errorLabel: string
     tryAgain: string
   }
+  // Restablecer contraseña desde el link del correo
+  passwordReset: {
+    verifying: string
+    verifyingHint: string
+    description: string
+    newPassword: string
+    updating: string
+    updated: string
+    updatedHint: string
+    updateFailed: string
+    goHome: string
+    goToConsole: string
+    linkRejected: string
+    linkMissing: string
+    linkExpired: string
+    verificationUnavailable: string
+    requestNewLink: string
+  }
+  // Cuenta propia de quien tiene sesión
+  account: {
+    title: string
+    description: string
+    emailFixed: string
+    passwordDescription: string
+    currentPassword: string
+    changePassword: string
+    passwordChanged: string
+    passwordChangedHint: string
+    wrongCurrentPassword: string
+    samePassword: string
+    guestTitle: string
+    guestDescription: string
+    profileTitle: string
+    profileDescription: string
+    profileSaved: string
+    saveFailed: string
+    addressesTitle: string
+    addressesDescription: string
+    addressesEmptyTitle: string
+    addressesEmptyDescription: string
+    addAddress: string
+    newAddress: string
+    editAddress: string
+    editAddressNamed: string
+    deleteAddressNamed: string
+    addressLineRequired: string
+    addressNickname: string
+    addressNicknameHint: string
+    unlabeledAddress: string
+    addressSaved: string
+    addressDeleted: string
+    defaultAddressDeleted: string
+    deleteAddressTitleNamed: string
+    deleteAddressDescription: string
+    deleteDefaultAddressDescription: string
+    defaultAddress: string
+    makeDefault: string
+    defaultAddressChanged: string
+    ordersTitle: string
+    ordersDescription: string
+  }
   // Header & Menu
     header: {
       menu: string
@@ -239,6 +308,12 @@ export interface Translations {
     checkEmail: string
     backToLogin: string
     sendToAnotherEmail: string
+    emailPlaceholder: string
+    sendRecoveryLink: string
+    recoveryLinkError: string
+    recoveryLinkErrorHint: string
+    recoveryLinkSentTo: string
+    recoveryLinkSpamHint: string
     recoverPassword: string
     enterEmail: string
     passwordResetSent: string
@@ -400,6 +475,14 @@ export const translations: Record<Language, Translations> = {
       paymentStatusColumn: 'Pago',
       guestTitle: 'Inicia sesión para ver tus pedidos',
       guestDescription: 'Crea una cuenta o inicia sesión para consultar el historial de tus compras.',
+      detailTitle: 'Pedido {number}',
+      viewDetail: 'Ver detalle',
+      itemsTitle: 'Artículos',
+      backToHistory: 'Volver a mis pedidos',
+      notFoundTitle: 'No encontramos ese pedido',
+      notFoundDescription: 'Revisa el número: puede estar mal copiado o pertenecer a otra cuenta.',
+      unavailableTitle: 'No pudimos abrir tus pedidos',
+      unavailableDescription: 'No logramos identificar la tienda en la que estás. Vuelve a intentarlo en unos segundos: tus pedidos siguen guardados.',
       statusLabels: {
         pending: 'Pendiente',
         confirmed: 'Confirmado',
@@ -472,6 +555,68 @@ export const translations: Record<Language, Translations> = {
       errorLabel: 'Error:',
       tryAgain: 'Intentar de nuevo',
     },
+    passwordReset: {
+      verifying: 'Verificando tu link',
+      verifyingHint: 'Un momento, estamos comprobando el link de recuperación.',
+      description: 'Ingresa tu nueva contraseña.',
+      newPassword: 'Nueva contraseña',
+      updating: 'Actualizando...',
+      updated: '¡Contraseña restablecida!',
+      updatedHint: 'Tu contraseña quedó actualizada. Ya puedes seguir con ella.',
+      updateFailed: 'No pudimos actualizar tu contraseña',
+      goHome: 'Ir al inicio',
+      goToConsole: 'Ir a mi panel',
+      linkRejected: 'Link inválido o expirado',
+      linkMissing: 'Este link no trae los datos de recuperación. Solicita uno nuevo y ábrelo desde el correo.',
+      linkExpired: 'El link de recuperación ya se usó o expiró. Solicita uno nuevo para continuar.',
+      verificationUnavailable: 'No pudimos verificar el link en este momento. Vuelve a intentarlo en un minuto.',
+      requestNewLink: 'Solicitar un link nuevo',
+    },
+    account: {
+      title: 'Mi cuenta',
+      description: 'Los datos con los que entras a tu cuenta.',
+      emailFixed: 'Tu correo identifica la cuenta y no se cambia desde aquí.',
+      passwordDescription: 'Para cambiarla, escribe la que usas hoy.',
+      currentPassword: 'Contraseña actual',
+      changePassword: 'Cambiar contraseña',
+      passwordChanged: 'Contraseña actualizada',
+      passwordChangedHint: 'La próxima vez que entres, usa la nueva.',
+      wrongCurrentPassword: 'La contraseña actual no es correcta.',
+      samePassword: 'La nueva contraseña tiene que ser distinta de la actual.',
+      guestTitle: 'Inicia sesión para ver tu cuenta',
+      guestDescription: 'Necesitas una sesión abierta para cambiar tu contraseña.',
+      profileTitle: 'Tus datos',
+      profileDescription: 'Con esto te identificamos y te contactamos por tus pedidos.',
+      profileSaved: 'Datos guardados',
+      saveFailed: 'No se pudo guardar',
+      addressesTitle: 'Tus direcciones',
+      addressesDescription: 'La predeterminada es la que el checkout completa por ti.',
+      addressesEmptyTitle: 'Todavía no tienes direcciones guardadas',
+      addressesEmptyDescription:
+        'Guarda la primera y el checkout la traerá escrita la próxima vez que compres.',
+      addAddress: 'Agregar dirección',
+      newAddress: 'Nueva dirección',
+      editAddress: 'Editar dirección',
+      editAddressNamed: 'Editar {name}',
+      deleteAddressNamed: 'Eliminar {name}',
+      addressLineRequired: 'Escribe la dirección: es lo único obligatorio.',
+      addressNickname: 'Nombre de la dirección',
+      addressNicknameHint: 'Casa, oficina, donde te la reciben...',
+      unlabeledAddress: 'Dirección sin nombre',
+      addressSaved: 'Dirección guardada',
+      addressDeleted: 'Dirección eliminada',
+      defaultAddressDeleted: 'Dirección eliminada. Ahora el checkout completa {successor}.',
+      deleteAddressTitleNamed: '¿Eliminar {name}?',
+      deleteAddressDescription:
+        'Vas a eliminar {address}. Sale de tu libreta y el checkout deja de traerla; los pedidos que ya la usaron no cambian.',
+      deleteDefaultAddressDescription:
+        'Vas a eliminar {address}, la que el checkout completa por ti. A partir de ahora completará {successor}; los pedidos que ya usaron la anterior no cambian.',
+      defaultAddress: 'Predeterminada',
+      makeDefault: 'Usar como predeterminada',
+      defaultAddressChanged: 'Dirección predeterminada actualizada',
+      ordersTitle: 'Tus pedidos',
+      ordersDescription: 'Todo lo que has comprado en esta tienda, en un solo sitio.',
+    },
     header: {
       menu: 'Menú',
       offers: 'Ofertas',
@@ -492,6 +637,12 @@ export const translations: Record<Language, Translations> = {
       checkEmail: 'Revisa tu correo para restablecer tu contraseña',
       backToLogin: 'Volver a iniciar sesión',
       sendToAnotherEmail: 'Enviar a otro correo',
+      emailPlaceholder: 'tu@email.com',
+      sendRecoveryLink: 'Enviar link de recuperación',
+      recoveryLinkError: 'Error al enviar email',
+      recoveryLinkErrorHint: 'Por favor, intenta nuevamente',
+      recoveryLinkSentTo: 'Hemos enviado un link de recuperación a:',
+      recoveryLinkSpamHint: 'Si no recibes el email, verifica tu carpeta de spam o intenta nuevamente.',
       recoverPassword: 'Recuperar Contraseña',
       enterEmail: 'Correo electrónico',
       passwordResetSent: 'Correo enviado',
@@ -651,6 +802,14 @@ export const translations: Record<Language, Translations> = {
       paymentStatusColumn: 'Payment',
       guestTitle: 'Log in to see your orders',
       guestDescription: 'Create an account or log in to check your purchase history.',
+      detailTitle: 'Order {number}',
+      viewDetail: 'View details',
+      itemsTitle: 'Items',
+      backToHistory: 'Back to my orders',
+      notFoundTitle: 'We could not find that order',
+      notFoundDescription: 'Check the number: it may be mistyped or belong to another account.',
+      unavailableTitle: 'We could not open your orders',
+      unavailableDescription: 'We could not identify the store you are in. Try again in a few seconds: your orders are still saved.',
       statusLabels: {
         pending: 'Pending',
         confirmed: 'Confirmed',
@@ -723,6 +882,68 @@ export const translations: Record<Language, Translations> = {
       errorLabel: 'Error:',
       tryAgain: 'Try Again',
     },
+    passwordReset: {
+      verifying: 'Checking your link',
+      verifyingHint: 'One moment, we are checking the recovery link.',
+      description: 'Enter your new password.',
+      newPassword: 'New password',
+      updating: 'Updating...',
+      updated: 'Password reset!',
+      updatedHint: 'Your password is updated. You can carry on with it now.',
+      updateFailed: 'We could not update your password',
+      goHome: 'Go to home',
+      goToConsole: 'Go to my dashboard',
+      linkRejected: 'Invalid or expired link',
+      linkMissing: 'This link carries no recovery data. Request a new one and open it from your email.',
+      linkExpired: 'The recovery link was already used or has expired. Request a new one to continue.',
+      verificationUnavailable: 'We could not check the link right now. Please try again in a minute.',
+      requestNewLink: 'Request a new link',
+    },
+    account: {
+      title: 'My account',
+      description: 'The details you use to sign in.',
+      emailFixed: 'Your email identifies the account and cannot be changed here.',
+      passwordDescription: 'To change it, type the one you use today.',
+      currentPassword: 'Current password',
+      changePassword: 'Change password',
+      passwordChanged: 'Password updated',
+      passwordChangedHint: 'Next time you sign in, use the new one.',
+      wrongCurrentPassword: 'That is not your current password.',
+      samePassword: 'The new password must be different from the current one.',
+      guestTitle: 'Sign in to see your account',
+      guestDescription: 'You need an open session to change your password.',
+      profileTitle: 'Your details',
+      profileDescription: 'How we identify you and reach you about your orders.',
+      profileSaved: 'Details saved',
+      saveFailed: 'We could not save',
+      addressesTitle: 'Your addresses',
+      addressesDescription: 'The default one is what checkout fills in for you.',
+      addressesEmptyTitle: 'You have no saved addresses yet',
+      addressesEmptyDescription:
+        'Save the first one and checkout will bring it already written next time you buy.',
+      addAddress: 'Add address',
+      newAddress: 'New address',
+      editAddress: 'Edit address',
+      editAddressNamed: 'Edit {name}',
+      deleteAddressNamed: 'Delete {name}',
+      addressLineRequired: 'Type the address: it is the only required field.',
+      addressNickname: 'Address name',
+      addressNicknameHint: 'Home, office, where they take it for you...',
+      unlabeledAddress: 'Unnamed address',
+      addressSaved: 'Address saved',
+      addressDeleted: 'Address deleted',
+      defaultAddressDeleted: 'Address deleted. Checkout now fills in {successor}.',
+      deleteAddressTitleNamed: 'Delete {name}?',
+      deleteAddressDescription:
+        'You are deleting {address}. It leaves your address book and checkout stops bringing it; orders that already used it do not change.',
+      deleteDefaultAddressDescription:
+        'You are deleting {address}, the one checkout fills in for you. From now on it will fill in {successor}; orders that already used the old one do not change.',
+      defaultAddress: 'Default',
+      makeDefault: 'Use as default',
+      defaultAddressChanged: 'Default address updated',
+      ordersTitle: 'Your orders',
+      ordersDescription: 'Everything you have bought in this store, in one place.',
+    },
     header: {
       menu: 'Menu',
       offers: 'Offers',
@@ -743,6 +964,12 @@ export const translations: Record<Language, Translations> = {
       checkEmail: 'Check your email to reset your password',
       backToLogin: 'Back to login',
       sendToAnotherEmail: 'Send to another email',
+      emailPlaceholder: 'you@email.com',
+      sendRecoveryLink: 'Send recovery link',
+      recoveryLinkError: 'Could not send the email',
+      recoveryLinkErrorHint: 'Please try again',
+      recoveryLinkSentTo: 'We sent a recovery link to:',
+      recoveryLinkSpamHint: 'If the email does not arrive, check your spam folder or try again.',
       recoverPassword: 'Recover Password',
       enterEmail: 'Email',
       passwordResetSent: 'Email sent',
@@ -902,6 +1129,14 @@ export const translations: Record<Language, Translations> = {
       paymentStatusColumn: 'Pagamento',
       guestTitle: 'Entre para ver seus pedidos',
       guestDescription: 'Crie uma conta ou entre para consultar o histórico das suas compras.',
+      detailTitle: 'Pedido {number}',
+      viewDetail: 'Ver detalhes',
+      itemsTitle: 'Itens',
+      backToHistory: 'Voltar aos meus pedidos',
+      notFoundTitle: 'Não encontramos esse pedido',
+      notFoundDescription: 'Confira o número: pode estar copiado errado ou pertencer a outra conta.',
+      unavailableTitle: 'Não conseguimos abrir seus pedidos',
+      unavailableDescription: 'Não conseguimos identificar a loja em que você está. Tente de novo em alguns segundos: seus pedidos continuam guardados.',
       statusLabels: {
         pending: 'Pendente',
         confirmed: 'Confirmado',
@@ -974,6 +1209,68 @@ export const translations: Record<Language, Translations> = {
       errorLabel: 'Erro:',
       tryAgain: 'Tentar novamente',
     },
+    passwordReset: {
+      verifying: 'Verificando seu link',
+      verifyingHint: 'Um momento, estamos conferindo o link de recuperação.',
+      description: 'Digite sua nova senha.',
+      newPassword: 'Nova senha',
+      updating: 'Atualizando...',
+      updated: 'Senha redefinida!',
+      updatedHint: 'Sua senha foi atualizada. Já pode seguir com ela.',
+      updateFailed: 'Não conseguimos atualizar sua senha',
+      goHome: 'Ir ao início',
+      goToConsole: 'Ir ao meu painel',
+      linkRejected: 'Link inválido ou expirado',
+      linkMissing: 'Este link não traz os dados de recuperação. Solicite um novo e abra pelo e-mail.',
+      linkExpired: 'O link de recuperação já foi usado ou expirou. Solicite um novo para continuar.',
+      verificationUnavailable: 'Não conseguimos verificar o link agora. Tente novamente em um minuto.',
+      requestNewLink: 'Solicitar um novo link',
+    },
+    account: {
+      title: 'Minha conta',
+      description: 'Os dados com que você entra na sua conta.',
+      emailFixed: 'Seu e-mail identifica a conta e não se altera por aqui.',
+      passwordDescription: 'Para alterá-la, digite a que você usa hoje.',
+      currentPassword: 'Senha atual',
+      changePassword: 'Alterar senha',
+      passwordChanged: 'Senha atualizada',
+      passwordChangedHint: 'Na próxima vez que entrar, use a nova.',
+      wrongCurrentPassword: 'Essa não é a sua senha atual.',
+      samePassword: 'A nova senha precisa ser diferente da atual.',
+      guestTitle: 'Entre para ver sua conta',
+      guestDescription: 'Você precisa de uma sessão aberta para alterar sua senha.',
+      profileTitle: 'Seus dados',
+      profileDescription: 'É assim que identificamos você e falamos sobre seus pedidos.',
+      profileSaved: 'Dados salvos',
+      saveFailed: 'Não foi possível salvar',
+      addressesTitle: 'Seus endereços',
+      addressesDescription: 'O padrão é o que o checkout preenche para você.',
+      addressesEmptyTitle: 'Você ainda não tem endereços salvos',
+      addressesEmptyDescription:
+        'Salve o primeiro e o checkout já o trará escrito na próxima compra.',
+      addAddress: 'Adicionar endereço',
+      newAddress: 'Novo endereço',
+      editAddress: 'Editar endereço',
+      editAddressNamed: 'Editar {name}',
+      deleteAddressNamed: 'Excluir {name}',
+      addressLineRequired: 'Escreva o endereço: é o único campo obrigatório.',
+      addressNickname: 'Nome do endereço',
+      addressNicknameHint: 'Casa, escritório, onde recebem para você...',
+      unlabeledAddress: 'Endereço sem nome',
+      addressSaved: 'Endereço salvo',
+      addressDeleted: 'Endereço excluído',
+      defaultAddressDeleted: 'Endereço excluído. Agora o checkout preenche {successor}.',
+      deleteAddressTitleNamed: 'Excluir {name}?',
+      deleteAddressDescription:
+        'Você vai excluir {address}. Ele sai da sua lista e o checkout deixa de trazê-lo; os pedidos que já o usaram não mudam.',
+      deleteDefaultAddressDescription:
+        'Você vai excluir {address}, o que o checkout preenche para você. A partir de agora ele preencherá {successor}; os pedidos que já usaram o anterior não mudam.',
+      defaultAddress: 'Padrão',
+      makeDefault: 'Usar como padrão',
+      defaultAddressChanged: 'Endereço padrão atualizado',
+      ordersTitle: 'Seus pedidos',
+      ordersDescription: 'Tudo o que você comprou nesta loja, em um só lugar.',
+    },
     header: {
       menu: 'Menu',
       offers: 'Ofertas',
@@ -994,6 +1291,12 @@ export const translations: Record<Language, Translations> = {
       checkEmail: 'Verifique seu e-mail para redefinir sua senha',
       backToLogin: 'Voltar ao login',
       sendToAnotherEmail: 'Enviar para outro e-mail',
+      emailPlaceholder: 'voce@email.com',
+      sendRecoveryLink: 'Enviar link de recuperação',
+      recoveryLinkError: 'Erro ao enviar o e-mail',
+      recoveryLinkErrorHint: 'Por favor, tente novamente',
+      recoveryLinkSentTo: 'Enviamos um link de recuperação para:',
+      recoveryLinkSpamHint: 'Se o e-mail não chegar, verifique sua caixa de spam ou tente novamente.',
       recoverPassword: 'Recuperar Senha',
       enterEmail: 'E-mail',
       passwordResetSent: 'E-mail enviado',

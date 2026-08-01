@@ -27,7 +27,7 @@ beforeAll(() => {
 
 function scrollContainer(): HTMLElement {
   const { container } = render(
-    <AdminShell stores={[]} activeStoreId="" defaultPinned>
+    <AdminShell stores={[]} activeStoreId="" servingState={null} defaultPinned>
       <p>Contenido</p>
     </AdminShell>,
   )

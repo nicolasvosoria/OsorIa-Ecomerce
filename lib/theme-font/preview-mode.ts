@@ -15,6 +15,11 @@ export interface ThemePreviewMessage {
   mode: ThemeMode;
 }
 
+/** The marker is a hint, never an authorization: the proxy still gates on membership. */
+export function isThemePreviewSearch(params: URLSearchParams): boolean {
+  return params.get(THEME_PREVIEW_QUERY_PARAM) === "1";
+}
+
 /**
  * True when the storefront is running inside the `/admin/theme` customizer
  * iframe (`?themePreview=1`). Callers use this to suppress applying the
@@ -23,11 +28,7 @@ export interface ThemePreviewMessage {
  */
 export function isThemePreviewMode(): boolean {
   if (typeof window === "undefined") return false;
-  return (
-    new URLSearchParams(window.location.search).get(
-      THEME_PREVIEW_QUERY_PARAM,
-    ) === "1"
-  );
+  return isThemePreviewSearch(new URLSearchParams(window.location.search));
 }
 
 export function parseThemePreviewMessage(

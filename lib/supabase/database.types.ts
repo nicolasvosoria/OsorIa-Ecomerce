@@ -2043,6 +2043,45 @@ export type Database = {
         }
         Relationships: []
       }
+      user_addresses: {
+        Row: {
+          address_line_1: string
+          city: string | null
+          country: string
+          created_at: string
+          id: string
+          is_default: boolean
+          label: string | null
+          postal_code: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          address_line_1: string
+          city?: string | null
+          country?: string
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          label?: string | null
+          postal_code?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          address_line_1?: string
+          city?: string | null
+          country?: string
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          label?: string | null
+          postal_code?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_profiles: {
         Row: {
           created_at: string | null
@@ -2051,6 +2090,7 @@ export type Database = {
           id: string
           last_name: string | null
           must_change_password: boolean
+          phone: string | null
           role: string
           signup_store_id: string | null
           updated_at: string | null
@@ -2062,6 +2102,7 @@ export type Database = {
           id: string
           last_name?: string | null
           must_change_password?: boolean
+          phone?: string | null
           role?: string
           signup_store_id?: string | null
           updated_at?: string | null
@@ -2073,6 +2114,7 @@ export type Database = {
           id?: string
           last_name?: string | null
           must_change_password?: boolean
+          phone?: string | null
           role?: string
           signup_store_id?: string | null
           updated_at?: string | null

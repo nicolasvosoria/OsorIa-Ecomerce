@@ -1,8 +1,13 @@
 import { getSupabaseAuthClient } from "@/lib/supabase/admin-route-auth";
+import { ECOMMERCE_SCHEMA } from "@/lib/supabase/contract";
 
-type SupabaseAuthClient = NonNullable<Awaited<ReturnType<typeof getSupabaseAuthClient>>>;
+export type SupabaseAuthClient = NonNullable<Awaited<ReturnType<typeof getSupabaseAuthClient>>>;
 
-export type ServerAuthSession = { userId: string; client: SupabaseAuthClient };
+export type ServerAuthSession = {
+  userId: string;
+  email: string | null;
+  client: SupabaseAuthClient;
+};
 
 // Idioma común a getCheckoutPrefill (app/checkout/actions.ts), loadOrdersPageView
 // (app/orders/load-orders-view.ts) y loadOrderForSessionUser
@@ -11,9 +16,16 @@ export type ServerAuthSession = { userId: string; client: SupabaseAuthClient };
 // sesión-primero-consulta-después sin tocar la base de datos.
 export async function resolveServerAuthSession(): Promise<ServerAuthSession | null> {
   const authClient = await getSupabaseAuthClient();
-  const userId = (await authClient?.auth.getUser())?.data?.user?.id;
-  if (!authClient || !userId) {
+  const user = (await authClient?.auth.getUser())?.data?.user;
+  if (!authClient || !user) {
     return null;
   }
-  return { userId, client: authClient };
+  return { userId: user.id, email: user.email ?? null, client: authClient };
+}
+
+// El cliente de sesión nace en el schema por defecto de PostgREST (public), que
+// no tiene ninguna tabla del ecommerce; apuntarlo a ecommerce es lo mismo que
+// hacen getSupabaseEcommerce y el cliente de servicio.
+export function ecommerceForSession(client: SupabaseAuthClient) {
+  return client.schema(ECOMMERCE_SCHEMA);
 }

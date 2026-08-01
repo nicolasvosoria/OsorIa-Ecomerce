@@ -14,10 +14,9 @@ import {
 } from "@/components/ui/card"
 import { FormField } from "@/components/ui/form-field"
 import { Input } from "@/components/ui/input"
+import { MIN_PASSWORD_LENGTH } from "@/lib/account/password-rule"
 import { updatePassword } from "@/lib/supabase/auth-api"
 import { completeForcedPasswordChange } from "./actions"
-
-const MIN_PASSWORD_LENGTH = 6
 
 // A minted owner (D21) lands here on first entry to /admin, holding the temporary
 // password the operator handed off. Changing it flows: updatePassword on the live

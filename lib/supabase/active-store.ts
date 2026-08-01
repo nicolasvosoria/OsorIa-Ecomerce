@@ -16,7 +16,7 @@ import {
 } from "./admin-store";
 import { ECOMMERCE_TABLES } from "./contract";
 
-type ActiveStoreAdminGrant = {
+export type ActiveStoreAdminGrant = {
   supabase: any;
   storeId: string;
   userId: string;

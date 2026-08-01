@@ -1,24 +1,31 @@
 "use client";
 
 import Link from "next/link";
-import { Package } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { useCheckoutLoginIntent } from "@/contexts/checkout-login-intent-context";
 import { useLanguage } from "@/contexts/language-context";
-import type { Language } from "@/lib/i18n/translations";
-import { formatCartMoney, LANGUAGE_LOCALES } from "@/lib/cart/cart-summary";
+import { formatCartMoney } from "@/lib/cart/cart-summary";
+import { formatOrderDate } from "@/lib/orders/format-order-date";
 import type { OrdersPageView, OrdersListItem } from "./load-orders-view";
+import {
+  OrderPageNotice,
+  SignInToSeeOrdersNotice,
+  StoreUnresolvedOrdersNotice,
+} from "./order-page-notice";
 
 interface OrdersPageClientProps {
   view: OrdersPageView;
 }
 
 export function OrdersPageClient({ view }: OrdersPageClientProps) {
-  if (!view.authenticated) {
-    return <OrdersGuestState />;
+  if (view.status === "guest") {
+    return <SignInToSeeOrdersNotice />;
+  }
+
+  if (view.status === "storeUnresolved") {
+    return <StoreUnresolvedOrdersNotice />;
   }
 
   if (view.orders.length === 0) {
@@ -28,43 +35,21 @@ export function OrdersPageClient({ view }: OrdersPageClientProps) {
   return <OrdersListPage orders={view.orders} />;
 }
 
-// El guest jamás llega a esta pantalla vía una lectura de pedidos (D5): el
-// único CTA disponible es el puente de login de checkout (slice 4), reusado
-// tal cual para esta señal genérica de "inicia sesión".
-function OrdersGuestState() {
-  const { t } = useLanguage();
-  const { requestLogin } = useCheckoutLoginIntent();
-
-  return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-8 md:py-16">
-        <div className="flex flex-col items-center justify-center min-h-[60vh] text-center gap-4">
-          <Package className="h-16 w-16 md:h-24 md:w-24 text-muted-foreground" />
-          <h1 className="text-2xl md:text-3xl font-bold">{t.orders.guestTitle}</h1>
-          <p className="text-muted-foreground max-w-md">{t.orders.guestDescription}</p>
-          <Button onClick={requestLogin}>{t.checkout.guestLoginCta}</Button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
+// Un cliente sin pedidos en ESTA tienda es lo normal, no un error: tras el
+// recorte por tienda (D17) es además el caso más común.
 function OrdersEmptyState() {
   const { t } = useLanguage();
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-8 md:py-16">
-        <div className="flex flex-col items-center justify-center min-h-[60vh] text-center gap-4">
-          <Package className="h-16 w-16 md:h-24 md:w-24 text-muted-foreground" />
-          <h1 className="text-2xl md:text-3xl font-bold">{t.orders.noOrders}</h1>
-          <p className="text-muted-foreground max-w-md">{t.orders.emptyDescription}</p>
-          <Button asChild>
-            <Link href="/shop">{t.wishlist.exploreProducts}</Link>
-          </Button>
-        </div>
-      </div>
-    </div>
+    <OrderPageNotice
+      title={t.orders.noOrders}
+      description={t.orders.emptyDescription}
+      action={
+        <Button asChild>
+          <Link href="/shop">{t.wishlist.exploreProducts}</Link>
+        </Button>
+      }
+    />
   );
 }
 
@@ -93,7 +78,7 @@ function OrderRow({ order }: { order: OrdersListItem }) {
       <CardContent className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="font-semibold">
-            {t.orders.orderNumber}: {order.orderNumber}
+            {t.orders.orderNumber}: <span className="font-mono">{order.orderNumber}</span>
           </p>
           <p className="text-sm text-muted-foreground">
             {formatOrderDate(order.orderDate, language)} ·{" "}
@@ -108,16 +93,18 @@ function OrderRow({ order }: { order: OrdersListItem }) {
           <span className="font-bold">
             {formatCartMoney(order.totalAmount, order.currencyCode, language)}
           </span>
+          {/* Cada fila repite el mismo rótulo, así que el número entra en el
+              nombre accesible: "Ver detalle" a secas no dice de cuál. */}
+          <Button asChild variant="outline" size="sm">
+            <Link
+              href={`/orders/${encodeURIComponent(order.orderNumber)}`}
+              aria-label={`${t.orders.viewDetail} ${order.orderNumber}`}
+            >
+              {t.orders.viewDetail}
+            </Link>
+          </Button>
         </div>
       </CardContent>
     </Card>
   );
-}
-
-function formatOrderDate(orderDate: string, language: Language): string {
-  return new Intl.DateTimeFormat(LANGUAGE_LOCALES[language], {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  }).format(new Date(orderDate));
 }

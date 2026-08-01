@@ -1,3 +1,5 @@
+import type { AuthError, AuthTokenResponsePassword, UserResponse } from '@supabase/supabase-js'
+
 import type { UserProfile, AuthResult } from '@/lib/types/user'
 import { getSupabaseBrowserClient, getSupabaseEcommerce } from './client'
 import { ECOMMERCE_TABLES } from './contract'
@@ -549,9 +551,15 @@ export async function resetPassword(email: string): Promise<{ success: boolean; 
       }
     }
 
+    // `redirectTo` es el nombre real de la opción: resetPasswordForEmail ignora
+    // `emailRedirectTo` (eso es de signUp/resend), así que hasta ahora el correo
+    // salía sin redirect_to y GoTrue caía al Site URL — un solo host para todos
+    // los inquilinos. Es lo que llena `{{ .RedirectTo }}` en la plantilla, y sin
+    // él el link de `token_hash` (D7) no sabría a qué subdominio volver; la
+    // cookie de sesión es host-only, así que volver al host equivocado no sirve.
     const result = await withTimeout(
       supabase.auth.resetPasswordForEmail(email, {
-        emailRedirectTo: getUrl('/auth/reset-password'),
+        redirectTo: getUrl('/auth/reset-password'),
       }),
       10000,
       'resetPassword'
@@ -617,6 +625,98 @@ export async function updatePassword(
       error: error.message || 'Error inesperado al actualizar contraseña',
     }
   }
+}
+
+export type PasswordChangeResult =
+  | { success: true }
+  | { success: false; reason: 'wrongCurrentPassword' }
+  | { success: false; reason: 'samePassword' }
+  | { success: false; reason: 'failed'; error: string }
+
+const REAUTHENTICATION_TIMEOUT_MS = 15000
+
+/**
+ * Cambiar la contraseña propia desde una sesión viva, exigiendo la actual (D21).
+ *
+ * A diferencia de updatePassword, que se llama tras probar identidad por link de
+ * correo o por contraseña temporal recién tecleada, esta ruta se abre desde
+ * cualquier sesión persistente: sin la contraseña actual, un portátil prestado
+ * bastaría para dejar fuera al dueño de la cuenta.
+ */
+export async function changeOwnPassword({
+  currentPassword,
+  newPassword,
+}: {
+  currentPassword: string
+  newPassword: string
+}): Promise<PasswordChangeResult> {
+  const supabase = getSupabaseBrowserClient()
+  if (!supabase) {
+    return { success: false, reason: 'failed', error: 'Supabase no configurado' }
+  }
+
+  try {
+    // El correo lo pone la sesión, nunca el formulario: con un correo ajeno esto
+    // dejaría de probar identidad y pasaría a ser un cambio de cuenta, con el
+    // updateUser de abajo cayendo sobre la equivocada.
+    const session = await withTimeout<UserResponse>(
+      supabase.auth.getUser(),
+      10000,
+      'changeOwnPassword/getUser'
+    )
+    const email = session.data.user?.email
+    if (!email) {
+      return {
+        success: false,
+        reason: 'failed',
+        error: session.error?.message || 'No hay sesión activa',
+      }
+    }
+
+    // Supabase no expone un "verifica esta contraseña": volver a iniciar sesión
+    // con ella es la única prueba. Fallar no toca la sesión guardada (auth-js
+    // solo escribe storage cuando la respuesta trae sesión), así que un intento
+    // equivocado deja dentro a quien ya estaba; acertar la renueva con tokens
+    // frescos y el mismo usuario.
+    const reauthentication = await withTimeout<AuthTokenResponsePassword>(
+      supabase.auth.signInWithPassword({ email, password: currentPassword }),
+      REAUTHENTICATION_TIMEOUT_MS,
+      'changeOwnPassword/reauthentication'
+    )
+    if (reauthentication.error) {
+      if (isInvalidCredentialsError(reauthentication.error)) {
+        return { success: false, reason: 'wrongCurrentPassword' }
+      }
+      return { success: false, reason: 'failed', error: reauthentication.error.message }
+    }
+
+    const updated = await updatePassword(newPassword)
+    if (updated.success) {
+      return { success: true }
+    }
+    if (updated.code === 'same_password') {
+      return { success: false, reason: 'samePassword' }
+    }
+    return {
+      success: false,
+      reason: 'failed',
+      error: updated.error || 'Error al actualizar contraseña',
+    }
+  } catch (error) {
+    console.error('[Auth] Error inesperado al cambiar la contraseña propia:', error)
+    return {
+      success: false,
+      reason: 'failed',
+      error: error instanceof Error ? error.message : String(error),
+    }
+  }
+}
+
+// Una contraseña que no coincide llega como 400 con code 'invalid_credentials'.
+// Cualquier otro fallo —red, rate limit, GoTrue caído— no prueba nada sobre la
+// contraseña y no puede presentarse como "esa no es la tuya".
+function isInvalidCredentialsError(error: AuthError): boolean {
+  return error.code === 'invalid_credentials' || (!error.code && error.status === 400)
 }
 
 // Supabase rejects updateUser when the new password matches the current one. Recent

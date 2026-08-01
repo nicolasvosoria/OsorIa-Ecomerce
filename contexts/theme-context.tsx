@@ -51,7 +51,13 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-export function ThemeProvider({ children }: { children: ReactNode }) {
+export function ThemeProvider({
+  children,
+  isUnknownTenant = false,
+}: {
+  children: ReactNode;
+  isUnknownTenant?: boolean;
+}) {
   const [themes, setThemes] = useState<AppTheme[]>([]);
   const [activeTheme, setActiveThemeState] = useState<AppTheme | null>(null);
   const [loading, setLoading] = useState(true);
@@ -261,6 +267,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     // el tema vía postMessage, así que nunca se debe cargar ni aplicar el
     // tema persistido en BD (ver el listener de mensajes más abajo).
     if (isThemePreviewMode()) {
+      deferStateUpdate(() => setLoading(false));
+      return;
+    }
+
+    // Un subdominio sin tienda detrás no tiene publicación propia:
+    // `getActiveTheme()` caería en la tienda cuyo subdominio es `default` y el
+    // aviso saldría con los colores de otro inquilino. Sin tema aplicado mandan
+    // los tokens base de globals.css (D3).
+    if (isUnknownTenant) {
       deferStateUpdate(() => setLoading(false));
       return;
     }

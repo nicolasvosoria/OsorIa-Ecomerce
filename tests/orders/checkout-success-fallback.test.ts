@@ -32,14 +32,10 @@ vi.mock("@/lib/supabase/orders-api", () => ({
 }));
 
 import { loadSuccessPageFallbackOrder } from "@/app/checkout/success/fallback-order";
-
-function authClientFor(userId: string | null) {
-  return {
-    auth: {
-      getUser: async () => ({ data: { user: userId ? { id: userId } : null } }),
-    },
-  };
-}
+import {
+  createSessionAuthClient,
+  ECOMMERCE_SCOPED_CLIENT,
+} from "@/tests/fixtures/session-auth-client";
 
 const ORDER_FIXTURE = {
   order_number: "A-9001",
@@ -73,15 +69,17 @@ describe("loadSuccessPageFallbackOrder", () => {
   });
 
   it("reads via the session client when the customer is signed in, without needing an email", async () => {
-    getSupabaseAuthClientMock.mockResolvedValue(authClientFor("session-user-1"));
+    getSupabaseAuthClientMock.mockResolvedValue(createSessionAuthClient("session-user-1"));
     getOrderByNumberForUserMock.mockResolvedValue(ORDER_FIXTURE);
 
     const fallback = await loadSuccessPageFallbackOrder("A-9001", null);
 
+    // Las tablas del ecommerce no existen en el schema public, que es donde nace
+    // el cliente de sesión: sin acotarlo esta lectura vuelve siempre vacía.
     expect(getOrderByNumberForUserMock).toHaveBeenCalledWith(
       "A-9001",
       "session-user-1",
-      expect.anything(),
+      ECOMMERCE_SCOPED_CLIENT,
     );
     expect(getOrderByNumberMock).not.toHaveBeenCalled();
     expect(getServiceEcommerceClientMock).not.toHaveBeenCalled();
@@ -101,7 +99,7 @@ describe("loadSuccessPageFallbackOrder", () => {
   });
 
   it("falls back to the guest branch (service client + store_id/email) when there is no session", async () => {
-    getSupabaseAuthClientMock.mockResolvedValue(authClientFor(null));
+    getSupabaseAuthClientMock.mockResolvedValue(createSessionAuthClient(null));
     const serviceClient = { marker: "service-client" };
     getServiceEcommerceClientMock.mockReturnValue(serviceClient);
     getOrderByNumberMock.mockResolvedValue(ORDER_FIXTURE);
@@ -121,7 +119,7 @@ describe("loadSuccessPageFallbackOrder", () => {
   });
 
   it("never queries an order when neither a session nor guest auth resolves", async () => {
-    getSupabaseAuthClientMock.mockResolvedValue(authClientFor(null));
+    getSupabaseAuthClientMock.mockResolvedValue(createSessionAuthClient(null));
 
     const fallback = await loadSuccessPageFallbackOrder("A-9001", null);
 

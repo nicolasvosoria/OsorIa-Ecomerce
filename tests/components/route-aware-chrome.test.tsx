@@ -127,6 +127,30 @@ describe("RouteAwareChrome", () => {
     },
   )
 
+  // El login pertenece al viaje de autenticación, no a la tienda: entra sin su
+  // fachada. Y solo él (D3) — el resto de /auth son pantallas de cara al cliente.
+  it("renders /auth/login without any storefront chrome around it", () => {
+    renderChrome("/auth/login")
+
+    expect(screen.getByTestId("route-children")).toBeInTheDocument()
+    expect(screen.queryByTestId("editable-wrapper-header")).not.toBeInTheDocument()
+    expect(screen.queryByTestId("storefront-header")).not.toBeInTheDocument()
+    expect(screen.queryByTestId("editable-wrapper-footer")).not.toBeInTheDocument()
+    expect(screen.queryByTestId("storefront-footer")).not.toBeInTheDocument()
+    expect(screen.queryByTestId("floating-contact-button")).not.toBeInTheDocument()
+  })
+
+  it.each(["/auth/cuenta-confirmada", "/", "/shop"])(
+    "keeps the storefront chrome on %s, so the login is not a blanket /auth exemption",
+    (pathname) => {
+      renderChrome(pathname)
+
+      expect(screen.getByTestId("storefront-header")).toBeInTheDocument()
+      expect(screen.getByTestId("storefront-footer")).toBeInTheDocument()
+      expect(screen.getByTestId("floating-contact-button")).toBeInTheDocument()
+    },
+  )
+
   it("never renders a floating session button, leaving logout to the admin shell", () => {
     renderChrome("/dashboard")
     expect(screen.queryByRole("button", { name: /cerrar sesión/i })).not.toBeInTheDocument()

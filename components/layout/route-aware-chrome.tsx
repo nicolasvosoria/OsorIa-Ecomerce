@@ -17,6 +17,7 @@ import { sectionLabel } from "@/lib/section-editor/sections-registry"
 
 interface RouteAwareChromeProps {
   children: ReactNode
+  isNeutralPage?: boolean
 }
 
 const ADMIN_CHROME_BASES = ["/admin", "/dashboard"]
@@ -26,7 +27,7 @@ export function isAdminChromeRoute(pathname: string | null): boolean {
   return ADMIN_CHROME_BASES.some((base) => isRouteOrDescendant(pathname, base))
 }
 
-export function RouteAwareChrome({ children }: RouteAwareChromeProps) {
+export function RouteAwareChrome({ children, isNeutralPage = false }: RouteAwareChromeProps) {
   const pathname = usePathname()
   const hasHydrated = useHasHydrated()
   // El host admin (Plan 12) no tiene storefront: allí el proxy sirve la consola
@@ -34,7 +35,19 @@ export function RouteAwareChrome({ children }: RouteAwareChromeProps) {
   // host — que solo se conoce en el cliente, igual que este chrome, pospuesto ya
   // a la hidratación — es lo que aparta el header y footer de tienda.
   const isStorefrontHost = hasHydrated && !isPlatformAdminHost(window.location.host)
-  const isStorefrontRoute = isStorefrontHost && !isAdminChromeRoute(pathname)
+  // Los avisos de tienda apagada o inexistente también llegan por reescritura,
+  // y ahí el pathname miente todavía más: sigue siendo "/" o "/shop". Por eso la
+  // señal la trae el servidor desde el header que estampó el proxy (D3), y deja
+  // el aviso solo, sin nada del chrome de tienda alrededor.
+  // El login del auth journey, en cambio, sí llega por navegación real, así que
+  // aquí el pathname basta. Pertenece al viaje de autenticación y no a la
+  // tienda: entra sin su chrome, y solo él (D3), porque el resto de /auth son
+  // pantallas de cara al cliente.
+  const isStorefrontRoute =
+    isStorefrontHost &&
+    !isAdminChromeRoute(pathname) &&
+    pathname !== "/auth/login" &&
+    !isNeutralPage
   // The header and footer stay selectable inside the preview iframe (they reuse
   // the same `EditableWrapper`), while the rest of the storefront chrome — the
   // contact button — is edit-mode-only UI that has no place inside the customizer preview.

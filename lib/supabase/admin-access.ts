@@ -115,6 +115,42 @@ async function fetchManagesAnyStore(userId: string) {
   return { kind: "storeAccess" as const, managesAnyStore: (await response.json()) === true };
 }
 
+// Store-SCOPED authority for the proxy, the twin of resolveAdminAccess below:
+// membership in THIS store, never "manages some store". ecommerce.
+// can_user_manage_store is STABLE too, so it travels over GET like the
+// store-agnostic function above. A lookup that fails denies: the caller can
+// only fall back to the neutral page, so the cause is logged here.
+export async function requesterManagesStore(
+  request: NextRequest,
+  storeId: string,
+): Promise<boolean> {
+  const user = await getCurrentUser(request);
+  if (!user) {
+    return false;
+  }
+
+  const params = new URLSearchParams({ p_user_id: user.id, p_store_id: storeId });
+
+  try {
+    const response = await readWithServiceRole(
+      `rpc/${ECOMMERCE_FUNCTIONS.canUserManageStore}?${params.toString()}`,
+    );
+
+    if (!response?.ok) {
+      console.error(
+        "[AdminAccess] can_user_manage_store lookup failed:",
+        response?.status ?? "supabase not configured",
+      );
+      return false;
+    }
+
+    return (await response.json()) === true;
+  } catch (error) {
+    console.error("[AdminAccess] can_user_manage_store lookup failed:", error);
+    return false;
+  }
+}
+
 export async function resolveAdminAccess(request: NextRequest): Promise<AdminAccessResult> {
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
     return { status: "guest", reason: "supabase_not_configured" };

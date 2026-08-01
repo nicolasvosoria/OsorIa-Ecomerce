@@ -28,6 +28,16 @@ describe("root docs cleanup", () => {
       entry.endsWith(".md"),
     );
 
-    expect(rootMarkdownFiles.sort()).toEqual(["AGENTS.md", "README.md"]);
+    // DESIGN.md and PRODUCT.md are not loose notes: they are the Impeccable
+    // design-foundation records, read from the project root by spec (DESIGN.md
+    // follows the official DESIGN.md format; PRODUCT.md is its product-truth
+    // counterpart), sidecar at .impeccable/design.json. They are durable,
+    // intended root-level artifacts, so they stay in the allowlist.
+    expect(rootMarkdownFiles.sort()).toEqual([
+      "AGENTS.md",
+      "DESIGN.md",
+      "PRODUCT.md",
+      "README.md",
+    ]);
   });
 });

@@ -162,6 +162,27 @@ describe("Header layout variants", () => {
     expect(screen.queryByTestId("mega-menu-panel")).not.toBeInTheDocument()
   })
 
+  it("keeps classic category links on the type ramp (text-base), no hardcoded pixel size", async () => {
+    render(<Header />)
+
+    const desktopHeader = await screen.findByTestId("header-desktop-classic")
+    const categoryLink = await within(desktopHeader).findByRole("link", { name: "Parlantes" })
+
+    expect(categoryLink).toHaveClass("text-base")
+    expect(categoryLink.className).not.toMatch(/text-\[\d+px\]/)
+  })
+
+  it("keeps centered category links on the type ramp too", async () => {
+    styleOverrides = { layoutVariant: "centered" }
+    render(<Header />)
+
+    const desktopHeader = await screen.findByTestId("header-desktop-centered")
+    const categoryLink = await within(desktopHeader).findByRole("link", { name: "Parlantes" })
+
+    expect(categoryLink).toHaveClass("text-base")
+    expect(categoryLink.className).not.toMatch(/text-\[\d+px\]/)
+  })
+
   it("no longer gives the classic nav row its own sticky/border (unified header-level sticky)", async () => {
     render(<Header />)
 

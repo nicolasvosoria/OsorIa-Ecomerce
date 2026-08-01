@@ -6,9 +6,17 @@ import { ShieldAlert } from "lucide-react";
 import { AdminAuthGuard } from "@/components/admin/admin-auth-guard";
 import { AdminShell } from "@/components/admin/shell/admin-shell";
 import { AdminActiveStoreProvider } from "@/contexts/admin-active-store-context";
-import { authorizeActiveStoreAdmin } from "@/lib/supabase/active-store";
+import {
+  authorizeActiveStoreAdmin,
+  type ActiveStoreAdminGrant,
+} from "@/lib/supabase/active-store";
 import { redirectIfPasswordChangeRequired } from "@/lib/admin/password-change-gate";
 import { SIDEBAR_PIN_COOKIE, isSidebarPinned } from "@/lib/admin/sidebar-pin-cookie";
+import {
+  resolveStoreServingState,
+  type StoreServingState,
+} from "@/lib/stores/serving-state";
+import { ECOMMERCE_TABLES } from "@/lib/supabase/contract";
 import { listStoresForUser, type StoreSummary } from "@/lib/supabase/memberships-api";
 import {
   Card,
@@ -25,7 +33,12 @@ export const metadata: Metadata = {
 
 type AdminStoreContext =
   | { forbidden: true }
-  | { forbidden: false; stores: StoreSummary[]; activeStoreId: string };
+  | {
+      forbidden: false;
+      stores: StoreSummary[];
+      activeStoreId: string;
+      servingState: StoreServingState | null;
+    };
 
 export default async function AdminLayout({
   children,
@@ -51,6 +64,7 @@ export default async function AdminLayout({
         <AdminShell
           stores={context.stores}
           activeStoreId={context.activeStoreId}
+          servingState={context.servingState}
           defaultPinned={sidebarPinned}
         >
           {children}
@@ -76,13 +90,44 @@ async function resolveAdminStoreContext(): Promise<AdminStoreContext> {
       console.error("[Admin Layout] No se pudo resolver la tienda activa:", authorization.error);
     }
 
-    return { forbidden: false, stores: [], activeStoreId: "" };
+    return { forbidden: false, stores: [], activeStoreId: "", servingState: null };
   }
 
   await redirectIfPasswordChangeRequired(authorization.userId, authorization.supabase);
 
   const stores = await listStoresForUser(authorization.userId);
-  return { forbidden: false, stores, activeStoreId: authorization.storeId };
+  return {
+    forbidden: false,
+    stores,
+    activeStoreId: authorization.storeId,
+    servingState: await readActiveStoreServingState(authorization),
+  };
+}
+
+// D10: el panel enseña si la tienda se está sirviendo, así que el shell necesita
+// las dos banderas del ciclo de vida. Se leen aquí, con el cliente que ya trae la
+// autorización y con el storeId que ella resolvió — nunca uno que venga del
+// cliente. Una lectura fallida no tiene por qué apagar el panel entero: devuelve
+// `null` y el indicador calla en vez de afirmar un estado que no conoce.
+async function readActiveStoreServingState({
+  supabase,
+  storeId,
+}: ActiveStoreAdminGrant): Promise<StoreServingState | null> {
+  const { data: store, error } = await supabase
+    .from(ECOMMERCE_TABLES.stores)
+    .select("is_active, is_public")
+    .eq("id", storeId)
+    .maybeSingle();
+
+  if (error || !store) {
+    console.error("[Admin Layout] No se pudo leer el estado de publicación:", error);
+    return null;
+  }
+
+  return resolveStoreServingState({
+    isActive: store.is_active ?? false,
+    isPublic: store.is_public ?? false,
+  });
 }
 
 function AdminStoreAccessDenied() {

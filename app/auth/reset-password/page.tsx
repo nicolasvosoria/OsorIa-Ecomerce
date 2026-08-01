@@ -1,501 +1,431 @@
 "use client"
 
-import { useState, useEffect, Suspense } from "react"
-import { useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Eye, EyeOff, CheckCircle2, XCircle, Loader2 } from "lucide-react"
+import { Suspense, useEffect, useRef, useState, type ReactNode } from "react"
+import Link from "next/link"
+import { useRouter, useSearchParams } from "next/navigation"
+import { CheckCircle2, Eye, EyeOff, KeyRound, Loader2, XCircle } from "lucide-react"
 import { toast } from "sonner"
+
+import { PasswordRecoveryDialog } from "@/components/auth/password-recovery-dialog"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card"
+import { FormField } from "@/components/ui/form-field"
+import { Input } from "@/components/ui/input"
+import { useLanguage } from "@/contexts/language-context"
+import {
+  blamePasswordFields,
+  findPasswordProblem,
+  MIN_PASSWORD_LENGTH,
+  type PasswordFieldErrors,
+} from "@/lib/account/password-rule"
+import { getAuthReturnPath, resolvePostAuthDestination } from "@/lib/auth-return-intent"
 import { updatePassword } from "@/lib/supabase/auth-api"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
-import Link from "next/link"
-
-function ResetPasswordContent() {
-  const router = useRouter()
-  const [newPassword, setNewPassword] = useState("")
-  const [confirmPassword, setConfirmPassword] = useState("")
-  const [showPassword, setShowPassword] = useState(false)
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-  const [isVerifying, setIsVerifying] = useState(true)
-  const [status, setStatus] = useState<"idle" | "success" | "error">("idle")
-  const [errorMessage, setErrorMessage] = useState("")
-  const [hasValidSession, setHasValidSession] = useState(false)
-
-  useEffect(() => {
-    const verifyTokenAndSession = async () => {
-      try {
-        const supabase = getSupabaseBrowserClient()
-        if (!supabase) {
-          setStatus("error")
-          setErrorMessage("Error de configuración")
-          setIsVerifying(false)
-          return
-        }
-
-        console.log("[ResetPassword] URL completa:", window.location.href)
-        console.log("[ResetPassword] Hash:", window.location.hash)
-
-        // Verificar si hay un token de recuperación en el hash de la URL
-        const hashParams = new URLSearchParams(window.location.hash.substring(1))
-        const accessToken = hashParams.get("access_token")
-        const type = hashParams.get("type")
-        const refreshToken = hashParams.get("refresh_token")
-
-        console.log("[ResetPassword] Token encontrado:", {
-          type,
-          hasAccessToken: !!accessToken,
-          hasRefreshToken: !!refreshToken
-        })
-
-        // Listener para detectar cuando se crea la sesión desde el token
-        let subscription: { unsubscribe: () => void } | null = null
-        
-        const setupListener = () => {
-          const { data } = supabase.auth.onAuthStateChange(async (event: string, session: any) => {
-            console.log("[ResetPassword] Evento de autenticación:", event, "Sesión:", !!session)
-            
-            if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") {
-              if (session) {
-                console.log("[ResetPassword] Sesión creada desde token de recuperación")
-                setHasValidSession(true)
-                setStatus("idle")
-                setIsVerifying(false)
-                
-                // Limpiar el hash de la URL después de procesar
-                if (window.location.hash) {
-                  window.history.replaceState(null, "", window.location.pathname)
-                }
-              }
-            }
-          })
-          subscription = data.subscription
-        }
-
-        setupListener()
-
-        if (type === "recovery" && (accessToken || refreshToken)) {
-          console.log("[ResetPassword] Token de recuperación encontrado, procesando...")
-          
-          // Si hay tokens en el hash, Supabase debería procesarlos automáticamente
-          // pero a veces necesitamos forzar el intercambio
-          if (accessToken && refreshToken) {
-            try {
-              // Intentar intercambiar el token por una sesión
-              const { data: { session }, error: sessionError } = await supabase.auth.setSession({
-                access_token: accessToken,
-                refresh_token: refreshToken,
-              })
-
-              if (sessionError) {
-                console.error("[ResetPassword] Error al establecer sesión:", sessionError)
-              } else if (session) {
-                console.log("[ResetPassword] Sesión establecida correctamente")
-                setHasValidSession(true)
-                setStatus("idle")
-                setIsVerifying(false)
-                
-                // Limpiar el hash de la URL
-                if (window.location.hash) {
-                  window.history.replaceState(null, "", window.location.pathname)
-                }
-                return
-              }
-            } catch (error) {
-              console.error("[ResetPassword] Error al procesar tokens:", error)
-            }
-          }
-
-          // Esperar un momento para que Supabase procese el token del hash automáticamente
-          await new Promise(resolve => setTimeout(resolve, 1000))
-          
-          // Verificar si hay una sesión activa
-          const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-          
-          if (sessionError) {
-            console.error("[ResetPassword] Error al obtener sesión:", sessionError)
-          }
-
-          if (session) {
-            console.log("[ResetPassword] Sesión válida encontrada")
-            setHasValidSession(true)
-            setStatus("idle")
-            setIsVerifying(false)
-            
-            // Limpiar el hash de la URL
-            if (window.location.hash) {
-              window.history.replaceState(null, "", window.location.pathname)
-            }
-          } else {
-            // Esperar un poco más para que el listener procese el token
-            setTimeout(async () => {
-              const { data: { session: retrySession } } = await supabase.auth.getSession()
-              if (retrySession) {
-                console.log("[ResetPassword] Sesión encontrada después del retry")
-                setHasValidSession(true)
-                setStatus("idle")
-              } else {
-                console.error("[ResetPassword] No se pudo crear sesión después de múltiples intentos")
-                setStatus("error")
-                setErrorMessage("El link de recuperación es inválido o ha expirado. Por favor, solicita un nuevo link.")
-              }
-              setIsVerifying(false)
-            }, 3000)
-          }
-        } else {
-          // Verificar si ya hay una sesión activa (por si el usuario ya procesó el token)
-          const { data: { session } } = await supabase.auth.getSession()
-          
-          if (session) {
-            console.log("[ResetPassword] Sesión activa encontrada")
-            setHasValidSession(true)
-            setStatus("idle")
-            setIsVerifying(false)
-          } else {
-            console.error("[ResetPassword] No hay token ni sesión válida")
-            setStatus("error")
-            setErrorMessage("Link de recuperación inválido o expirado. Por favor, solicita un nuevo link.")
-            setIsVerifying(false)
-          }
-        }
-
-        // Cleanup subscription
-        return () => {
-          if (subscription) {
-            subscription.unsubscribe()
-          }
-        }
-      } catch (error: any) {
-        console.error("[ResetPassword] Error inesperado:", error)
-        setStatus("error")
-        setErrorMessage("Error al procesar el link de recuperación")
-        setIsVerifying(false)
-      }
-    }
-
-    verifyTokenAndSession()
-  }, [])
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    // Validaciones
-    if (!newPassword || !confirmPassword) {
-      toast.error("Campos incompletos", {
-        description: "Por favor, completa todos los campos",
-        duration: 3000,
-      })
-      return
-    }
-
-    if (newPassword.length < 6) {
-      toast.error("Contraseña muy corta", {
-        description: "La contraseña debe tener al menos 6 caracteres",
-        duration: 3000,
-      })
-      return
-    }
-
-    if (newPassword !== confirmPassword) {
-      toast.error("Las contraseñas no coinciden", {
-        description: "Por favor, verifica que ambas contraseñas sean iguales",
-        duration: 3000,
-      })
-      return
-    }
-
-    setIsLoading(true)
-    setErrorMessage("")
-
-    try {
-      const result = await updatePassword(newPassword)
-
-      if (result.success) {
-        setStatus("success")
-        toast.success("Contraseña actualizada", {
-          description: "Tu contraseña ha sido restablecida exitosamente",
-          duration: 3000,
-        })
-
-        // Redirigir al login después de 3 segundos
-        setTimeout(() => {
-          router.push("/")
-        }, 3000)
-      } else {
-        setStatus("error")
-        setErrorMessage(result.error || "Error al actualizar la contraseña")
-        toast.error("Error al actualizar contraseña", {
-          description: result.error || "Por favor, intenta nuevamente",
-          duration: 5000,
-        })
-      }
-    } catch (error: any) {
-      setStatus("error")
-      setErrorMessage(error.message || "Error inesperado")
-      toast.error("Error inesperado", {
-        description: "Ocurrió un error al procesar tu solicitud",
-        duration: 5000,
-      })
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  if (status === "success") {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: "var(--background)" }}>
-        <div className="w-full max-w-md">
-          <div className="text-center space-y-6 p-8 rounded-lg border" style={{ backgroundColor: "var(--card)", borderColor: "var(--border)" }}>
-            <div className="flex justify-center">
-              <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ backgroundColor: "var(--primary)", opacity: 0.1 }}>
-                <CheckCircle2 className="w-8 h-8" style={{ color: "var(--primary)" }} />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <h1 className="text-2xl font-bold" style={{ color: "var(--foreground)" }}>
-                ¡Contraseña Restablecida!
-              </h1>
-              <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
-                Tu contraseña ha sido actualizada exitosamente. Serás redirigido al inicio en unos segundos...
-              </p>
-            </div>
-            <div className="pt-4">
-              <Link href="/">
-                <Button
-                  className="w-full"
-                  style={{
-                    backgroundColor: "var(--primary)",
-                    color: "var(--primary-foreground)",
-                  }}
-                >
-                  Ir al inicio
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  if (isVerifying) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: "var(--background)" }}>
-        <div className="w-full max-w-md">
-          <div className="text-center space-y-6 p-8 rounded-lg border" style={{ backgroundColor: "var(--card)", borderColor: "var(--border)" }}>
-            <div className="flex justify-center">
-              <Loader2 className="w-8 h-8 animate-spin" style={{ color: "var(--primary)" }} />
-            </div>
-            <div className="space-y-2">
-              <h1 className="text-2xl font-bold" style={{ color: "var(--foreground)" }}>
-                Verificando link...
-              </h1>
-              <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
-                Por favor espera mientras verificamos tu link de recuperación
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  if (status === "error" && !hasValidSession) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: "var(--background)" }}>
-        <div className="w-full max-w-md">
-          <div className="text-center space-y-6 p-8 rounded-lg border" style={{ backgroundColor: "var(--card)", borderColor: "var(--border)" }}>
-            <div className="flex justify-center">
-              <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ backgroundColor: "var(--destructive)", opacity: 0.1 }}>
-                <XCircle className="w-8 h-8" style={{ color: "var(--destructive)" }} />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <h1 className="text-2xl font-bold" style={{ color: "var(--foreground)" }}>
-                Link Inválido
-              </h1>
-              <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
-                {errorMessage || "El link de recuperación es inválido o ha expirado. Por favor, solicita un nuevo link."}
-              </p>
-            </div>
-            <div className="pt-4 space-y-2">
-              <Link href="/">
-                <Button
-                  className="w-full"
-                  style={{
-                    backgroundColor: "var(--primary)",
-                    color: "var(--primary-foreground)",
-                  }}
-                >
-                  Volver al inicio
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: "var(--background)" }}>
-      <div className="w-full max-w-md">
-        <div className="p-8 rounded-lg border" style={{ backgroundColor: "var(--card)", borderColor: "var(--border)" }}>
-          <div className="space-y-6">
-            <div className="text-center space-y-2">
-              <h1 className="text-2xl font-bold" style={{ color: "var(--foreground)" }}>
-                Restablecer Contraseña
-              </h1>
-              <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
-                Ingresa tu nueva contraseña
-              </p>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <label
-                  htmlFor="newPassword"
-                  className="text-sm font-medium"
-                  style={{ color: "var(--foreground)" }}
-                >
-                  Nueva Contraseña
-                </label>
-                <div className="relative">
-                  <Input
-                    id="newPassword"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="••••••••"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    required
-                    minLength={6}
-                    className="w-full pr-10 placeholder:opacity-50"
-                    style={{
-                      backgroundColor: "var(--background)",
-                      borderColor: "var(--border)",
-                      color: "var(--foreground)",
-                    }}
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-                    onClick={() => setShowPassword(!showPassword)}
-                    title={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-                    style={{ color: "var(--muted-foreground)" }}
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-                <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>
-                  Mínimo 6 caracteres
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <label
-                  htmlFor="confirmPassword"
-                  className="text-sm font-medium"
-                  style={{ color: "var(--foreground)" }}
-                >
-                  Confirmar Nueva Contraseña
-                </label>
-                <div className="relative">
-                  <Input
-                    id="confirmPassword"
-                    type={showConfirmPassword ? "text" : "password"}
-                    placeholder="••••••••"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    required
-                    minLength={6}
-                    className="w-full pr-10 placeholder:opacity-50"
-                    style={{
-                      backgroundColor: "var(--background)",
-                      borderColor: "var(--border)",
-                      color: "var(--foreground)",
-                    }}
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    title={showConfirmPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-                    style={{ color: "var(--muted-foreground)" }}
-                  >
-                    {showConfirmPassword ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-              </div>
-
-              {errorMessage && (
-                <div className="p-3 rounded-lg text-sm" style={{ backgroundColor: "var(--destructive)", opacity: 0.1, color: "var(--destructive)" }}>
-                  {errorMessage}
-                </div>
-              )}
-
-              <div className="flex flex-col gap-2 pt-4">
-                <Button
-                  type="submit"
-                  className="w-full"
-                  disabled={isLoading}
-                  style={{
-                    backgroundColor: "var(--primary)",
-                    color: "var(--primary-foreground)",
-                  }}
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Actualizando...
-                    </>
-                  ) : (
-                    "Restablecer Contraseña"
-                  )}
-                </Button>
-                <Link href="/">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full"
-                    disabled={isLoading}
-                    style={{
-                      borderColor: "var(--border)",
-                      color: "var(--foreground)",
-                    }}
-                  >
-                    Cancelar
-                  </Button>
-                </Link>
-              </div>
-            </form>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
+import { isCurrentUserAdminOrUnverified } from "@/lib/supabase/permissions-api"
 
 export default function ResetPasswordPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: "var(--background)" }}>
-        <Loader2 className="h-8 w-8 animate-spin" style={{ color: "var(--primary)" }} />
-      </div>
-    }>
-      <ResetPasswordContent />
+    <Suspense fallback={<VerifyingLinkScreen />}>
+      <ResetPasswordFlow />
     </Suspense>
   )
 }
 
+type RecoveryPhase =
+  | { step: "verifying" }
+  | { step: "linkRejected"; reason: LinkRejection }
+  | { step: "newPassword"; exit: RecoveryExit }
+  | { step: "updated"; exit: RecoveryExit }
+
+function ResetPasswordFlow() {
+  const searchParams = useSearchParams()
+  const tokenHash = searchParams.get("token_hash")
+  const linkType = searchParams.get("type")
+  const code = searchParams.get("code")
+  const returnPath = getAuthReturnPath(searchParams)
+  const [phase, setPhase] = useState<RecoveryPhase>({ step: "verifying" })
+  // El token del correo se gasta al canjearlo: un segundo intento (el doble
+  // montaje de StrictMode en desarrollo) convertiría un link válido en rechazado.
+  const claimStarted = useRef(false)
+
+  useEffect(() => {
+    if (claimStarted.current) return
+    claimStarted.current = true
+
+    claimRecoverySession(readRecoveryLink({ tokenHash, linkType, code })).then(async (claim) => {
+      if (claim.outcome === "rejected") {
+        setPhase({ step: "linkRejected", reason: claim.reason })
+        return
+      }
+
+      setPhase({ step: "newPassword", exit: await resolveRecoveryExit(returnPath) })
+      // El token ya está canjeado: dejarlo en la barra de direcciones solo lo
+      // expone al historial y al referer sin servir para nada.
+      window.history.replaceState(null, "", window.location.pathname)
+    })
+  }, [tokenHash, linkType, code, returnPath])
+
+  if (phase.step === "verifying") {
+    return <VerifyingLinkScreen />
+  }
+
+  if (phase.step === "linkRejected") {
+    return <LinkRejectedScreen reason={phase.reason} />
+  }
+
+  if (phase.step === "updated") {
+    return <PasswordUpdatedScreen exit={phase.exit} />
+  }
+
+  return (
+    <NewPasswordScreen
+      exit={phase.exit}
+      onUpdated={() => setPhase({ step: "updated", exit: phase.exit })}
+    />
+  )
+}
+
+// Adónde puede salir quien ya canjeó el link. La sesión existe desde ese
+// momento, así que el destino se decide por capacidad igual que en el login
+// (D4): "/" es un callejón para el dueño, porque el proxy reescribe la raíz de
+// una tienda sin publicar al mismo aviso del que venía huyendo.
+type RecoveryExit = { path: string; leadsToConsole: boolean }
+
+async function resolveRecoveryExit(returnPath: string | null): Promise<RecoveryExit> {
+  const canAccessAdmin = await isCurrentUserAdminOrUnverified()
+
+  return {
+    path: resolvePostAuthDestination({
+      returnPath,
+      canAccessAdmin,
+      fallback: canAccessAdmin ? "/admin" : "/",
+    }),
+    // Todo destino que `resolvePostAuthDestination` entrega a quien administra
+    // cuelga de /admin, así que la capacidad ya basta para etiquetar la salida.
+    leadsToConsole: canAccessAdmin,
+  }
+}
+
+type RecoveryLink =
+  | { kind: "tokenHash"; tokenHash: string }
+  | { kind: "code"; code: string }
+  | { kind: "absent" }
+
+// Un correo de recuperación puede llegar de dos formas y ninguna es el hash
+// implícito heredado (#access_token), que este proyecto ya no puede emitir:
+// `token_hash` es la preferida (D7) porque verifyOtp no depende del navegador
+// que pidió el link, y `?code` es lo que la plantilla de Supabase sigue enviando
+// hasta que el operador la cambie en el panel.
+function readRecoveryLink({
+  tokenHash,
+  linkType,
+  code,
+}: {
+  tokenHash: string | null
+  linkType: string | null
+  code: string | null
+}): RecoveryLink {
+  // El tipo se exige: esta pantalla solo completa una recuperación, y un token
+  // de alta o de cambio de correo no tiene nada que hacer aquí.
+  if (tokenHash && linkType === "recovery") {
+    return { kind: "tokenHash", tokenHash }
+  }
+  if (code) {
+    return { kind: "code", code }
+  }
+  return { kind: "absent" }
+}
+
+type LinkRejection =
+  | { cause: "noTokenInLink" }
+  | { cause: "verificationUnavailable" }
+  | { cause: "refusedByAuth"; detail: string }
+
+type RecoveryClaim = { outcome: "claimed" } | { outcome: "rejected"; reason: LinkRejection }
+
+async function claimRecoverySession(link: RecoveryLink): Promise<RecoveryClaim> {
+  if (link.kind === "absent") {
+    return { outcome: "rejected", reason: { cause: "noTokenInLink" } }
+  }
+
+  const supabase = getSupabaseBrowserClient()
+  if (!supabase) {
+    return { outcome: "rejected", reason: { cause: "verificationUnavailable" } }
+  }
+
+  try {
+    const { error } =
+      link.kind === "tokenHash"
+        ? await supabase.auth.verifyOtp({ token_hash: link.tokenHash, type: "recovery" })
+        : await supabase.auth.exchangeCodeForSession(link.code)
+
+    if (error) {
+      return { outcome: "rejected", reason: { cause: "refusedByAuth", detail: error.message } }
+    }
+
+    return { outcome: "claimed" }
+  } catch (error) {
+    console.error("[ResetPassword] Error al canjear el link de recuperación:", error)
+    return { outcome: "rejected", reason: { cause: "verificationUnavailable" } }
+  }
+}
+
+function VerifyingLinkScreen() {
+  const { t } = useLanguage()
+
+  return (
+    <RecoveryCard>
+      <CardHeader className="text-center">
+        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+        <h1 className="text-2xl font-semibold leading-none tracking-tight">
+          {t.passwordReset.verifying}
+        </h1>
+        <CardDescription>{t.passwordReset.verifyingHint}</CardDescription>
+      </CardHeader>
+    </RecoveryCard>
+  )
+}
+
+function LinkRejectedScreen({ reason }: { reason: LinkRejection }) {
+  const { t } = useLanguage()
+  const router = useRouter()
+  const [recoveryOpen, setRecoveryOpen] = useState(false)
+
+  const explanation = {
+    noTokenInLink: t.passwordReset.linkMissing,
+    verificationUnavailable: t.passwordReset.verificationUnavailable,
+    refusedByAuth: t.passwordReset.linkExpired,
+  }[reason.cause]
+
+  return (
+    <RecoveryCard>
+      <CardHeader className="text-center">
+        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10">
+          <XCircle className="h-8 w-8 text-destructive" />
+        </div>
+        <h1 className="text-2xl font-semibold leading-none tracking-tight">
+          {t.passwordReset.linkRejected}
+        </h1>
+        <CardDescription>{explanation}</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {reason.cause === "refusedByAuth" && (
+          <Alert variant="destructive">
+            <AlertDescription>{reason.detail}</AlertDescription>
+          </Alert>
+        )}
+        {/* D9: el callejón sin salida era el defecto, así que pedir otro link se
+            hace aquí mismo, con el mismo diálogo que el header y el login. */}
+        <div className="flex flex-col gap-2">
+          <Button type="button" className="w-full" onClick={() => setRecoveryOpen(true)}>
+            {t.passwordReset.requestNewLink}
+          </Button>
+          {/* "/" no es una salida: en el subdominio de una tienda sin publicar
+              el proxy lo reescribe al aviso del que venía esta persona, y aquí
+              todavía no hay sesión con la que decidir otra cosa. El login sí se
+              sirve tal cual en los dos hosts. */}
+          <Button asChild variant="outline" className="w-full">
+            <Link href="/auth/login">{t.header.backToLogin}</Link>
+          </Button>
+        </div>
+      </CardContent>
+      <PasswordRecoveryDialog
+        open={recoveryOpen}
+        onOpenChange={setRecoveryOpen}
+        // "Volver" aquí solo puede ser el login del auth journey: esta pantalla
+        // se sirve igual en el host admin y en el subdominio de una tienda, y el
+        // único inicio de sesión que existe en ambos es /auth/login (el de la
+        // tienda es un modal del header, que esta página no controla).
+        onBackToSignIn={() => router.push("/auth/login")}
+      />
+    </RecoveryCard>
+  )
+}
+
+function NewPasswordScreen({ exit, onUpdated }: { exit: RecoveryExit; onUpdated: () => void }) {
+  const { t } = useLanguage()
+  const [newPassword, setNewPassword] = useState("")
+  const [confirmation, setConfirmation] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [failure, setFailure] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<PasswordFieldErrors>({})
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault()
+
+    const problem = findPasswordProblem({ newPassword, confirmation })
+    if (problem) {
+      const message = {
+        incomplete: t.header.incompleteFieldsDescription,
+        tooShort: t.header.passwordMinLength,
+        mismatch: t.header.passwordsDoNotMatch,
+      }[problem]
+      setFieldErrors(blamePasswordFields({ problem, message, typed: { newPassword, confirmation } }))
+      toast.error(message)
+      return
+    }
+
+    setFieldErrors({})
+    setIsSubmitting(true)
+    setFailure(null)
+    const result = await updatePassword(newPassword)
+    setIsSubmitting(false)
+
+    if (!result.success) {
+      const detail = result.error || t.passwordReset.updateFailed
+      setFailure(detail)
+      toast.error(t.passwordReset.updateFailed, { description: detail, duration: 5000 })
+      return
+    }
+
+    toast.success(t.passwordReset.updated, {
+      description: t.passwordReset.updatedHint,
+      duration: 3000,
+    })
+    onUpdated()
+  }
+
+  return (
+    <RecoveryCard>
+      <CardHeader className="text-center">
+        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+          <KeyRound className="h-8 w-8 text-primary" />
+        </div>
+        <h1 className="text-2xl font-semibold leading-none tracking-tight">
+          {t.auth.resetPassword}
+        </h1>
+        <CardDescription>{t.passwordReset.description}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={submit} className="space-y-4">
+          <PasswordField
+            id="new-password"
+            label={t.passwordReset.newPassword}
+            hint={t.header.passwordMinLength}
+            error={fieldErrors.newPassword}
+            value={newPassword}
+            onChange={setNewPassword}
+          />
+          <PasswordField
+            id="confirm-password"
+            label={t.auth.confirmPassword}
+            error={fieldErrors.confirmation}
+            value={confirmation}
+            onChange={setConfirmation}
+          />
+
+          {failure && (
+            <Alert variant="destructive">
+              <AlertDescription>{failure}</AlertDescription>
+            </Alert>
+          )}
+
+          <div className="flex flex-col gap-2 pt-4">
+            <Button type="submit" disabled={isSubmitting} className="w-full">
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {t.passwordReset.updating}
+                </>
+              ) : (
+                t.auth.resetPassword
+              )}
+            </Button>
+            <Button asChild variant="outline" className="w-full">
+              <Link href={exit.path}>{t.common.cancel}</Link>
+            </Button>
+          </div>
+        </form>
+      </CardContent>
+    </RecoveryCard>
+  )
+}
+
+// Sin traslado automático a propósito: mover a alguien de pantalla contra su
+// voluntad, y encima con un plazo que no puede parar, es justo lo que prohíbe
+// WCAG 2.2.1. La salida queda a un clic y es la persona quien lo da.
+function PasswordUpdatedScreen({ exit }: { exit: RecoveryExit }) {
+  const { t } = useLanguage()
+
+  return (
+    <RecoveryCard>
+      <CardHeader className="text-center">
+        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+          <CheckCircle2 className="h-8 w-8 text-primary" />
+        </div>
+        <h1 className="text-2xl font-semibold leading-none tracking-tight">
+          {t.passwordReset.updated}
+        </h1>
+        <CardDescription>{t.passwordReset.updatedHint}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Button asChild className="w-full">
+          <Link href={exit.path}>
+            {exit.leadsToConsole ? t.passwordReset.goToConsole : t.passwordReset.goHome}
+          </Link>
+        </Button>
+      </CardContent>
+    </RecoveryCard>
+  )
+}
+
+function PasswordField({
+  id,
+  label,
+  hint,
+  error,
+  value,
+  onChange,
+}: {
+  id: string
+  label: string
+  hint?: string
+  error?: string
+  value: string
+  onChange: (value: string) => void
+}) {
+  const { t } = useLanguage()
+  const [revealed, setRevealed] = useState(false)
+
+  return (
+    <FormField id={id} label={label} hint={hint} error={error}>
+      {(field) => (
+        <div className="relative">
+          <Input
+            {...field}
+            type={revealed ? "text" : "password"}
+            autoComplete="new-password"
+            required
+            minLength={MIN_PASSWORD_LENGTH}
+            className="pr-10 placeholder:opacity-50"
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            // size-icon-sm exime al icono del mínimo táctil de 44px en móvil: el
+            // control vive dentro de un campo de 36px de alto.
+            className="size-icon-sm absolute inset-y-0 right-0"
+            aria-label={revealed ? t.header.hidePassword : t.header.showPassword}
+            onClick={() => setRevealed(!revealed)}
+          >
+            {revealed ? <EyeOff /> : <Eye />}
+          </Button>
+        </div>
+      )}
+    </FormField>
+  )
+}
+
+function RecoveryCard({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex min-h-dvh items-center justify-center bg-background p-4">
+      <Card className="w-full max-w-md">{children}</Card>
+    </div>
+  )
+}

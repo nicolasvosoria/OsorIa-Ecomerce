@@ -8,6 +8,7 @@ import {
   getOrders,
   getOrdersByEmail,
   getOrdersForUser,
+  getStoreOrderByNumberForUser,
   updateOrderStatus,
 } from "@/lib/supabase/orders-api";
 
@@ -31,6 +32,15 @@ const ORDER_ROW = {
   currency_code: "COP",
   created_at: "2026-01-01T00:00:00Z",
   updated_at: "2026-01-01T00:00:00Z",
+};
+
+// El mismo comprador, la misma plataforma, otra tienda: es el pedido que su
+// historial en store-1 no puede enseñar (D17).
+const ORDER_ROW_IN_ANOTHER_STORE = {
+  ...ORDER_ROW,
+  id: "order-2",
+  store_id: "store-2",
+  order_number: "B-1",
 };
 
 // Records every .eq() so each test can assert the store filter is applied.
@@ -99,12 +109,19 @@ function userIdFilterFor(
   );
 }
 
-// Client that only resolves the orders row when every scripted `.eq()` filter
-// on the "orders" table matches the row's own fields, mimicking the RLS
-// backstop so tests can prove an order_number guess alone is not enough.
-function makeAuthorizingClient() {
+// Client that actually applies every scripted `.eq()` to the seeded orders,
+// mimicking the RLS + WHERE backstop. Recording the filters only proves what was
+// asked; this one proves which rows come back, which is what a leak is about.
+function makeFilteringClient(orderRows: Array<Record<string, unknown>>) {
   function makeBuilder(table: string) {
     const filters: Record<string, unknown> = {};
+    const matchingRows = () =>
+      table === "orders"
+        ? orderRows.filter((row) =>
+            Object.entries(filters).every(([column, value]) => row[column] === value),
+          )
+        : [];
+
     const builder: any = {
       select: vi.fn(() => builder),
       order: vi.fn(() => builder),
@@ -114,18 +131,13 @@ function makeAuthorizingClient() {
         return builder;
       }),
       single: vi.fn(async () => {
-        if (table !== "orders") {
-          return { data: null, error: null };
-        }
-        const matches = Object.entries(filters).every(
-          ([column, value]) => (ORDER_ROW as Record<string, unknown>)[column] === value,
-        );
-        return matches
-          ? { data: ORDER_ROW, error: null }
-          : { data: null, error: { message: "Not found" } };
+        const found = matchingRows();
+        return found.length === 1
+          ? { data: found[0], error: null }
+          : { data: null, error: { code: "PGRST116", message: "No rows found" } };
       }),
       then: (onFulfilled: any, onRejected: any) =>
-        Promise.resolve({ data: [], error: null }).then(onFulfilled, onRejected),
+        Promise.resolve({ data: matchingRows(), error: null }).then(onFulfilled, onRejected),
     };
     return builder;
   }
@@ -199,7 +211,7 @@ describe("orders-api store scoping", () => {
   });
 
   it("does not return an order when order_number is guessed but store_id or email do not match", async () => {
-    getSupabaseEcommerceMock.mockReturnValue(makeAuthorizingClient());
+    getSupabaseEcommerceMock.mockReturnValue(makeFilteringClient([ORDER_ROW]));
 
     const wrongStore = await getOrderByNumber("A-1", {
       storeId: "store-2",
@@ -238,7 +250,11 @@ describe("orders-api store scoping", () => {
     expect(order?.id).toBe("order-1");
   });
 
-  it("scopes getOrderByNumberForUser by the caller's user_id (checkout success, D7)", async () => {
+  // D17 deja esta función DELIBERADAMENTE sin filtro de tienda: la comparte la
+  // pantalla de éxito del checkout, que tiene que resolver el pedido recién
+  // hecho aunque la tienda del host no se resuelva en ese request. Acotarla
+  // aquí rompería esa confirmación, así que el assert vacío es el que avisa.
+  it("scopes getOrderByNumberForUser by user_id only, never by store_id (checkout success, D7/D17)", async () => {
     const { client, eqCalls } = makeRecordingClient();
 
     const order = await getOrderByNumberForUser("A-1", "user-1", client);
@@ -247,17 +263,77 @@ describe("orders-api store scoping", () => {
     expect(userIdFilterFor(eqCalls)).toEqual([
       { table: "orders", column: "user_id", value: "user-1" },
     ]);
+    expect(storeFilterFor(eqCalls)).toEqual([]);
     expect(order?.id).toBe("order-1");
   });
 
+  it("resolves a just-placed order from another store through getOrderByNumberForUser", async () => {
+    const client = makeFilteringClient([ORDER_ROW, ORDER_ROW_IN_ANOTHER_STORE]);
+
+    const order = await getOrderByNumberForUser("B-1", "user-1", client);
+
+    expect(order?.id).toBe("order-2");
+  });
+
   it("does not return an order from getOrderByNumberForUser when order_number is guessed but user_id does not match", async () => {
-    const client = makeAuthorizingClient();
+    const client = makeFilteringClient([ORDER_ROW]);
 
     const attacker = await getOrderByNumberForUser("A-1", "attacker-user", client);
     const owner = await getOrderByNumberForUser("A-1", "user-1", client);
 
     expect(attacker).toBeNull();
     expect(owner?.id).toBe("order-1");
+  });
+
+  it("scopes getStoreOrderByNumberForUser by both store_id and user_id (order detail, D17)", async () => {
+    const { client, eqCalls } = makeRecordingClient();
+
+    const order = await getStoreOrderByNumberForUser(
+      "A-1",
+      { storeId: "store-1", userId: "user-1" },
+      client,
+    );
+
+    expect(getSupabaseEcommerceMock).not.toHaveBeenCalled();
+    expect(storeFilterFor(eqCalls)).toEqual([
+      { table: "orders", column: "store_id", value: "store-1" },
+    ]);
+    expect(userIdFilterFor(eqCalls)).toEqual([
+      { table: "orders", column: "user_id", value: "user-1" },
+    ]);
+    expect(order?.id).toBe("order-1");
+  });
+
+  it("hides an order placed in another store from getStoreOrderByNumberForUser, even from its owner", async () => {
+    const client = makeFilteringClient([ORDER_ROW, ORDER_ROW_IN_ANOTHER_STORE]);
+
+    const fromAnotherStore = await getStoreOrderByNumberForUser(
+      "B-1",
+      { storeId: "store-1", userId: "user-1" },
+      client,
+    );
+    const ownStore = await getStoreOrderByNumberForUser(
+      "A-1",
+      { storeId: "store-1", userId: "user-1" },
+      client,
+    );
+
+    expect(fromAnotherStore).toBeNull();
+    expect(ownStore?.id).toBe("order-1");
+  });
+
+  // El recorte por tienda no puede haber abierto un camino que se salte la
+  // propiedad: acertar tienda y número sigue sin bastar.
+  it("does not return an order from getStoreOrderByNumberForUser when the store matches but user_id does not", async () => {
+    const client = makeFilteringClient([ORDER_ROW]);
+
+    const attacker = await getStoreOrderByNumberForUser(
+      "A-1",
+      { storeId: "store-1", userId: "attacker-user" },
+      client,
+    );
+
+    expect(attacker).toBeNull();
   });
 
   it("scopes getMostRecentOrderByUserId by the caller's user_id (checkout prefill, D4)", async () => {
@@ -271,17 +347,31 @@ describe("orders-api store scoping", () => {
     expect(order?.id).toBe("order-1");
   });
 
-  it("scopes getOrdersForUser by the caller's user_id (order history, D5)", async () => {
+  // Antes este test fijaba lo contrario: el historial filtraba solo por user_id
+  // y por tanto mezclaba tiendas. D17 lo cambia — el cliente no sabe que detrás
+  // hay una plataforma, así que su historial en esta tienda es solo de aquí.
+  it("scopes getOrdersForUser by the caller's user_id AND the current store (order history, D5/D17)", async () => {
     const { client, eqCalls } = makeRecordingClient();
 
-    const orders = await getOrdersForUser("user-1", client);
+    const orders = await getOrdersForUser({ storeId: "store-1", userId: "user-1" }, client);
 
     expect(getSupabaseEcommerceMock).not.toHaveBeenCalled();
     expect(userIdFilterFor(eqCalls)).toEqual([
       { table: "orders", column: "user_id", value: "user-1" },
     ]);
+    expect(storeFilterFor(eqCalls)).toEqual([
+      { table: "orders", column: "store_id", value: "store-1" },
+    ]);
     expect(orders).toHaveLength(1);
     expect(orders[0]?.id).toBe("order-1");
+  });
+
+  it("leaves an order placed in another store out of getOrdersForUser", async () => {
+    const client = makeFilteringClient([ORDER_ROW, ORDER_ROW_IN_ANOTHER_STORE]);
+
+    const orders = await getOrdersForUser({ storeId: "store-1", userId: "user-1" }, client);
+
+    expect(orders.map((order) => order.id)).toEqual(["order-1"]);
   });
 
   it("returns an empty list from getOrdersForUser when the customer has no previous orders", async () => {
@@ -299,7 +389,10 @@ describe("orders-api store scoping", () => {
       }),
     };
 
-    const orders = await getOrdersForUser("user-without-orders", noOrdersClient);
+    const orders = await getOrdersForUser(
+      { storeId: "store-1", userId: "user-without-orders" },
+      noOrdersClient,
+    );
 
     expect(orders).toEqual([]);
   });

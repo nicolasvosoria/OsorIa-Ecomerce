@@ -3,12 +3,14 @@
 import { headers } from "next/headers"
 import { after } from "next/server"
 
+import { formatSavedAddressLine, type SavedAddress } from "@/lib/account/saved-address"
 import { checkoutOrderSchema } from "@/lib/checkout/schemas"
 import {
   generateInvoiceEmailHTML,
   sendEmail,
 } from "@/lib/orders/order-confirmation-email"
 import { resolveEmailBaseUrl } from "@/lib/security/email-runtime-guards"
+import { getAccountProfile } from "@/lib/supabase/account-profile-api"
 import {
   createOrder,
   getMostRecentOrderByUserId,
@@ -16,8 +18,13 @@ import {
   type InventoryValidationResult,
   type OrderWithItems,
 } from "@/lib/supabase/orders-api"
-import { resolveServerAuthSession } from "@/lib/supabase/server-auth-session"
+import {
+  ecommerceForSession,
+  resolveServerAuthSession,
+  type ServerAuthSession,
+} from "@/lib/supabase/server-auth-session"
 import { getServiceEcommerceClient } from "@/lib/supabase/service-client"
+import { findDefaultUserAddress } from "@/lib/supabase/user-addresses-api"
 
 export type PlaceCheckoutOrderResult =
   | { success: true; orderNumber: string; orderId: string }
@@ -77,13 +84,67 @@ export async function placeCheckoutOrder(
   }
 }
 
+// D16: con datos guardados en la cuenta el checkout deja de adivinar — lee la
+// dirección predeterminada de la libreta y el teléfono del perfil (A1) en vez de
+// copiar el último pedido. El teléfono y la dirección se guardan por separado,
+// así que cada campo decide su fuente por su cuenta: lo guardado manda y el
+// último pedido rellena el hueco que quede. Quien todavía no ha guardado nada,
+// que hoy es casi todo el mundo, conserva el comportamiento anterior.
 export async function getCheckoutPrefill(): Promise<CheckoutPrefill> {
   const session = await resolveServerAuthSession()
   if (!session) {
     return null
   }
 
-  const lastOrder = await getMostRecentOrderByUserId(session.userId, session.client)
+  const saved = toPrefillFields(await readSavedAccountData(session))
+  if (saved.phone && saved.address) {
+    return saved
+  }
+
+  const lastOrder = await prefillFromMostRecentOrder(session)
+  if (!lastOrder) {
+    return saved.phone || saved.address ? saved : null
+  }
+
+  return {
+    phone: saved.phone || lastOrder.phone,
+    address: saved.address || lastOrder.address,
+  }
+}
+
+type SavedAccountData = { phone: string | null; defaultAddress: SavedAddress | null }
+
+function toPrefillFields(saved: SavedAccountData): NonNullable<CheckoutPrefill> {
+  return {
+    phone: saved.phone ?? "",
+    address: saved.defaultAddress ? formatSavedAddressLine(saved.defaultAddress) : "",
+  }
+}
+
+// El prefill es una comodidad, no un dato del pedido: si la cuenta no se puede
+// leer, el checkout sigue en pie con lo que haya. El motivo queda registrado —
+// no se pierde — igual que hace getMostRecentOrderByUserId con el suyo.
+async function readSavedAccountData(session: ServerAuthSession): Promise<SavedAccountData> {
+  try {
+    const [profile, defaultAddress] = await Promise.all([
+      getAccountProfile(session.userId, session.client),
+      findDefaultUserAddress(session.userId, session.client),
+    ])
+
+    return { phone: profile?.phone ?? null, defaultAddress }
+  } catch (error) {
+    console.error("[Checkout] No se pudieron leer los datos guardados de la cuenta:", error)
+    return { phone: null, defaultAddress: null }
+  }
+}
+
+async function prefillFromMostRecentOrder(
+  session: ServerAuthSession,
+): Promise<CheckoutPrefill> {
+  const lastOrder = await getMostRecentOrderByUserId(
+    session.userId,
+    ecommerceForSession(session.client),
+  )
   if (!lastOrder) {
     return null
   }

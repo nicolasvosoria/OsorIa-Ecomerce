@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { ChevronDown, LogOut, User } from "lucide-react"
 
@@ -44,6 +45,16 @@ export function AdminUserMenu() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="editor-chrome w-56">
         <DropdownMenuLabel className="truncate">{adminUserName(user)}</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {/* La cuenta vive en una sola página para los dos mundos (D14): /auth
+            pasa por el proxy tanto en el host admin como en el subdominio de
+            una tienda, publicada o no. */}
+        <DropdownMenuItem asChild>
+          <Link href="/auth/cuenta">
+            <User className="h-4 w-4" aria-hidden="true" />
+            Cuenta
+          </Link>
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem variant="destructive" disabled={signingOut} onSelect={handleLogout}>
           <LogOut className="h-4 w-4" />

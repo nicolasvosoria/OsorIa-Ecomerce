@@ -1,47 +1,26 @@
-import Link from 'next/link'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { AlertCircle } from 'lucide-react'
+import { Card, CardDescription, CardHeader } from '@/components/ui/card'
 
+// Este subdominio no resuelve a ninguna tienda: no hay dueño a quien ofrecerle
+// una entrada ni catálogo al que mandar al visitante, así que el aviso no lleva
+// ninguna salida (D1).
 export default function StoreNotFound() {
   return (
     <div className="container mx-auto px-4 py-16 flex items-center justify-center min-h-screen">
       <Card className="max-w-md w-full">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center">
-            <AlertCircle className="w-8 h-8 text-destructive" />
-          </div>
-          <CardTitle className="text-2xl">Tienda no encontrada</CardTitle>
+          {/* El aviso es toda la página: su título tiene que ser un encabezado
+              real para que un lector de pantalla tenga dónde aterrizar.
+              `CardTitle` pinta un <div> y no acepta `asChild`, y la primitiva se
+              comparte con storefront y admin, así que el <h1> se queda aquí con
+              las clases que esa primitiva ya resolvía. */}
+          <h1 className="font-semibold text-2xl tracking-tight">
+            Aquí no hay ninguna tienda
+          </h1>
           <CardDescription>
-            La tienda que estás buscando no existe o no está disponible.
+            Esta dirección no corresponde a ninguna tienda. Revisa que esté bien escrita.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-muted-foreground text-center">
-            Verifica que la URL sea correcta o contacta al administrador si crees que esto es un error.
-          </p>
-          <div className="flex flex-col gap-2">
-            <Button asChild className="w-full">
-              <Link href="/">Ir a la página principal</Link>
-            </Button>
-            <Button variant="outline" asChild className="w-full">
-              <Link href="/shop">Explorar tienda</Link>
-            </Button>
-          </div>
-        </CardContent>
       </Card>
     </div>
   )
 }
-
-
-
-
-
-
-
-
-
-
-
-

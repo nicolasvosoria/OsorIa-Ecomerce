@@ -30,3 +30,6 @@ next-env.d.ts
 # local agent/tooling files
 .atl/
 opencode.json
+# caché de sesión de impeccable (rutas absolutas de esta máquina);
+# .impeccable/design.json sí se versiona
+.impeccable/hook.cache.json

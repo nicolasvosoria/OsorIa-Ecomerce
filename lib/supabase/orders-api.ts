@@ -1550,12 +1550,65 @@ export async function getOrderByNumber(
  * el cliente con la sesión del usuario: RLS (orders_owner_or_admin_read) solo
  * expone filas con user_id = auth.uid(), así que no depende de un email en la
  * URL como el flujo de invitado.
+ *
+ * A propósito NO filtra por tienda: la confirmación tiene que resolver el
+ * pedido recién hecho aunque la tienda del host no se pueda resolver en ese
+ * request. El detalle del historial, que sí quiere ese recorte, usa
+ * getStoreOrderByNumberForUser.
  */
 export async function getOrderByNumberForUser(
   orderNumber: string,
   userId: string,
   supabaseOverride?: any,
 ): Promise<OrderWithItems | null> {
+  return readOrderByNumberForUser({
+    orderNumber,
+    userId,
+    storeId: null,
+    supabaseOverride,
+    operation: "getOrderByNumberForUser",
+  });
+}
+
+// Dueño (user_id) y tienda del host (store_id) viajan juntos porque juntos
+// definen qué pedido es visible en esta tienda: ninguno de los dos basta solo.
+export interface StoreCustomerOrderAuth {
+  storeId: string;
+  userId: string;
+}
+
+/**
+ * Obtener un pedido del historial de la tienda actual (D17). El store_id acota
+ * la lectura a la tienda del host; la propiedad la sigue cargando user_id, así
+ * que acertar el número de pedido de otra persona no lo expone.
+ */
+export async function getStoreOrderByNumberForUser(
+  orderNumber: string,
+  auth: StoreCustomerOrderAuth,
+  supabaseOverride?: any,
+): Promise<OrderWithItems | null> {
+  return readOrderByNumberForUser({
+    orderNumber,
+    userId: auth.userId,
+    storeId: auth.storeId,
+    supabaseOverride,
+    operation: "getStoreOrderByNumberForUser",
+  });
+}
+
+async function readOrderByNumberForUser({
+  orderNumber,
+  userId,
+  storeId,
+  supabaseOverride,
+  operation,
+}: {
+  orderNumber: string;
+  userId: string;
+  storeId: string | null;
+  supabaseOverride?: any;
+  operation: string;
+}): Promise<OrderWithItems | null> {
   try {
     const supabase = supabaseOverride ?? getSupabaseEcommerce();
     if (!supabase) {
@@ -1563,16 +1616,20 @@ export async function getOrderByNumberForUser(
       return null;
     }
 
-    const orderResult = (await withTimeout(
-      supabase
-        .from(ECOMMERCE_TABLES.orders)
-        .select("*")
-        .eq("order_number", orderNumber)
-        .eq("user_id", userId)
-        .single(),
-      15000,
-      "getOrderByNumberForUser",
-    )) as { data: any; error: any };
+    let query = supabase
+      .from(ECOMMERCE_TABLES.orders)
+      .select("*")
+      .eq("order_number", orderNumber)
+      .eq("user_id", userId);
+
+    if (storeId) {
+      query = query.eq("store_id", storeId);
+    }
+
+    const orderResult = (await withTimeout(query.single(), 15000, operation)) as {
+      data: any;
+      error: any;
+    };
 
     // PGRST116 (ninguna fila) es el resultado esperado cuando el pedido no es
     // del usuario de la sesión, no un error a registrar.
@@ -1776,14 +1833,18 @@ export async function getMostRecentOrderByUserId(
 }
 
 /**
- * Obtener el historial de pedidos de un usuario autenticado (pantalla "Mis
- * pedidos" del storefront). El caller debe pasar el cliente con la sesión del
- * usuario: RLS (orders_owner_or_admin_read) solo expone filas con
+ * Obtener el historial de pedidos de un usuario en la tienda actual (pantalla
+ * "Mis pedidos" del storefront). El caller debe pasar el cliente con la sesión
+ * del usuario: RLS (orders_owner_or_admin_read) solo expone filas con
  * user_id = auth.uid(), así que un llamador anónimo o sin ese cliente no
  * obtiene ningún pedido.
+ *
+ * store_id es obligatorio (D17): el cliente no sabe que detrás hay una
+ * plataforma, así que su historial en esta tienda no puede mezclar compras
+ * hechas en otra. Al ser obligatorio, ninguna pantalla puede olvidarlo.
  */
 export async function getOrdersForUser(
-  userId: string,
+  auth: StoreCustomerOrderAuth,
   supabaseOverride?: any,
 ): Promise<OrderWithItems[]> {
   try {
@@ -1797,7 +1858,8 @@ export async function getOrdersForUser(
       supabase
         .from(ECOMMERCE_TABLES.orders)
         .select("*")
-        .eq("user_id", userId)
+        .eq("user_id", auth.userId)
+        .eq("store_id", auth.storeId)
         .order("order_date", { ascending: false })
         .limit(50),
       15000,
