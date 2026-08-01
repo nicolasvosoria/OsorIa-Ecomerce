@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { headers } from 'next/headers'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card'
+import { resolveStoreNameFromHeader } from '@/lib/stores/store-name-header'
 
 // El panel de publicación vive en /admin/settings. `next` es el parámetro de
 // intención de retorno que ya emiten el proxy y el callback de auth, y que
@@ -14,7 +15,7 @@ export default async function StoreInactive() {
   // live, y estampa su identidad en los headers de la petición: nombrarla es
   // enseñarle al visitante *esa* tienda, nunca la plataforma. Si el header no
   // llega, el aviso se queda sin nombre en vez de inventar uno.
-  const storeName = (await headers()).get('x-store-name')?.trim()
+  const storeName = resolveStoreNameFromHeader((await headers()).get('x-store-name'))
 
   return (
     <div className="container mx-auto px-4 py-16 flex items-center justify-center min-h-screen">

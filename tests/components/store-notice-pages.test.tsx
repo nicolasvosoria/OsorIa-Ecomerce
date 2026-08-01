@@ -75,6 +75,48 @@ describe("Store notice pages", () => {
       expect(screen.getByText(new RegExp(STORE_NAME))).toBeInTheDocument()
     })
 
+    // Un header HTTP solo transporta ASCII: el transporte que lleva los headers
+    // de petición del proxy a la función que renderiza codifica en UTF-8
+    // porcentual cada byte no ASCII, así que el aviso llegó a producción
+    // enseñándole "Cumbre Dorada Caf%C3%A9" al cliente. Casi todo nombre de
+    // tienda en español lleva tilde o ñ, así que el defecto alcanzaba a casi
+    // todas.
+    it("names a store with accents without leaking the percent escapes", async () => {
+      requestHeaders.value = new Headers({
+        [STORE_NAME_HEADER]: "Cumbre Dorada Caf%C3%A9",
+      })
+
+      render(await StoreInactive())
+
+      expect(screen.getByRole("heading", { level: 1 })).toHaveAccessibleName(
+        `${STORE_NAME} todavía no está abierta`,
+      )
+      expect(document.body.textContent).not.toContain("%C3%A9")
+    })
+
+    it("leaves a store name that needed no encoding exactly as it arrived", async () => {
+      requestHeaders.value = new Headers({ [STORE_NAME_HEADER]: "NiCoffe" })
+
+      render(await StoreInactive())
+
+      expect(screen.getByRole("heading", { level: 1 })).toHaveAccessibleName(
+        "NiCoffe todavía no está abierta",
+      )
+    })
+
+    // Un `%` literal en el nombre viaja sin codificar y hace lanzar a
+    // `decodeURIComponent`: el aviso es la página que existe para cuando algo va
+    // mal, así que no puede ser ella la que se caiga.
+    it("still names the store when the value is not a valid encoding", async () => {
+      requestHeaders.value = new Headers({ [STORE_NAME_HEADER]: "Tienda 100%" })
+
+      render(await StoreInactive())
+
+      expect(screen.getByRole("heading", { level: 1 })).toHaveAccessibleName(
+        "Tienda 100% todavía no está abierta",
+      )
+    })
+
     // El aviso es toda la página: sin un encabezado de nivel 1 un lector de
     // pantalla no tiene dónde aterrizar.
     it("exposes its message as the single level-1 heading of the page", async () => {
