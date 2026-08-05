@@ -40,6 +40,8 @@
     "@radix-ui/react-switch": "1.1.2",
     "@radix-ui/react-tabs": "latest",
     "@radix-ui/react-tooltip": "latest",
+    "@react-email/components": "1.0.12",
+    "@react-email/render": "2.1.0",
     "@supabase/ssr": "latest",
     "@supabase/supabase-js": "latest",
     "@types/eslint": "latest",
