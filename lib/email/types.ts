@@ -4,6 +4,7 @@ export const EMAIL_TEMPLATE_KINDS = [
   "new-user-invite",
   "password-recovery",
   "password-changed",
+  "store-mailbox-verification",
   "order-received",
   "merchant-new-order",
   "membership-acceptance",
@@ -45,6 +46,14 @@ type MembershipEmailInput = {
   membershipName: string;
 };
 
+// No recipientName: whoever can read the mailbox may not be a named person
+// (a shared pedidos@ inbox, for instance), so the copy addresses the mailbox's
+// purpose instead of a person (D6).
+type MailboxVerificationEmailInput = {
+  purpose: "reply_to" | "order_mailbox";
+  actionPath: string;
+};
+
 type OrderStatusEmailInput = OrderEmailInput & {
   trackingCode?: string;
   returnReason?: string;
@@ -62,6 +71,7 @@ export type EmailTemplateInput =
   | EmailEnvelope<"new-user-invite", AuthEmailInput>
   | EmailEnvelope<"password-recovery", AuthEmailInput>
   | EmailEnvelope<"password-changed", { recipientName: string }>
+  | EmailEnvelope<"store-mailbox-verification", MailboxVerificationEmailInput>
   | EmailEnvelope<"order-received", OrderEmailInput>
   | EmailEnvelope<"merchant-new-order", MerchantOrderEmailInput>
   | EmailEnvelope<"membership-acceptance", MembershipEmailInput>

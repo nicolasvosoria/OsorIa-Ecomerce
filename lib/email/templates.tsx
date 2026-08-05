@@ -30,6 +30,7 @@ function getTemplateText(input: EmailTemplateInput): string {
     case "new-user-invite": return `Hola, ${input.data.recipientName}. Te invitaron al equipo de ${input.branding.displayName}.`;
     case "password-recovery": return `Hola, ${input.data.recipientName}. Usa este enlace para restablecer tu contraseña.`;
     case "password-changed": return `Hola, ${input.data.recipientName}. Tu contraseña fue actualizada correctamente.`;
+    case "store-mailbox-verification": return `Alguien solicitó usar este correo como ${input.data.purpose === "reply_to" ? "correo de respuesta" : "buzón de pedidos"} de ${input.branding.displayName}. Si fuiste tú, confirma con el siguiente enlace. Si no reconoces esta solicitud, ignora este mensaje.`;
     case "order-received": return `Hola, ${input.data.customerName}. Recibimos tu pedido ${input.data.orderNumber} y te avisaremos de sus novedades.`;
     case "merchant-new-order": return `El pedido ${input.data.orderNumber} de ${input.data.customerName} está listo para que lo revises.`;
     case "membership-acceptance": return `Hola, ${input.data.recipientName}. Tu acceso como ${input.data.membershipName} fue activado.`;
@@ -45,7 +46,8 @@ function getAction(input: EmailTemplateInput): { href: string } | undefined {
     case "signup-confirmation":
     case "owner-invite":
     case "new-user-invite":
-    case "password-recovery": return { href: getAdminUrl(input.data.actionPath) };
+    case "password-recovery":
+    case "store-mailbox-verification": return { href: getAdminUrl(input.data.actionPath) };
     case "password-changed": return undefined;
     case "membership-acceptance": return { href: getAdminUrl("/login") };
     case "merchant-new-order": return { href: getAdminUrl(`/orders/${encodeURIComponent(input.data.orderNumber)}`) };

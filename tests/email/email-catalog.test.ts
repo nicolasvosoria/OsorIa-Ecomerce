@@ -23,8 +23,8 @@ const brandedOrder: EmailTemplateInput = {
 
 describe("email catalog", () => {
   it("provides a typed safe fixture for every catalog template", () => {
-    expect(EMAIL_TEMPLATE_KINDS).toHaveLength(12);
-    expect(EMAIL_TEMPLATE_KINDS.map(getEmailPreviewFixture)).toHaveLength(12);
+    expect(EMAIL_TEMPLATE_KINDS).toHaveLength(13);
+    expect(EMAIL_TEMPLATE_KINDS.map(getEmailPreviewFixture)).toHaveLength(13);
   });
 
   it("renders tenant branding and escaped customer data in HTML and text", async () => {

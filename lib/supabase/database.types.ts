@@ -7,11 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "12.2.3 (519615d)"
-  }
   ecommerce: {
     Tables: {
       app_font_pairings: {
@@ -163,13 +158,6 @@ export type Database = {
             columns: ["theme_id"]
             isOneToOne: false
             referencedRelation: "app_themes"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "app_theme_versions_theme_id_fkey"
-            columns: ["theme_id"]
-            isOneToOne: false
-            referencedRelation: "app_themes_legacy"
             referencedColumns: ["id"]
           },
         ]
@@ -339,6 +327,135 @@ export type Database = {
           },
         ]
       }
+      email_outbox: {
+        Row: {
+          attempt_count: number
+          created_at: string
+          from_address: string
+          html_body: string
+          id: string
+          idempotency_key: string
+          last_error: string | null
+          last_error_code: string | null
+          lease_expires_at: string | null
+          locked_at: string | null
+          locked_by: string | null
+          next_attempt_at: string
+          provider_message_id: string | null
+          recipient_email: string
+          reply_to_address: string | null
+          sent_at: string | null
+          status: string
+          store_id: string | null
+          subject: string
+          template_kind: string
+          text_body: string
+          updated_at: string
+        }
+        Insert: {
+          attempt_count?: number
+          created_at?: string
+          from_address: string
+          html_body: string
+          id?: string
+          idempotency_key: string
+          last_error?: string | null
+          last_error_code?: string | null
+          lease_expires_at?: string | null
+          locked_at?: string | null
+          locked_by?: string | null
+          next_attempt_at?: string
+          provider_message_id?: string | null
+          recipient_email: string
+          reply_to_address?: string | null
+          sent_at?: string | null
+          status?: string
+          store_id?: string | null
+          subject: string
+          template_kind: string
+          text_body: string
+          updated_at?: string
+        }
+        Update: {
+          attempt_count?: number
+          created_at?: string
+          from_address?: string
+          html_body?: string
+          id?: string
+          idempotency_key?: string
+          last_error?: string | null
+          last_error_code?: string | null
+          lease_expires_at?: string | null
+          locked_at?: string | null
+          locked_by?: string | null
+          next_attempt_at?: string
+          provider_message_id?: string | null
+          recipient_email?: string
+          reply_to_address?: string | null
+          sent_at?: string | null
+          status?: string
+          store_id?: string | null
+          subject?: string
+          template_kind?: string
+          text_body?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_outbox_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_outbox_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores_legacy"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_send_attempts: {
+        Row: {
+          created_at: string
+          id: string
+          purpose: string
+          recipient_email: string
+          store_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          purpose: string
+          recipient_email: string
+          store_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          purpose?: string
+          recipient_email?: string
+          store_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_send_attempts_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_send_attempts_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores_legacy"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       home_section_layout: {
         Row: {
           id: number
@@ -422,13 +539,6 @@ export type Database = {
             columns: ["related_order_id"]
             isOneToOne: false
             referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "inventory_movements_related_order_id_fkey"
-            columns: ["related_order_id"]
-            isOneToOne: false
-            referencedRelation: "orders_legacy"
             referencedColumns: ["id"]
           },
           {
@@ -888,13 +998,6 @@ export type Database = {
             referencedRelation: "orders"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "order_addresses_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders_legacy"
-            referencedColumns: ["id"]
-          },
         ]
       }
       order_combo_snapshots: {
@@ -975,13 +1078,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "order_combo_snapshots_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders_legacy"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "order_combo_snapshots_order_item_id_fkey"
             columns: ["order_item_id"]
             isOneToOne: true
@@ -1054,13 +1150,6 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "order_items_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders_legacy"
             referencedColumns: ["id"]
           },
           {
@@ -1267,13 +1356,6 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "payment_transactions_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders_legacy"
             referencedColumns: ["id"]
           },
         ]
@@ -1542,13 +1624,6 @@ export type Database = {
             referencedRelation: "orders"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "shipments_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders_legacy"
-            referencedColumns: ["id"]
-          },
         ]
       }
       shop_config: {
@@ -1673,6 +1748,12 @@ export type Database = {
           address: string | null
           contact_email: string | null
           contact_phone: string | null
+          order_mailbox_email: string | null
+          order_mailbox_pending_email: string | null
+          order_mailbox_verified_at: string | null
+          reply_to_email: string | null
+          reply_to_pending_email: string | null
+          reply_to_verified_at: string | null
           store_id: string
           updated_at: string | null
         }
@@ -1680,6 +1761,12 @@ export type Database = {
           address?: string | null
           contact_email?: string | null
           contact_phone?: string | null
+          order_mailbox_email?: string | null
+          order_mailbox_pending_email?: string | null
+          order_mailbox_verified_at?: string | null
+          reply_to_email?: string | null
+          reply_to_pending_email?: string | null
+          reply_to_verified_at?: string | null
           store_id: string
           updated_at?: string | null
         }
@@ -1687,6 +1774,12 @@ export type Database = {
           address?: string | null
           contact_email?: string | null
           contact_phone?: string | null
+          order_mailbox_email?: string | null
+          order_mailbox_pending_email?: string | null
+          order_mailbox_verified_at?: string | null
+          reply_to_email?: string | null
+          reply_to_pending_email?: string | null
+          reply_to_verified_at?: string | null
           store_id?: string
           updated_at?: string | null
         }
@@ -1845,6 +1938,54 @@ export type Database = {
           },
           {
             foreignKeyName: "store_items_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores_legacy"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      store_mailbox_verifications: {
+        Row: {
+          consumed_at: string | null
+          created_at: string
+          email: string
+          expires_at: string
+          field: string
+          id: string
+          store_id: string
+          token_hash: string
+        }
+        Insert: {
+          consumed_at?: string | null
+          created_at?: string
+          email: string
+          expires_at: string
+          field: string
+          id?: string
+          store_id: string
+          token_hash: string
+        }
+        Update: {
+          consumed_at?: string | null
+          created_at?: string
+          email?: string
+          expires_at?: string
+          field?: string
+          id?: string
+          store_id?: string
+          token_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_mailbox_verifications_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "store_mailbox_verifications_store_id_fkey"
             columns: ["store_id"]
             isOneToOne: false
             referencedRelation: "stores_legacy"
@@ -2013,6 +2154,7 @@ export type Database = {
           id: string
           is_active: boolean | null
           is_public: boolean | null
+          legal_name: string | null
           store_name: string
           subdomain: string
           updated_at: string | null
@@ -2025,6 +2167,7 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           is_public?: boolean | null
+          legal_name?: string | null
           store_name: string
           subdomain: string
           updated_at?: string | null
@@ -2037,6 +2180,7 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           is_public?: boolean | null
+          legal_name?: string | null
           store_name?: string
           subdomain?: string
           updated_at?: string | null
@@ -2224,33 +2368,6 @@ export type Database = {
         }
         Relationships: []
       }
-      app_themes_legacy: {
-        Row: {
-          created_at: string | null
-          id: number | null
-          is_active: boolean | null
-          store_id: string | null
-          theme_config: Json | null
-          theme_name: string | null
-          updated_at: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "app_theme_versions_store_id_fkey"
-            columns: ["store_id"]
-            isOneToOne: false
-            referencedRelation: "stores"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "app_theme_versions_store_id_fkey"
-            columns: ["store_id"]
-            isOneToOne: false
-            referencedRelation: "stores_legacy"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       component_styles_legacy: {
         Row: {
           component_name: string | null
@@ -2296,6 +2413,16 @@ export type Database = {
           },
         ]
       }
+      email_outbox_health: {
+        Row: {
+          newest_updated_at: string | null
+          oldest_created_at: string | null
+          quota_failures: number | null
+          row_count: number | null
+          status: string | null
+        }
+        Relationships: []
+      }
       item_options_legacy: {
         Row: {
           created_at: string | null
@@ -2319,59 +2446,6 @@ export type Database = {
             columns: ["item_id"]
             isOneToOne: false
             referencedRelation: "store_items_legacy"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      orders_legacy: {
-        Row: {
-          cancelled_at: string | null
-          confirmed_at: string | null
-          created_at: string | null
-          currency_code: string | null
-          customer_email: string | null
-          customer_first_name: string | null
-          customer_last_name: string | null
-          customer_phone: string | null
-          customer_type: string | null
-          delivered_at: string | null
-          discount_amount: number | null
-          id: string | null
-          metadata: Json | null
-          notes: string | null
-          order_date: string | null
-          order_number: string | null
-          payment_method: string | null
-          payment_reference: string | null
-          payment_status: string | null
-          shipped_at: string | null
-          shipping_address: string | null
-          shipping_city: string | null
-          shipping_cost: number | null
-          shipping_country: string | null
-          shipping_notes: string | null
-          shipping_postal_code: string | null
-          status: string | null
-          store_id: string | null
-          subtotal: number | null
-          tax_amount: number | null
-          total_amount: number | null
-          updated_at: string | null
-          user_id: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "orders_store_id_fkey"
-            columns: ["store_id"]
-            isOneToOne: false
-            referencedRelation: "stores"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "orders_store_id_fkey"
-            columns: ["store_id"]
-            isOneToOne: false
-            referencedRelation: "stores_legacy"
             referencedColumns: ["id"]
           },
         ]
@@ -2467,6 +2541,51 @@ export type Database = {
         Args: { p_store_id: string; p_user_id: string }
         Returns: boolean
       }
+      check_and_record_send_attempt: {
+        Args: {
+          p_purpose: string
+          p_recipient_email: string
+          p_store_id: string
+        }
+        Returns: boolean
+      }
+      claim_email_outbox_batch: {
+        Args: { p_batch_size?: number; p_worker_id: string }
+        Returns: {
+          attempt_count: number
+          created_at: string
+          from_address: string
+          html_body: string
+          id: string
+          idempotency_key: string
+          last_error: string | null
+          last_error_code: string | null
+          lease_expires_at: string | null
+          locked_at: string | null
+          locked_by: string | null
+          next_attempt_at: string
+          provider_message_id: string | null
+          recipient_email: string
+          reply_to_address: string | null
+          sent_at: string | null
+          status: string
+          store_id: string | null
+          subject: string
+          template_kind: string
+          text_body: string
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "email_outbox"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      confirm_store_mailbox_verification: {
+        Args: { p_token_hash: string }
+        Returns: Json
+      }
       decrement_inventory: {
         Args: { p_items: Json; p_order_id: string; p_store_id: string }
         Returns: Json
@@ -2481,6 +2600,14 @@ export type Database = {
       is_public_item: { Args: { p_item_id: string }; Returns: boolean }
       is_public_store: { Args: { p_store_id: string }; Returns: boolean }
       is_storage_admin: { Args: never; Returns: boolean }
+      mark_email_outbox_failed: {
+        Args: { p_error_code?: string; p_error_message: string; p_id: string }
+        Returns: undefined
+      }
+      mark_email_outbox_sent: {
+        Args: { p_id: string; p_provider_message_id: string }
+        Returns: undefined
+      }
       provision_store: {
         Args: {
           p_currency_code?: string
@@ -2489,6 +2616,22 @@ export type Database = {
           p_subdomain: string
         }
         Returns: string
+      }
+      prune_email_outbox: { Args: { p_older_than?: string }; Returns: number }
+      request_store_mailbox_verification: {
+        Args: {
+          p_actor_user_id: string
+          p_email_from: string
+          p_email_html: string
+          p_email_subject: string
+          p_email_text: string
+          p_field: string
+          p_idempotency_key: string
+          p_new_email: string
+          p_store_id: string
+          p_token_hash: string
+        }
+        Returns: Json
       }
       storage_root_store_id: { Args: { object_name: string }; Returns: string }
       user_manages_any_store: { Args: { p_user_id: string }; Returns: boolean }
@@ -2660,3 +2803,4 @@ export const Constants = {
     },
   },
 } as const
+

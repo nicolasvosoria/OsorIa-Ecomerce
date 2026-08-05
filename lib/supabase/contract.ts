@@ -15,6 +15,7 @@ export const ECOMMERCE_TABLES = {
   appThemes: "app_themes",
   carts: "carts",
   componentStyles: "component_styles",
+  emailOutbox: "email_outbox",
   homeSectionLayout: "home_section_layout",
   itemCategories: "item_categories",
   itemImages: "item_images",
@@ -33,8 +34,10 @@ export const ECOMMERCE_TABLES = {
   roles: "roles",
   shopConfig: "shop_config",
   storeBranding: "store_branding",
+  storeContact: "store_contact",
   storeIntegrations: "store_integrations",
   storeItems: "store_items",
+  storeMailboxVerifications: "store_mailbox_verifications",
   storeUserRoles: "store_user_roles",
   storeUsers: "store_users",
   stores: "stores",
@@ -45,21 +48,26 @@ export const ECOMMERCE_TABLES = {
 export const ECOMMERCE_VIEWS = {
   appFontPairingsLegacy: "app_font_pairings_legacy",
   appFontsLegacy: "app_fonts_legacy",
-  appThemesLegacy: "app_themes_legacy",
   componentStylesLegacy: "component_styles_legacy",
+  emailOutboxHealth: "email_outbox_health",
   itemOptionsLegacy: "item_options_legacy",
-  ordersLegacy: "orders_legacy",
   storeItemsLegacy: "store_items_legacy",
   storesLegacy: "stores_legacy",
 } as const satisfies Record<string, EcommerceViewName>;
 
 export const ECOMMERCE_FUNCTIONS = {
   canUserManageStore: "can_user_manage_store",
+  claimEmailOutboxBatch: "claim_email_outbox_batch",
+  confirmStoreMailboxVerification: "confirm_store_mailbox_verification",
   decrementInventory: "decrement_inventory",
   incrementItemViews: "increment_item_views",
   isComponentStylesAdmin: "is_component_styles_admin",
   isStorageAdmin: "is_storage_admin",
+  markEmailOutboxFailed: "mark_email_outbox_failed",
+  markEmailOutboxSent: "mark_email_outbox_sent",
   provisionStore: "provision_store",
+  pruneEmailOutbox: "prune_email_outbox",
+  requestStoreMailboxVerification: "request_store_mailbox_verification",
   userManagesAnyStore: "user_manages_any_store",
 } as const satisfies Record<string, EcommerceFunctionName>;
 

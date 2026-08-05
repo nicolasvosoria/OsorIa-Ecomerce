@@ -4,7 +4,10 @@ import prettierConfig from "eslint-config-prettier";
 
 const eslintConfig = [
   // Worktrees de sesiones paralelas viven bajo .claude/; no son código del repo.
-  { ignores: [".claude/**"] },
+  // supabase/functions/** corre en Deno, no en este proyecto Node/Next: sus
+  // únicos globals (Deno.*) y su resolución de imports (specifiers npm:/rutas
+  // con extensión .ts) no existen en este toolchain.
+  { ignores: [".claude/**", "supabase/functions/**"] },
   ...nextCoreWebVitals,
   ...nextTypescript,
   prettierConfig,

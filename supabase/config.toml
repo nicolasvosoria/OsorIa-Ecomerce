@@ -378,6 +378,14 @@ deno_version = 2
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
+# The caller is the pg_cron schedule (see 20260805000400_ecommerce_email_
+# worker_provisioning.sql), never a Supabase Auth session, so there is no user
+# JWT to verify. Authorization is the function's own check of a Vault-backed
+# shared secret (D19).
+[functions."email-worker"]
+enabled = true
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

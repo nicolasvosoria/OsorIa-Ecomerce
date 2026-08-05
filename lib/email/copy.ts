@@ -31,6 +31,11 @@ export const EMAIL_COPY: Record<EmailTemplateKind, EmailCopy> = {
     subject: (storeName) => `Tu contraseña de ${storeName} fue actualizada`,
     heading: "Tu contraseña fue actualizada",
   },
+  "store-mailbox-verification": {
+    subject: (storeName) => `Confirma un correo de ${storeName}`,
+    heading: "Confirma este correo",
+    actionLabel: "Confirmar correo",
+  },
   "order-received": {
     subject: (storeName, orderNumber) => `Recibimos tu pedido ${orderNumber} en ${storeName}`,
     heading: "Recibimos tu pedido",
