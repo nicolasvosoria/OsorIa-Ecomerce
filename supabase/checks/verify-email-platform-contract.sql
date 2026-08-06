@@ -190,6 +190,33 @@ begin
   end if;
 end $$;
 
+-- D29 + D30 (slice 4b): status and the four lifecycle timestamps are NOT
+-- reachable by a direct authenticated UPDATE -- only
+-- ecommerce.transition_order_status can move them. Without this, a store
+-- admin's own PATCH could jump the frozen graph outright (pending straight
+-- to delivered) and leave email_outbox empty, exactly what slice 4's own
+-- verification reproduced. Every other column keeps the access it already
+-- had.
+do $$
+declare
+  v_violations text[];
+begin
+  select array_agg(msg) into v_violations
+  from (
+    select format('authenticated can UPDATE ecommerce.orders.%s', col) as msg
+    from unnest(array['status', 'confirmed_at', 'shipped_at', 'delivered_at', 'cancelled_at']) col
+    where has_column_privilege('authenticated', 'ecommerce.orders', col, 'update')
+    union all
+    select format('authenticated cannot UPDATE ecommerce.orders.%s', col)
+    from unnest(array['notes', 'shipping_address', 'payment_reference', 'updated_at']) col
+    where not has_column_privilege('authenticated', 'ecommerce.orders', col, 'update')
+  ) v;
+
+  if v_violations is not null then
+    raise exception 'orders column grant contract broken: %', array_to_string(v_violations, '; ');
+  end if;
+end $$;
+
 -- -----------------------------------------------------------------------------
 -- Runtime behavior: token integrity, one-hour expiry, single-use consumption,
 -- the D25 rate limits, outbox claim/lease under concurrency, idempotency, and
@@ -1027,6 +1054,91 @@ begin
     raise exception 'D11: a shipped transition with NO notification must raise';
   exception when others then null;
   end;
+end $$;
+
+-- -----------------------------------------------------------------------------
+-- Slice 4b: the verifier's exact bypass, reproduced under the SAME role a real
+-- PostgREST request runs as (SET LOCAL ROLE authenticated + the session's own
+-- auth.uid() via request.jwt.claim.sub), not just a privilege-catalog check.
+-- A genuine store owner -- can_manage_store(v_store_id) true, RLS's row check
+-- would let the write through -- can no longer reach status or any lifecycle
+-- timestamp with a direct UPDATE; only ecommerce.transition_order_status can
+-- move them, and it still works for service_role, the only role granted
+-- EXECUTE on it.
+-- -----------------------------------------------------------------------------
+do $$
+declare
+  v_owner_id uuid := gen_random_uuid();
+  v_store_id uuid;
+  v_order_id uuid;
+  v_status text;
+  v_col text;
+  v_result jsonb;
+begin
+  insert into auth.users (id, email, encrypted_password, email_confirmed_at, created_at, updated_at, raw_app_meta_data, raw_user_meta_data, aud, role)
+  values (v_owner_id, 'orders-grant-check-owner@example.com', 'x', now(), now(), now(), '{}', '{}', 'authenticated', 'authenticated');
+  insert into ecommerce.user_profiles (id, email, role) values (v_owner_id, 'orders-grant-check-owner@example.com', 'user');
+  v_store_id := ecommerce.provision_store('orders-grant-check-store', 'Orders Grant Check Store', v_owner_id, 'COP');
+
+  insert into ecommerce.orders (
+    store_id, order_number, customer_type, customer_email, customer_first_name, customer_last_name,
+    shipping_address, shipping_city, shipping_postal_code, subtotal, total_amount, status
+  ) values (
+    v_store_id, ecommerce.generate_order_number(v_store_id), 'guest', 'buyer@example.com', 'Ada', 'Lovelace',
+    'Calle 1', 'Bogotá', '110111', 10000, 10000, 'pending'
+  ) returning id into v_order_id;
+
+  set local role authenticated;
+  perform set_config('request.jwt.claim.sub', v_owner_id::text, true);
+
+  if not ecommerce.can_manage_store(v_store_id) then
+    raise exception 'Fixture broken: the checked-in owner must manage the store for this to prove anything';
+  end if;
+
+  begin
+    update ecommerce.orders set status = 'delivered' where id = v_order_id and store_id = v_store_id;
+    raise exception 'Bypass reopened: authenticated could UPDATE ecommerce.orders.status directly';
+  exception when insufficient_privilege then null;
+  end;
+
+  foreach v_col in array array['confirmed_at', 'shipped_at', 'delivered_at', 'cancelled_at'] loop
+    begin
+      execute format('update ecommerce.orders set %I = now() where id = $1 and store_id = $2', v_col)
+        using v_order_id, v_store_id;
+      raise exception 'Bypass reopened: authenticated could UPDATE ecommerce.orders.%', v_col;
+    exception when insufficient_privilege then null;
+    end;
+  end loop;
+
+  select status into v_status from ecommerce.orders where id = v_order_id;
+  if v_status <> 'pending' then
+    raise exception 'A rejected direct UPDATE must never change ecommerce.orders.status, got %', v_status;
+  end if;
+
+  -- The revoke is narrow, not a blunt lockout: a column that stays granted
+  -- (notes is not one of the five) is still writable directly.
+  update ecommerce.orders set notes = 'orders-grant-check: authenticated can still edit notes directly'
+  where id = v_order_id and store_id = v_store_id;
+  if not found then
+    raise exception 'A legitimate authenticated write to a column that remains granted must still succeed';
+  end if;
+
+  reset role;
+
+  -- The legitimate path stays open: service_role can still transition the
+  -- SAME order through the frozen graph, exactly as before this migration.
+  set local role service_role;
+  v_result := ecommerce.transition_order_status(v_order_id, v_store_id, v_owner_id, 'confirmed');
+  if (v_result ->> 'ok')::boolean is not true then
+    raise exception 'service_role must still be able to transition orders through the locked function, got %', v_result;
+  end if;
+
+  select status into v_status from ecommerce.orders where id = v_order_id;
+  if v_status <> 'confirmed' then
+    raise exception 'transition_order_status must still persist the new status for service_role, got %', v_status;
+  end if;
+
+  reset role;
 end $$;
 
 rollback;
