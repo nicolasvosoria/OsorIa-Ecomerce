@@ -3,21 +3,35 @@
 // lib/email/resend-client.ts's call to Resend -- no SDK, no new dependency
 // (A4's hazard).
 //
-// Unconfigured-keys decision: FAIL OPEN, loudly logged, rather than fail
-// closed. Slice 7 is the only place real keys ever get set (the HARD
-// BOUNDARY forbids any live infra before it), so "unconfigured" is not an
-// edge case here -- it is the actual state of every environment this slice
-// ships into: local dev, CI, and this repo's whole existing signup/recovery
+// Unconfigured-keys decision: the split below is by RUNTIME, not by a single
+// global rule. Slice 7 is the only place real keys ever get set (the HARD
+// BOUNDARY forbids any live infra before it), so "unconfigured" is the
+// actual state of every environment except a live production deploy: local
+// dev, CI, preview deploys, and this repo's whole existing signup/recovery
 // test surface (tests/auth/signUp.test.ts, tests/auth/password-recovery-
-// dialog.test.tsx, etc.), none of which set TURNSTILE_SECRET_KEY. Failing
-// closed would make signup and recovery entirely unusable everywhere until
-// slice 7, and would contradict this slice's own verify criterion that both
-// the configured and unconfigured states must be exercisable. D25's
-// dedicated per-store/per-purpose/per-recipient rate limiter (reused, not
-// rebuilt) already bounds the abuse this gate exists to catch while keys are
-// absent, so the residual exposure is a real but narrower one: a live,
-// deployed, MIS-configured project after slice 7 -- exactly the case the
-// loud log line below exists to surface.
+// dialog.test.tsx, etc.), none of which set TURNSTILE_SECRET_KEY. Those keep
+// failing OPEN, loudly logged -- failing closed there would make signup and
+// recovery entirely unusable everywhere until slice 7, and would contradict
+// this slice's own verify criterion that both the configured and
+// unconfigured states must be exercisable.
+//
+// Production is different: a real, publicly reachable deploy with the
+// secret missing or misspelled means the widget still renders and solves
+// (it's gated by the separate, public NEXT_PUBLIC_TURNSTILE_SITE_KEY) while
+// the server silently ignores every token, with no signal beyond a log line
+// indistinguishable from routine noise. D25's rate limiter bounds volume,
+// not the absence of CAPTCHA friction -- so a misconfigured production
+// deploy fails CLOSED instead, loudly, via console.error.
+//
+// Production is detected with `VERCEL_ENV === "production"`, not
+// `NODE_ENV`: Vercel sets NODE_ENV to "production" for every built
+// deployment INCLUDING previews, so NODE_ENV alone can't tell a live
+// production deploy from a preview one -- and previews never have the
+// secret either, so failing closed on NODE_ENV would break them the same
+// way it breaks local dev and CI. VERCEL_ENV is the signal Vercel provides
+// specifically to distinguish "production" / "preview" / "development"; it
+// is unset outside Vercel (local dev, CI), which keeps this repo's whole
+// existing test surface on the fail-open path with no extra stubbing.
 const SITEVERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 
 export type TurnstileVerification =
@@ -28,6 +42,16 @@ export async function verifyTurnstile(token: string | null): Promise<TurnstileVe
   const secretKey = process.env.TURNSTILE_SECRET_KEY;
 
   if (!secretKey) {
+    if (process.env.VERCEL_ENV === "production") {
+      console.error(
+        JSON.stringify({
+          level: "error",
+          msg: "turnstile: TURNSTILE_SECRET_KEY is not configured in production, failing closed",
+        }),
+      );
+      return { ok: false, reason: "verification_failed" };
+    }
+
     console.warn(
       JSON.stringify({
         level: "warn",
