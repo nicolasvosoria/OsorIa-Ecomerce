@@ -1,9 +1,9 @@
 {
   "version": "5",
   "specifiers": {
-    "npm:@react-email/components@1.0.12": "1.0.12_react@19.2.1_react-dom@19.2.8__react@19.2.1",
-    "npm:@react-email/render@2.1.0": "2.1.0_react@19.2.1_react-dom@19.2.8__react@19.2.1",
-    "npm:@supabase/supabase-js@2": "2.112.0",
+    "npm:@react-email/components@1.0.12": "1.0.12_react@19.2.1_react-dom@19.2.1__react@19.2.1",
+    "npm:@react-email/render@2.1.0": "2.1.0_react@19.2.1_react-dom@19.2.1__react@19.2.1",
+    "npm:react-dom@19.2.1": "19.2.1_react@19.2.1",
     "npm:react@19.2.1": "19.2.1"
   },
   "npm": {
@@ -43,7 +43,7 @@
       ],
       "deprecated": true
     },
-    "@react-email/components@1.0.12_react@19.2.1_react-dom@19.2.8__react@19.2.1": {
+    "@react-email/components@1.0.12_react@19.2.1_react-dom@19.2.1__react@19.2.1": {
       "integrity": "sha512-tH18JhPDWgE+3jnYkzyB6ZrZdfNnEsFe4PwmuXmlOw4NGIysP8wPY5aXZg++pTG9qUabXg1nzX/FGHGkObH8xQ==",
       "dependencies": [
         "@react-email/body",
@@ -61,7 +61,7 @@
         "@react-email/link",
         "@react-email/markdown",
         "@react-email/preview",
-        "@react-email/render@2.0.6_react@19.2.1_react-dom@19.2.8__react@19.2.1",
+        "@react-email/render@2.0.6_react@19.2.1_react-dom@19.2.1__react@19.2.1",
         "@react-email/row",
         "@react-email/section",
         "@react-email/tailwind",
@@ -141,7 +141,7 @@
       ],
       "deprecated": true
     },
-    "@react-email/render@2.0.6_react@19.2.1_react-dom@19.2.8__react@19.2.1": {
+    "@react-email/render@2.0.6_react@19.2.1_react-dom@19.2.1__react@19.2.1": {
       "integrity": "sha512-xOzaYkH3jLZKqN5MqrTXYnmqBYUnZSVbkxdb5PGGmDcK6sKDVMliaDiSwfXajRC9JtSHTcGc2tmGLHWuCgVpog==",
       "dependencies": [
         "html-to-text",
@@ -150,7 +150,7 @@
         "react-dom"
       ]
     },
-    "@react-email/render@2.1.0_react@19.2.1_react-dom@19.2.8__react@19.2.1": {
+    "@react-email/render@2.1.0_react@19.2.1_react-dom@19.2.1__react@19.2.1": {
       "integrity": "sha512-F+zE3O6d6sW6Aj2UjvZAA17R7tJKM7kcq2mgV6k4HCT8jeLLFaVP2txMtH1lgqYFRMZ0Gxsd37q2PRyiXLXXxA==",
       "dependencies": [
         "entities",
@@ -220,51 +220,6 @@
         "selderee"
       ]
     },
-    "@supabase/auth-js@2.112.0": {
-      "integrity": "sha512-8qAdObNQHKbSeVBLmf2WLNT7+bCE8zBofpCFiNUqGBAl5qw9VagSvcmPXlh78McAU7iHrGik1oeJxiB2A6B29w==",
-      "dependencies": [
-        "tslib"
-      ]
-    },
-    "@supabase/functions-js@2.112.0": {
-      "integrity": "sha512-2DdaEZs0vq86orMIZBO+eM5w5/UxZb1EZyg2JraBKS4W9BzfFO+fOFD6YStmZ7iAOWvxNTGPjPNItsofpGgTCA==",
-      "dependencies": [
-        "tslib"
-      ]
-    },
-    "@supabase/phoenix@0.4.5": {
-      "integrity": "sha512-aAn9H9ovVyeApKy11OWOrrOGq8DV68yWeH4ud2lN9fzn4aO8Zb5GLL9m1pUg9nLqIcT+ZDfAcsZe0E/nqdv2lw=="
-    },
-    "@supabase/postgrest-js@2.112.0": {
-      "integrity": "sha512-4HKCVq32Jlk/wS8Ud8QgaAuQ4u6w1hZfw/gS5IcIN7wYddElMj4kfiCZpHMPfncomMnYzAKBUhwBZPpRcTH2Yw==",
-      "dependencies": [
-        "tslib"
-      ]
-    },
-    "@supabase/realtime-js@2.112.0": {
-      "integrity": "sha512-McFFP+ivFDMTaCEh8JDpG+sPEmv5IjKvrP0uTH3Lbsriai4KbxB8ycY8TqPQnbjhOVjEifQm1q0y2tL1CUw9Zg==",
-      "dependencies": [
-        "@supabase/phoenix",
-        "tslib"
-      ]
-    },
-    "@supabase/storage-js@2.112.0": {
-      "integrity": "sha512-X44Bl045X/e5e2tJqWsY+JmQvgtm04BJuijiWprIWYLn0mDvGnu8hLdzPOPcTVji7wlqbt2ZUHttsv+rGKQYXw==",
-      "dependencies": [
-        "iceberg-js",
-        "tslib"
-      ]
-    },
-    "@supabase/supabase-js@2.112.0": {
-      "integrity": "sha512-dHVOgog58GOagtrZuPxJYg/R45ZV2U0qqgXffH+lMlt1OS+267Pw4g7bw3iXCGxN85OufiE0nI1baxDXlgEyfQ==",
-      "dependencies": [
-        "@supabase/auth-js",
-        "@supabase/functions-js",
-        "@supabase/postgrest-js",
-        "@supabase/realtime-js",
-        "@supabase/storage-js"
-      ]
-    },
     "deepmerge@4.3.1": {
       "integrity": "sha512-3sUqbMEc77XqpdNO7FRyRog+eW3ph+GYCbj+rK+uYyRMuwsVy0rMiVtPn+QJlKFvWP/1PYpapqYn0Me2knFn+A=="
     },
@@ -318,9 +273,6 @@
         "entities"
       ]
     },
-    "iceberg-js@0.8.1": {
-      "integrity": "sha512-1dhVQZXhcHje7798IVM+xoo/1ZdVfzOMIc8/rgVSijRK38EDqOJoGula9N/8ZI5RD8QTxNQtK/Gozpr+qUqRRA=="
-    },
     "leac@0.6.0": {
       "integrity": "sha512-y+SqErxb8h7nE/fiEX07jsbuhrpO9lL8eca7/Y1nuWV2moNlXhyd59iDGcRf6moVyDMbmTNzL40SUyrFU/yDpg=="
     },
@@ -345,8 +297,8 @@
     "prismjs@1.30.0": {
       "integrity": "sha512-DEvV2ZF2r2/63V+tK8hQvrR2ZGn10srHbXviTlcv7Kpzw8jWiNTqbVgjO3IY8RxrrOUF8VPMQQFysYYYv0YZxw=="
     },
-    "react-dom@19.2.8_react@19.2.1": {
-      "integrity": "sha512-rVprimfGBG3DR+Tq0IQG2DT5PxKth1WIGDmj5yPmlzr4YBe7uyE+Du4oVqTDXZSHGGGXRtTJEGSSePyQCMBglQ==",
+    "react-dom@19.2.1_react@19.2.1": {
+      "integrity": "sha512-ibrK8llX2a4eOskq1mXKu/TGZj9qzomO+sNfO98M6d9zIPOEhlBkMkBUBLd1vgS0gQsLDBzA+8jJBVXDnfHmJg==",
       "dependencies": [
         "react",
         "scheduler"
@@ -366,17 +318,6 @@
     },
     "tailwindcss@4.3.3": {
       "integrity": "sha512-gOhV3P7ufE62QDGg1zVaTgCR+EtPv92k2nIhVcVKcLmxT1sUBsQGhnZj175j+MqRt4zLF7ic+sCYjfhxMxj7YQ=="
-    },
-    "tslib@2.8.1": {
-      "integrity": "sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w=="
     }
-  },
-  "workspace": {
-    "dependencies": [
-      "npm:@react-email/components@1.0.12",
-      "npm:@react-email/render@2.1.0",
-      "npm:react-dom@19.2.1",
-      "npm:react@19.2.1"
-    ]
   }
 }

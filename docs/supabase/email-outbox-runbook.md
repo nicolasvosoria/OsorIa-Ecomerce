@@ -88,18 +88,209 @@ cargan errores de tipos preexistentes y ajenos a este chequeo, de
 `createClient()` sin el genérico `Database`, que harían fallar un `deno
 check` por una razón que no tiene nada que ver con arrancar) contra cada
 `supabase/functions/*/index.ts` y falla si algún import no resuelve a un
-archivo real. Solo necesita el binario `deno` -- corre en CI sin Docker. Lo
-que NO prueba: que la function arranca dentro del edge-runtime real (env
-vars, APIs solo-Deno, la versión de Deno específica que empaqueta ese
-runtime) -- eso solo lo prueba `supabase functions serve` + una petición
-real, y sí necesita Docker. Antes de activar el worker o el hook en un
-proyecto real, correr ambos:
+archivo real. Solo necesita el binario `deno` -- corre en CI sin Docker.
+
+El nombre del comando (`-boot`) sobreclama lo que en realidad prueba: es un
+chequeo de **resolución**, no de arranque ni de ejecución -- se mantiene ese
+nombre porque así lo referencia esta rama, pero tanto el propio script como
+esta sección lo dejan explícito. Lo que NO prueba: que la function arranca
+dentro del edge-runtime real, y ni siquiera arrancar prueba que un código
+concreto (como el JSX de `lib/email/render.tsx`) se haya ejecutado alguna
+vez -- una petición que devuelve 401 por firma inválida o 500 por falta de
+secreto también "arranca" la function sin llegar jamás al render. Esa
+distinción no era teórica: se activó en staging (ver la sección siguiente).
+`pnpm supabase:verify:functions-render` (abajo) es lo único que cierra esa
+brecha.
 
 ```sh
 pnpm supabase:verify:functions-boot
 supabase functions serve --no-verify-jwt &
 curl -i -X POST http://127.0.0.1:54321/functions/v1/email-worker -H "Authorization: Bearer <EMAIL_WORKER_CRON_SECRET local>"
 curl -i -X POST http://127.0.0.1:54321/functions/v1/auth-email-hook
+```
+
+## deno.json por función (no uno compartido) -- el fallo real de staging
+
+La activación en vivo de `plan-correos-ecommerce` reveló que `auth-email-hook`
+en staging respondía 500 a toda invocación real de GoTrue (signup y
+recuperación de contraseña rotos) con
+`{"error":"ReferenceError: React is not defined"}`: el JSX de
+`lib/email/render.tsx` se estaba compilando al runtime CLÁSICO
+(`React.createElement(...)`, que necesita `React` en scope) en vez del
+automático (`react/jsx-runtime`), pese a que `supabase/functions/deno.json`
+(un único archivo compartido en la raíz de `functions/`) ya declaraba
+`jsx: "react-jsx"` / `jsxImportSource: "react"` correctamente.
+
+Causa raíz, confirmada contra el código fuente del CLI
+(`ShouldUseDenoJsonDiscovery` en `pkg/function/bundle.go`) y contra la
+documentación oficial de Supabase: el CLI (v2.95.3+) solo auto-descubre un
+`deno.json` que esté en el MISMO DIRECTORIO que el entrypoint de la
+function. Un `deno.json` compartido en la raíz de `supabase/functions/` NO
+califica -- el deploy cae a un import map "fallback" (por eso el log de
+deploy mostraba `WARNING: Functions using fallback import map`), que
+descarta las `compilerOptions` y deja el JSX en modo clásico. Esto además
+afectaba a `email-worker`, que no declaraba ningún `import_map` propio en
+`config.toml` y por tanto también caía al mismo fallback (aunque ese
+function no usa JSX, así que el síntoma ahí era silencioso). El flag
+`import_map` de `config.toml` apuntando a un `import_map.json` suelto
+(en vez de un `deno.json`) tampoco calificaba, y además el CLI ya reporta
+ese flag como no soportado: `Specifying import_map through flags is no
+longer supported. Please use deno.json instead.`
+
+Corregido moviendo la configuración a un `deno.json` propio por function
+(estructura recomendada por Supabase):
+
+```
+supabase/functions/auth-email-hook/deno.json   -- jsx/jsxImportSource + imports (react, @react-email/*)
+supabase/functions/email-worker/deno.json      -- {} (no usa JSX; existe solo para no caer al mismo fallback)
+```
+
+y declarando `import_map = "./functions/<slug>/deno.json"` explícitamente
+en `config.toml` para cada function (mismo patrón que genera `supabase
+functions new`), en vez de dejarlo implícito. Ya no existe ningún
+`supabase/functions/deno.json` ni `import_map.json` compartido -- la propia
+documentación de Supabase advierte que un `deno.json` global en
+`/supabase/functions` "es posible para desarrollo local pero no se
+recomienda para despliegue".
+
+### `pnpm supabase:verify:functions-render`
+
+`scripts/check-edge-functions-render.mjs` es la prueba de que lo de arriba
+funciona de verdad: arranca `supabase functions serve` (Docker) con un
+secreto propio y desechable, siembra una tienda + `auth_intents` temporales,
+firma una petición Standard Webhooks real y la envía a `auth-email-hook` --
+la primera vez que algo en este repo lleva una petición hasta
+`renderEmail()` bajo un runtime real. Si la respuesta es 200, confirma
+además que la fila que cayó en `ecommerce.email_outbox` tiene `html_body`/
+`text_body` no vacíos, y limpia todo lo que sembró.
+
+Se descartó deliberadamente la alternativa de un script `deno run` puro (sin
+Docker): reproduce el `ReferenceError` original perfectamente contra la
+configuración vieja (confirmado a mano, mismo texto exacto que el log de
+staging), pero es una vía de resolución de dependencias distinta a la que
+usa `supabase functions deploy`/`serve` -- lo único que prueba fielmente
+"esto es lo que va a pasar de verdad" es ir por el edge-runtime real. Es más
+lento y necesita Docker, pero es lo único que alguna vez probó que un correo
+renderizado sale de esta function.
+
+Qué prueba: que con el contenido actual de
+`supabase/functions/auth-email-hook/deno.json`, una petición firmada real
+llega hasta `renderEmail()` bajo el edge-runtime real y produce HTML/texto
+no vacíos que caen en `email_outbox`. Qué NO prueba: que `supabase
+functions deploy` vaya a elegir este `deno.json` exacto al desplegar (esa es
+la regla de resolución de arriba, un problema distinto de si el render
+funciona una vez que el config SÍ se aplica) -- ni que el edge-runtime del
+proyecto real se comporte idéntico al que empaqueta el Docker de esta
+máquina.
+
+#### `react`/`react-dom` no coincidían bajo Deno -- segundo defecto, ya corregido
+
+Este chequeo quedó en ROJO la primera vez que se corrigió la regla de
+resolución de arriba, por un defecto DISTINTO al `ReferenceError` original.
+`@react-email/render` (2.1.0, y la copia interna 2.0.6 que trae
+`@react-email/components@1.0.12`) declara `react-dom` como
+`peerDependencies` (`^18.0 || ^19.0 || ^19.0.0-rc`). Aunque
+`auth-email-hook/deno.json` fijaba `react-dom` en `19.2.1` -- la misma
+versión exacta que `react` --, esa entrada nunca se activaba: nada bajo
+`lib/email/` importa el especificador `"react-dom"` a secas (solo `"react"`
+y `"@react-email/*"`), así que Deno nunca caminaba esa entrada del import
+map y resolvía el `react-dom` del peer de forma independiente -- a veces
+quedándose con lo más nuevo que satisface el rango (`19.2.8`, un patch
+distinto al `19.2.1` fijado), y a veces no (ver "no determinista" abajo).
+`react-dom` valida en tiempo de ejecución
+(`ensureCorrectIsomorphicReactVersion`) que su propia versión coincida
+EXACTO con la de `react`; cuando no coincidían, lanzaba `Error: Incompatible
+React versions` en cada intento de render.
+
+**No determinista con `deno.json` solo.** Sin un `deno.lock` fijado, cada
+arranque en frío resuelve `react-dom` de cero -- unas veces Deno deduplica
+a un único `react@19.2.1` compartido (fuerza el choque con `react-dom`), y
+otras resuelve dos copias independientes de `react` que casualmente quedan
+autoconsistentes (`react@19.2.8`/`react-dom@19.2.8` juntos, sin cruzarse con
+nuestro `react@19.2.1`). Confirmado a mano ambos lados: con un
+`deno.lock` viejo fijado a la resolución incorrecta, falla 100% de las
+veces (determinista); sin ningún `deno.lock`, pasa la mayoría de las veces
+pero no todas -- exactamente el "silencioso en un build futuro" que hace que
+esto no sea aceptable tal cual.
+
+**La corrección:** un `package.json` junto al `deno.json`
+(`supabase/functions/auth-email-hook/package.json`) con:
+
+```json
+{ "overrides": { "react": "19.2.1", "react-dom": "19.2.1" } }
+```
+
+**El invariante que fija este `overrides`: Deno debe resolver exactamente
+el mismo par `react`/`react-dom` que ya usa el lado Node** (`package.json`
+raíz los fija ambos, exactos, en `19.2.1`) -- `lib/email/` es un único
+conjunto de módulos compartido entre los dos runtimes y debe comportarse
+igual en ambos. No "simplificar" quitando este `overrides` ni aflojando la
+versión: sin él, `react-dom` vuelve a resolverse por su cuenta y el defecto
+reaparece, con la variante no determinista de arriba.
+
+`overrides` es el mecanismo que Deno documenta para forzar la versión de una
+dependencia transitiva/peer en todo el grafo (`peerDependencies` solo se lee
+de un `package.json`, nunca de `deno.json` -- confirmado contra la
+documentación oficial de Deno). Confirmado que SÍ fuerza la resolución
+correcta incluso dentro del edge-runtime real (que no monta el
+`node_modules` de la raíz del repo, así que no hay forma de que esté
+"haciendo trampa" reusando la resolución ya consistente del lado Next.js):
+`docker exec` contra el contenedro después de un render exitoso muestra
+`react-dom@19.2.1_react@19.2.1` en el lockfile resultante, nunca ya
+`19.2.8` emparejado con `19.2.1`.
+
+**El `deno.lock` resultante SÍ se fija en el repo** (para que un build en
+frío no pueda volver a resolver distinto), pero recortado a mano: `deno
+install` (el único comando que de verdad escribe un lockfile cuando hay un
+`package.json` de por medio -- `deno info`/`deno cache` no escriben ninguno
+en ese caso) agrega una sección `"workspace"` de nivel superior con el
+`overrides` embebido, en un formato de lockfile que el edge-runtime real
+(`supabase-edge-runtime-1.73.13`, compatible con Deno v2.1.4 -- una versión
+de Deno MÁS VIEJA que el `deno` 2.9.3 de esta máquina) no sabe parsear:
+`Failed deserializing. Lockfile may be corrupt: Invalid workspace section:
+missing field 'dependencies'` -- un `503 BOOT_ERROR` determinista, peor que
+el defecto original. Regenerar así si algún día hace falta:
+
+```sh
+cd supabase/functions/auth-email-hook
+rm -f deno.lock
+deno install --node-modules-dir=none --lockfile-only
+python3 -c "
+import json
+d = json.load(open('deno.lock'))
+d.pop('workspace', None)
+json.dump(d, open('deno.lock', 'w'), indent=2)
+"
+```
+
+y confirmar que `react-dom@19.2.1_react@19.2.1` (no `19.2.8`) aparece bajo
+`npm` en el resultado antes de commitear. `--node-modules-dir=none` evita
+que `deno install` además cree una carpeta `node_modules/` ahí (no se
+commitea; sería ruido generado, igual que en el resto del repo).
+
+`email-worker` no necesita nada de esto: su único import externo es `npm:
+@supabase/supabase-js@2` (confirmado contra su `deno.lock` -- ningún
+`react`/`react-dom`/`@react-email/*` en su grafo de dependencias), así que
+nunca toca este peer dependency.
+
+Confirmado con 3 corridas consecutivas en frío (`docker stop`+`rm` tanto del
+contenedor de Studio como del de edge-runtime antes de cada una -- Studio
+también monta el mismo volumen con caché de Deno, así que un `docker volume
+rm` con Studio todavía corriendo falla en silencio sin limpiar nada de
+verdad; ver el comentario en `scripts/check-edge-functions-render.mjs` si
+hace falta repetir esto) que `pnpm supabase:verify:functions-render` pasa
+de punta a punta.
+
+No afecta el lado Node/Next.js (`app/api/email-preview`,
+`lib/checkout/order-notifications.ts`,
+`lib/auth/platform-identity-invites.ts`,
+`app/admin/actions/store-identity.ts`): ahí `react`/`react-dom` ya estaban
+fijados exactos a `19.2.1` en `package.json`/`pnpm-lock.yaml`, sin ninguna
+resolución npm por peer-dependency de por medio -- este defecto era
+exclusivo del lado Deno de `auth-email-hook`.
+
+```sh
+pnpm supabase:verify:functions-render
 ```
 
 ## Activar en la slice 7 (referencia, no ejecutar desde aquí)

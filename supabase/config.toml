@@ -387,26 +387,56 @@ deno_version = 2
 # worker_provisioning.sql), never a Supabase Auth session, so there is no user
 # JWT to verify. Authorization is the function's own check of a Vault-backed
 # shared secret (D19).
+#
+# import_map points at this function's OWN deno.json (not a shared
+# supabase/functions/deno.json): this CLI (v2.95.3+) only auto-discovers a
+# deno.json that sits in the SAME DIRECTORY as the entrypoint
+# (ShouldUseDenoJsonDiscovery in the CLI's bundler); a shared root-level one
+# is silently NOT picked up and the deploy falls back to a default config
+# with no jsx/jsxImportSource, which is what broke auth-email-hook in
+# staging (see the runbook's deno.json section) -- this function has no JSX
+# of its own, but gets its own deno.json anyway per Supabase's own
+# recommended structure ("each function should maintain its own
+# configuration"), so it never falls into that same fallback path either.
+# No react/react-dom pin needed here (unlike auth-email-hook, below): this
+# function's only external dependency is npm:@supabase/supabase-js -- it
+# never touches lib/email/render.tsx or anything react-based.
 [functions."email-worker"]
 enabled = true
 verify_jwt = false
+import_map = "./functions/email-worker/deno.json"
 
 # D15: the Send Email Hook. The caller is GoTrue over HTTP, not a Supabase
 # session, so there is no user JWT to verify either -- authorization is the
 # Standard Webhooks signature the function itself checks against
-# AUTH_EMAIL_HOOK_SECRET. import_map maps the bare `@react-email/*`
-# specifiers lib/email/render.tsx and its siblings use (Next's bundler
-# resolves those from node_modules; Deno needs the explicit npm: mapping).
+# AUTH_EMAIL_HOOK_SECRET. import_map points at this function's OWN deno.json
+# (see the comment on [functions."email-worker"] above for why NOT a shared
+# root-level one) -- it maps the bare `@react-email/*`/`react` specifiers
+# lib/email/render.tsx and its siblings use (Next's bundler resolves those
+# from node_modules; Deno needs the explicit npm: mapping) and sets
+# compilerOptions.jsx/jsxImportSource so that mapping's JSX actually compiles
+# to the automatic runtime instead of the classic one (which needs a bare
+# `React` global neither this function nor lib/email/ ever provides).
 # NOT registered under [auth.hook.send_email] here: this slice only AUTHORS
 # and locally verifies the function (its own tests, and invoking it directly
 # with a hand-signed payload) -- wiring GoTrue itself to call it, locally or
 # on the real project, is slice 7's job (see the runbook), so today's local
 # stack's existing Auth email behavior is unaffected by this function merely
 # existing.
+#
+# This function directory also carries its own package.json (`overrides`)
+# and a matching deno.lock: the invariant is that Deno must resolve the
+# EXACT SAME react/react-dom pair the Node side already pins in the root
+# package.json (19.2.1/19.2.1) -- lib/email/ is one shared module set and
+# must behave identically under both runtimes. Do not remove that
+# package.json or loosen its pin without re-reading the investigation in
+# docs/supabase/email-outbox-runbook.md first: without it, react-dom
+# resolves its own peer dependency independently and can non-deterministically
+# land on a different patch than react, which crashes every render.
 [functions."auth-email-hook"]
 enabled = true
 verify_jwt = false
-import_map = "./functions/import_map.json"
+import_map = "./functions/auth-email-hook/deno.json"
 
 [analytics]
 enabled = true
