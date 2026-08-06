@@ -33,7 +33,7 @@ function getTemplateText(input: EmailTemplateInput): string {
     case "store-mailbox-verification": return `Alguien solicitó usar este correo como ${input.data.purpose === "reply_to" ? "correo de respuesta" : "buzón de pedidos"} de ${input.branding.displayName}. Si fuiste tú, confirma con el siguiente enlace. Si no reconoces esta solicitud, ignora este mensaje.`;
     case "order-received": return `Hola, ${input.data.customerName}. Recibimos tu pedido ${input.data.orderNumber} y te avisaremos de sus novedades.`;
     case "merchant-new-order": return `El pedido ${input.data.orderNumber} de ${input.data.customerName} está listo para que lo revises.`;
-    case "membership-acceptance": return `Hola, ${input.data.recipientName}. Tu acceso como ${input.data.membershipName} fue activado.`;
+    case "membership-acceptance": return `Hola, ${input.data.recipientName}. Te invitaron como ${input.data.membershipName} de ${input.branding.displayName}. Acepta para activar tu acceso.`;
     case "order-shipped": return `Hola, ${input.data.customerName}. Tu pedido ${input.data.orderNumber} fue enviado${input.data.trackingCode ? ` con guía ${input.data.trackingCode}` : ""}.`;
     case "order-delivered": return `Hola, ${input.data.customerName}. Tu pedido ${input.data.orderNumber} fue entregado.`;
     case "order-cancelled": return `Hola, ${input.data.customerName}. Tu pedido ${input.data.orderNumber} fue cancelado.`;
@@ -53,9 +53,9 @@ function getAction(input: EmailTemplateInput): { href: string } | undefined {
     // /admin/settings), so the link lands there.
     case "owner-invite":
     case "new-user-invite":
-    case "store-mailbox-verification": return { href: getAdminUrl(input.data.actionPath) };
+    case "store-mailbox-verification":
+    case "membership-acceptance": return { href: getAdminUrl(input.data.actionPath) };
     case "password-changed": return undefined;
-    case "membership-acceptance": return { href: getAdminUrl("/login") };
     case "merchant-new-order": return { href: getAdminUrl(`/orders/${encodeURIComponent(input.data.orderNumber)}`) };
     default: return { href: getTenantUrl(input.branding.validatedSubdomain, `/orders/${encodeURIComponent(input.data.orderNumber)}`) };
   }

@@ -41,9 +41,15 @@ type MerchantOrderEmailInput = {
   customerName: string;
 };
 
+// D21: membership is never granted immediately, so this is an invitation to
+// accept, not a notice of something already active -- actionPath carries the
+// hashed acceptance token the same way owner-invite/new-user-invite carry
+// theirs, just through this app's own token (lib/security/verification-token.ts)
+// instead of GoTrue's.
 type MembershipEmailInput = {
   recipientName: string;
   membershipName: string;
+  actionPath: string;
 };
 
 // No recipientName: whoever can read the mailbox may not be a named person

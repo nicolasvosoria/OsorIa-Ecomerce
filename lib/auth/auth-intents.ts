@@ -1,10 +1,11 @@
 import { createVerificationToken } from "@/lib/security/verification-token";
 import { ECOMMERCE_TABLES } from "@/lib/supabase/contract";
 
-// D23's catalog-complete purpose set (see the auth_intents table comment):
-// this slice only ever mints 'signup' and 'recovery'. 'owner_invite' and
-// 'new_user_invite' exist in the schema for slice 6 to mint against without
-// another migration; nothing here writes them.
+// D23's catalog-complete purpose set (see the auth_intents table comment).
+// 'signup'/'recovery' are minted by lib/auth/prepare-auth-redirect.ts;
+// 'owner_invite'/'new_user_invite' are minted by
+// lib/auth/platform-identity-invites.ts's inviteNewIdentity (slice 6) --
+// both purposes existed in the schema since slice 5 so this migration-free.
 export type AuthIntentPurpose = "signup" | "recovery" | "owner_invite" | "new_user_invite";
 
 const INTENT_LIFETIME_MS = 60 * 60 * 1000; // D24: one hour

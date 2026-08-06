@@ -11,6 +11,8 @@ import {
   requesterManagesStore,
   resolveAdminAccess,
 } from '@/lib/supabase/admin-access'
+import { ACCEPT_INVITE_PATH } from '@/lib/auth/platform-identity-invites'
+import { isInvitedPendingPassword } from '@/lib/auth/invited-session-gate'
 import { isThemePreviewSearch } from '@/lib/theme-font/preview-mode'
 import { isRouteOrDescendant } from '@/lib/admin/routes'
 import {
@@ -334,6 +336,19 @@ export async function proxy(request: NextRequest) {
 
   if (publicPaths.some(path => pathname.startsWith(path))) {
     return NextResponse.next({ request: { headers: requestHeaders } })
+  }
+
+  // D22: la restricción global de la sesión recién invitada corre antes que
+  // CUALQUIER otra rama (host admin, storefront de tenant) para que aplique
+  // sin importar en qué host esté navegando -- "cada ruta", no solo /admin.
+  // Se salta únicamente su propio destino permitido; todo lo demás
+  // (incluido cerrar sesión, que es una llamada del SDK a GoTrue, nunca una
+  // ruta de esta app) vive dentro de esa misma página.
+  if (pathname !== ACCEPT_INVITE_PATH && (await isInvitedPendingPassword(request))) {
+    const redirectUrl = request.nextUrl.clone()
+    redirectUrl.pathname = ACCEPT_INVITE_PATH
+    redirectUrl.search = ''
+    return NextResponse.redirect(redirectUrl)
   }
 
   // ── Host admin (Plan 12): corre antes del flag DISABLE_SUBDOMAIN_MULTI_TENANT

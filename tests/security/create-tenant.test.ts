@@ -1,14 +1,47 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-const { ensurePlatformUserByEmail } = vi.hoisted(() => ({
-  ensurePlatformUserByEmail: vi.fn(),
+const {
+  resolveAuthIdentityByEmail,
+  inviteNewIdentity,
+  mintPendingMembershipInvite,
+  provisionOrCompensate,
+  insertInvitedProfile,
+  ensureStoreUser,
+  resolveStoreRoleId,
+  assignSingleRole,
+  loadStoreIdentity,
+  toTenantEmailBranding,
+} = vi.hoisted(() => ({
+  resolveAuthIdentityByEmail: vi.fn(),
+  inviteNewIdentity: vi.fn(),
+  mintPendingMembershipInvite: vi.fn(),
+  provisionOrCompensate: vi.fn(),
+  insertInvitedProfile: vi.fn(),
+  ensureStoreUser: vi.fn(),
+  resolveStoreRoleId: vi.fn(),
+  assignSingleRole: vi.fn(),
+  loadStoreIdentity: vi.fn(),
+  toTenantEmailBranding: vi.fn(),
 }))
 
-vi.mock("@/lib/supabase/memberships-api", () => ({ ensurePlatformUserByEmail }))
+vi.mock("@/lib/auth/platform-identity-invites", () => ({
+  resolveAuthIdentityByEmail,
+  inviteNewIdentity,
+  mintPendingMembershipInvite,
+  provisionOrCompensate,
+}))
+vi.mock("@/lib/supabase/memberships-api", () => ({
+  insertInvitedProfile,
+  ensureStoreUser,
+  resolveStoreRoleId,
+  assignSingleRole,
+}))
+vi.mock("@/lib/supabase/store-identity-api", () => ({ loadStoreIdentity, toTenantEmailBranding }))
 
 import { createTenant } from "@/lib/supabase/stores-admin-api"
 import type { CreateStoreFormValues } from "@/lib/stores/schemas"
 
+const ACTOR_ID = "super-1"
 const input: CreateStoreFormValues = {
   storeName: "QA Store",
   subdomain: "qa-store",
@@ -18,154 +51,161 @@ const input: CreateStoreFormValues = {
   ownerLastName: "Pérez",
 }
 
-function serviceWith(rpc: ReturnType<typeof vi.fn>, from?: any) {
-  return from ? { rpc, from } : { rpc }
-}
-
-// The signup_store_id write (D8) runs through service.from(...).update(...).eq(...);
-// only the tests exercising a freshly-minted owner need this chain mocked.
-function updateChain(result: { error: unknown } = { error: null }) {
-  const eq = vi.fn().mockResolvedValue(result)
-  const update = vi.fn(() => ({ eq }))
-  const from = vi.fn(() => ({ update }))
-  return { from, update, eq }
+function serviceWith(rpc: ReturnType<typeof vi.fn>, deleteResult: { error: unknown } = { error: null }) {
+  const eq = vi.fn().mockResolvedValue(deleteResult)
+  const del = vi.fn(() => ({ eq }))
+  const updateEq = vi.fn().mockResolvedValue({ error: null })
+  const update = vi.fn(() => ({ eq: updateEq }))
+  const from = vi.fn(() => ({ delete: del, update }))
+  return { rpc, from, del, deleteEq: eq, update, updateEq }
 }
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // D20's happy-path default: provisionOrCompensate just runs the provision
+  // callback, so these tests exercise createTenant's OWN assembly of it --
+  // compensation itself is proven in platform-identity-invites.test.ts.
+  provisionOrCompensate.mockImplementation((_userId: string, provision: () => Promise<unknown>) => provision())
+  insertInvitedProfile.mockResolvedValue(undefined)
+  ensureStoreUser.mockResolvedValue("store-user-1")
+  resolveStoreRoleId.mockResolvedValue("role-owner-1")
+  assignSingleRole.mockResolvedValue(undefined)
+  loadStoreIdentity.mockResolvedValue({ subdomain: "qa-store" })
+  toTenantEmailBranding.mockReturnValue({ displayName: "QA Store", validatedSubdomain: "qa-store", primaryColor: "", commercialAddress: "" })
 })
 
-describe("createTenant provisioning order", () => {
-  it("resolves the owner identity BEFORE provisioning, passing that userId to the RPC", async () => {
-    ensurePlatformUserByEmail.mockResolvedValue({ userId: "owner-uid", created: false })
+describe("createTenant: store shell first (D20's circular-dependency fix)", () => {
+  it("creates the store with a NULL owner before resolving the owner identity at all", async () => {
     const rpc = vi.fn().mockResolvedValue({ data: "store-1", error: null })
     const service = serviceWith(rpc)
+    resolveAuthIdentityByEmail.mockResolvedValue({ exists: false })
+    inviteNewIdentity.mockResolvedValue({ outcome: "invited", userId: "new-uid" })
 
-    const result = await createTenant(input, service)
+    await createTenant(input, ACTOR_ID, service)
 
-    expect(result).toEqual({ success: true, storeId: "store-1" })
-    expect(ensurePlatformUserByEmail).toHaveBeenCalledWith("duena@correo.com", service, {
-      firstName: "Ana",
-      lastName: "Pérez",
-    })
     expect(rpc).toHaveBeenCalledWith("provision_store", {
       p_subdomain: "qa-store",
       p_store_name: "QA Store",
-      p_owner_user_id: "owner-uid",
+      p_owner_user_id: null,
       p_currency_code: "COP",
     })
-    expect(ensurePlatformUserByEmail.mock.invocationCallOrder[0]).toBeLessThan(
-      rpc.mock.invocationCallOrder[0],
-    )
+    expect(rpc.mock.invocationCallOrder[0]).toBeLessThan(resolveAuthIdentityByEmail.mock.invocationCallOrder[0])
   })
 
-  it("returns the temporary password when the owner was freshly minted", async () => {
-    ensurePlatformUserByEmail.mockResolvedValue({
-      userId: "new-uid",
-      created: true,
-      tempPassword: "temp-secret-24-chars",
-    })
-    const rpc = vi.fn().mockResolvedValue({ data: "store-2", error: null })
-    const { from } = updateChain()
-
-    const result = await createTenant(input, serviceWith(rpc, from))
-
-    expect(result).toEqual({
-      success: true,
-      storeId: "store-2",
-      tempPassword: "temp-secret-24-chars",
-    })
-  })
-
-  it("does NOT provision when the owner identity cannot be resolved (foreign account)", async () => {
-    ensurePlatformUserByEmail.mockRejectedValue(
-      new Error("Ese correo ya pertenece a una cuenta de la plataforma pero no del ecommerce."),
-    )
-    const rpc = vi.fn()
-
-    const result = await createTenant(input, serviceWith(rpc))
-
-    expect(result).toEqual({
-      success: false,
-      error: "Ese correo ya pertenece a una cuenta de la plataforma pero no del ecommerce.",
-    })
-    expect(rpc).not.toHaveBeenCalled()
-  })
-
-  it("maps a subdomain unique violation to a readable message", async () => {
-    ensurePlatformUserByEmail.mockResolvedValue({ userId: "owner-uid", created: false })
+  it("maps a subdomain collision at shell creation to a readable message and never resolves an owner", async () => {
     const rpc = vi.fn().mockResolvedValue({
       data: null,
-      error: {
-        code: "23505",
-        message: 'duplicate key value violates unique constraint "stores_subdomain_key"',
-      },
+      error: { code: "23505", message: 'duplicate key value violates unique constraint "stores_subdomain_key"' },
     })
+    const service = serviceWith(rpc)
 
-    const result = await createTenant(input, serviceWith(rpc))
+    const result = await createTenant(input, ACTOR_ID, service)
 
     expect(result).toEqual({ success: false, error: "Ese subdominio ya está en uso. Elige otro." })
-  })
-
-  it("does not mask a non-collision provisioning error as a subdomain conflict", async () => {
-    ensurePlatformUserByEmail.mockResolvedValue({ userId: "owner-uid", created: false })
-    const rpc = vi.fn().mockResolvedValue({
-      data: null,
-      error: { code: "42501", message: "permission denied for function provision_store" },
-    })
-
-    const result = await createTenant(input, serviceWith(rpc))
-
-    expect(result).toEqual({
-      success: false,
-      error: "permission denied for function provision_store",
-    })
+    expect(resolveAuthIdentityByEmail).not.toHaveBeenCalled()
   })
 })
 
-describe("createTenant owner signup origin (D8)", () => {
-  it("records the provisioned store as signup_store_id for a freshly-minted owner", async () => {
-    ensurePlatformUserByEmail.mockResolvedValue({
-      userId: "new-uid",
-      created: true,
-      tempPassword: "temp-secret-24-chars",
+describe("createTenant: D20 native invite for an unknown owner", () => {
+  it("invites the owner natively, provisions ownership, and records the signup origin", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: "store-1", error: null })
+    const service = serviceWith(rpc)
+    resolveAuthIdentityByEmail.mockResolvedValue({ exists: false })
+    inviteNewIdentity.mockResolvedValue({ outcome: "invited", userId: "new-uid" })
+
+    const result = await createTenant(input, ACTOR_ID, service)
+
+    expect(result).toEqual({ success: true, storeId: "store-1" })
+    expect(inviteNewIdentity).toHaveBeenCalledWith(service, {
+      storeId: "store-1",
+      subdomain: "qa-store",
+      email: "duena@correo.com",
+      purpose: "owner_invite",
+      names: { firstName: "Ana", lastName: "Pérez" },
     })
-    const rpc = vi.fn().mockResolvedValue({ data: "store-3", error: null })
-    const { from, update, eq } = updateChain()
-
-    await createTenant(input, serviceWith(rpc, from))
-
-    expect(from).toHaveBeenCalledWith("user_profiles")
-    expect(update).toHaveBeenCalledWith({ signup_store_id: "store-3" })
-    expect(eq).toHaveBeenCalledWith("id", "new-uid")
+    expect(insertInvitedProfile).toHaveBeenCalledWith(service, "new-uid", "duena@correo.com", {
+      firstName: "Ana",
+      lastName: "Pérez",
+    })
+    expect(ensureStoreUser).toHaveBeenCalledWith(service, "store-1", "new-uid")
+    expect(resolveStoreRoleId).toHaveBeenCalledWith(service, "store-1", "owner")
+    expect(assignSingleRole).toHaveBeenCalledWith(service, "store-user-1", "role-owner-1")
+    expect(service.from).toHaveBeenCalledWith("user_profiles")
+    expect(service.update).toHaveBeenCalledWith({ signup_store_id: "store-1" })
+    expect(service.updateEq).toHaveBeenCalledWith("id", "new-uid")
+    expect(service.del).not.toHaveBeenCalled()
   })
 
-  it("leaves an existing owner's signup_store_id untouched", async () => {
-    ensurePlatformUserByEmail.mockResolvedValue({ userId: "owner-uid", created: false })
-    const rpc = vi.fn().mockResolvedValue({ data: "store-4", error: null })
-    const from = vi.fn()
+  it("deletes the store shell (never the identity itself here) when the invite send is rate-limited", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: "store-1", error: null })
+    const service = serviceWith(rpc)
+    resolveAuthIdentityByEmail.mockResolvedValue({ exists: false })
+    inviteNewIdentity.mockResolvedValue({ outcome: "rate_limited" })
 
-    const result = await createTenant(input, serviceWith(rpc, from))
+    const result = await createTenant(input, ACTOR_ID, service)
 
-    expect(result).toEqual({ success: true, storeId: "store-4" })
-    expect(from).not.toHaveBeenCalled()
+    expect(result.success).toBe(false)
+    expect(service.del).toHaveBeenCalledWith()
+    expect(service.deleteEq).toHaveBeenCalledWith("id", "store-1")
+    expect(insertInvitedProfile).not.toHaveBeenCalled()
   })
 
-  it("still returns success when the best-effort origin write fails", async () => {
-    ensurePlatformUserByEmail.mockResolvedValue({
-      userId: "new-uid",
-      created: true,
-      tempPassword: "temp-secret-24-chars",
-    })
-    const rpc = vi.fn().mockResolvedValue({ data: "store-5", error: null })
-    const { from } = updateChain({ error: { message: "permission denied" } })
+  // The compensation verify criterion's "new identity" direction, at the
+  // createTenant assembly level: provisionOrCompensate is handed the
+  // freshly-invited userId, never a pre-existing one.
+  it("hands provisionOrCompensate the freshly invited userId when provisioning fails", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: "store-1", error: null })
+    const service = serviceWith(rpc)
+    resolveAuthIdentityByEmail.mockResolvedValue({ exists: false })
+    inviteNewIdentity.mockResolvedValue({ outcome: "invited", userId: "new-uid" })
+    insertInvitedProfile.mockRejectedValue(new Error("profile insert failed"))
 
-    const result = await createTenant(input, serviceWith(rpc, from))
+    const result = await createTenant(input, ACTOR_ID, service)
 
-    expect(result).toEqual({
-      success: true,
-      storeId: "store-5",
-      tempPassword: "temp-secret-24-chars",
-    })
+    expect(result).toEqual({ success: false, error: "profile insert failed" })
+    expect(provisionOrCompensate).toHaveBeenCalledWith("new-uid", expect.any(Function))
+    // The store this SAME request just created is also cleaned up: nothing
+    // to hand off to anyone once ownership provisioning failed entirely.
+    expect(service.del).toHaveBeenCalledWith()
+    expect(service.deleteEq).toHaveBeenCalledWith("id", "store-1")
+  })
+})
+
+describe("createTenant: D21 pending acceptance for an owner who already exists", () => {
+  it("mints a pending membership invite instead of granting ownership immediately", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: "store-1", error: null })
+    const service = serviceWith(rpc)
+    resolveAuthIdentityByEmail.mockResolvedValue({ exists: true, userId: "existing-uid" })
+    mintPendingMembershipInvite.mockResolvedValue({ outcome: "invited" })
+
+    const result = await createTenant(input, ACTOR_ID, service)
+
+    expect(result).toEqual({ success: true, storeId: "store-1" })
+    expect(loadStoreIdentity).toHaveBeenCalledWith(service, "store-1")
+    expect(mintPendingMembershipInvite).toHaveBeenCalledWith(service, expect.objectContaining({
+      actorUserId: ACTOR_ID,
+      storeId: "store-1",
+      intendedUserId: "existing-uid",
+      email: "duena@correo.com",
+      roleName: "owner",
+    }))
+    // Never an immediate grant (D21): no membership/role writes happen here.
+    expect(insertInvitedProfile).not.toHaveBeenCalled()
+    expect(ensureStoreUser).not.toHaveBeenCalled()
+    expect(inviteNewIdentity).not.toHaveBeenCalled()
+    expect(service.del).not.toHaveBeenCalled()
+  })
+
+  it("deletes the store shell when the pending invite cannot be sent", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: "store-1", error: null })
+    const service = serviceWith(rpc)
+    resolveAuthIdentityByEmail.mockResolvedValue({ exists: true, userId: "existing-uid" })
+    mintPendingMembershipInvite.mockResolvedValue({ outcome: "not_authorized" })
+
+    const result = await createTenant(input, ACTOR_ID, service)
+
+    expect(result.success).toBe(false)
+    expect(service.del).toHaveBeenCalledWith()
+    expect(service.deleteEq).toHaveBeenCalledWith("id", "store-1")
   })
 })

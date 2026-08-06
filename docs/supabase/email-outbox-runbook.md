@@ -133,6 +133,74 @@ Activar en la slice 7:
 5. Turnstile: `TURNSTILE_SECRET_KEY` (secreto del Worker/servidor, leído por `lib/security/turnstile.ts`) y `NEXT_PUBLIC_TURNSTILE_SITE_KEY` (clave pública del widget, `vercel env add`) para el sitekey real emitido en el dashboard de Cloudflare para `*.osoria.help` y `admin.osoria.help`. Hasta entonces, `verifyTurnstile()` sigue en su estado "no configurado" (D26): deja pasar la verificación y lo registra en el log en vez de bloquear el registro/recuperación -- ver el razonamiento en `lib/security/turnstile.ts`.
 6. Smoke test: registrar una cuenta nueva desde el storefront de una tienda real, confirmar que `email_outbox` recibe la fila `signup-confirmation` con el remitente `Osoria <auth@mail.osoria.help>` y que el enlace vuelve al subdominio correcto.
 
+## Invitaciones de dueño y de equipo (slice 6) también nacen sin enganchar el correo real
+
+`lib/auth/platform-identity-invites.ts` reemplaza la contraseña temporal por
+la invitación nativa de Supabase (D20): `createTenant` y `addStoreMember`
+resuelven primero si el correo ya existe EN CUALQUIER PARTE de este proyecto
+compartido (`ecommerce.find_auth_user_id_by_email`, nunca solo
+`ecommerce.user_profiles`) y bifurcan:
+
+- **Desconocido en todo el proyecto** → `auth.admin.inviteUserByEmail` mintea
+  la identidad, la marca `app_metadata.invited_pending_password = true`
+  (D22) y aprovisiona la membresía de inmediato. Si el aprovisionamiento
+  falla después, `deleteInvitedIdentity` revierte exactamente esa identidad
+  (nunca una preexistente) — las filas de `store_users`/`user_profiles`
+  caen solas por `on delete cascade`.
+- **Ya existe en el proyecto** (de este app o de otro) → D21: se mintea
+  `ecommerce.pending_membership_invites` y se encola el correo
+  `membership-acceptance` (D11); la membresía real solo se escribe cuando
+  esa MISMA identidad autenticada la acepta explícitamente en
+  `/auth/accept-membership`.
+
+El correo de invitación nativo (`owner-invite`/`new-user-invite`) sigue el
+mismo destino que todo lo demás desde la slice 5: se renderiza en
+`supabase/functions/auth-email-hook` y cae en `ecommerce.email_outbox` —
+pero ese Hook sigue **sin registrar** contra `[auth.hook.send_email]`
+localmente (ver la sección de arriba), así que hoy GoTrue manda su propio
+correo por SMTP a Inbucket en su lugar. Verificado localmente contra el
+stack local, llamando `POST /auth/v1/invite` de verdad (mismo endpoint que
+`auth.admin.inviteUserByEmail`) con el `redirect_to` que este código
+construye: la identidad se crea, el `app_metadata.invited_pending_password`
+escrito con `PUT /admin/users/:id` persiste y se confirmó viajando dentro
+del JWT de la sesión una vez canjeado el token (`POST /auth/v1/verify` con
+`type=invite`) — exactamente lo que `lib/auth/invited-session-gate.ts` lee
+sin una consulta aparte a Postgres. También se confirmó que reinvitar un
+correo YA CONFIRMADO (no uno todavía "invited") es lo único que devuelve
+`email_exists` en este GoTrue (v2.194.0) — reinvitar uno todavía sin
+confirmar simplemente reenvía, 200 — así que `inviteNewIdentity`'s manejo de
+`email_exists` es una defensa contra la carrera entre la resolución previa
+(`find_auth_user_id_by_email`) y esta llamada, no el camino principal de
+detección (ese es el `select` contra `auth.users`).
+
+D22's restricción global de la sesión invitada (`proxy.ts`,
+`lib/auth/invited-session-gate.ts`) lee `app_metadata.invited_pending_
+password` de la MISMA sesión que `getUser()` ya valida — nunca una consulta
+aparte a Postgres. Si algún día hace falta desatascar a mano a alguien
+atrapado ahí (un correo que nunca completó el alta), se limpia con el
+Admin API, nunca con SQL directo (esa columna vive en `auth.users.raw_app_
+meta_data`, no en ninguna tabla de `ecommerce`):
+
+```ts
+await authAdmin.auth.admin.updateUserById(userId, {
+  app_metadata: { invited_pending_password: false },
+});
+```
+
+`email_send_attempts.purpose` suma tres valores nuevos a los de la slice 5
+(`mailbox_verification:*`, `auth:signup`, `auth:recovery`): `owner_invite`,
+`new_user_invite` (D20, mismo namespace que `auth_intents.purpose`) y
+`membership_invite` (D21). Mismo límite reusado (1/60s, 5/hora por tienda x
+propósito x destinatario, D25) — ninguno es un limitador nuevo.
+
+Activar en la slice 7: nada adicional específico de esta sección — el
+enganche del Hook (arriba) ya cubre que estos dos correos empiecen a
+renderizarse con la plantilla D11 real en vez del correo por defecto de
+GoTrue. Sí confirmar que el proyecto real tiene `*.osoria.help` en su lista
+de redirect URLs permitidos (Authentication → URL Configuration): sin eso,
+`inviteUserByEmail` rechaza el `redirectTo` que este código ya construye con
+`lib/email/urls.ts`.
+
 ## El gate de identidad del checkout (D7/A8/D31) también nace apagado
 
 La slice 3 conecta el checkout a `getStoreIdentityReadiness()` (nombre público,

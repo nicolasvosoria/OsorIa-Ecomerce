@@ -55,8 +55,8 @@ describe("AddMemberDialog", () => {
     expect(screen.getByRole("heading", { name: "Agregar miembro" })).toBeInTheDocument()
   })
 
-  it("closes the modal and refreshes when the invite succeeds", async () => {
-    mockAddStoreMemberAction.mockResolvedValue({ success: true })
+  it("closes the modal and refreshes when a member already on the team gets a role update", async () => {
+    mockAddStoreMemberAction.mockResolvedValue({ success: true, outcome: "role_updated" })
     const { user, dialog } = await renderAndOpenDialog()
 
     await fillAndSubmit(user, dialog, "nuevo@correo.com")
@@ -65,23 +65,30 @@ describe("AddMemberDialog", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument())
   })
 
-  it("keeps the modal open and reveals the temporary password when a new identity is minted", async () => {
-    mockAddStoreMemberAction.mockResolvedValue({
-      success: true,
-      created: true,
-      tempPassword: "aVeryStrongTempPassword",
-    })
+  it("closes the modal and refreshes when a new identity is invited natively (D20)", async () => {
+    mockAddStoreMemberAction.mockResolvedValue({ success: true, outcome: "invited" })
     const { user, dialog } = await renderAndOpenDialog()
 
     await fillAndSubmit(user, dialog, "nuevo-dueno@correo.com")
 
     await waitFor(() =>
+      expect(mockToastSuccess).toHaveBeenCalledWith("Invitamos a esa persona por correo."),
+    )
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument())
+  })
+
+  it("closes the modal and refreshes when an existing identity gets a pending acceptance link (D21)", async () => {
+    mockAddStoreMemberAction.mockResolvedValue({ success: true, outcome: "pending_acceptance" })
+    const { user, dialog } = await renderAndOpenDialog()
+
+    await fillAndSubmit(user, dialog, "socio@correo.com")
+
+    await waitFor(() =>
       expect(mockToastSuccess).toHaveBeenCalledWith(
-        "Cuenta creada. Comparte la contraseña temporal.",
+        "Le enviamos un correo para que acepte unirse al equipo.",
       ),
     )
-    expect(screen.getByRole("dialog")).toBeInTheDocument()
-    expect(screen.getByDisplayValue("aVeryStrongTempPassword")).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument())
   })
 
   it("keeps the modal open and shows the real error when the invite fails", async () => {

@@ -30,6 +30,7 @@ export const ECOMMERCE_TABLES = {
   orderItems: "order_items",
   orders: "orders",
   paymentTransactions: "payment_transactions",
+  pendingMembershipInvites: "pending_membership_invites",
   productComboComponents: "product_combo_components",
   productCombos: "product_combos",
   roles: "roles",
@@ -57,6 +58,7 @@ export const ECOMMERCE_VIEWS = {
 } as const satisfies Record<string, EcommerceViewName>;
 
 export const ECOMMERCE_FUNCTIONS = {
+  acceptMembershipInvite: "accept_membership_invite",
   canUserManageStore: "can_user_manage_store",
   checkAndRecordSendAttempt: "check_and_record_send_attempt",
   claimEmailOutboxBatch: "claim_email_outbox_batch",
@@ -64,6 +66,7 @@ export const ECOMMERCE_FUNCTIONS = {
   createOrderWithNotifications: "create_order_with_notifications",
   decrementInventory: "decrement_inventory",
   finalizeCustomerProfile: "finalize_customer_profile",
+  findAuthUserIdByEmail: "find_auth_user_id_by_email",
   generateOrderNumber: "generate_order_number",
   incrementItemViews: "increment_item_views",
   isComponentStylesAdmin: "is_component_styles_admin",
@@ -72,6 +75,7 @@ export const ECOMMERCE_FUNCTIONS = {
   markEmailOutboxSent: "mark_email_outbox_sent",
   provisionStore: "provision_store",
   pruneEmailOutbox: "prune_email_outbox",
+  requestMembershipInvite: "request_membership_invite",
   requestStoreMailboxVerification: "request_store_mailbox_verification",
   transitionOrderStatus: "transition_order_status",
   userManagesAnyStore: "user_manages_any_store",

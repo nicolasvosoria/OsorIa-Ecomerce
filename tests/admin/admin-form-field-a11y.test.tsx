@@ -85,7 +85,7 @@ describe("add member form field wiring", () => {
     render(<AddMemberForm />)
 
     expect(describedByText(screen.getByLabelText("Correo del usuario"))).toContain(
-      "Si el correo no tiene cuenta, se creará una con una contraseña temporal.",
+      "Invitamos por correo: si ya tiene cuenta, le pedimos que acepte unirse.",
     )
     expect(screen.getByLabelText("Rol en la tienda")).toBeInTheDocument()
   })

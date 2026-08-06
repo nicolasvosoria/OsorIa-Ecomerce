@@ -16,7 +16,7 @@ declare
   v_missing text[];
 begin
   select array_agg(required_table order by required_table) into v_missing
-  from (values ('email_outbox'), ('email_send_attempts'), ('store_mailbox_verifications'), ('auth_intents')) req(required_table)
+  from (values ('email_outbox'), ('email_send_attempts'), ('store_mailbox_verifications'), ('auth_intents'), ('pending_membership_invites')) req(required_table)
   where to_regclass(format('ecommerce.%I', req.required_table)) is null;
 
   if v_missing is not null then
@@ -35,7 +35,9 @@ begin
     ('store_contact', 'order_mailbox_email'), ('store_contact', 'order_mailbox_pending_email'), ('store_contact', 'order_mailbox_verified_at'),
     ('email_outbox', 'idempotency_key'), ('email_outbox', 'attempt_count'), ('email_outbox', 'provider_message_id'), ('email_outbox', 'last_error'),
     ('orders', 'idempotency_key'), ('orders', 'payload_fingerprint'),
-    ('auth_intents', 'store_id'), ('auth_intents', 'purpose'), ('auth_intents', 'token_hash'), ('auth_intents', 'expires_at'), ('auth_intents', 'consumed_at')
+    ('auth_intents', 'store_id'), ('auth_intents', 'purpose'), ('auth_intents', 'token_hash'), ('auth_intents', 'expires_at'), ('auth_intents', 'consumed_at'),
+    ('pending_membership_invites', 'store_id'), ('pending_membership_invites', 'intended_user_id'), ('pending_membership_invites', 'role_name'),
+    ('pending_membership_invites', 'token_hash'), ('pending_membership_invites', 'expires_at'), ('pending_membership_invites', 'consumed_at')
   ) req(required_table, required_column)
   where not exists (
     select 1 from information_schema.columns c
@@ -188,6 +190,94 @@ begin
 
   if v_violations is not null then
     raise exception 'finalize_customer_profile grant contract broken: %', array_to_string(v_violations, '; ');
+  end if;
+end $$;
+
+-- -----------------------------------------------------------------------------
+-- Slice 6: D20/D21's three new functions must exist with the exact
+-- signatures the app calls, and D30's grant contract (service_role only) --
+-- same posture as every other privileged write in this file.
+-- -----------------------------------------------------------------------------
+do $$
+begin
+  if to_regprocedure('ecommerce.find_auth_user_id_by_email(text)') is null then
+    raise exception 'Missing ecommerce.find_auth_user_id_by_email(text)';
+  end if;
+  if to_regprocedure('ecommerce.request_membership_invite(uuid, uuid, uuid, text, text, text, text, text, text, text, text)') is null then
+    raise exception 'Missing ecommerce.request_membership_invite(uuid, uuid, uuid, text, text, text, text, text, text, text, text)';
+  end if;
+  if to_regprocedure('ecommerce.accept_membership_invite(uuid, text)') is null then
+    raise exception 'Missing ecommerce.accept_membership_invite(uuid, text)';
+  end if;
+end $$;
+
+do $$
+declare
+  v_violations text[];
+begin
+  select array_agg(msg) into v_violations
+  from (
+    select format('%s can EXECUTE ecommerce.find_auth_user_id_by_email', role) as msg
+    from unnest(array['anon', 'authenticated']) role
+    where has_function_privilege(role, 'ecommerce.find_auth_user_id_by_email(text)', 'execute')
+    union all
+    select 'service_role cannot EXECUTE ecommerce.find_auth_user_id_by_email'
+    where not has_function_privilege('service_role', 'ecommerce.find_auth_user_id_by_email(text)', 'execute')
+    union all
+    select format('%s can EXECUTE ecommerce.request_membership_invite', role)
+    from unnest(array['anon', 'authenticated']) role
+    where has_function_privilege(role, 'ecommerce.request_membership_invite(uuid, uuid, uuid, text, text, text, text, text, text, text, text)', 'execute')
+    union all
+    select 'service_role cannot EXECUTE ecommerce.request_membership_invite'
+    where not has_function_privilege('service_role', 'ecommerce.request_membership_invite(uuid, uuid, uuid, text, text, text, text, text, text, text, text)', 'execute')
+    union all
+    select format('%s can EXECUTE ecommerce.accept_membership_invite', role)
+    from unnest(array['anon', 'authenticated']) role
+    where has_function_privilege(role, 'ecommerce.accept_membership_invite(uuid, text)', 'execute')
+    union all
+    select 'service_role cannot EXECUTE ecommerce.accept_membership_invite'
+    where not has_function_privilege('service_role', 'ecommerce.accept_membership_invite(uuid, text)', 'execute')
+  ) v;
+
+  if v_violations is not null then
+    raise exception 'D20/D21 invite function grant contract broken: %', array_to_string(v_violations, '; ');
+  end if;
+end $$;
+
+-- D14: pending_membership_invites is RLS-enabled with zero anon/authenticated
+-- grants and full service_role access, same posture as every other slice-2/5
+-- table -- including whatever the baseline's blanket `grant ... on all
+-- tables` might otherwise have swept up (it only ever covered tables that
+-- existed when it ran, not this one).
+do $$
+declare
+  v_violations text[];
+begin
+  if not exists (
+    select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'ecommerce' and c.relname = 'pending_membership_invites' and c.relrowsecurity is true
+  ) then
+    raise exception 'ecommerce.pending_membership_invites is missing enabled RLS';
+  end if;
+
+  select array_agg(msg) into v_violations
+  from (
+    select format('%s has %s on ecommerce.pending_membership_invites', role, priv) as msg
+    from unnest(array['anon', 'authenticated']) role
+    cross join unnest(array['select', 'insert', 'update', 'delete']) priv
+    where has_table_privilege(role, 'ecommerce.pending_membership_invites', priv)
+  ) v;
+
+  if v_violations is not null then
+    raise exception 'anon/authenticated must have ZERO privileges on pending_membership_invites: %', array_to_string(v_violations, '; ');
+  end if;
+
+  if not (
+    has_table_privilege('service_role', 'ecommerce.pending_membership_invites', 'select')
+    and has_table_privilege('service_role', 'ecommerce.pending_membership_invites', 'insert')
+    and has_table_privilege('service_role', 'ecommerce.pending_membership_invites', 'update')
+  ) then
+    raise exception 'service_role must retain full access to ecommerce.pending_membership_invites';
   end if;
 end $$;
 
@@ -1333,6 +1423,278 @@ begin
     raise exception 'transition_order_status must still persist the new status for service_role, got %', v_status;
   end if;
 
+  reset role;
+end $$;
+
+-- -----------------------------------------------------------------------------
+-- Slice 6: D20's store-shell path. A null owner creates the store alone; a
+-- real owner keeps the ORIGINAL atomic behavior exactly (regression guard for
+-- every existing caller, including this file's own fixtures above).
+-- -----------------------------------------------------------------------------
+do $$
+declare
+  v_owner_id uuid := gen_random_uuid();
+  v_shell_store_id uuid;
+  v_owned_store_id uuid;
+begin
+  insert into auth.users (id, email, encrypted_password, email_confirmed_at, created_at, updated_at, raw_app_meta_data, raw_user_meta_data, aud, role)
+  values (v_owner_id, 'store-shell-check-owner@example.com', 'x', now(), now(), now(), '{}', '{}', 'authenticated', 'authenticated');
+  insert into ecommerce.user_profiles (id, email, role) values (v_owner_id, 'store-shell-check-owner@example.com', 'user');
+
+  v_shell_store_id := ecommerce.provision_store('store-shell-check', 'Store Shell Check', null, 'COP');
+  if v_shell_store_id is null then
+    raise exception 'D20: provision_store with a null owner must still create the store';
+  end if;
+  if exists (select 1 from ecommerce.store_users where store_id = v_shell_store_id) then
+    raise exception 'D20: a null-owner provision_store must leave zero store_users rows';
+  end if;
+  if exists (select 1 from ecommerce.roles where store_id = v_shell_store_id) then
+    raise exception 'D20: a null-owner provision_store must leave zero roles rows';
+  end if;
+
+  v_owned_store_id := ecommerce.provision_store('store-shell-check-owned', 'Store Shell Check Owned', v_owner_id, 'COP');
+  if not exists (
+    select 1 from ecommerce.store_users su
+    join ecommerce.store_user_roles sur on sur.store_user_id = su.id
+    join ecommerce.roles r on r.id = sur.role_id
+    where su.store_id = v_owned_store_id and su.user_id = v_owner_id and r.role_name = 'owner'
+  ) then
+    raise exception 'D20 regression: a real owner must still get immediate ownership from provision_store, unchanged';
+  end if;
+end $$;
+
+-- -----------------------------------------------------------------------------
+-- Slice 6: D20/D21/D24/D25's owner and membership invitations --
+-- ecommerce.find_auth_user_id_by_email, request_membership_invite and
+-- accept_membership_invite. Every guarantee the verify criteria name for
+-- this slice that a real Postgres role/transaction boundary can prove:
+-- authorization, D25's reused rate limit, token integrity/expiry/single-use,
+-- the intended-user binding (a different authenticated user gains nothing),
+-- and no-enumeration.
+-- -----------------------------------------------------------------------------
+do $$
+declare
+  v_owner_id uuid := gen_random_uuid();
+  v_store_id uuid;
+  v_member_id uuid := gen_random_uuid();
+  v_other_id uuid := gen_random_uuid();
+  v_token_hash text := encode(digest('membership-invite-check-token-1', 'sha256'), 'hex');
+  v_second_hash text := encode(digest('membership-invite-check-token-2', 'sha256'), 'hex');
+  v_result jsonb;
+  v_expires_at timestamptz;
+  v_created_at timestamptz;
+  v_outbox_count integer;
+  v_role_name text;
+  v_membership_count integer;
+begin
+  insert into auth.users (id, email, encrypted_password, email_confirmed_at, created_at, updated_at, raw_app_meta_data, raw_user_meta_data, aud, role)
+  values
+    (v_owner_id, 'membership-invite-owner@example.com', 'x', now(), now(), now(), '{}', '{}', 'authenticated', 'authenticated'),
+    (v_member_id, 'membership-invite-member@example.com', 'x', now(), now(), now(), '{}', '{}', 'authenticated', 'authenticated'),
+    (v_other_id, 'membership-invite-other@example.com', 'x', now(), now(), now(), '{}', '{}', 'authenticated', 'authenticated');
+  insert into ecommerce.user_profiles (id, email, role) values (v_owner_id, 'membership-invite-owner@example.com', 'user');
+  v_store_id := ecommerce.provision_store('membership-invite-check-store', 'Membership Invite Check Store', v_owner_id, 'COP');
+
+  -- D20/D21's fork point: resolves an existing email case-insensitively,
+  -- returns null for one that exists nowhere in this project's auth.users.
+  if ecommerce.find_auth_user_id_by_email('Membership-Invite-Member@Example.com') <> v_member_id then
+    raise exception 'D20/D21: find_auth_user_id_by_email must resolve an existing email case-insensitively';
+  end if;
+  if ecommerce.find_auth_user_id_by_email('nadie-nunca-membership-invite@example.com') is not null then
+    raise exception 'D20/D21: find_auth_user_id_by_email must return null for an unknown email';
+  end if;
+
+  -- D30: an outsider who does not manage the store can never mint a
+  -- membership invite into it, regardless of role validity.
+  v_result := ecommerce.request_membership_invite(
+    v_other_id, v_store_id, v_member_id, 'membership-invite-member@example.com', 'admin', v_token_hash,
+    'Osoria <auth@mail.osoria.help>', 'subj', '<p>h</p>', 't', 'idem-mi-unauthorized'
+  );
+  if (v_result ->> 'ok')::boolean is not false or v_result ->> 'reason' <> 'not_authorized' then
+    raise exception 'D30: a caller who does not manage the store must never mint a membership invite, got %', v_result;
+  end if;
+
+  -- Defense in depth (D30), same posture as request_store_mailbox_verification's
+  -- own field check: an unrecognized role is rejected even for an authorized actor.
+  v_result := ecommerce.request_membership_invite(
+    v_owner_id, v_store_id, v_member_id, 'membership-invite-member@example.com', 'super_admin', v_token_hash,
+    'Osoria <auth@mail.osoria.help>', 'subj', '<p>h</p>', 't', 'idem-mi-badrole'
+  );
+  if (v_result ->> 'ok')::boolean is not false or v_result ->> 'reason' <> 'invalid_role' then
+    raise exception 'D21: an unrecognized role must be rejected as invalid_role, got %', v_result;
+  end if;
+
+  -- Happy path: the authorized owner invites a real, already-existing identity.
+  v_result := ecommerce.request_membership_invite(
+    v_owner_id, v_store_id, v_member_id, 'membership-invite-member@example.com', 'admin', v_token_hash,
+    'Osoria <auth@mail.osoria.help>', 'Te invitaron', '<p>h</p>', 't', 'idem-mi-1'
+  );
+  if (v_result ->> 'ok')::boolean is not true then
+    raise exception 'Expected the authorized owner''s invite to succeed, got %', v_result;
+  end if;
+
+  select expires_at, created_at, role_name into v_expires_at, v_created_at, v_role_name
+  from ecommerce.pending_membership_invites where token_hash = v_token_hash;
+  if v_expires_at is null or abs(extract(epoch from (v_expires_at - v_created_at)) - 3600) > 5 then
+    raise exception 'D24: a membership invite must expire exactly one hour after creation, got a % second window', extract(epoch from (v_expires_at - v_created_at));
+  end if;
+  if v_role_name <> 'admin' then
+    raise exception 'Expected the invite to record the requested role, got %', v_role_name;
+  end if;
+
+  select count(*) into v_outbox_count from ecommerce.email_outbox
+  where idempotency_key = 'idem-mi-1' and template_kind = 'membership-acceptance';
+  if v_outbox_count <> 1 then
+    raise exception 'D11/D13: expected exactly one membership-acceptance outbox row, got %', v_outbox_count;
+  end if;
+
+  -- D25 rate limit, part 1: a second invite for the same store x purpose x
+  -- recipient inside 60 seconds is rejected, even with a fresh token.
+  v_result := ecommerce.request_membership_invite(
+    v_owner_id, v_store_id, v_member_id, 'membership-invite-member@example.com', 'admin', v_second_hash,
+    'Osoria <auth@mail.osoria.help>', 'subj', '<p>h</p>', 't', 'idem-mi-2'
+  );
+  if v_result ->> 'reason' <> 'rate_limited' then
+    raise exception 'D25: a second membership invite inside 60 seconds must be rate_limited, got %', v_result;
+  end if;
+
+  -- D25 rate limit, part 2: back-date the cooldown but leave 5 attempts
+  -- already logged in the last hour -- the 6th must still be rejected.
+  update ecommerce.email_send_attempts set created_at = now() - interval '2 minutes'
+  where store_id = v_store_id and purpose = 'membership_invite';
+  insert into ecommerce.email_send_attempts (store_id, purpose, recipient_email, created_at)
+  select v_store_id, 'membership_invite', 'membership-invite-member@example.com', now() - interval '2 minutes'
+  from generate_series(1, 4);
+
+  if ecommerce.check_and_record_send_attempt(v_store_id, 'membership_invite', 'membership-invite-member@example.com') is not false then
+    raise exception 'D25: a 6th membership invite send inside one hour must be rejected by the hourly cap';
+  end if;
+
+  -- D21's load-bearing guarantee: a DIFFERENT authenticated user holding the
+  -- SAME link gains nothing, rejected with the exact same generic reason an
+  -- unknown token gets (no enumeration).
+  v_result := ecommerce.accept_membership_invite(v_other_id, v_token_hash);
+  if (v_result ->> 'ok')::boolean is not false or (v_result ->> 'reason') <> 'invalid_or_expired' then
+    raise exception 'D21: a different authenticated user must never accept someone else''s invite, got %', v_result;
+  end if;
+  if exists (select 1 from ecommerce.store_users where store_id = v_store_id and user_id = v_other_id) then
+    raise exception 'D21: a rejected accept must never create a membership for the wrong user';
+  end if;
+
+  -- Happy path: the intended user accepts and is granted exactly the invited role.
+  v_result := ecommerce.accept_membership_invite(v_member_id, v_token_hash);
+  if (v_result ->> 'ok')::boolean is not true then
+    raise exception 'Expected the intended user''s accept to succeed, got %', v_result;
+  end if;
+  if not exists (
+    select 1 from ecommerce.store_users su
+    join ecommerce.store_user_roles sur on sur.store_user_id = su.id
+    join ecommerce.roles r on r.id = sur.role_id
+    where su.store_id = v_store_id and su.user_id = v_member_id and r.role_name = 'admin'
+  ) then
+    raise exception 'D21: accepting must grant exactly the invited role';
+  end if;
+  if not exists (select 1 from ecommerce.user_profiles where id = v_member_id) then
+    raise exception 'D21: accepting must seed an ecommerce.user_profiles row for an identity that had none (the FK store_users.user_id -> user_profiles(id) demands it)';
+  end if;
+
+  -- Single-use, independent of the intended-user check above: a second
+  -- accept of the SAME already-consumed token must fail and never create a
+  -- second membership row.
+  v_result := ecommerce.accept_membership_invite(v_member_id, v_token_hash);
+  if (v_result ->> 'ok')::boolean is not false then
+    raise exception 'D21: a consumed membership invite must never accept a second time, got %', v_result;
+  end if;
+
+  select count(*) into v_membership_count from ecommerce.store_users where store_id = v_store_id and user_id = v_member_id;
+  if v_membership_count <> 1 then
+    raise exception 'D21: a replayed accept must never create a second membership row, found %', v_membership_count;
+  end if;
+
+  -- Expiry (D24): an invite past its expires_at is rejected even though it
+  -- was never consumed.
+  insert into ecommerce.pending_membership_invites (store_id, intended_user_id, email, role_name, token_hash, expires_at)
+  values (
+    v_store_id, v_member_id, 'membership-invite-member@example.com', 'admin',
+    encode(digest('membership-invite-check-token-expired', 'sha256'), 'hex'), now() - interval '1 minute'
+  );
+  v_result := ecommerce.accept_membership_invite(v_member_id, encode(digest('membership-invite-check-token-expired', 'sha256'), 'hex'));
+  if (v_result ->> 'ok')::boolean is not false or (v_result ->> 'reason') <> 'invalid_or_expired' then
+    raise exception 'D24: an expired membership invite must be rejected, got %', v_result;
+  end if;
+
+  -- No enumeration: an unknown token gets the EXACT same generic response as
+  -- the wrong-user and expired cases above.
+  if ecommerce.accept_membership_invite(gen_random_uuid(), 'not-a-real-membership-invite-hash') <> jsonb_build_object('ok', false, 'reason', 'invalid_or_expired') then
+    raise exception 'D24-style posture: an unknown membership invite token must return the same generic invalid_or_expired response';
+  end if;
+end $$;
+
+-- -----------------------------------------------------------------------------
+-- Slice 6 role boundary: the grant assertions above prove the CATALOG is
+-- right; this reproduces the verifier's own bypass mechanism (SET LOCAL ROLE,
+-- what PostgREST itself uses per request) to prove the ROLE the app actually
+-- calls through (service_role) is the only one that can -- same pattern as
+-- the finalize_customer_profile and transition_order_status reproductions
+-- above.
+-- -----------------------------------------------------------------------------
+do $$
+declare
+  v_owner_id uuid := gen_random_uuid();
+  v_member_id uuid := gen_random_uuid();
+  v_store_id uuid;
+  v_token_hash text := encode(digest('role-check-membership-invite-token', 'sha256'), 'hex');
+  v_result jsonb;
+begin
+  insert into auth.users (id, email, encrypted_password, email_confirmed_at, created_at, updated_at, raw_app_meta_data, raw_user_meta_data, aud, role)
+  values
+    (v_owner_id, 'role-check-invite-owner@example.com', 'x', now(), now(), now(), '{}', '{}', 'authenticated', 'authenticated'),
+    (v_member_id, 'role-check-invite-member@example.com', 'x', now(), now(), now(), '{}', '{}', 'authenticated', 'authenticated');
+  insert into ecommerce.user_profiles (id, email, role) values (v_owner_id, 'role-check-invite-owner@example.com', 'user');
+  v_store_id := ecommerce.provision_store('role-check-invite-store', 'Role Check Invite Store', v_owner_id, 'COP');
+
+  set local role authenticated;
+  begin
+    perform ecommerce.find_auth_user_id_by_email('role-check-invite-member@example.com');
+    raise exception 'Bypass reopened: authenticated could EXECUTE ecommerce.find_auth_user_id_by_email directly';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    perform ecommerce.request_membership_invite(
+      v_owner_id, v_store_id, v_member_id, 'role-check-invite-member@example.com', 'admin', v_token_hash,
+      'Osoria <auth@mail.osoria.help>', 's', '<p>h</p>', 't', 'idem-role-check'
+    );
+    raise exception 'Bypass reopened: authenticated could EXECUTE ecommerce.request_membership_invite directly';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    perform ecommerce.accept_membership_invite(v_member_id, v_token_hash);
+    raise exception 'Bypass reopened: authenticated could EXECUTE ecommerce.accept_membership_invite directly';
+  exception when insufficient_privilege then null;
+  end;
+  reset role;
+
+  if exists (select 1 from ecommerce.pending_membership_invites where token_hash = v_token_hash) then
+    raise exception 'A rejected authenticated call must never mint a pending_membership_invites row';
+  end if;
+
+  set local role service_role;
+  if ecommerce.find_auth_user_id_by_email('role-check-invite-member@example.com') <> v_member_id then
+    raise exception 'service_role must be able to resolve an identity through find_auth_user_id_by_email';
+  end if;
+
+  v_result := ecommerce.request_membership_invite(
+    v_owner_id, v_store_id, v_member_id, 'role-check-invite-member@example.com', 'admin', v_token_hash,
+    'Osoria <auth@mail.osoria.help>', 's', '<p>h</p>', 't', 'idem-role-check'
+  );
+  if (v_result ->> 'ok')::boolean is not true then
+    raise exception 'service_role must be able to mint a membership invite through the app''s own call path, got %', v_result;
+  end if;
+
+  v_result := ecommerce.accept_membership_invite(v_member_id, v_token_hash);
+  if (v_result ->> 'ok')::boolean is not true then
+    raise exception 'service_role must be able to accept a membership invite through the app''s own call path, got %', v_result;
+  end if;
   reset role;
 end $$;
 

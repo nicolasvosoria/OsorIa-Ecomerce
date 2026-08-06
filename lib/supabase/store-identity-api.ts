@@ -1,5 +1,6 @@
 import { ECOMMERCE_FUNCTIONS, ECOMMERCE_TABLES } from "./contract";
 import { hashVerificationToken } from "@/lib/security/verification-token";
+import type { TenantEmailBranding } from "@/lib/email/types";
 import type { StoreIdentitySnapshot } from "@/lib/stores/identity-readiness";
 import type { MailboxVerificationField } from "@/lib/stores/schemas";
 
@@ -63,6 +64,21 @@ export async function loadStoreIdentity(supabase: any, storeId: string): Promise
     orderMailboxEmail: contact?.order_mailbox_email ?? null,
     orderMailboxPendingEmail: contact?.order_mailbox_pending_email ?? null,
     orderMailboxVerifiedAt: contact?.order_mailbox_verified_at ?? null,
+  };
+}
+
+// Same shape app/admin/actions/store-identity.ts already builds inline for
+// the mailbox-verification email; lib/auth/platform-identity-invites.ts's
+// mintPendingMembershipInvite (D21) is this helper's second caller, so the
+// mapping lives here once instead of a second inline copy.
+export function toTenantEmailBranding(identity: StoreIdentityView): TenantEmailBranding {
+  return {
+    displayName: identity.displayName ?? "",
+    validatedSubdomain: identity.subdomain,
+    primaryColor: identity.primaryColor ?? "",
+    commercialAddress: identity.commercialAddress ?? "",
+    ...(identity.logoUrl ? { logoUrl: identity.logoUrl } : {}),
+    ...(identity.contactEmail ? { contactEmail: identity.contactEmail } : {}),
   };
 }
 

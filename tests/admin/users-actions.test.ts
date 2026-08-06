@@ -39,17 +39,17 @@ describe("store membership actions (store gate)", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     authorizeActiveStoreAdmin.mockResolvedValue(STORE_GRANT)
-    addStoreMember.mockResolvedValue({ success: true })
+    addStoreMember.mockResolvedValue({ success: true, outcome: "role_updated" })
     findUserIdByEmail.mockResolvedValue("member-2")
     upsertMembershipRole.mockResolvedValue({ success: true })
     removeMembership.mockResolvedValue({ success: true })
   })
 
-  it("adds a member scoped to the active store with the service client", async () => {
+  it("adds a member scoped to the active store, with the acting admin's id and the service client", async () => {
     const result = await addStoreMemberAction("nuevo@correo.com", "admin")
 
-    expect(result).toEqual({ success: true })
-    expect(addStoreMember).toHaveBeenCalledWith("store-1", "nuevo@correo.com", "admin", SERVICE)
+    expect(result).toEqual({ success: true, outcome: "role_updated" })
+    expect(addStoreMember).toHaveBeenCalledWith("store-1", "admin-1", "nuevo@correo.com", "admin", SERVICE)
     expect(revalidatePath).toHaveBeenCalledWith("/admin/users")
   })
 

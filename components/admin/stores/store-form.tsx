@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useTransition } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
@@ -12,7 +12,6 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FormField } from "@/components/ui/form-field"
 import { Input } from "@/components/ui/input"
-import { TempPasswordReveal } from "@/components/admin/temp-password-reveal"
 import { createStoreSchema, type CreateStoreFormValues } from "@/lib/stores/schemas"
 import { createTenantAction } from "@/app/(platform)/admin/stores/actions"
 
@@ -30,17 +29,18 @@ const emptyValues: CreateStoreFormValues = {
 export function StoreForm() {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
-  const [tempPassword, setTempPassword] = useState<string | null>(null)
   const {
     register,
     handleSubmit,
-    reset,
     formState: { errors },
   } = useForm<CreateStoreFormValues>({
     resolver: zodResolver(createStoreSchema),
     defaultValues: emptyValues,
   })
 
+  // D20: the owner is invited natively, never handed a temporary password --
+  // there is nothing left to reveal on this screen, so success always leaves
+  // it for the console.
   const createStore = (values: CreateStoreFormValues) => {
     startTransition(async () => {
       const result = await createTenantAction(values)
@@ -49,16 +49,7 @@ export function StoreForm() {
         return
       }
 
-      // A minted owner gets a temporary password: keep the operator on this page
-      // with it, since it will never be shown again.
-      if (result.tempPassword) {
-        setTempPassword(result.tempPassword)
-        toast.success("Tienda creada. Comparte la contraseña temporal con el dueño.")
-        reset(emptyValues)
-        return
-      }
-
-      toast.success("Tienda creada")
+      toast.success("Tienda creada. Invitamos al dueño por correo.")
       router.push(STORES_PATH)
     })
   }
@@ -99,7 +90,7 @@ export function StoreForm() {
           <FormField
             id="ownerEmail"
             label="Correo del dueño *"
-            hint="Si el correo no tiene cuenta, se creará una con una contraseña temporal."
+            hint="Le enviamos una invitación a este correo para que elija su propia contraseña."
             error={errors.ownerEmail?.message}
           >
             {(field) => (
@@ -129,14 +120,6 @@ export function StoreForm() {
               Crear tienda
             </Button>
           </div>
-
-          {tempPassword ? (
-            <TempPasswordReveal
-              value={tempPassword}
-              title="Contraseña temporal del dueño"
-              recipient="al dueño"
-            />
-          ) : null}
         </form>
       </CardContent>
     </Card>

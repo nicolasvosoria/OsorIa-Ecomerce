@@ -3,6 +3,13 @@ import { randomBytes } from "node:crypto";
 import { getSupabaseServiceClient } from "./admin-store";
 import { getServiceAuthAdminClient } from "./service-client";
 import { ECOMMERCE_TABLES } from "./contract";
+import { loadStoreIdentity, toTenantEmailBranding } from "./store-identity-api";
+import {
+  inviteNewIdentity,
+  mintPendingMembershipInvite,
+  provisionOrCompensate,
+  resolveAuthIdentityByEmail,
+} from "@/lib/auth/platform-identity-invites";
 import { isStoreRoleName, type StoreRoleName } from "@/lib/memberships/roles";
 import type { UserRole } from "@/lib/types/user";
 
@@ -25,21 +32,17 @@ export type StoreMember = {
 
 export type MembershipResult = { success: boolean; error?: string };
 
-// Adding a member can now mint a brand-new platform identity, so its result
-// carries the one-time temporary password on that path (D21). Kept separate from
-// MembershipResult so the three role/removal actions never see a `tempPassword`
-// field they can't produce.
+// D20/D21's three outcomes, discriminated so the UI never has to guess which
+// fields a given result carries: an unknown email is natively invited
+// (immediate membership -- nobody could have been hijacked, since nobody
+// used that email before); one that already exists anywhere in this shared-
+// pool project gets a pending acceptance instead of an instant grant; one
+// already on this exact store's team just has its role replaced.
 export type AddStoreMemberResult =
-  | { success: true; created: false }
-  | { success: true; created: true; tempPassword: string }
+  | { success: true; outcome: "role_updated" }
+  | { success: true; outcome: "invited" }
+  | { success: true; outcome: "pending_acceptance" }
   | { success: false; error: string };
-
-// Outcome of resolving a platform account behind an email. `created` discriminates
-// the freshly-minted identity (which carries the temporary password its owner must
-// change on first entry) from one that already had an ecommerce profile.
-export type EnsurePlatformUserResult =
-  | { userId: string; created: false }
-  | { userId: string; created: true; tempPassword: string };
 
 // A reset must hand the temp password to the operator even when the flag write
 // fails after the password already changed — throwing it away would lock the
@@ -49,10 +52,7 @@ export type ResetOwnerCredentialResult =
   | { success: true; tempPassword: string; ownerEmail: string; flagWarning: string | null }
   | { success: false; error: string };
 
-type PlatformUserNames = { firstName?: string; lastName?: string };
-
-const FOREIGN_PLATFORM_ACCOUNT_ERROR =
-  "Ese correo ya pertenece a una cuenta de la plataforma pero no del ecommerce. Usa otro correo.";
+export type PlatformIdentityNames = { firstName?: string; lastName?: string };
 
 type StoreRoleLinks = { roles: { role_name: string } | null }[] | null;
 
@@ -154,12 +154,25 @@ export async function listStoreOwners(
   return members.filter((member) => member.role === "owner");
 }
 
-// Adds a member to the store by email. An email with an ecommerce profile is
-// attached directly; an unknown email is minted a platform account first (D21).
-// Re-adding an existing member updates their store role instead of duplicating
-// the membership. When a new identity is minted its temporary password is returned.
+const RATE_LIMITED_INVITE_ERROR =
+  "Ya enviamos una invitación hace poco. Espera un momento antes de volver a intentarlo.";
+const GENERIC_INVITE_ERROR = "No se pudo enviar la invitación";
+const NOT_AUTHORIZED_INVITE_ERROR = "No tienes permiso para invitar a esta tienda";
+
+// Adds a member to the store by email. Three outcomes (D20/D21), decided by
+// whether the email already exists ANYWHERE in this shared-pool project's
+// auth.users (resolveAuthIdentityByEmail, never ecommerce.user_profiles
+// alone -- see this slice's brief):
+//   - already a member of THIS store -> role_updated, same as before
+//   - exists elsewhere in the org, not yet a member here -> D21's pending
+//     acceptance; no store_users row is written until the intended user
+//     accepts
+//   - unknown anywhere -> D20's native invite, immediate membership (nobody
+//     could have been hijacked, since nobody used that email before), with
+//     compensation if profile/membership provisioning fails afterward
 export async function addStoreMember(
   storeId: string,
+  actorUserId: string,
   email: string,
   roleName: StoreRoleName,
   supabaseOverride?: any,
@@ -169,119 +182,130 @@ export async function addStoreMember(
     return { success: false, error: "Supabase no configurado" };
   }
 
-  try {
-    const platformUser = await ensurePlatformUserByEmail(email, service);
-    const storeUserId = await ensureStoreUser(service, storeId, platformUser.userId);
-    const roleId = await resolveStoreRoleId(service, storeId, roleName);
-    await assignSingleRole(service, storeUserId, roleId);
+  const normalizedEmail = email.trim().toLowerCase();
 
-    return platformUser.created
-      ? { success: true, created: true, tempPassword: platformUser.tempPassword }
-      : { success: true, created: false };
+  try {
+    const identity = await resolveAuthIdentityByEmail(service, normalizedEmail);
+    if (!identity.exists) {
+      return await inviteAndProvisionMember(service, { storeId, email: normalizedEmail, roleName });
+    }
+
+    const existingStoreUserId = await findStoreUserId(service, storeId, identity.userId);
+    if (existingStoreUserId) {
+      const roleId = await resolveStoreRoleId(service, storeId, roleName);
+      await assignSingleRole(service, existingStoreUserId, roleId);
+      return { success: true, outcome: "role_updated" };
+    }
+
+    return await sendPendingMembershipInvite(service, {
+      actorUserId,
+      storeId,
+      intendedUserId: identity.userId,
+      email: normalizedEmail,
+      roleName,
+    });
   } catch (error) {
     return { success: false, error: toMembershipErrorMessage(error) };
   }
 }
 
-// Resolves the platform identity behind an email, minting one when it is unknown
-// to the whole platform (D21/D15). Three outcomes, in order:
-//   - profile exists  -> reuse its user id, create nothing
-//   - unknown email    -> create a confirmed account with a temporary password,
-//                         seed an ecommerce profile (role defaults to 'user',
-//                         must_change_password true), return that password
-//   - belongs to auth but not ecommerce -> a clear error (D20): createUser
-//                         collides with `email_exists`, and we deliberately do
-//                         not look up or adopt an account another platform app
-//                         owns.
-// D21 replaces the invite link (D9): the shared project's Site URL redirects to
-// copaosoria, so an owner never reaches this app through an emailed link. Instead
-// the operator hands off the temporary password and the owner logs in here.
-export async function ensurePlatformUserByEmail(
-  email: string,
+// D20's branch: needs the store's own subdomain for the invite link
+// (lib/email/urls.ts's getTenantUrl), so this loads the store's identity
+// once instead of threading a second parameter through addStoreMember for
+// what is otherwise the D21 branch's own dependency.
+async function inviteAndProvisionMember(
   service: any,
-  names: PlatformUserNames = {},
-): Promise<EnsurePlatformUserResult> {
-  const normalizedEmail = email.trim().toLowerCase();
+  input: { storeId: string; email: string; roleName: StoreRoleName },
+): Promise<AddStoreMemberResult> {
+  const identity = await loadStoreIdentity(service, input.storeId);
 
-  const existingUserId = await findUserIdByEmail(normalizedEmail, service);
-  if (existingUserId) {
-    return { userId: existingUserId, created: false };
+  const invited = await inviteNewIdentity(service, {
+    storeId: input.storeId,
+    subdomain: identity.subdomain,
+    email: input.email,
+    purpose: "new_user_invite",
+  });
+
+  if (invited.outcome === "rate_limited") {
+    return { success: false, error: RATE_LIMITED_INVITE_ERROR };
+  }
+  if (invited.outcome === "email_exists") {
+    return { success: false, error: "Ese correo acaba de registrarse en la plataforma. Intenta de nuevo." };
+  }
+  if (invited.outcome === "error") {
+    return { success: false, error: invited.error };
   }
 
-  const authAdmin = getServiceAuthAdminClient();
-  if (!authAdmin) {
-    throw new Error("Supabase no configurado");
+  await provisionOrCompensate(invited.userId, async () => {
+    await insertInvitedProfile(service, invited.userId, input.email, {});
+    const storeUserId = await ensureStoreUser(service, input.storeId, invited.userId);
+    const roleId = await resolveStoreRoleId(service, input.storeId, input.roleName);
+    await assignSingleRole(service, storeUserId, roleId);
+  });
+
+  return { success: true, outcome: "invited" };
+}
+
+async function sendPendingMembershipInvite(
+  service: any,
+  input: {
+    actorUserId: string;
+    storeId: string;
+    intendedUserId: string;
+    email: string;
+    roleName: StoreRoleName;
+  },
+): Promise<AddStoreMemberResult> {
+  const identity = await loadStoreIdentity(service, input.storeId);
+  const result = await mintPendingMembershipInvite(service, {
+    actorUserId: input.actorUserId,
+    storeId: input.storeId,
+    intendedUserId: input.intendedUserId,
+    email: input.email,
+    roleName: input.roleName,
+    branding: toTenantEmailBranding(identity),
+  });
+
+  if (result.outcome === "invited") {
+    return { success: true, outcome: "pending_acceptance" };
   }
-
-  const tempPassword = generateTempPassword();
-  const userId = await createConfirmedIdentity(authAdmin, normalizedEmail, tempPassword);
-  await insertInvitedProfile(service, userId, normalizedEmail, names);
-
-  return { userId, created: true, tempPassword };
+  if (result.outcome === "rate_limited") {
+    return { success: false, error: RATE_LIMITED_INVITE_ERROR };
+  }
+  if (result.outcome === "not_authorized") {
+    return { success: false, error: NOT_AUTHORIZED_INVITE_ERROR };
+  }
+  return { success: false, error: "error" in result ? result.error : GENERIC_INVITE_ERROR };
 }
 
 // 24 random bytes (~32 base64url chars) clears Supabase's 6-char minimum with a
-// wide margin and is unguessable; the owner replaces it on first entry anyway.
+// wide margin and is unguessable. Still used by resetOwnerCredential (D7) --
+// unrelated to D20's native invite, which never mints a password at all.
 const TEMP_PASSWORD_BYTES = 24;
 
 function generateTempPassword(): string {
   return randomBytes(TEMP_PASSWORD_BYTES).toString("base64url");
 }
 
-// Creates the owner's account already email-confirmed, so no verification mail is
-// sent and no redirect to the shared project's Site URL ever happens. Wraps the
-// call because `on_auth_user_created_copaosoria` — a foreign AFTER INSERT trigger
-// with no exception handling — can abort it, and an already-registered email comes
-// back as `email_exists` rather than a throw.
-async function createConfirmedIdentity(
-  authAdmin: any,
-  email: string,
-  password: string,
-): Promise<string> {
-  let response: { data: any; error: any };
-  try {
-    response = await authAdmin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-    });
-  } catch (error) {
-    throw new Error(`No se pudo crear la cuenta del dueño: ${toMembershipErrorMessage(error)}`);
-  }
-
-  const { data, error } = response;
-  if (error) {
-    if (error.code === "email_exists") {
-      throw new Error(FOREIGN_PLATFORM_ACCOUNT_ERROR);
-    }
-    throw new Error(`No se pudo crear la cuenta del dueño: ${error.message}`);
-  }
-
-  const userId = data?.user?.id;
-  if (!userId) {
-    throw new Error("No se pudo crear la cuenta del dueño");
-  }
-
-  return userId;
-}
-
-// Seeds the ecommerce profile for a freshly-minted identity, mirroring the normal
-// sign-up insert (no role -> DB default 'user') but flagging must_change_password
-// so the admin forces the owner off the temporary password on first entry.
-// Surfaces the insert error instead of dropping it, so a failed profile never
-// passes silently.
-async function insertInvitedProfile(
+// Seeds the ecommerce profile for a freshly invited identity (D20), mirroring
+// the normal sign-up insert (no role -> DB default 'user'). Never sets
+// must_change_password: a D20 invite is held to setup-only routes by D22's
+// app_metadata flag instead, a stronger, session-wide restriction that
+// column was never enough to express. Surfaces the insert error instead of
+// dropping it, so a failed profile never passes silently -- the caller
+// (inviteAndProvisionMember/stores-admin-api.ts) wraps this in
+// provisionOrCompensate, so a thrown error here still reverts the identity.
+export async function insertInvitedProfile(
   service: any,
   userId: string,
   email: string,
-  names: PlatformUserNames,
+  names: PlatformIdentityNames,
 ): Promise<void> {
   const { error } = await service.from(ECOMMERCE_TABLES.userProfiles).insert({
     id: userId,
     email,
     first_name: names.firstName ?? null,
     last_name: names.lastName ?? null,
-    must_change_password: true,
   });
 
   if (error) {
@@ -407,9 +431,11 @@ export async function setUserGlobalRole(
   return { success: true };
 }
 
-// Whether this user still holds the temporary password an owner-invite minted
-// (D21). The admin guard reads it to force the change before any admin use; it is
-// false for everyone who set their own password, so the guard never fires for them.
+// Whether this user still holds the temporary password resetOwnerCredential
+// (D7) minted. The admin guard reads it to force the change before any admin
+// use; it is false for everyone who set their own password, so the guard
+// never fires for them. Unrelated to D20/D22's invited-session restriction,
+// which never touches this column -- see insertInvitedProfile's comment.
 export async function requiresPasswordChange(
   userId: string,
   supabaseOverride?: any,
@@ -592,7 +618,10 @@ async function findStoreUserId(
 
 // `grantedBy` is only ever set by the support self-grant (D2); every other
 // caller leaves the column untouched so its presence stays a truthful signal.
-async function ensureStoreUser(
+// Exported: stores-admin-api.ts's createTenant reuses this exact primitive
+// to grant ownership once a D20-invited or D21-accepted owner is ready,
+// instead of a second, competing way to write the same store_users row.
+export async function ensureStoreUser(
   service: any,
   storeId: string,
   userId: string,
@@ -616,7 +645,7 @@ async function ensureStoreUser(
   return data.id;
 }
 
-async function resolveStoreRoleId(
+export async function resolveStoreRoleId(
   service: any,
   storeId: string,
   roleName: StoreRoleName,
@@ -649,7 +678,7 @@ async function resolveStoreRoleId(
   return created.id;
 }
 
-async function assignSingleRole(
+export async function assignSingleRole(
   service: any,
   storeUserId: string,
   roleId: string,

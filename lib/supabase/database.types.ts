@@ -1420,6 +1420,57 @@ export type Database = {
           },
         ]
       }
+      pending_membership_invites: {
+        Row: {
+          consumed_at: string | null
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          intended_user_id: string
+          role_name: string
+          store_id: string
+          token_hash: string
+        }
+        Insert: {
+          consumed_at?: string | null
+          created_at?: string
+          email: string
+          expires_at: string
+          id?: string
+          intended_user_id: string
+          role_name: string
+          store_id: string
+          token_hash: string
+        }
+        Update: {
+          consumed_at?: string | null
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          intended_user_id?: string
+          role_name?: string
+          store_id?: string
+          token_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pending_membership_invites_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_membership_invites_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores_legacy"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       permissions: {
         Row: {
           description: string | null
@@ -2596,6 +2647,10 @@ export type Database = {
       }
     }
     Functions: {
+      accept_membership_invite: {
+        Args: { p_token_hash: string; p_user_id: string }
+        Returns: Json
+      }
       can_manage_store: { Args: { p_store_id: string }; Returns: boolean }
       can_user_manage_store: {
         Args: { p_store_id: string; p_user_id: string }
@@ -2671,6 +2726,7 @@ export type Database = {
         }
         Returns: Json
       }
+      find_auth_user_id_by_email: { Args: { p_email: string }; Returns: string }
       generate_order_number: {
         Args: { p_order_date?: string; p_store_id: string }
         Returns: string
@@ -2699,6 +2755,22 @@ export type Database = {
         Returns: string
       }
       prune_email_outbox: { Args: { p_older_than?: string }; Returns: number }
+      request_membership_invite: {
+        Args: {
+          p_actor_user_id: string
+          p_email: string
+          p_email_from: string
+          p_email_html: string
+          p_email_subject: string
+          p_email_text: string
+          p_idempotency_key: string
+          p_intended_user_id: string
+          p_role_name: string
+          p_store_id: string
+          p_token_hash: string
+        }
+        Returns: Json
+      }
       request_store_mailbox_verification: {
         Args: {
           p_actor_user_id: string

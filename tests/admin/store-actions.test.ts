@@ -43,24 +43,12 @@ beforeEach(() => {
 })
 
 describe("createTenantAction", () => {
-  it("provisions through the super_admin gate, passing the granted service client", async () => {
+  it("provisions through the super_admin gate, passing the actor id and the granted service client", async () => {
     const result = await createTenantAction(input)
 
     expect(result).toEqual({ success: true, storeId: "store-1" })
-    expect(createTenant).toHaveBeenCalledWith(input, SERVICE)
+    expect(createTenant).toHaveBeenCalledWith(input, "super-1", SERVICE)
     expect(revalidatePath).toHaveBeenCalledWith("/admin/stores")
-  })
-
-  it("forwards the temporary password of a freshly-created owner", async () => {
-    createTenant.mockResolvedValue({
-      success: true,
-      storeId: "store-2",
-      tempPassword: "T3mp-Pass!23",
-    })
-
-    const result = await createTenantAction(input)
-
-    expect(result).toMatchObject({ tempPassword: "T3mp-Pass!23" })
   })
 
   it("refuses a non-super_admin caller and never provisions", async () => {

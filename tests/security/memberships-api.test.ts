@@ -1,8 +1,30 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { createClient } = vi.hoisted(() => ({ createClient: vi.fn() }));
+const {
+  resolveAuthIdentityByEmail,
+  inviteNewIdentity,
+  mintPendingMembershipInvite,
+  provisionOrCompensate,
+  loadStoreIdentity,
+  toTenantEmailBranding,
+} = vi.hoisted(() => ({
+  resolveAuthIdentityByEmail: vi.fn(),
+  inviteNewIdentity: vi.fn(),
+  mintPendingMembershipInvite: vi.fn(),
+  provisionOrCompensate: vi.fn(),
+  loadStoreIdentity: vi.fn(),
+  toTenantEmailBranding: vi.fn(),
+}));
 
 vi.mock("@supabase/supabase-js", () => ({ createClient }));
+vi.mock("@/lib/auth/platform-identity-invites", () => ({
+  resolveAuthIdentityByEmail,
+  inviteNewIdentity,
+  mintPendingMembershipInvite,
+  provisionOrCompensate,
+}));
+vi.mock("@/lib/supabase/store-identity-api", () => ({ loadStoreIdentity, toTenantEmailBranding }));
 
 import {
   addStoreMember,
@@ -386,34 +408,32 @@ describe("upsertMembershipRole role replacement", () => {
   });
 });
 
-describe("addStoreMember platform-user provisioning", () => {
-  function mockAuthAdmin(createUser: ReturnType<typeof vi.fn>) {
-    createClient.mockReturnValue({ auth: { admin: { createUser } } });
-  }
+describe("addStoreMember (D20/D21)", () => {
+  const STORE_ID = "store-1";
+  const ACTOR_ID = "owner-1";
 
-  // Ecommerce service the action passes in: happy-path stubs for the membership
-  // and role writes, with `existingProfileId` steering findUserIdByEmail and a
-  // spy on the user_profiles insert so we can assert the seeded profile.
-  function mockEcommerceService(existingProfileId: string | null) {
+  // Ecommerce service the action passes in: happy-path stubs for the
+  // store_users lookup/insert and role write, keyed generically since
+  // resolveAuthIdentityByEmail (mocked, see below) is now what decides
+  // whether an identity exists at all -- this file no longer calls the real
+  // user_profiles.ilike lookup for that.
+  function mockEcommerceService(existingStoreUserId: string | null) {
     const profileInsert = vi.fn().mockResolvedValue({ error: null });
     const from = vi.fn((table: string) => {
       if (table === "user_profiles") {
-        return {
-          select: () => ({
-            ilike: () => ({
-              maybeSingle: async () => ({
-                data: existingProfileId ? { id: existingProfileId } : null,
-                error: null,
-              }),
-            }),
-          }),
-          insert: profileInsert,
-        };
+        return { insert: profileInsert };
       }
       if (table === "store_users") {
         return {
           select: () => ({
-            eq: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }) }),
+            eq: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({
+                  data: existingStoreUserId ? { id: existingStoreUserId } : null,
+                  error: null,
+                }),
+              }),
+            }),
           }),
           insert: () => ({ select: () => ({ single: async () => ({ data: { id: "su-1" }, error: null }) }) }),
         };
@@ -441,73 +461,99 @@ describe("addStoreMember platform-user provisioning", () => {
     vi.clearAllMocks();
     process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
     process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role-key";
+    provisionOrCompensate.mockImplementation((_userId: string, provision: () => Promise<unknown>) => provision());
+    loadStoreIdentity.mockResolvedValue({ subdomain: "cumbre-dorada" });
+    toTenantEmailBranding.mockReturnValue({ displayName: "Cumbre Dorada", validatedSubdomain: "cumbre-dorada", primaryColor: "", commercialAddress: "" });
   });
 
-  // Case 1 — the production path (D21): an email unknown to the whole platform is
-  // minted a confirmed account with a strong temporary password, seeded a 'user'
-  // profile flagged must_change_password, and that password comes back. No invite
-  // link — the shared project's Site URL would send the owner to the wrong app.
-  it("mints a confirmed account with a temp password, seeds a must-change profile, and returns the password", async () => {
-    const createUser = vi.fn().mockResolvedValue({
-      data: { user: { id: "new-uid" } },
-      error: null,
-    });
-    mockAuthAdmin(createUser);
+  // Case 1 (D20) — an email unknown ANYWHERE in this shared-pool project is
+  // invited natively and gains membership immediately: nobody could have
+  // been hijacked, since nobody used that email before.
+  it("invites an unknown email natively and provisions membership immediately", async () => {
+    resolveAuthIdentityByEmail.mockResolvedValue({ exists: false });
+    inviteNewIdentity.mockResolvedValue({ outcome: "invited", userId: "new-uid" });
     const { service, profileInsert } = mockEcommerceService(null);
 
-    const result = await addStoreMember("store-1", "  NUEVO@Correo.com ", "owner", service);
+    const result = await addStoreMember(STORE_ID, ACTOR_ID, "  NUEVO@Correo.com ", "admin", service);
 
-    expect(createUser).toHaveBeenCalledTimes(1);
-    const createArgs = createUser.mock.calls[0][0];
-    expect(createArgs.email).toBe("nuevo@correo.com");
-    expect(createArgs.email_confirm).toBe(true);
-    expect(typeof createArgs.password).toBe("string");
-    expect(createArgs.password.length).toBeGreaterThanOrEqual(6);
-
-    // Role is left to the DB default ('user', D15): the insert never sets it.
+    expect(resolveAuthIdentityByEmail).toHaveBeenCalledWith(service, "nuevo@correo.com");
+    expect(inviteNewIdentity).toHaveBeenCalledWith(service, {
+      storeId: STORE_ID,
+      subdomain: "cumbre-dorada",
+      email: "nuevo@correo.com",
+      purpose: "new_user_invite",
+    });
+    expect(provisionOrCompensate).toHaveBeenCalledWith("new-uid", expect.any(Function));
+    // No must_change_password (D22's app_metadata flag replaces it for this path).
     expect(profileInsert).toHaveBeenCalledWith({
       id: "new-uid",
       email: "nuevo@correo.com",
       first_name: null,
       last_name: null,
-      must_change_password: true,
     });
-    // The account and the handed-off password are the same secret.
-    expect(result).toEqual({ success: true, created: true, tempPassword: createArgs.password });
+    expect(result).toEqual({ success: true, outcome: "invited" });
   });
 
-  // Case 2 — the email belongs to another platform app: createUser collides with
-  // email_exists, and we refuse with a clear error, never adopting the account.
-  it("rejects an email that exists on the platform but not in ecommerce", async () => {
-    const createUser = vi.fn().mockResolvedValue({
-      data: { user: null },
-      error: { code: "email_exists", status: 422, message: "email already exists" },
-    });
-    mockAuthAdmin(createUser);
-    const { service, profileInsert } = mockEcommerceService(null);
+  // Case 2 (D21) — the email already exists somewhere in the org (this
+  // app's ecommerce.user_profiles or a different app's own identity, both
+  // resolved the same way by resolveAuthIdentityByEmail) but is not yet a
+  // member of THIS store: a pending acceptance, never an immediate grant.
+  it("mints a pending membership invite for an identity that exists but is not yet a member of this store", async () => {
+    resolveAuthIdentityByEmail.mockResolvedValue({ exists: true, userId: "existing-uid" });
+    mintPendingMembershipInvite.mockResolvedValue({ outcome: "invited" });
+    const { service } = mockEcommerceService(null);
 
-    const result = await addStoreMember("store-1", "ajeno@correo.com", "owner", service);
+    const result = await addStoreMember(STORE_ID, ACTOR_ID, "socio@correo.com", "admin", service);
+
+    expect(loadStoreIdentity).toHaveBeenCalledWith(service, STORE_ID);
+    expect(mintPendingMembershipInvite).toHaveBeenCalledWith(service, expect.objectContaining({
+      actorUserId: ACTOR_ID,
+      storeId: STORE_ID,
+      intendedUserId: "existing-uid",
+      email: "socio@correo.com",
+      roleName: "admin",
+    }));
+    expect(inviteNewIdentity).not.toHaveBeenCalled();
+    expect(result).toEqual({ success: true, outcome: "pending_acceptance" });
+  });
+
+  // Case 3 — already a member of THIS exact store: same as before slice 6,
+  // just a role replacement, no invite of any kind.
+  it("replaces the role of an identity already on this store's team, without inviting anyone", async () => {
+    resolveAuthIdentityByEmail.mockResolvedValue({ exists: true, userId: "existing-uid" });
+    const { service } = mockEcommerceService("su-existing");
+
+    const result = await addStoreMember(STORE_ID, ACTOR_ID, "socio@correo.com", "owner", service);
+
+    expect(result).toEqual({ success: true, outcome: "role_updated" });
+    expect(mintPendingMembershipInvite).not.toHaveBeenCalled();
+    expect(inviteNewIdentity).not.toHaveBeenCalled();
+  });
+
+  it("surfaces a rate-limited native invite as a friendly Spanish message", async () => {
+    resolveAuthIdentityByEmail.mockResolvedValue({ exists: false });
+    inviteNewIdentity.mockResolvedValue({ outcome: "rate_limited" });
+    const { service } = mockEcommerceService(null);
+
+    const result = await addStoreMember(STORE_ID, ACTOR_ID, "nuevo@correo.com", "admin", service);
 
     expect(result).toEqual({
       success: false,
-      error: "Ese correo ya pertenece a una cuenta de la plataforma pero no del ecommerce. Usa otro correo.",
+      error: "Ya enviamos una invitación hace poco. Espera un momento antes de volver a intentarlo.",
     });
-    expect(createUser).toHaveBeenCalledTimes(1);
-    expect(profileInsert).not.toHaveBeenCalled();
   });
 
-  // Case 3 — the email already uses ecommerce: reuse its id, never touch the
-  // admin API. Its own password stands; must_change_password stays at its default.
-  it("reuses an existing ecommerce profile without minting an account", async () => {
-    const createUser = vi.fn();
-    mockAuthAdmin(createUser);
-    const { service, profileInsert } = mockEcommerceService("existing-uid");
+  // The compensation verify criterion's "already existed" direction, at the
+  // addStoreMember assembly level: an identity resolveAuthIdentityByEmail
+  // found pre-existing is NEVER passed to provisionOrCompensate at all.
+  it("never routes a pre-existing identity through provisionOrCompensate", async () => {
+    resolveAuthIdentityByEmail.mockResolvedValue({ exists: true, userId: "existing-uid" });
+    mintPendingMembershipInvite.mockResolvedValue({ outcome: "invited" });
+    const { service } = mockEcommerceService(null);
 
-    const result = await addStoreMember("store-1", "socio@correo.com", "admin", service);
+    await addStoreMember(STORE_ID, ACTOR_ID, "socio@correo.com", "admin", service);
 
-    expect(result).toEqual({ success: true, created: false });
-    expect(createUser).not.toHaveBeenCalled();
-    expect(profileInsert).not.toHaveBeenCalled();
+    expect(provisionOrCompensate).not.toHaveBeenCalled();
   });
 });
 
