@@ -62,7 +62,6 @@
     "lucide-react": "^0.454.0",
     "motion": "latest",
     "next": "^16.0.8",
-    "nodemailer": "^7.0.12",
     "nuqs": "latest",
     "path": "latest",
     "prettier": "latest",

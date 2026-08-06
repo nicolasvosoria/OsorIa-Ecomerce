@@ -196,22 +196,36 @@ versión exacta que `react` --, esa entrada nunca se activaba: nada bajo
 y `"@react-email/*"`), así que Deno nunca caminaba esa entrada del import
 map y resolvía el `react-dom` del peer de forma independiente -- a veces
 quedándose con lo más nuevo que satisface el rango (`19.2.8`, un patch
-distinto al `19.2.1` fijado), y a veces no (ver "no determinista" abajo).
+distinto al `19.2.1` fijado), y a veces no (ver más abajo).
 `react-dom` valida en tiempo de ejecución
 (`ensureCorrectIsomorphicReactVersion`) que su propia versión coincida
 EXACTO con la de `react`; cuando no coincidían, lanzaba `Error: Incompatible
 React versions` en cada intento de render.
 
-**No determinista con `deno.json` solo.** Sin un `deno.lock` fijado, cada
-arranque en frío resuelve `react-dom` de cero -- unas veces Deno deduplica
-a un único `react@19.2.1` compartido (fuerza el choque con `react-dom`), y
-otras resuelve dos copias independientes de `react` que casualmente quedan
+**Riesgo de deriva con el tiempo, no aleatoriedad de una corrida a otra.**
+Sin un `deno.lock` fijado, cada arranque en frío resuelve `react-dom`
+contra el estado del registro de npm en ese momento: puede deduplicar a un
+único `react@19.2.1` compartido (fuerza el choque con `react-dom`), o
+resolver dos copias independientes de `react` que casualmente quedan
 autoconsistentes (`react@19.2.8`/`react-dom@19.2.8` juntos, sin cruzarse con
-nuestro `react@19.2.1`). Confirmado a mano ambos lados: con un
+nuestro `react@19.2.1`). Un verificador independiente corrió 14 arranques en
+frío consecutivos sin `deno.lock` intentando reproducir un cambio de
+resultado entre corridas y no lo logró: las 14 resolvieron exactamente
+igual -- para una misma foto del registro de npm, la resolución ES
+determinista. El riesgo real no es azar dentro de la misma sesión, sino
+deriva hacia adelante: sin `deno.lock`, nada impide que un futuro publish de
+npm de un patch de `react`/`react-dom` que siga cayendo dentro del rango
+resuelto cambie ese resultado en un build posterior, en silencio -- eso, y
+no la variación instantánea, es el "silencioso en un build futuro" que hace
+que esto no sea aceptable tal cual. Confirmado a mano en un extremo: con un
 `deno.lock` viejo fijado a la resolución incorrecta, falla 100% de las
-veces (determinista); sin ningún `deno.lock`, pasa la mayoría de las veces
-pero no todas -- exactamente el "silencioso en un build futuro" que hace que
-esto no sea aceptable tal cual.
+veces (determinista, pero hacia el resultado equivocado). La pieza que de
+verdad carga el peso de evitar la deriva es el `deno.lock` que se commitea
+(abajo) -- fija la resolución exacta de forma permanente --, no la sola
+presencia del archivo `overrides`: ese archivo declara la intención (fuerza
+`react`/`react-dom` a `19.2.1` frente al resolver), pero sin un lockfile
+committeado esa intención se re-evalúa contra el registro en cada arranque
+en frío en vez de quedar fijada.
 
 **La corrección:** un `package.json` junto al `deno.json`
 (`supabase/functions/auth-email-hook/package.json`) con:
@@ -226,7 +240,7 @@ raíz los fija ambos, exactos, en `19.2.1`) -- `lib/email/` es un único
 conjunto de módulos compartido entre los dos runtimes y debe comportarse
 igual en ambos. No "simplificar" quitando este `overrides` ni aflojando la
 versión: sin él, `react-dom` vuelve a resolverse por su cuenta y el defecto
-reaparece, con la variante no determinista de arriba.
+reaparece, con el riesgo de deriva descrito arriba.
 
 `overrides` es el mecanismo que Deno documenta para forzar la versión de una
 dependencia transitiva/peer en todo el grafo (`peerDependencies` solo se lee

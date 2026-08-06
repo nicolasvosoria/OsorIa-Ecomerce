@@ -430,9 +430,12 @@ import_map = "./functions/email-worker/deno.json"
 # package.json (19.2.1/19.2.1) -- lib/email/ is one shared module set and
 # must behave identically under both runtimes. Do not remove that
 # package.json or loosen its pin without re-reading the investigation in
-# docs/supabase/email-outbox-runbook.md first: without it, react-dom
-# resolves its own peer dependency independently and can non-deterministically
-# land on a different patch than react, which crashes every render.
+# docs/supabase/email-outbox-runbook.md first (see the "react/react-dom no
+# coincidían bajo Deno" section) for what breaks and why: without the
+# committed deno.lock, react-dom's peer resolution can drift to a
+# different patch than react on a future cold start as npm publishes new
+# versions -- not run-to-run randomness at a given moment -- and
+# react-dom's own version check crashes every render when that happens.
 [functions."auth-email-hook"]
 enabled = true
 verify_jwt = false
