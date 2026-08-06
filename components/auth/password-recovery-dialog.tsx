@@ -1,9 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { toast } from "sonner"
 
-import { TurnstileWidget } from "@/components/auth/turnstile-widget"
+import { TurnstileWidget, type TurnstileWidgetHandle } from "@/components/auth/turnstile-widget"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -64,6 +64,7 @@ function RecoveryLinkRequest({ onCancel, onBackToSignIn }: RecoveryLinkRequestPr
   // el correo, que es lo que anuncian aria-invalid y aria-describedby.
   const [emailError, setEmailError] = useState<string | undefined>(undefined)
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
+  const turnstileRef = useRef<TurnstileWidgetHandle>(null)
 
   const requestRecoveryLink = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -80,6 +81,7 @@ function RecoveryLinkRequest({ onCancel, onBackToSignIn }: RecoveryLinkRequestPr
     setEmailError(undefined)
     const result = await resetPassword(email, turnstileToken)
     if (!result.success) {
+      turnstileRef.current?.reset()
       const detail = result.error || t.header.recoveryLinkErrorHint
       setEmailError(detail)
       toast.error(t.header.recoveryLinkError, {
@@ -156,7 +158,7 @@ function RecoveryLinkRequest({ onCancel, onBackToSignIn }: RecoveryLinkRequestPr
 
         {/* D26: no-op (renders nothing) until NEXT_PUBLIC_TURNSTILE_SITE_KEY
             is set -- see components/auth/turnstile-widget.tsx. */}
-        <TurnstileWidget onToken={setTurnstileToken} />
+        <TurnstileWidget ref={turnstileRef} onToken={setTurnstileToken} />
 
         <div className="flex flex-col gap-2 pt-4">
           <Button type="submit" className="w-full">

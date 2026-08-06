@@ -1,5 +1,5 @@
--- Fail-closed contract verification for the durable email platform (slice 2 of
--- plan-correos-ecommerce). Mirrors verify-ecommerce-contract.sql's style
+-- Fail-closed contract verification for the durable email platform.
+-- Mirrors verify-ecommerce-contract.sql's style
 -- (schema assertions, `raise exception` on failure) but adds runtime
 -- assertions the catalog-contract file never needed: token/rate-limit/outbox
 -- behavior that can only be proven by actually calling the functions.
@@ -81,8 +81,8 @@ begin
   end if;
 end $$;
 
--- D29/D30: the order status transition RPC (slice 4) must exist with the
--- exact signature the app calls.
+-- D29/D30: the order status transition RPC must exist with the exact
+-- signature the app calls.
 do $$
 begin
   if to_regprocedure('ecommerce.transition_order_status(uuid, uuid, uuid, text, jsonb)') is null then
@@ -194,9 +194,9 @@ begin
 end $$;
 
 -- -----------------------------------------------------------------------------
--- Slice 6: D20/D21's three new functions must exist with the exact
--- signatures the app calls, and D30's grant contract (service_role only) --
--- same posture as every other privileged write in this file.
+-- D20/D21's three new functions must exist with the exact signatures the
+-- app calls, and D30's grant contract (service_role only) -- same posture
+-- as every other privileged write in this file.
 -- -----------------------------------------------------------------------------
 do $$
 begin
@@ -245,8 +245,9 @@ begin
 end $$;
 
 -- D14: pending_membership_invites is RLS-enabled with zero anon/authenticated
--- grants and full service_role access, same posture as every other slice-2/5
--- table -- including whatever the baseline's blanket `grant ... on all
+-- grants and full service_role access, same posture as every other
+-- service-role-only table in this schema -- including whatever the
+-- baseline's blanket `grant ... on all
 -- tables` might otherwise have swept up (it only ever covered tables that
 -- existed when it ran, not this one).
 do $$
@@ -307,13 +308,11 @@ begin
   end if;
 end $$;
 
--- D29 + D30 (slice 4b): status and the four lifecycle timestamps are NOT
--- reachable by a direct authenticated UPDATE -- only
--- ecommerce.transition_order_status can move them. Without this, a store
--- admin's own PATCH could jump the frozen graph outright (pending straight
--- to delivered) and leave email_outbox empty, exactly what slice 4's own
--- verification reproduced. Every other column keeps the access it already
--- had.
+-- D29 + D30: status and the four lifecycle timestamps are NOT reachable by a
+-- direct authenticated UPDATE -- only ecommerce.transition_order_status can
+-- move them. Without this, a store admin's own PATCH could jump the frozen
+-- graph outright (pending straight to delivered) and leave email_outbox
+-- empty. Every other column keeps the access it already had.
 do $$
 declare
   v_violations text[];
@@ -428,7 +427,7 @@ begin
 end $$;
 
 -- -----------------------------------------------------------------------------
--- Slice 5: D23's auth_intents + ecommerce.finalize_customer_profile.
+-- D23's auth_intents + ecommerce.finalize_customer_profile.
 -- Mint is a plain insert (lib/auth/auth-intents.ts's mintAuthIntent has no
 -- authorization decision to make -- the store was already resolved
 -- trustworthily server-side before this ever runs), so this block mints by
@@ -532,7 +531,7 @@ begin
 end $$;
 
 -- -----------------------------------------------------------------------------
--- Finding 1 (slice-5 verifier, live PostgREST + a real GoTrue session): the
+-- Finding 1 (live PostgREST + a real GoTrue session): the
 -- grant assertion above (has_function_privilege) proved the CATALOG was
 -- right while the calling code was still broken --
 -- lib/auth/finalize-signup-action.ts called this RPC through the session's
@@ -551,7 +550,8 @@ end $$;
 -- as service_role (tests/security/finalize-signup-action.test.ts proves
 -- that, at the mocked-client level) or that PostgREST's own JWT-to-role
 -- resolution behaves the same way over a real HTTP call with a live GoTrue
--- session -- only that last mile needs the verifier's own live rig.
+-- session -- only that last mile needs a live rig against real PostgREST +
+-- GoTrue.
 -- -----------------------------------------------------------------------------
 do $$
 declare
@@ -866,7 +866,7 @@ begin
 end $$;
 
 -- -----------------------------------------------------------------------------
--- Verifier finding 1 (slice 3): the merchant notification is OPTIONAL during
+-- Finding 1: the merchant notification is OPTIONAL during
 -- D31's pre-enforcement window, but only in a checkable shape -- always
 -- exactly one order-received, at most one merchant-new-order, nothing else.
 -- See 20260805000600_ecommerce_checkout_optional_merchant_notification.sql.
@@ -1029,7 +1029,7 @@ begin
 end $$;
 
 -- -----------------------------------------------------------------------------
--- Verifier finding 2 (slice 3): the checkout follow-ups that run after the
+-- Finding 2: the checkout follow-ups that run after the
 -- atomic order write (inventory decrement, shipping address, payment
 -- transaction) converge to exactly one effect per order across a retried
 -- follow-up sequence -- never zero, never twice. See
@@ -1157,7 +1157,7 @@ begin
 end $$;
 
 -- -----------------------------------------------------------------------------
--- Slice 4: ecommerce.transition_order_status -- the frozen D29 graph
+-- ecommerce.transition_order_status -- the frozen D29 graph
 -- (exhaustive: every one of the 7x7 (from, to) pairs, not a sample), terminal
 -- states, authorization, tenant scoping, and the D11 lifecycle notification
 -- catalog (atomically with the status change, D27 spirit). This is real
@@ -1342,8 +1342,9 @@ begin
 end $$;
 
 -- -----------------------------------------------------------------------------
--- Slice 4b: the verifier's exact bypass, reproduced under the SAME role a real
--- PostgREST request runs as (SET LOCAL ROLE authenticated + the session's own
+-- The exact bypass a direct authenticated UPDATE could attempt, reproduced
+-- under the SAME role a real PostgREST request runs as (SET LOCAL ROLE
+-- authenticated + the session's own
 -- auth.uid() via request.jwt.claim.sub), not just a privilege-catalog check.
 -- A genuine store owner -- can_manage_store(v_store_id) true, RLS's row check
 -- would let the write through -- can no longer reach status or any lifecycle
@@ -1427,7 +1428,7 @@ begin
 end $$;
 
 -- -----------------------------------------------------------------------------
--- Slice 6: D20's store-shell path. A null owner creates the store alone; a
+-- D20's store-shell path. A null owner creates the store alone; a
 -- real owner keeps the ORIGINAL atomic behavior exactly (regression guard for
 -- every existing caller, including this file's own fixtures above).
 -- -----------------------------------------------------------------------------
@@ -1464,10 +1465,10 @@ begin
 end $$;
 
 -- -----------------------------------------------------------------------------
--- Slice 6: D20/D21/D24/D25's owner and membership invitations --
+-- D20/D21/D24/D25's owner and membership invitations --
 -- ecommerce.find_auth_user_id_by_email, request_membership_invite and
--- accept_membership_invite. Every guarantee the verify criteria name for
--- this slice that a real Postgres role/transaction boundary can prove:
+-- accept_membership_invite. Every guarantee only a real Postgres
+-- role/transaction boundary can prove:
 -- authorization, D25's reused rate limit, token integrity/expiry/single-use,
 -- the intended-user binding (a different authenticated user gains nothing),
 -- and no-enumeration.
@@ -1631,8 +1632,8 @@ begin
 end $$;
 
 -- -----------------------------------------------------------------------------
--- Slice 6 role boundary: the grant assertions above prove the CATALOG is
--- right; this reproduces the verifier's own bypass mechanism (SET LOCAL ROLE,
+-- Role boundary: the grant assertions above prove the CATALOG is
+-- right; this reproduces the same bypass mechanism (SET LOCAL ROLE,
 -- what PostgREST itself uses per request) to prove the ROLE the app actually
 -- calls through (service_role) is the only one that can -- same pattern as
 -- the finalize_customer_profile and transition_order_status reproductions

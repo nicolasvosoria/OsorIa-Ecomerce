@@ -4,8 +4,9 @@ import { ECOMMERCE_TABLES } from "@/lib/supabase/contract";
 // D23's catalog-complete purpose set (see the auth_intents table comment).
 // 'signup'/'recovery' are minted by lib/auth/prepare-auth-redirect.ts;
 // 'owner_invite'/'new_user_invite' are minted by
-// lib/auth/platform-identity-invites.ts's inviteNewIdentity (slice 6) --
-// both purposes existed in the schema since slice 5 so this migration-free.
+// lib/auth/platform-identity-invites.ts's inviteNewIdentity -- all four
+// already sit in the table's purpose check constraint, so this is
+// migration-free.
 export type AuthIntentPurpose = "signup" | "recovery" | "owner_invite" | "new_user_invite";
 
 const INTENT_LIFETIME_MS = 60 * 60 * 1000; // D24: one hour

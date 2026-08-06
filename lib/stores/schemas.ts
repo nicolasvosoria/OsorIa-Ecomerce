@@ -69,8 +69,6 @@ export const updateStoreIdentitySchema = z.object({
   commercialAddress: z.string().trim().min(1, "La dirección es requerida"),
 })
 
-export type UpdateStoreIdentityValues = z.infer<typeof updateStoreIdentitySchema>
-
 const MAILBOX_FIELDS = ["reply_to", "order_mailbox"] as const
 
 export const requestMailboxVerificationSchema = z.object({
@@ -78,5 +76,4 @@ export const requestMailboxVerificationSchema = z.object({
   email: z.string().trim().min(1, INVALID_EMAIL_MESSAGE).email(INVALID_EMAIL_MESSAGE),
 })
 
-export type RequestMailboxVerificationValues = z.infer<typeof requestMailboxVerificationSchema>
 export type MailboxVerificationField = (typeof MAILBOX_FIELDS)[number]

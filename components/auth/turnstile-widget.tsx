@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { forwardRef, useEffect, useImperativeHandle, useRef } from "react"
 
 const SCRIPT_SRC = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
 
@@ -16,6 +16,7 @@ declare global {
     turnstile?: {
       render: (container: HTMLElement, options: TurnstileRenderOptions) => string
       remove: (widgetId: string) => void
+      reset: (widgetId: string) => void
     }
   }
 }
@@ -35,45 +36,72 @@ function loadTurnstileScript(): Promise<void> {
   return scriptLoadPromise
 }
 
+export type TurnstileWidgetHandle = {
+  // A solved token is single-use: Cloudflare's siteverify rejects a replay
+  // with timeout-or-duplicate. Callers must reset after any failed submit
+  // that leaves the form mounted, before the user can retry.
+  reset: () => void
+}
+
+interface TurnstileWidgetProps {
+  onToken: (token: string | null) => void
+}
+
 // D26: signup and password recovery show this widget. NEXT_PUBLIC_TURNSTILE_SITE_KEY
-// unset (every environment before slice 7 sets real keys, including this
+// unset (every environment without real Turnstile keys, including this
 // repo's whole existing signup/recovery test suite) renders nothing and
 // reports no token -- lib/security/turnstile.ts's fail-open decision treats
 // that as "unconfigured, skip", not a blocked form.
-export function TurnstileWidget({ onToken }: { onToken: (token: string | null) => void }) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const onTokenRef = useRef(onToken)
-  useEffect(() => {
-    onTokenRef.current = onToken
-  })
-
-  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
-
-  useEffect(() => {
-    if (!siteKey || !containerRef.current) return
-
-    let widgetId: string | null = null
-    let cancelled = false
-
-    loadTurnstileScript().then(() => {
-      if (cancelled || !containerRef.current || !window.turnstile) return
-      widgetId = window.turnstile.render(containerRef.current, {
-        sitekey: siteKey,
-        callback: (token) => onTokenRef.current(token),
-        "error-callback": () => onTokenRef.current(null),
-        "expired-callback": () => onTokenRef.current(null),
-      })
+export const TurnstileWidget = forwardRef<TurnstileWidgetHandle, TurnstileWidgetProps>(
+  function TurnstileWidget({ onToken }, ref) {
+    const containerRef = useRef<HTMLDivElement>(null)
+    const onTokenRef = useRef(onToken)
+    const widgetIdRef = useRef<string | null>(null)
+    useEffect(() => {
+      onTokenRef.current = onToken
     })
 
-    return () => {
-      cancelled = true
-      if (widgetId && window.turnstile) {
-        window.turnstile.remove(widgetId)
+    const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
+
+    useImperativeHandle(
+      ref,
+      () => ({
+        reset: () => {
+          if (widgetIdRef.current && window.turnstile) {
+            window.turnstile.reset(widgetIdRef.current)
+          }
+          onTokenRef.current(null)
+        },
+      }),
+      [],
+    )
+
+    useEffect(() => {
+      if (!siteKey || !containerRef.current) return
+
+      let cancelled = false
+
+      loadTurnstileScript().then(() => {
+        if (cancelled || !containerRef.current || !window.turnstile) return
+        widgetIdRef.current = window.turnstile.render(containerRef.current, {
+          sitekey: siteKey,
+          callback: (token) => onTokenRef.current(token),
+          "error-callback": () => onTokenRef.current(null),
+          "expired-callback": () => onTokenRef.current(null),
+        })
+      })
+
+      return () => {
+        cancelled = true
+        if (widgetIdRef.current && window.turnstile) {
+          window.turnstile.remove(widgetIdRef.current)
+          widgetIdRef.current = null
+        }
       }
-    }
-  }, [siteKey])
+    }, [siteKey])
 
-  if (!siteKey) return null
+    if (!siteKey) return null
 
-  return <div ref={containerRef} />
-}
+    return <div ref={containerRef} />
+  },
+)

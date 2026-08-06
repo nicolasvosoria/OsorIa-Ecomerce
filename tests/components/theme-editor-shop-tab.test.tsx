@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-// Slice 11: the Vitrina tab's controls. Covers the null "Relevancia (por
+// The Vitrina tab's controls. Covers the null "Relevancia (por
 // defecto)" sort option (D20) mapping to `null`, a real sort selection, a
 // filter-visibility toggle, and copy edits — each reporting the right staged
 // change through its callback. Radix Select can't be driven under jsdom (no

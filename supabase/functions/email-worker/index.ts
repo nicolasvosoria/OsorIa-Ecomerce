@@ -1,6 +1,7 @@
 // D16/D19: the email-outbox worker. Invoked once a minute by the pg_cron
 // schedule authored in supabase/migrations/20260805000400_ecommerce_email_
-// worker_provisioning.sql (INACTIVE until slice 7 flips it on).
+// worker_provisioning.sql (INACTIVE until `cron.alter_job` enables it on the
+// real project).
 //
 // `verify_jwt = false` (supabase/config.toml) because the caller is Postgres,
 // not a Supabase Auth session -- there is no user JWT to verify. Authorization

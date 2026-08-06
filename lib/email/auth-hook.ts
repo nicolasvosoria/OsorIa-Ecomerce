@@ -9,23 +9,19 @@ import type { EmailTemplateInput, EmailTemplateKind, TenantEmailBranding } from 
 
 // D15/D11: maps GoTrue's `email_data.email_action_type` to this app's four-
 // kind Auth catalog. "invite" resolves to owner-invite/new-user-invite only
-// once an auth_intents row with that purpose exists to read (slice 6 mints
-// those; this slice never does) -- see resolveAuthEventKind. Every other
-// action_type this project's Supabase Auth can still emit (magiclink,
-// email_change_current/new, reauthentication) has no catalog entry: this app
-// never triggers them, so a request for one is a graceful no-op, never an
-// error that could block a legitimate GoTrue action (D15's five-second/never-
-// fail-the-user posture).
+// once an auth_intents row with that purpose exists to read (lib/auth/
+// platform-identity-invites.ts mints those; this file never does) -- see
+// resolveAuthEventKind. Every other action_type this project's Supabase Auth
+// can still emit (magiclink, email_change_current/new, reauthentication) has
+// no catalog entry: this app never triggers them, so a request for one is a
+// graceful no-op, never an error that could block a legitimate GoTrue action
+// (D15's five-second/never-fail-the-user posture).
 //
 // "password_changed_notification" is not in Supabase's publicly documented
 // action-type list; it was confirmed empirically against the local GoTrue
 // v2.194.0 binary (the string constant next to the
-// GOTRUE_MAILER_NOTIFICATIONS_PASSWORD_CHANGED_ENABLED flag this slice turns
-// on in supabase/config.toml) rather than guessed.
-const RECOVERY_ACTION_TYPE = "recovery";
-const SIGNUP_ACTION_TYPE = "signup";
-const INVITE_ACTION_TYPE = "invite";
-const PASSWORD_CHANGED_ACTION_TYPE = "password_changed_notification";
+// GOTRUE_MAILER_NOTIFICATIONS_PASSWORD_CHANGED_ENABLED flag supabase/config.toml
+// turns on) rather than guessed.
 
 export type AuthHookUser = {
   id: string;
@@ -70,10 +66,10 @@ export type AuthHookOutcome =
 // D15's whole hook, dependency-injected like lib/email/outbox-worker.ts so
 // Vitest can prove the wiring (D41) with a mocked enqueueEmail and never
 // reach Resend -- the worker (lib/email/outbox-worker.ts,
-// supabase/functions/email-worker) is the only thing that ever calls Resend,
-// unchanged by this slice. Rendering (renderEmail) is the only "slow" step
-// here and is itself sub-100ms React server rendering, well inside D15's
-// five-second budget together with the one DB insert.
+// supabase/functions/email-worker) is the only thing that ever calls Resend.
+// Rendering (renderEmail) is the only "slow" step here and is itself
+// sub-100ms React server rendering, well inside D15's five-second budget
+// together with the one DB insert.
 //
 // `webhookId` is the Standard Webhooks `webhook-id` header, already verified
 // by the caller (supabase/functions/auth-email-hook, via
@@ -129,13 +125,13 @@ type AuthCatalogKind = "signup-confirmation" | "password-recovery" | "password-c
 
 async function resolveAuthEventKind(payload: AuthHookPayload, deps: AuthHookDeps): Promise<AuthCatalogKind | null> {
   switch (payload.email_data.email_action_type) {
-    case SIGNUP_ACTION_TYPE:
+    case "signup":
       return "signup-confirmation";
-    case RECOVERY_ACTION_TYPE:
+    case "recovery":
       return "password-recovery";
-    case PASSWORD_CHANGED_ACTION_TYPE:
+    case "password_changed_notification":
       return "password-changed";
-    case INVITE_ACTION_TYPE: {
+    case "invite": {
       const intent = await deps.peekAuthIntent(extractIntentToken(payload.email_data.redirect_to) ?? "");
       if (intent?.purpose === "owner_invite") return "owner-invite";
       if (intent?.purpose === "new_user_invite") return "new-user-invite";
@@ -146,13 +142,13 @@ async function resolveAuthEventKind(payload: AuthHookPayload, deps: AuthHookDeps
   }
 }
 
-// Trusted-store resolution, never a request header (see this slice's brief):
-// an intent bound at mint time if this event carries one (signup, recovery,
-// and eventually slice 6's invites), else the user's own home store on
+// Trusted-store resolution, never a request header: an intent bound at mint
+// time if this event carries one (signup, recovery, and lib/auth/platform-
+// identity-invites.ts's invites), else the user's own home store on
 // ecommerce.user_profiles for an existing account (password-changed has no
 // redirect_to/intent to read at all). Neither match existing is the expected
-// shape for an auth.users row this app doesn't own (this org's shared pool,
-// per this slice's brief) -- a graceful skip, not an error.
+// shape for an auth.users row this app doesn't own (auth.users is a pool
+// shared with sibling apps) -- a graceful skip, not an error.
 async function resolveStoreId(payload: AuthHookPayload, deps: AuthHookDeps): Promise<string | null> {
   const intentToken = extractIntentToken(payload.email_data.redirect_to);
   if (intentToken) {

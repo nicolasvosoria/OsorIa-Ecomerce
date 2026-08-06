@@ -58,13 +58,14 @@ export async function prepareAuthRedirect(input: {
   return { ok: true, redirectTo: redirectTo.toString() };
 }
 
-// D25: reuses the slice-2 primitive (1/60s, 5/hour per store x purpose x
-// recipient) instead of a second limiter -- inlined here rather than its own
-// module since prepareAuthRedirect is its one and only caller. `purpose` is
-// namespaced with an `auth:` prefix so an auth send attempt can never
-// collide with a mailbox-verification purpose sharing the same underlying
-// table (D25's migration comment: "deliberately purpose-generic so slice 6's
-// invite sends can reuse the same table" -- this is that reuse).
+// D25: reuses ecommerce.check_and_record_send_attempt (1/60s, 5/hour per
+// store x purpose x recipient) instead of a second limiter -- inlined here
+// rather than its own module since prepareAuthRedirect is its one and only
+// caller. `purpose` is namespaced with an `auth:` prefix so an auth send
+// attempt can never collide with a mailbox-verification purpose sharing the
+// same underlying table (D25's migration comment: "deliberately
+// purpose-generic so invite sends can reuse the same table" -- lib/auth/
+// platform-identity-invites.ts is that reuse).
 async function ensureAuthSendAllowed(
   supabase: any,
   storeId: string,

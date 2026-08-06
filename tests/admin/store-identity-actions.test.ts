@@ -1,18 +1,24 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-const { authorizeActiveStoreAdmin, revalidatePath, loadStoreIdentity, renderEmail, createVerificationToken } = vi.hoisted(
-  () => ({
-    authorizeActiveStoreAdmin: vi.fn(),
-    revalidatePath: vi.fn(),
-    loadStoreIdentity: vi.fn(),
-    renderEmail: vi.fn(),
-    createVerificationToken: vi.fn(),
-  }),
-)
+const {
+  authorizeActiveStoreAdmin,
+  revalidatePath,
+  loadStoreIdentity,
+  toTenantEmailBranding,
+  renderEmail,
+  createVerificationToken,
+} = vi.hoisted(() => ({
+  authorizeActiveStoreAdmin: vi.fn(),
+  revalidatePath: vi.fn(),
+  loadStoreIdentity: vi.fn(),
+  toTenantEmailBranding: vi.fn(),
+  renderEmail: vi.fn(),
+  createVerificationToken: vi.fn(),
+}))
 
 vi.mock("@/lib/supabase/active-store", () => ({ authorizeActiveStoreAdmin }))
 vi.mock("next/cache", () => ({ revalidatePath }))
-vi.mock("@/lib/supabase/store-identity-api", () => ({ loadStoreIdentity }))
+vi.mock("@/lib/supabase/store-identity-api", () => ({ loadStoreIdentity, toTenantEmailBranding }))
 vi.mock("@/lib/email/render", () => ({ renderEmail }))
 vi.mock("@/lib/security/verification-token", () => ({ createVerificationToken }))
 
@@ -95,6 +101,13 @@ describe("requestMailboxVerification", () => {
     supabase = createSupabaseMock()
     authorizeActiveStoreAdmin.mockResolvedValue({ supabase, storeId: ACTIVE_STORE_ID, userId: "owner-1" })
     loadStoreIdentity.mockResolvedValue(identity)
+    toTenantEmailBranding.mockReturnValue({
+      displayName: identity.displayName,
+      validatedSubdomain: identity.subdomain,
+      primaryColor: identity.primaryColor,
+      commercialAddress: identity.commercialAddress,
+      contactEmail: identity.contactEmail,
+    })
     renderEmail.mockResolvedValue({ subject: "Confirma un correo", html: "<p>h</p>", text: "t" })
     createVerificationToken.mockReturnValue({ token: "plaintext-token", tokenHash: "hashed-token" })
   })

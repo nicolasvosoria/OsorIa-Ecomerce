@@ -218,7 +218,8 @@ double_confirm_changes = true
 # If enabled, users need to confirm their email address before signing in.
 # D11's signup-confirmation catalog kind only ever gets sent (and the Send
 # Email Hook below only ever fires with email_action_type=signup) when this
-# is true. Slice 7 enables the matching setting on the real project.
+# is true. Enabling the matching setting on the real project is a manual
+# production step.
 enable_confirmations = true
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
 secure_password_change = false
@@ -247,8 +248,8 @@ otp_expiry = 3600
 # D11's password-changed catalog kind is GoTrue's own built-in notification
 # (GOTRUE_MAILER_NOTIFICATIONS_PASSWORD_CHANGED_ENABLED, off by default) --
 # turned on so it reaches the Send Email Hook below like every other Auth
-# catalog kind, instead of silently never firing. Slice 7 enables the
-# matching setting on the real project.
+# catalog kind, instead of silently never firing. Enabling the matching
+# setting on the real project is a manual production step.
 [auth.email.notification.password_changed]
 enabled = true
 
@@ -417,10 +418,10 @@ import_map = "./functions/email-worker/deno.json"
 # compilerOptions.jsx/jsxImportSource so that mapping's JSX actually compiles
 # to the automatic runtime instead of the classic one (which needs a bare
 # `React` global neither this function nor lib/email/ ever provides).
-# NOT registered under [auth.hook.send_email] here: this slice only AUTHORS
+# NOT registered under [auth.hook.send_email] here: this repo only AUTHORS
 # and locally verifies the function (its own tests, and invoking it directly
 # with a hand-signed payload) -- wiring GoTrue itself to call it, locally or
-# on the real project, is slice 7's job (see the runbook), so today's local
+# on the real project, is a manual step (see the runbook), so today's local
 # stack's existing Auth email behavior is unaffected by this function merely
 # existing.
 #

@@ -1,7 +1,7 @@
 // D15: the Supabase Auth Send Email Hook. Verifies the Standard Webhooks
 // signature, resolves which store an Auth event belongs to, renders the
 // matching D11 catalog template, and enqueues it into the SAME
-// ecommerce.email_outbox slice 2 built (D14) -- never calls Resend itself
+// ecommerce.email_outbox (D14) -- never calls Resend itself
 // (lib/email/outbox-worker.ts / supabase/functions/email-worker still own
 // that, unchanged). All decision logic lives in lib/email/auth-hook.ts
 // (dependency-injected, tested by tests/email/auth-hook.test.ts per D41);
@@ -10,7 +10,7 @@
 // stay a thin wrapper.
 //
 // AUTHORED and locally verified here only (HARD BOUNDARY): registering this
-// against the real project's Auth settings is slice 7's job, documented in
+// against the real project's Auth settings is a manual step, documented in
 // docs/supabase/email-outbox-runbook.md.
 //
 // `verify_jwt = false` (supabase/config.toml) because the caller is GoTrue,

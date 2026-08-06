@@ -57,7 +57,7 @@ export function EmailAction({ href, label, primaryColor }: { href: string; label
   );
 }
 
-export function getPrimaryColor(color: string): string {
+function getPrimaryColor(color: string): string {
   return HEX_COLOR_PATTERN.test(color) ? color : DEFAULT_PRIMARY_COLOR;
 }
 

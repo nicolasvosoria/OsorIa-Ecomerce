@@ -28,9 +28,10 @@ export type AuthIdentityLookup = { exists: false } | { exists: true; userId: str
 // D20/D21's fork point. The ONLY place outside
 // ecommerce.find_auth_user_id_by_email itself that may learn whether an
 // email exists in auth.users -- "exists" here means "exists somewhere in
-// this shared-pool project" (this slice's brief), never "is already a user
-// of this app", so callers must branch D20 (native invite) vs D21 (pending
-// acceptance) on this alone, never on ecommerce.user_profiles.
+// this shared-pool project" (auth.users is shared across sibling apps),
+// never "is already a user of this app", so callers must branch D20 (native
+// invite) vs D21 (pending acceptance) on this alone, never on
+// ecommerce.user_profiles.
 export async function resolveAuthIdentityByEmail(
   service: any,
   email: string,
@@ -116,7 +117,7 @@ export async function inviteNewIdentity(
   return { outcome: "invited", userId };
 }
 
-// D25: reuses slice 2's check_and_record_send_attempt (1/60s, 5/hour per
+// D25: reuses ecommerce.check_and_record_send_attempt (1/60s, 5/hour per
 // store x purpose x recipient) instead of a second limiter -- same shape as
 // lib/auth/prepare-auth-redirect.ts's ensureAuthSendAllowed, gating BEFORE
 // any auth.users mutation so a rate-limited attempt never creates or touches
@@ -137,8 +138,8 @@ async function ensureInviteSendAllowed(
 }
 
 // Reads back the CURRENT app_metadata before writing: auth.users is a shared
-// pool (this slice's brief), so a sibling app may already carry its own keys
-// there, and a blind overwrite would destroy them. AdminUserAttributes.
+// pool, so a sibling app may already carry its own keys there, and a blind
+// overwrite would destroy them. AdminUserAttributes.
 // app_metadata is service-role-only to write (GoTrueAdminApi.updateUserById),
 // unlike user_metadata, which the client SDK can rewrite itself -- that
 // asymmetry is exactly why D22 keys off this field and not the other.

@@ -6,7 +6,7 @@
   "scripts": {
     "build": "next build",
     "dev": "next dev",
-    "lint": "eslint app/api/store app/api/orders/send-confirmation-email lib/security tests/security tests/quality --max-warnings=0",
+    "lint": "eslint app/api/store app/api/email-preview lib/security tests/security tests/quality --max-warnings=0",
     "lint:full": "eslint . --max-warnings=0",
     "start": "next start",
     "seed:default": "node scripts/seed-default-store.mjs",

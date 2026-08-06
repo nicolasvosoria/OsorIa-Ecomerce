@@ -1635,8 +1635,8 @@ describe("orders-api live order contract", () => {
     expect(merchantNotification.recipientEmail).toBe("pedidos@example.com");
   });
 
-  // Verifier finding 1: store_contact starts null-null for essentially every
-  // real store today (ecommerce.provision_store never inserts a row, and
+  // store_contact starts null-null for essentially every real store today
+  // (ecommerce.provision_store never inserts a row, and
   // nothing in the live app writes contact_email), so resolveMerchantRecipient
   // must degrade gracefully instead of throwing before the atomic RPC is ever
   // called. Ready-store fixture shared by the two "exactly two, both modes"
@@ -1667,7 +1667,7 @@ describe("orders-api live order contract", () => {
     ],
   });
 
-  it("D31/D12 (verifier finding 1): enqueues the customer receipt ALONE and makes the shortfall visible when the store has no merchant recipient and enforcement is off", async () => {
+  it("D31/D12: enqueues the customer receipt ALONE and makes the shortfall visible when the store has no merchant recipient and enforcement is off", async () => {
     const state = new MockSupabaseState({
       "store_items:select": [
         { data: [{ id: "store-item-1", base_price: 100000, currency_code: "COP" }], error: null },
@@ -1743,7 +1743,7 @@ describe("orders-api live order contract", () => {
     warnSpy.mockRestore();
   });
 
-  it("D12 (verifier finding 1): a ready store still gets exactly two outbox notifications with enforcement off", async () => {
+  it("D12: a ready store still gets exactly two outbox notifications with enforcement off", async () => {
     const state = new MockSupabaseState({
       "store_items:select": [
         { data: [{ id: "store-item-1", base_price: 100000, currency_code: "COP" }], error: null },
@@ -1783,7 +1783,7 @@ describe("orders-api live order contract", () => {
     expect(merchantNotification.recipientEmail).toBe("pedidos@tienda-lista.com");
   });
 
-  it("D12 (verifier finding 1): a ready store also gets exactly two outbox notifications with enforcement ON, and checkout succeeds", async () => {
+  it("D12: a ready store also gets exactly two outbox notifications with enforcement ON, and checkout succeeds", async () => {
     vi.stubEnv("CHECKOUT_ENFORCE_STORE_IDENTITY_READINESS", "true");
 
     const state = new MockSupabaseState({
@@ -1827,10 +1827,10 @@ describe("orders-api live order contract", () => {
     ]);
   });
 
-  // D41: the four scenarios below each fail without this slice's behavior --
-  // D27's atomic rollback is proven separately, at the real-Postgres level,
-  // by supabase/checks/verify-email-platform-contract.sql (a JS mock cannot
-  // prove real transactional atomicity).
+  // D41: the four scenarios below each fail without the atomic checkout
+  // write's guarantees -- D27's atomic rollback is proven separately, at the
+  // real-Postgres level, by supabase/checks/verify-email-platform-contract.sql
+  // (a JS mock cannot prove real transactional atomicity).
 
   it("D31: blocks checkout before any write when the identity readiness gate is enforced and the store is the genuine null-null empty state", async () => {
     vi.stubEnv("CHECKOUT_ENFORCE_STORE_IDENTITY_READINESS", "true");
@@ -1847,8 +1847,8 @@ describe("orders-api live order contract", () => {
       ],
       "store_contact:select": [
         {
-          // Verifier finding 1: the real default state of essentially every
-          // store today has NO row at all (ecommerce.provision_store never
+          // The real default state of essentially every store today has NO
+          // row at all (ecommerce.provision_store never
           // inserts store_contact, and nothing in the live app ever writes
           // contact_email) -- contact_email null here, not the
           // "tienda@example.com" no real store actually has.
@@ -1921,7 +1921,7 @@ describe("orders-api live order contract", () => {
 
     expect(created?.id).toBe("order-existing-1");
     expect(created?.items).toEqual(existingItems);
-    // D41 (verifier finding 2): a replay must NOT short-circuit before the
+    // D41: a replay must NOT short-circuit before the
     // follow-up writes -- a first attempt can die between the atomic RPC
     // succeeding and these running, so skipping them here on replay is
     // exactly what used to leave inventory never decremented. They run every

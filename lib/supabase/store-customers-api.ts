@@ -21,8 +21,8 @@ type StoreOrderCustomerRow = {
 }
 
 // The store's own customers, derived from the orders it owns (D8): no per-store
-// signup column exists yet (slice 11 adds one for new users), so today a store's
-// customer relationship is read from its orders. The query is scoped to storeId —
+// signup column exists yet, so today a store's customer relationship is read
+// from its orders. The query is scoped to storeId —
 // the service client bypasses RLS, so that explicit filter is the tenant
 // isolation, and a customer of another store can never surface here. Both
 // registered buyers (user_id set) and guests (user_id null) count, grouped by

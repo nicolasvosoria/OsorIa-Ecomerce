@@ -118,8 +118,8 @@ describe("processAuthEmailHookPayload", () => {
     expect(deps.enqueueEmail).not.toHaveBeenCalled()
   })
 
-  // The "auth.users is a shared pool" case from this slice's brief: no
-  // matching intent AND no ecommerce profile for this user at all.
+  // The "auth.users is a shared pool" case: no matching intent AND no
+  // ecommerce profile for this user at all.
   it("skips gracefully when neither an intent nor a profile can resolve a store", async () => {
     const deps = buildDeps({ peekAuthIntent: vi.fn().mockResolvedValue(null), loadProfileHomeStore: vi.fn().mockResolvedValue(null) })
 

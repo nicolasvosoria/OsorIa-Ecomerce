@@ -48,8 +48,8 @@ function isLifecycleStatus(status: Order["status"]): status is OrderLifecycleSta
 }
 
 // D30: the single call site that replaces the old direct `.update({status})`
-// write (lib/supabase/orders-api.ts's updateOrderStatus, before this slice)
-// behind ecommerce.transition_order_status. The frozen D29 graph and the
+// write (lib/supabase/orders-api.ts's updateOrderStatus) behind
+// ecommerce.transition_order_status. The frozen D29 graph and the
 // authorization/tenant checks live inside that locked function; this
 // assembles what it needs BEFORE calling it (D13: the lifecycle message
 // renders in TS, never in SQL) and interprets its result -- same shape as

@@ -30,18 +30,3 @@ describe("email preview route", () => {
     expect((await GET(createRequest("order-received") as never)).status).toBe(404);
   });
 });
-
-import { GET as getLegacyPreview } from "@/app/api/orders/send-confirmation-email/route";
-
-describe("legacy order preview route", () => {
-  it("redirects development previews to the fixture-only catalog", () => {
-    vi.stubEnv("NODE_ENV", "development");
-
-    const response = getLegacyPreview(createRequest("to=attacker@example.com") as never);
-
-    expect(response.status).toBe(307);
-    expect(response.headers.get("location")).toBe(
-      "http://localhost:3000/api/email-preview?template=order-received",
-    );
-  });
-});

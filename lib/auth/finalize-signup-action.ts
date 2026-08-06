@@ -23,7 +23,7 @@ export type FinalizeCustomerSignupResult = { ok: boolean };
 // session's own client: the migration grants EXECUTE on
 // ecommerce.finalize_customer_profile to service_role only (verified by
 // supabase/checks/verify-email-platform-contract.sql), the same posture as
-// every other privileged write in this slice. p_user_id/p_email still come
+// every other privileged write in this codebase. p_user_id/p_email still come
 // exclusively from the trusted session read above, never from anything the
 // client supplies -- widening the caller's role never widens what it can
 // assert about itself.

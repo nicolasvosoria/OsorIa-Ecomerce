@@ -517,8 +517,8 @@ describe("addStoreMember (D20/D21)", () => {
     expect(result).toEqual({ success: true, outcome: "pending_acceptance" });
   });
 
-  // Case 3 — already a member of THIS exact store: same as before slice 6,
-  // just a role replacement, no invite of any kind.
+  // Case 3 — already a member of THIS exact store: same as before D20/D21's
+  // invite paths existed, just a role replacement, no invite of any kind.
   it("replaces the role of an identity already on this store's team, without inviting anyone", async () => {
     resolveAuthIdentityByEmail.mockResolvedValue({ exists: true, userId: "existing-uid" });
     const { service } = mockEcommerceService("su-existing");

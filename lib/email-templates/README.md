@@ -1,6 +1,6 @@
 # Plantillas de correo
 
-Plantillas HTML para correos de la tienda OSORIA. El estilo está alineado con el correo de **confirmación de pedido** (`/api/orders/send-confirmation-email`).
+Plantillas HTML para correos de la tienda OSORIA. El estilo está alineado con el correo de **confirmación de pedido** (previsualizable en `/api/email-preview?template=order-received`).
 
 ## Confirmación de cuenta (`account-confirmation.html`)
 

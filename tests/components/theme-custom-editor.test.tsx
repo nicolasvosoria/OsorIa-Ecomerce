@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-// Covers Slice 5's unified transactional publish (D16): handleApply must
+// Covers handleApply's unified transactional publish (D16): it must
 // write staged content FIRST (merged over current persisted variables) and
 // only publish the theme version LAST, must stop before publishing the theme
 // if any content write fails, and must surface an actionable error (without
@@ -268,8 +268,8 @@ describe("ThemeCustomEditor handleApply (D16 unified publish)", () => {
     });
   });
 
-  // Slice 11: the Vitrina tab seeds from getShopConfig and folds into the same
-  // unified Apply — a changed shop_config persists via updateShopConfig, an
+  // The Vitrina tab seeds from getShopConfig and folds into the same unified
+  // Apply — a changed shop_config persists via updateShopConfig, an
   // unchanged one never calls it, and the /shop header copy rides the existing
   // content channel (updateComponentStyle "shop").
   it("seeds the Vitrina tab from getShopConfig for the active store", async () => {

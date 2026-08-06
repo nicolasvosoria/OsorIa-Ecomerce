@@ -162,7 +162,7 @@ const NOT_AUTHORIZED_INVITE_ERROR = "No tienes permiso para invitar a esta tiend
 // Adds a member to the store by email. Three outcomes (D20/D21), decided by
 // whether the email already exists ANYWHERE in this shared-pool project's
 // auth.users (resolveAuthIdentityByEmail, never ecommerce.user_profiles
-// alone -- see this slice's brief):
+// alone):
 //   - already a member of THIS store -> role_updated, same as before
 //   - exists elsewhere in the org, not yet a member here -> D21's pending
 //     acceptance; no store_users row is written until the intended user

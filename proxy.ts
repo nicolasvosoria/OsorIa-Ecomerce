@@ -248,8 +248,8 @@ async function isThemePreviewByStoreManager(
 
 // ── Host admin (Plan 12, separación de privilegios) ─────────────────────────
 // admin.<dominio> sirve SOLO el tier plataforma (D1/D4): la consola de tenants
-// con rutas limpias (`/` consola, `/create` alta, `/<uuid>` ficha — su página
-// llega en el slice 7) que el proxy reescribe a las páginas existentes bajo
+// con rutas limpias (`/` consola, `/create` alta, `/<uuid>` ficha, cuya página
+// propia aún no existe) que el proxy reescribe a las páginas existentes bajo
 // /admin/stores (A3), más el auth journey, que pasa tal cual. El storefront no
 // existe aquí: la rama no emite headers x-store-* ni cookie store_id ni toca el
 // caché de tiendas. Plan 13 reescribirá el proxy: mantener esta rama localizada.

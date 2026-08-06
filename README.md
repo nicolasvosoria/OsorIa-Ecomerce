@@ -99,9 +99,10 @@ Gate policy:
 
 - `pnpm-lock.yaml` is the single lockfile source of truth.
 - `lint`, `typecheck`, `test`, and `build` must fail loudly on real errors (no warning-only pass-through).
-- Current H2 `lint`/`typecheck`/`test` scripts are **focused quality gates** for hardening surfaces (`app/api/store`, `app/api/orders/send-confirmation-email`, `lib/security`, `tests/security`, `tests/quality`).
+- Current H2 `lint`/`typecheck`/`test` scripts are **focused quality gates** for hardening surfaces (`app/api/store`, `app/api/email-preview`, `lib/security`, `tests/security`, `tests/quality`).
 - Full-repository visibility remains available via `pnpm lint:full`, `pnpm typecheck:full`, and `pnpm test:full` so hidden issues are explicit instead of ignored.
 - If any command fails, stop the lane and fix the issue before continuing.
+- The design detector is pinned to `impeccable@3.5.0`, run as `NPM_CONFIG_CACHE=/tmp/impeccable-npm-cache npx --yes impeccable@3.5.0 detect <touched front surfaces>` — the default npm cache is read-only under the sandbox.
 
 ## 📚 Tech Stack
 - `NEXT_PUBLIC_SUPABASE_URL`

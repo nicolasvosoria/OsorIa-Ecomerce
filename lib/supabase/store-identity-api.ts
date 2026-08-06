@@ -67,10 +67,11 @@ export async function loadStoreIdentity(supabase: any, storeId: string): Promise
   };
 }
 
-// Same shape app/admin/actions/store-identity.ts already builds inline for
-// the mailbox-verification email; lib/auth/platform-identity-invites.ts's
-// mintPendingMembershipInvite (D21) is this helper's second caller, so the
-// mapping lives here once instead of a second inline copy.
+// The one place branding is read off StoreIdentityView into email copy --
+// every caller (lib/checkout/order-notifications.ts, memberships-api.ts,
+// stores-admin-api.ts, the mailbox-verification action) uses this so a
+// store's footer -- logo, address, email, phone -- never differs by which
+// email it's on.
 export function toTenantEmailBranding(identity: StoreIdentityView): TenantEmailBranding {
   return {
     displayName: identity.displayName ?? "",
@@ -79,6 +80,7 @@ export function toTenantEmailBranding(identity: StoreIdentityView): TenantEmailB
     commercialAddress: identity.commercialAddress ?? "",
     ...(identity.logoUrl ? { logoUrl: identity.logoUrl } : {}),
     ...(identity.contactEmail ? { contactEmail: identity.contactEmail } : {}),
+    ...(identity.phone ? { contactPhone: identity.phone } : {}),
   };
 }
 

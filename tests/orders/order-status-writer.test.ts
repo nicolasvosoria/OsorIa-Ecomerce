@@ -6,12 +6,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 // prove the frozen D29 graph itself, real transactional atomicity, or a
 // database-enforced rejection -- that belongs to (and is proven by)
 // supabase/checks/verify-email-platform-contract.sql against real Postgres.
-const { loadStoreIdentity, renderEmail } = vi.hoisted(() => ({
+const { loadStoreIdentity, toTenantEmailBranding, renderEmail } = vi.hoisted(() => ({
   loadStoreIdentity: vi.fn(),
+  toTenantEmailBranding: vi.fn(),
   renderEmail: vi.fn(),
 }))
 
-vi.mock("@/lib/supabase/store-identity-api", () => ({ loadStoreIdentity }))
+vi.mock("@/lib/supabase/store-identity-api", () => ({ loadStoreIdentity, toTenantEmailBranding }))
 vi.mock("@/lib/email/render", () => ({ renderEmail }))
 
 import {
@@ -72,6 +73,14 @@ describe("transitionOrderStatusAtomically", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     loadStoreIdentity.mockResolvedValue(IDENTITY)
+    toTenantEmailBranding.mockReturnValue({
+      displayName: IDENTITY.displayName,
+      validatedSubdomain: IDENTITY.subdomain,
+      primaryColor: IDENTITY.primaryColor,
+      commercialAddress: IDENTITY.commercialAddress,
+      contactEmail: IDENTITY.contactEmail,
+      contactPhone: IDENTITY.phone,
+    })
     renderEmail.mockResolvedValue(RENDERED_EMAIL)
   })
 

@@ -12,7 +12,7 @@ import { resolveEmailSender } from "@/lib/email/sender"
 import { createVerificationToken } from "@/lib/security/verification-token"
 import { authorizeActiveStoreAdmin } from "@/lib/supabase/active-store"
 import { ECOMMERCE_FUNCTIONS, ECOMMERCE_TABLES } from "@/lib/supabase/contract"
-import { loadStoreIdentity } from "@/lib/supabase/store-identity-api"
+import { loadStoreIdentity, toTenantEmailBranding } from "@/lib/supabase/store-identity-api"
 
 const SETTINGS_PATH = "/admin/settings"
 const INVALID_INPUT = "Los datos no son válidos. Revisa el formulario e intenta de nuevo."
@@ -85,13 +85,7 @@ export async function requestMailboxVerification(input: unknown): Promise<AdminA
   const sender = resolveEmailSender("store-mailbox-verification", identity.displayName ?? "", null)
   const rendered = await renderEmail({
     kind: "store-mailbox-verification",
-    branding: {
-      displayName: identity.displayName ?? "",
-      validatedSubdomain: identity.subdomain,
-      primaryColor: identity.primaryColor ?? "",
-      commercialAddress: identity.commercialAddress ?? "",
-      ...(identity.contactEmail ? { contactEmail: identity.contactEmail } : {}),
-    },
+    branding: toTenantEmailBranding(identity),
     data: { purpose: field, actionPath: `/auth/mailbox-verification?token=${token}` },
   })
 

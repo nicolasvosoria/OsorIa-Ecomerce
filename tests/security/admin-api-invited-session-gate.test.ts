@@ -37,8 +37,8 @@ import { NextRequest } from "next/server";
 // authorization layer down, rejects an invited-pending session and accepts a
 // normal one, for both a read and a write. What it does NOT prove: an actual
 // network round trip through a running Next.js process. That remaining gap is
-// covered by this slice's manual live reproduction against a running dev
-// server and local Supabase (see the report), not by this automated suite.
+// covered by a manual live reproduction against a running dev server and
+// local Supabase, not by this automated suite.
 const { createServerClient, createClient, cookies } = vi.hoisted(() => ({
   createServerClient: vi.fn(),
   createClient: vi.fn(),
@@ -261,8 +261,8 @@ describe("admin API routes reject an invited-pending session (D22)", () => {
     );
 
     expect(response.status).toBe(403);
-    // The verifier's live bypass returned real order rows: prove the fixed
-    // route never even reaches store resolution or the orders table for this
+    // A live bypass once returned real order rows: prove the fixed route
+    // never even reaches store resolution or the orders table for this
     // identity -- disqualified before authorizeCandidate ever runs.
     expect(schema.rpc).not.toHaveBeenCalled();
     expect(schema.fromTables).not.toContain("orders");
@@ -298,8 +298,8 @@ describe("admin API routes reject an invited-pending session (D22)", () => {
     );
 
     expect(response.status).toBe(403);
-    // The verifier's live bypass persisted the write to ecommerce.shop_config:
-    // prove the fixed route never even resolves the active store or calls
+    // A live bypass once persisted the write to ecommerce.shop_config: prove
+    // the fixed route never even resolves the active store or calls
     // .update() for this identity -- disqualified before authorizeCandidate
     // ever runs.
     expect(schema.rpc).not.toHaveBeenCalled();
