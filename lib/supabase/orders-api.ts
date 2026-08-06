@@ -3,6 +3,11 @@ import { ECOMMERCE_FUNCTIONS, ECOMMERCE_TABLES } from "./contract";
 import { getStoreId } from "@/lib/utils/store";
 import { buildComboOrderSnapshotById } from "./combos-api";
 import type { ComboOrderSnapshot } from "@/lib/combos/types";
+import {
+  CheckoutIdempotencyConflictError,
+  StoreIdentityNotReadyError,
+  writeOrderAtomically,
+} from "@/lib/checkout/order-writer";
 
 // Tipos para pedidos
 export interface Order {
@@ -147,6 +152,12 @@ function stripUntrustedComboSnapshotMetadata<T extends { metadata?: Record<strin
 }
 
 export interface CreateOrderData {
+  // D28: per-store checkout correlation key for one checkout attempt, and a
+  // hash of the payload it was issued for -- both required so createOrder can
+  // hand them straight to ecommerce.create_order_with_notifications (D27).
+  // Snake_case like every other field here: this interface mirrors DB columns.
+  idempotency_key: string;
+  payload_fingerprint: string;
   customer_type: "guest" | "user";
   user_id?: string | null;
   customer_email: string;
@@ -403,46 +414,56 @@ function extractProviderPaymentPayload(
 async function maybeInsertPaymentTransaction(
   supabase: any,
   order: Order,
-  metadata?: Record<string, any>,
+  metadata: Record<string, any> | undefined,
+  idempotencyKey: string,
 ): Promise<void> {
   const providerPayload = extractProviderPaymentPayload(metadata);
   if (!providerPayload) {
     return;
   }
 
+  // idempotency_key is unique (payment_transactions_idempotency_key_key):
+  // a retry of this SAME checkout attempt reuses the SAME key, so it's
+  // ignored instead of inserting a second row for the order. Null for every
+  // OTHER writer of this table (none exist today), so this never constrains
+  // a future one -- same reasoning as orders.idempotency_key.
   await withTimeout(
-    supabase.from(ECOMMERCE_TABLES.paymentTransactions).insert({
-      id: generateUuid(),
-      order_id: order.id,
-      provider:
-        providerPayload.provider ||
-        providerPayload.gateway ||
-        "provider_payload",
-      transaction_type: providerPayload.transaction_type || "payment",
-      amount:
-        providerPayload.amount ??
-        providerPayload.total_amount ??
-        order.total_amount,
-      currency_code:
-        providerPayload.currency_code || order.currency_code || "COP",
-      status: providerPayload.status || "pending",
-      provider_payment_method:
-        providerPayload.provider_payment_method ||
-        providerPayload.payment_method ||
-        null,
-      provider_transaction_id:
-        providerPayload.provider_transaction_id ||
-        providerPayload.transaction_id ||
-        providerPayload.reference ||
-        null,
-      provider_txn_id:
-        providerPayload.provider_transaction_id ||
-        providerPayload.transaction_id ||
-        providerPayload.reference ||
-        null,
-      metadata: providerPayload,
-      raw_response: providerPayload,
-    }),
+    supabase.from(ECOMMERCE_TABLES.paymentTransactions).upsert(
+      {
+        id: generateUuid(),
+        order_id: order.id,
+        idempotency_key: idempotencyKey,
+        provider:
+          providerPayload.provider ||
+          providerPayload.gateway ||
+          "provider_payload",
+        transaction_type: providerPayload.transaction_type || "payment",
+        amount:
+          providerPayload.amount ??
+          providerPayload.total_amount ??
+          order.total_amount,
+        currency_code:
+          providerPayload.currency_code || order.currency_code || "COP",
+        status: providerPayload.status || "pending",
+        provider_payment_method:
+          providerPayload.provider_payment_method ||
+          providerPayload.payment_method ||
+          null,
+        provider_transaction_id:
+          providerPayload.provider_transaction_id ||
+          providerPayload.transaction_id ||
+          providerPayload.reference ||
+          null,
+        provider_txn_id:
+          providerPayload.provider_transaction_id ||
+          providerPayload.transaction_id ||
+          providerPayload.reference ||
+          null,
+        metadata: providerPayload,
+        raw_response: providerPayload,
+      },
+      { onConflict: "idempotency_key", ignoreDuplicates: true },
+    ),
     15000,
     "createPaymentTransaction",
   ).catch((paymentError) => {
@@ -1256,85 +1277,44 @@ export async function createOrder(
       normalizedOrderData.items,
     );
 
-    // Crear el pedido
-    const orderResult = (await withTimeout(
-      supabase
-        .from(ECOMMERCE_TABLES.orders)
-        .insert({
-          store_id: resolvedStoreId,
-          customer_type: orderData.customer_type,
-          user_id: normalizedOrderData.user_id || null,
-          customer_email: normalizedOrderData.customer_email,
-          customer_first_name: normalizedOrderData.customer_first_name,
-          customer_last_name: normalizedOrderData.customer_last_name,
-          customer_phone: normalizedOrderData.customer_phone || null,
-          shipping_address: normalizedOrderData.shipping_address,
-          shipping_city: normalizedOrderData.shipping_city,
-          shipping_postal_code: normalizedOrderData.shipping_postal_code,
-          shipping_country: normalizedOrderData.shipping_country || "Colombia",
-          shipping_notes: normalizedOrderData.shipping_notes || null,
-          payment_method: normalizedOrderData.payment_method || null,
-          payment_status: normalizedOrderData.payment_status || "pending",
-          payment_reference: normalizedOrderData.payment_reference || null,
-          subtotal: normalizedOrderData.subtotal,
-          shipping_cost: normalizedOrderData.shipping_cost || 0,
-          tax_amount: normalizedOrderData.tax_amount || 0,
-          discount_amount: normalizedOrderData.discount_amount || 0,
-          total_amount: normalizedOrderData.total_amount,
-          currency_code: normalizedOrderData.currency_code || "COP",
-          notes: normalizedOrderData.notes || null,
-          metadata: normalizedOrderData.metadata || {},
-        })
-        .select()
-        .single(),
-      20000,
-      "createOrder",
-    )) as { data: any; error: any };
-
-    if (orderResult.error) {
-      console.error("[Orders] Error al crear pedido:", orderResult.error);
+    if (!resolvedStoreId) {
+      console.error("[Orders] No se pudo resolver la tienda del pedido");
       return null;
     }
 
-    const order = orderResult.data as Order;
+    // D27: header + items + the two D12 outbox notifications, all-or-nothing
+    // behind ecommerce.create_order_with_notifications. Replaces the two
+    // separate insert() calls this used to be (each its own HTTP request and
+    // its own transaction -- see the migration's comment for the orphaned-
+    // write hazard that created).
+    const atomicWrite = await writeOrderAtomically({
+      supabase,
+      storeId: resolvedStoreId,
+      idempotencyKey: orderData.idempotency_key,
+      payloadFingerprint: orderData.payload_fingerprint,
+      header: normalizedOrderData,
+    });
 
-    // Crear los items del pedido
-    const itemsToInsert = normalizedOrderData.items.map((item) => ({
-      id: generateUuid(),
-      order_id: order.id,
-      product_id: item.product_id || null,
-      product_name: item.product_name,
-      product_sku: item.product_sku || null,
-      variant_id: item.variant_id || null,
-      variant_title: item.variant_title || null,
-      unit_price: item.unit_price,
-      quantity: item.quantity,
-      total_price: item.total_price,
-      currency_code: item.currency_code || "COP",
-      product_image_url: item.product_image_url || null,
-      product_slug: item.product_slug || null,
-      selected_options: item.selected_options || {},
-      metadata: item.metadata || {},
-    }));
+    const order = atomicWrite.order;
+    const orderItems = atomicWrite.items;
 
-    const itemsResult = (await withTimeout(
-      supabase.from(ECOMMERCE_TABLES.orderItems).insert(itemsToInsert).select(),
-      20000,
-      "createOrderItems",
-    )) as { data: any; error: any };
-
-    if (itemsResult.error) {
-      console.error(
-        "[Orders] Error al crear items del pedido:",
-        itemsResult.error,
-      );
-      // El pedido ya fue creado, pero los items fallaron
-      // Podríamos eliminar el pedido o dejarlo sin items
-      return { ...order, items: [] } as OrderWithItems;
-    }
-
-    const orderItems = itemsResult.data as OrderItem[];
-
+    // D28/D41: the four follow-ups below run every time -- including on a
+    // replayed retry -- rather than being skipped when atomicWrite.replayed
+    // is true. A FIRST attempt can die anywhere between the atomic RPC
+    // succeeding and these finishing (e.g. the network drops right after);
+    // the customer's natural retry reuses the same idempotency key and
+    // reaches this same code with replayed:true, and skipping here on that
+    // assumption ("they all landed then too") is exactly what used to leave
+    // inventory never decremented and rows silently missing. Each follow-up
+    // is instead idempotent PER ORDER on its own terms: the three writes
+    // below use their natural key with ON CONFLICT DO NOTHING (order_item_id
+    // for combo snapshots, (order_id, address_type) for the shipping
+    // address, idempotency_key for the payment transaction -- see
+    // 20260805000700_ecommerce_checkout_followup_convergence.sql), and
+    // decrementInventoryAtomically's RPC claims a durable per-order marker
+    // in the SAME transaction as the decrement, so a retry can never double
+    // an insert or double-decrement stock, on a replay or a plain
+    // double-submit alike.
     const comboSnapshotRows = orderItems
       .map((orderItem) => {
         const snapshot = getComboSnapshotFromMetadata(orderItem);
@@ -1360,10 +1340,14 @@ export async function createOrder(
       .filter((row): row is NonNullable<typeof row> => row !== null);
 
     if (comboSnapshotRows.length > 0) {
+      // order_item_id is unique per row (order_combo_snapshots_order_item_key):
+      // a retry recomputes the SAME snapshot rows from the SAME (replayed or
+      // fresh) order items, so ignoring the conflict converges to exactly one
+      // snapshot per combo order item instead of raising or duplicating.
       const snapshotResult = await withTimeout(
         supabase
           .from(ECOMMERCE_TABLES.orderComboSnapshots)
-          .insert(comboSnapshotRows),
+          .upsert(comboSnapshotRows, { onConflict: "order_item_id", ignoreDuplicates: true }),
         15000,
         "createOrderComboSnapshots",
       ) as { error: any };
@@ -1375,9 +1359,13 @@ export async function createOrder(
       }
     }
 
+    // (order_id, address_type) is unique (order_addresses_order_id_address_type_key):
+    // this always writes the same 'shipping' type for a given order, so a
+    // retry's insert is ignored instead of creating a second shipping row.
     await withTimeout(
-      supabase.from(ECOMMERCE_TABLES.orderAddresses).insert(
+      supabase.from(ECOMMERCE_TABLES.orderAddresses).upsert(
         buildShippingAddressRow(order.id, normalizedOrderData),
+        { onConflict: "order_id,address_type", ignoreDuplicates: true },
       ),
       15000,
       "createOrderAddress",
@@ -1388,7 +1376,12 @@ export async function createOrder(
       );
     });
 
-    await maybeInsertPaymentTransaction(supabase, order, normalizedOrderData.metadata);
+    await maybeInsertPaymentTransaction(
+      supabase,
+      order,
+      normalizedOrderData.metadata,
+      orderData.idempotency_key,
+    );
 
     // Descontar inventario de forma ATÓMICA después de crear la orden.
     // Esta RPC es la autoridad sobre el stock (ver decrementInventoryAtomically):
@@ -1451,7 +1444,13 @@ export async function createOrder(
     };
   } catch (error: any) {
     console.error("[Orders] Error inesperado al crear pedido:", error);
-    if (error?.validationResult) {
+    if (
+      error?.validationResult ||
+      error instanceof StoreIdentityNotReadyError ||
+      error instanceof CheckoutIdempotencyConflictError
+    ) {
+      // Motivos específicos que el llamador (placeCheckoutOrder) necesita
+      // distinguir de un fallo genérico -- ver su catch.
       throw error;
     }
     return null;

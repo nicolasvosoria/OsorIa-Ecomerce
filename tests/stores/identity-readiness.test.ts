@@ -5,8 +5,6 @@ import { getStoreIdentityReadiness, type StoreIdentitySnapshot } from "@/lib/sto
 const COMPLETE: StoreIdentitySnapshot = {
   displayName: "Cumbre Dorada Café",
   legalName: "Cumbre Dorada S.A.S.",
-  logoUrl: "https://cdn.example.com/logo.png",
-  primaryColor: "#5daba8",
   phone: "3000000000",
   commercialAddress: "Bogotá, Colombia",
   replyToVerifiedAt: "2026-08-01T00:00:00.000Z",
@@ -14,7 +12,7 @@ const COMPLETE: StoreIdentitySnapshot = {
 }
 
 describe("getStoreIdentityReadiness", () => {
-  it("is ready when every D4 field is present and both mailboxes are verified", () => {
+  it("is ready when every A8 field is present and both mailboxes are verified", () => {
     expect(getStoreIdentityReadiness(COMPLETE)).toEqual({ ready: true, missingFields: [] })
   })
 
@@ -22,12 +20,12 @@ describe("getStoreIdentityReadiness", () => {
     const readiness = getStoreIdentityReadiness({
       ...COMPLETE,
       legalName: null,
-      logoUrl: "   ",
+      phone: "   ",
       replyToVerifiedAt: null,
     })
 
     expect(readiness.ready).toBe(false)
-    expect(readiness.missingFields).toEqual(["legalName", "logo", "replyTo"])
+    expect(readiness.missingFields).toEqual(["legalName", "phone", "replyTo"])
   })
 
   it("treats a pending (unverified) mailbox as not ready even once an address exists", () => {

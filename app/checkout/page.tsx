@@ -26,6 +26,11 @@ export default function CheckoutPage() {
   const [customerData, setCustomerData] = useState<GuestCustomerData | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [prefill, setPrefill] = useState<CheckoutPrefill>(null)
+  // D28: un solo id por carga de página, reenviado sin cambios en cada
+  // reintento de este mismo intento de compra (doble clic, error transitorio
+  // y "intentar de nuevo"). Una recarga de página genera uno nuevo a propósito
+  // -- eso es un intento de compra distinto.
+  const [checkoutIdempotencyKey] = useState(() => crypto.randomUUID())
 
   // Limpiar datos previos del checkout al cargar la página
   // Esto asegura que siempre se muestre el formulario para una nueva compra
@@ -141,7 +146,7 @@ export default function CheckoutPage() {
         items: orderItems,
       }
 
-      const result = await placeCheckoutOrder(orderPayload)
+      const result = await placeCheckoutOrder(orderPayload, checkoutIdempotencyKey)
       if (!result.success) {
         const error = new Error(result.error || "No se pudo crear el pedido")
         if (result.validationResult) {

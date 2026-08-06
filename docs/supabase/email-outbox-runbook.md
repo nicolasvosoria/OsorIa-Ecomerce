@@ -70,3 +70,19 @@ select count(*) from ecommerce.email_outbox where created_at < now() - interval 
 2. `supabase functions deploy email-worker`.
 3. `select cron.alter_job(job_id := jobid, active := true) from cron.job where jobname in ('email-outbox-worker', 'email-outbox-prune');`
 4. Smoke test: forzar una verificación de buzón desde `/admin/settings`, confirmar que la fila de `email_outbox` pasa a `sent` dentro de 2 minutos y que el correo llega.
+
+## El gate de identidad del checkout (D7/A8/D31) también nace apagado
+
+La slice 3 conecta el checkout a `getStoreIdentityReadiness()` (nombre público,
+razón social, teléfono, dirección comercial, Reply-To verificado, buzón de
+pedidos verificado), pero el rechazo real queda apagado hasta que cada tienda
+haya tenido tiempo de completar esos datos por su cuenta desde
+`/admin/settings`. El interruptor es una variable de entorno, no una fila de
+base de datos, porque la regla vive en TS puro
+(`lib/stores/identity-readiness.ts`) y no tiene un gemelo en SQL.
+
+Activarlo en la slice 7: `vercel env add CHECKOUT_ENFORCE_STORE_IDENTITY_READINESS
+production` con el valor `true`. Con el gate encendido, un checkout contra una
+tienda incompleta falla ANTES de crear la orden (ningún pedido, ningún item,
+ningún correo en cola) -- confirmar contra una tienda de prueba deliberadamente
+incompleta antes de encenderlo en una tienda real.

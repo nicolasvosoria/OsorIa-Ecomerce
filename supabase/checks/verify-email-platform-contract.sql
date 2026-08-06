@@ -33,7 +33,8 @@ begin
     ('stores', 'legal_name'),
     ('store_contact', 'reply_to_email'), ('store_contact', 'reply_to_pending_email'), ('store_contact', 'reply_to_verified_at'),
     ('store_contact', 'order_mailbox_email'), ('store_contact', 'order_mailbox_pending_email'), ('store_contact', 'order_mailbox_verified_at'),
-    ('email_outbox', 'idempotency_key'), ('email_outbox', 'attempt_count'), ('email_outbox', 'provider_message_id'), ('email_outbox', 'last_error')
+    ('email_outbox', 'idempotency_key'), ('email_outbox', 'attempt_count'), ('email_outbox', 'provider_message_id'), ('email_outbox', 'last_error'),
+    ('orders', 'idempotency_key'), ('orders', 'payload_fingerprint')
   ) req(required_table, required_column)
   where not exists (
     select 1 from information_schema.columns c
@@ -42,6 +43,38 @@ begin
 
   if v_missing is not null then
     raise exception 'Missing email platform columns: %', array_to_string(v_missing, ', ');
+  end if;
+end $$;
+
+-- D27: the atomic checkout RPC must exist with the exact signature the app calls.
+do $$
+begin
+  if to_regprocedure('ecommerce.create_order_with_notifications(uuid, text, text, jsonb, jsonb, jsonb)') is null then
+    raise exception 'Missing ecommerce.create_order_with_notifications(uuid, text, text, jsonb, jsonb, jsonb)';
+  end if;
+end $$;
+
+-- D30: same posture as decrement_inventory/provision_store -- service_role
+-- only, since the function inserts into orders/order_items/email_outbox as
+-- its owner without granting callers table access.
+do $$
+declare
+  v_violations text[];
+begin
+  select array_agg(msg) into v_violations
+  from (
+    select 'anon can EXECUTE ecommerce.create_order_with_notifications' as msg
+    where has_function_privilege('anon', 'ecommerce.create_order_with_notifications(uuid, text, text, jsonb, jsonb, jsonb)', 'execute')
+    union all
+    select 'authenticated can EXECUTE ecommerce.create_order_with_notifications'
+    where has_function_privilege('authenticated', 'ecommerce.create_order_with_notifications(uuid, text, text, jsonb, jsonb, jsonb)', 'execute')
+    union all
+    select 'service_role cannot EXECUTE ecommerce.create_order_with_notifications'
+    where not has_function_privilege('service_role', 'ecommerce.create_order_with_notifications(uuid, text, text, jsonb, jsonb, jsonb)', 'execute')
+  ) v;
+
+  if v_violations is not null then
+    raise exception 'create_order_with_notifications grant contract broken: %', array_to_string(v_violations, '; ');
   end if;
 end $$;
 
@@ -327,6 +360,454 @@ begin
   end if;
   if not exists (select 1 from ecommerce.email_outbox where id = v_row_b) then
     raise exception 'D17: a row inside the 30-day window must survive pruning';
+  end if;
+end $$;
+
+-- -----------------------------------------------------------------------------
+-- D27/D28/D12: atomic checkout order creation. Same rollback-wrapped
+-- transaction and the same contract-check-store the blocks above provisioned.
+-- -----------------------------------------------------------------------------
+do $$
+declare
+  v_store_id uuid;
+  v_reserved_order_number text;
+  v_order jsonb;
+  v_items jsonb;
+  v_notifications jsonb;
+  v_result jsonb;
+  v_order_id uuid;
+  v_second_order_id uuid;
+  v_outbox_count integer;
+  v_order_count integer;
+begin
+  select id into v_store_id from ecommerce.stores where subdomain = 'contract-check-store';
+
+  -- D13: the app reserves order_number via ecommerce.generate_order_number
+  -- BEFORE calling here (the two outbox emails are rendered with it already
+  -- in their text), then passes it through p_order.order_number. Reserving
+  -- it here too proves the function actually USES that value for the insert
+  -- instead of silently letting set_order_number_before_insert mint an
+  -- unrelated one -- which would desync the persisted order from what the
+  -- customer's already-queued email says.
+  v_reserved_order_number := ecommerce.generate_order_number(v_store_id);
+
+  v_order := jsonb_build_object(
+    'customer_type', 'guest', 'customer_email', 'buyer@example.com',
+    'customer_first_name', 'Ada', 'customer_last_name', 'Lovelace',
+    'shipping_address', 'Calle 123', 'shipping_city', 'Bogotá', 'shipping_postal_code', '110111',
+    'payment_method', 'cash_on_delivery', 'subtotal', 30000, 'total_amount', 30000,
+    'order_number', v_reserved_order_number
+  );
+  v_items := jsonb_build_array(
+    jsonb_build_object('product_name', 'Café 250g', 'unit_price', 30000, 'quantity', 1, 'total_price', 30000)
+  );
+  v_notifications := jsonb_build_array(
+    jsonb_build_object(
+      'templateKind', 'order-received', 'recipientEmail', 'buyer@example.com',
+      'fromAddress', 'Contract Check Store vía Osoria <pedidos@mail.osoria.help>', 'replyToAddress', null,
+      'subject', 'Recibimos tu pedido', 'htmlBody', '<p>h</p>', 'textBody', 't',
+      'idempotencyKey', 'checkout:' || v_store_id::text || ':atomic-check-1:order-received'
+    ),
+    jsonb_build_object(
+      'templateKind', 'merchant-new-order', 'recipientEmail', 'tienda@example.com',
+      'fromAddress', 'Contract Check Store vía Osoria <pedidos@mail.osoria.help>', 'replyToAddress', null,
+      'subject', 'Nuevo pedido', 'htmlBody', '<p>h</p>', 'textBody', 't',
+      'idempotencyKey', 'checkout:' || v_store_id::text || ':atomic-check-1:merchant-new-order'
+    )
+  );
+
+  -- Atomic rollback (D27): an empty p_items makes the function raise AFTER
+  -- the header insert but BEFORE the outbox insert -- the exception aborts
+  -- the whole call (one statement, one transaction), so the header must roll
+  -- back too, not just the items that were never written.
+  begin
+    perform ecommerce.create_order_with_notifications(
+      v_store_id, 'atomic-check-rollback', 'fingerprint-rollback', v_order, '[]'::jsonb, v_notifications
+    );
+    raise exception 'D27: an order with zero items must raise, not silently create';
+  exception when others then
+    null;
+  end;
+
+  if exists (select 1 from ecommerce.orders where store_id = v_store_id and idempotency_key = 'atomic-check-rollback') then
+    raise exception 'D27: the mid-way failure above must have left NO order row';
+  end if;
+  if exists (
+    select 1 from ecommerce.email_outbox
+    where idempotency_key like 'checkout:' || v_store_id::text || ':atomic-check-1:%'
+  ) then
+    raise exception 'D27: the mid-way failure above must have left NO outbox rows';
+  end if;
+
+  -- Happy path: header + items + exactly two outbox rows, atomically.
+  v_result := ecommerce.create_order_with_notifications(
+    v_store_id, 'atomic-check-1', 'fingerprint-1', v_order, v_items, v_notifications
+  );
+  if (v_result ->> 'ok')::boolean is not true or (v_result ->> 'replayed')::boolean is not false then
+    raise exception 'D27: expected a fresh order to be created, got %', v_result;
+  end if;
+  v_order_id := (v_result -> 'order' ->> 'id')::uuid;
+  if (v_result -> 'order' ->> 'order_number') <> v_reserved_order_number then
+    raise exception 'D13: the persisted order_number (%) must match the one reserved before rendering the emails (%)',
+      v_result -> 'order' ->> 'order_number', v_reserved_order_number;
+  end if;
+
+  select count(*) into v_outbox_count
+  from ecommerce.email_outbox
+  where idempotency_key like 'checkout:' || v_store_id::text || ':atomic-check-1:%';
+  if v_outbox_count <> 2 then
+    raise exception 'D12: expected exactly two outbox notifications, got %', v_outbox_count;
+  end if;
+
+  -- D28 identical retry: same key, same fingerprint -> the SAME order comes
+  -- back; no second order row, no second pair of outbox notifications.
+  v_result := ecommerce.create_order_with_notifications(
+    v_store_id, 'atomic-check-1', 'fingerprint-1', v_order, v_items, v_notifications
+  );
+  if (v_result ->> 'ok')::boolean is not true or (v_result ->> 'replayed')::boolean is not true then
+    raise exception 'D28: an identical retry must report replayed:true, got %', v_result;
+  end if;
+  if (v_result -> 'order' ->> 'id')::uuid <> v_order_id then
+    raise exception 'D28: an identical retry must return the SAME order id';
+  end if;
+
+  select count(*) into v_order_count from ecommerce.orders
+  where store_id = v_store_id and idempotency_key = 'atomic-check-1';
+  if v_order_count <> 1 then
+    raise exception 'D28: an identical retry must never create a second order, found %', v_order_count;
+  end if;
+
+  select count(*) into v_outbox_count
+  from ecommerce.email_outbox
+  where idempotency_key like 'checkout:' || v_store_id::text || ':atomic-check-1:%';
+  if v_outbox_count <> 2 then
+    raise exception 'D28: a replay must never enqueue a second pair of notifications, found %', v_outbox_count;
+  end if;
+
+  -- D28 conflicting payload: same key, different fingerprint -> rejected outright.
+  v_result := ecommerce.create_order_with_notifications(
+    v_store_id, 'atomic-check-1', 'a-different-fingerprint', v_order, v_items, v_notifications
+  );
+  if v_result <> jsonb_build_object('ok', false, 'reason', 'idempotency_conflict') then
+    raise exception 'D28: a reused key with a different payload must be rejected, got %', v_result;
+  end if;
+
+  -- A DIFFERENT key is a genuinely new order, never confused with the first.
+  -- Needs its own reserved order_number: reusing the first one would collide
+  -- with ecommerce.orders' (store_id, order_number) unique constraint, since
+  -- 'atomic-check-1' already committed with it above.
+  v_order := v_order || jsonb_build_object('order_number', ecommerce.generate_order_number(v_store_id));
+  v_result := ecommerce.create_order_with_notifications(
+    v_store_id, 'atomic-check-2', 'fingerprint-2', v_order, v_items,
+    jsonb_build_array(
+      jsonb_build_object(
+        'templateKind', 'order-received', 'recipientEmail', 'buyer@example.com',
+        'fromAddress', 'Contract Check Store vía Osoria <pedidos@mail.osoria.help>', 'replyToAddress', null,
+        'subject', 'Recibimos tu pedido', 'htmlBody', '<p>h</p>', 'textBody', 't',
+        'idempotencyKey', 'checkout:' || v_store_id::text || ':atomic-check-2:order-received'
+      ),
+      jsonb_build_object(
+        'templateKind', 'merchant-new-order', 'recipientEmail', 'tienda@example.com',
+        'fromAddress', 'Contract Check Store vía Osoria <pedidos@mail.osoria.help>', 'replyToAddress', null,
+        'subject', 'Nuevo pedido', 'htmlBody', '<p>h</p>', 'textBody', 't',
+        'idempotencyKey', 'checkout:' || v_store_id::text || ':atomic-check-2:merchant-new-order'
+      )
+    )
+  );
+  v_second_order_id := (v_result -> 'order' ->> 'id')::uuid;
+  if v_second_order_id = v_order_id then
+    raise exception 'D28: a different idempotency key must create a genuinely different order';
+  end if;
+end $$;
+
+-- -----------------------------------------------------------------------------
+-- Verifier finding 1 (slice 3): the merchant notification is OPTIONAL during
+-- D31's pre-enforcement window, but only in a checkable shape -- always
+-- exactly one order-received, at most one merchant-new-order, nothing else.
+-- See 20260805000600_ecommerce_checkout_optional_merchant_notification.sql.
+-- -----------------------------------------------------------------------------
+do $$
+declare
+  v_store_id uuid;
+  v_order jsonb;
+  v_items jsonb;
+  v_result jsonb;
+  v_outbox_count integer;
+  v_receipt_only jsonb;
+begin
+  select id into v_store_id from ecommerce.stores where subdomain = 'contract-check-store';
+
+  v_items := jsonb_build_array(
+    jsonb_build_object('product_name', 'Taza', 'unit_price', 15000, 'quantity', 1, 'total_price', 15000)
+  );
+  v_receipt_only := jsonb_build_array(
+    jsonb_build_object(
+      'templateKind', 'order-received', 'recipientEmail', 'buyer2@example.com',
+      'fromAddress', 'Contract Check Store vía Osoria <pedidos@mail.osoria.help>', 'replyToAddress', null,
+      'subject', 'Recibimos tu pedido', 'htmlBody', '<p>h</p>', 'textBody', 't',
+      'idempotencyKey', 'checkout:' || v_store_id::text || ':finding1-receipt-only:order-received'
+    )
+  );
+
+  -- D31: a store with no merchant recipient (enforcement off) still checks
+  -- out with the customer receipt ALONE -- one outbox row, not zero, not two.
+  v_order := jsonb_build_object(
+    'customer_type', 'guest', 'customer_email', 'buyer2@example.com',
+    'customer_first_name', 'Grace', 'customer_last_name', 'Hopper',
+    'shipping_address', 'Calle 456', 'shipping_city', 'Bogotá', 'shipping_postal_code', '110111',
+    'payment_method', 'cash_on_delivery', 'subtotal', 15000, 'total_amount', 15000,
+    'order_number', ecommerce.generate_order_number(v_store_id)
+  );
+  v_result := ecommerce.create_order_with_notifications(
+    v_store_id, 'finding1-receipt-only', 'fingerprint-f1a', v_order, v_items, v_receipt_only
+  );
+  if (v_result ->> 'ok')::boolean is not true then
+    raise exception 'Finding 1: a single order-received notification must be accepted, got %', v_result;
+  end if;
+
+  select count(*) into v_outbox_count from ecommerce.email_outbox
+  where idempotency_key like 'checkout:' || v_store_id::text || ':finding1-receipt-only:%';
+  if v_outbox_count <> 1 then
+    raise exception 'Finding 1: expected exactly one outbox row for the receipt-only order, got %', v_outbox_count;
+  end if;
+
+  -- Every OTHER shape the RPC must still reject, one at a time -- checkable
+  -- by structure, never "one or two, whatever".
+  begin
+    perform ecommerce.create_order_with_notifications(
+      v_store_id, 'finding1-zero-receipts', 'fingerprint-f1b',
+      v_order || jsonb_build_object('order_number', ecommerce.generate_order_number(v_store_id)),
+      v_items, '[]'::jsonb
+    );
+    raise exception 'Finding 1: zero notifications must raise';
+  exception when others then null;
+  end;
+
+  begin
+    perform ecommerce.create_order_with_notifications(
+      v_store_id, 'finding1-no-receipt', 'fingerprint-f1c',
+      v_order || jsonb_build_object('order_number', ecommerce.generate_order_number(v_store_id)),
+      v_items,
+      jsonb_build_array(jsonb_build_object(
+        'templateKind', 'merchant-new-order', 'recipientEmail', 'tienda@example.com',
+        'fromAddress', 'x', 'replyToAddress', null, 'subject', 's', 'htmlBody', 'h', 'textBody', 't',
+        'idempotencyKey', 'checkout:' || v_store_id::text || ':finding1-no-receipt:merchant-new-order'
+      ))
+    );
+    raise exception 'Finding 1: a merchant notification with NO order-received must raise';
+  exception when others then null;
+  end;
+
+  begin
+    perform ecommerce.create_order_with_notifications(
+      v_store_id, 'finding1-two-receipts', 'fingerprint-f1d',
+      v_order || jsonb_build_object('order_number', ecommerce.generate_order_number(v_store_id)),
+      v_items,
+      jsonb_build_array(
+        jsonb_build_object(
+          'templateKind', 'order-received', 'recipientEmail', 'a@example.com',
+          'fromAddress', 'x', 'replyToAddress', null, 'subject', 's', 'htmlBody', 'h', 'textBody', 't',
+          'idempotencyKey', 'checkout:' || v_store_id::text || ':finding1-two-receipts:order-received-1'
+        ),
+        jsonb_build_object(
+          'templateKind', 'order-received', 'recipientEmail', 'b@example.com',
+          'fromAddress', 'x', 'replyToAddress', null, 'subject', 's', 'htmlBody', 'h', 'textBody', 't',
+          'idempotencyKey', 'checkout:' || v_store_id::text || ':finding1-two-receipts:order-received-2'
+        )
+      )
+    );
+    raise exception 'Finding 1: two order-received notifications must raise';
+  exception when others then null;
+  end;
+
+  begin
+    perform ecommerce.create_order_with_notifications(
+      v_store_id, 'finding1-two-merchants', 'fingerprint-f1e',
+      v_order || jsonb_build_object('order_number', ecommerce.generate_order_number(v_store_id)),
+      v_items,
+      jsonb_build_array(
+        jsonb_build_object(
+          'templateKind', 'order-received', 'recipientEmail', 'a@example.com',
+          'fromAddress', 'x', 'replyToAddress', null, 'subject', 's', 'htmlBody', 'h', 'textBody', 't',
+          'idempotencyKey', 'checkout:' || v_store_id::text || ':finding1-two-merchants:order-received'
+        ),
+        jsonb_build_object(
+          'templateKind', 'merchant-new-order', 'recipientEmail', 'b@example.com',
+          'fromAddress', 'x', 'replyToAddress', null, 'subject', 's', 'htmlBody', 'h', 'textBody', 't',
+          'idempotencyKey', 'checkout:' || v_store_id::text || ':finding1-two-merchants:merchant-1'
+        ),
+        jsonb_build_object(
+          'templateKind', 'merchant-new-order', 'recipientEmail', 'c@example.com',
+          'fromAddress', 'x', 'replyToAddress', null, 'subject', 's', 'htmlBody', 'h', 'textBody', 't',
+          'idempotencyKey', 'checkout:' || v_store_id::text || ':finding1-two-merchants:merchant-2'
+        )
+      )
+    );
+    raise exception 'Finding 1: two merchant-new-order notifications must raise';
+  exception when others then null;
+  end;
+
+  begin
+    perform ecommerce.create_order_with_notifications(
+      v_store_id, 'finding1-unknown-kind', 'fingerprint-f1f',
+      v_order || jsonb_build_object('order_number', ecommerce.generate_order_number(v_store_id)),
+      v_items,
+      jsonb_build_array(
+        jsonb_build_object(
+          'templateKind', 'order-received', 'recipientEmail', 'a@example.com',
+          'fromAddress', 'x', 'replyToAddress', null, 'subject', 's', 'htmlBody', 'h', 'textBody', 't',
+          'idempotencyKey', 'checkout:' || v_store_id::text || ':finding1-unknown-kind:order-received'
+        ),
+        jsonb_build_object(
+          'templateKind', 'something-else', 'recipientEmail', 'b@example.com',
+          'fromAddress', 'x', 'replyToAddress', null, 'subject', 's', 'htmlBody', 'h', 'textBody', 't',
+          'idempotencyKey', 'checkout:' || v_store_id::text || ':finding1-unknown-kind:other'
+        )
+      )
+    );
+    raise exception 'Finding 1: an unrecognized templateKind must raise';
+  exception when others then null;
+  end;
+
+  -- None of the five rejected shapes above may have left an order behind:
+  -- each one raises before the header is ever inserted.
+  if exists (
+    select 1 from ecommerce.orders
+    where store_id = v_store_id
+      and idempotency_key in (
+        'finding1-zero-receipts', 'finding1-no-receipt', 'finding1-two-receipts',
+        'finding1-two-merchants', 'finding1-unknown-kind'
+      )
+  ) then
+    raise exception 'Finding 1: a rejected notification shape must never leave an order behind';
+  end if;
+end $$;
+
+-- -----------------------------------------------------------------------------
+-- Verifier finding 2 (slice 3): the checkout follow-ups that run after the
+-- atomic order write (inventory decrement, shipping address, payment
+-- transaction) converge to exactly one effect per order across a retried
+-- follow-up sequence -- never zero, never twice. See
+-- 20260805000700_ecommerce_checkout_followup_convergence.sql. This is real
+-- transactional/idempotency behavior a Vitest mock cannot prove (it bridges
+-- the RPC back onto plain insert queues), so it belongs here against real
+-- Postgres.
+-- -----------------------------------------------------------------------------
+do $$
+declare
+  v_store_id uuid;
+  v_item_id uuid;
+  v_order jsonb;
+  v_items jsonb;
+  v_notifications jsonb;
+  v_result jsonb;
+  v_order_id uuid;
+  v_decrement_items jsonb;
+  v_shortages jsonb;
+  v_quantity_after integer;
+  v_address_count integer;
+  v_payment_count integer;
+begin
+  select id into v_store_id from ecommerce.stores where subdomain = 'contract-check-store';
+
+  insert into ecommerce.store_items
+    (store_id, item_name, base_price, currency_code, track_inventory, inventory_quantity, is_active, is_available_for_sale)
+  values
+    (v_store_id, 'Finding 2 Widget', 10000, 'COP', true, 5, true, true)
+  returning id into v_item_id;
+
+  v_order := jsonb_build_object(
+    'customer_type', 'guest', 'customer_email', 'finding2@example.com',
+    'customer_first_name', 'Ada', 'customer_last_name', 'Lovelace',
+    'shipping_address', 'Calle 789', 'shipping_city', 'Bogotá', 'shipping_postal_code', '110111',
+    'payment_method', 'cash_on_delivery', 'subtotal', 20000, 'total_amount', 20000,
+    'order_number', ecommerce.generate_order_number(v_store_id)
+  );
+  v_items := jsonb_build_array(
+    jsonb_build_object(
+      'product_id', v_item_id::text, 'product_name', 'Finding 2 Widget',
+      'unit_price', 10000, 'quantity', 2, 'total_price', 20000
+    )
+  );
+  v_notifications := jsonb_build_array(
+    jsonb_build_object(
+      'templateKind', 'order-received', 'recipientEmail', 'finding2@example.com',
+      'fromAddress', 'Contract Check Store vía Osoria <pedidos@mail.osoria.help>', 'replyToAddress', null,
+      'subject', 'Recibimos tu pedido', 'htmlBody', '<p>h</p>', 'textBody', 't',
+      'idempotencyKey', 'checkout:' || v_store_id::text || ':finding2-order:order-received'
+    )
+  );
+
+  v_result := ecommerce.create_order_with_notifications(
+    v_store_id, 'finding2-order', 'fingerprint-f2', v_order, v_items, v_notifications
+  );
+  if (v_result ->> 'ok')::boolean is not true then
+    raise exception 'Finding 2 setup: expected the order to be created, got %', v_result;
+  end if;
+  v_order_id := (v_result -> 'order' ->> 'id')::uuid;
+
+  v_decrement_items := jsonb_build_array(
+    jsonb_build_object('variant_id', null, 'product_id', v_item_id::text, 'quantity', 2)
+  );
+
+  -- First follow-up attempt: genuinely decrements (5 -> 3).
+  select ecommerce.decrement_inventory(v_order_id, v_store_id, v_decrement_items) into v_shortages;
+  select inventory_quantity into v_quantity_after from ecommerce.store_items where id = v_item_id;
+  if v_quantity_after <> 3 or jsonb_array_length(v_shortages) <> 0 then
+    raise exception 'Finding 2: first decrement must take inventory from 5 to 3 with no shortages, got quantity=%, shortages=%', v_quantity_after, v_shortages;
+  end if;
+
+  if not exists (select 1 from ecommerce.orders where id = v_order_id and inventory_decremented_at is not null) then
+    raise exception 'Finding 2: inventory_decremented_at must be set after the first successful decrement';
+  end if;
+
+  -- Retried follow-up (e.g. the customer's page reload after the first
+  -- attempt died right after the atomic RPC succeeded, before this ran):
+  -- same order, same items. Must NOT decrement a second time.
+  select ecommerce.decrement_inventory(v_order_id, v_store_id, v_decrement_items) into v_shortages;
+  select inventory_quantity into v_quantity_after from ecommerce.store_items where id = v_item_id;
+  if v_quantity_after <> 3 then
+    raise exception 'Finding 2: a retried decrement for the SAME order must never decrement twice, inventory is now % (expected 3, unchanged)', v_quantity_after;
+  end if;
+  if jsonb_array_length(v_shortages) <> 0 then
+    raise exception 'Finding 2: a retried, already-decremented order must report no shortages, got %', v_shortages;
+  end if;
+
+  -- A plain double-submit (no failure in between, just a second call) must
+  -- converge identically: still exactly one decrement.
+  perform ecommerce.decrement_inventory(v_order_id, v_store_id, v_decrement_items);
+  select inventory_quantity into v_quantity_after from ecommerce.store_items where id = v_item_id;
+  if v_quantity_after <> 3 then
+    raise exception 'Finding 2: a third call (double-submit) must still never decrement twice, inventory is now %', v_quantity_after;
+  end if;
+
+  -- Shipping address: the SAME (order_id, address_type) upsert the app now
+  -- issues on every follow-up run (fresh row id, same conflict target) must
+  -- converge to exactly one row instead of raising or duplicating.
+  insert into ecommerce.order_addresses (id, order_id, address_type, address_line_1, city, postal_code, country)
+  values (gen_random_uuid(), v_order_id, 'shipping', 'Calle 789', 'Bogotá', '110111', 'Colombia')
+  on conflict (order_id, address_type) do nothing;
+  insert into ecommerce.order_addresses (id, order_id, address_type, address_line_1, city, postal_code, country)
+  values (gen_random_uuid(), v_order_id, 'shipping', 'Calle 789 (retry)', 'Bogotá', '110111', 'Colombia')
+  on conflict (order_id, address_type) do nothing;
+
+  select count(*) into v_address_count from ecommerce.order_addresses where order_id = v_order_id;
+  if v_address_count <> 1 then
+    raise exception 'Finding 2: a retried shipping address upsert must converge to exactly one row, found %', v_address_count;
+  end if;
+
+  -- Payment transaction: the SAME idempotency_key (the checkout's own,
+  -- reused across a retry) must converge to exactly one row too.
+  insert into ecommerce.payment_transactions (id, order_id, idempotency_key, provider, transaction_type, amount, currency_code, status)
+  values (gen_random_uuid(), v_order_id, 'finding2-order', 'cash_on_delivery', 'payment', 20000, 'COP', 'pending')
+  on conflict (idempotency_key) do nothing;
+  insert into ecommerce.payment_transactions (id, order_id, idempotency_key, provider, transaction_type, amount, currency_code, status)
+  values (gen_random_uuid(), v_order_id, 'finding2-order', 'cash_on_delivery', 'payment', 20000, 'COP', 'pending')
+  on conflict (idempotency_key) do nothing;
+
+  select count(*) into v_payment_count from ecommerce.payment_transactions where order_id = v_order_id;
+  if v_payment_count <> 1 then
+    raise exception 'Finding 2: a retried payment_transactions upsert must converge to exactly one row, found %', v_payment_count;
   end if;
 end $$;
 

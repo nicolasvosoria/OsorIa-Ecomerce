@@ -18,8 +18,6 @@ import type { StoreIdentityView } from "@/lib/supabase/store-identity-api"
 const READINESS_FIELD_LABELS: Record<StoreIdentityField, string> = {
   displayName: "Nombre público",
   legalName: "Razón social",
-  logo: "Logo",
-  primaryColor: "Color principal",
   phone: "Teléfono",
   commercialAddress: "Dirección comercial",
   replyTo: "Correo de respuesta verificado",

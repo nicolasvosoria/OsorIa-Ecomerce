@@ -48,7 +48,7 @@ describe("StoreIdentityPanel", () => {
   it("marks a field ready with the success icon and a missing field with the dashed icon", () => {
     render(<StoreIdentityPanel initial={INCOMPLETE_IDENTITY} />)
 
-    expect(readinessIconClass("Logo")).toContain("text-success")
+    expect(readinessIconClass("Nombre público")).toContain("text-success")
     expect(readinessIconClass("Razón social")).toContain("text-muted-foreground")
     expect(readinessIconClass("Buzón de pedidos verificado")).toContain("text-success")
     expect(readinessIconClass("Correo de respuesta verificado")).toContain("text-muted-foreground")

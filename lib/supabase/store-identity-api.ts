@@ -3,7 +3,14 @@ import { hashVerificationToken } from "@/lib/security/verification-token";
 import type { StoreIdentitySnapshot } from "@/lib/stores/identity-readiness";
 import type { MailboxVerificationField } from "@/lib/stores/schemas";
 
+// logoUrl/primaryColor live here, not on StoreIdentitySnapshot: A8 dropped
+// them from the readiness gate, but they still serve email branding (D3) --
+// lib/checkout/order-notifications.ts reads them to render the order emails,
+// same as app/admin/actions/store-identity.ts already does for the mailbox
+// verification email.
 export type StoreIdentityView = StoreIdentitySnapshot & {
+  logoUrl: string | null;
+  primaryColor: string | null;
   subdomain: string;
   contactEmail: string | null;
   replyToEmail: string | null;

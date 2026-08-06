@@ -1189,10 +1189,13 @@ export type Database = {
           delivered_at: string | null
           discount_amount: number | null
           id: string
+          idempotency_key: string | null
+          inventory_decremented_at: string | null
           metadata: Json | null
           notes: string | null
           order_date: string | null
           order_number: string
+          payload_fingerprint: string | null
           payment_method: string | null
           payment_reference: string | null
           payment_status:
@@ -1226,10 +1229,13 @@ export type Database = {
           delivered_at?: string | null
           discount_amount?: number | null
           id?: string
+          idempotency_key?: string | null
+          inventory_decremented_at?: string | null
           metadata?: Json | null
           notes?: string | null
           order_date?: string | null
           order_number: string
+          payload_fingerprint?: string | null
           payment_method?: string | null
           payment_reference?: string | null
           payment_status?:
@@ -1263,10 +1269,13 @@ export type Database = {
           delivered_at?: string | null
           discount_amount?: number | null
           id?: string
+          idempotency_key?: string | null
+          inventory_decremented_at?: string | null
           metadata?: Json | null
           notes?: string | null
           order_date?: string | null
           order_number?: string
+          payload_fingerprint?: string | null
           payment_method?: string | null
           payment_reference?: string | null
           payment_status?:
@@ -1310,6 +1319,7 @@ export type Database = {
           created_at: string | null
           currency_code: string
           id: string
+          idempotency_key: string | null
           metadata: Json | null
           order_id: string
           provider: string
@@ -1325,6 +1335,7 @@ export type Database = {
           created_at?: string | null
           currency_code?: string
           id?: string
+          idempotency_key?: string | null
           metadata?: Json | null
           order_id: string
           provider: string
@@ -1340,6 +1351,7 @@ export type Database = {
           created_at?: string | null
           currency_code?: string
           id?: string
+          idempotency_key?: string | null
           metadata?: Json | null
           order_id?: string
           provider?: string
@@ -2584,6 +2596,17 @@ export type Database = {
       }
       confirm_store_mailbox_verification: {
         Args: { p_token_hash: string }
+        Returns: Json
+      }
+      create_order_with_notifications: {
+        Args: {
+          p_idempotency_key: string
+          p_items: Json
+          p_notifications: Json
+          p_order: Json
+          p_payload_fingerprint: string
+          p_store_id: string
+        }
         Returns: Json
       }
       decrement_inventory: {
