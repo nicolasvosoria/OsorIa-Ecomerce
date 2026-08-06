@@ -1,10 +1,9 @@
 import type { AuthError, AuthTokenResponsePassword, UserResponse } from '@supabase/supabase-js'
 
 import type { UserProfile, AuthResult } from '@/lib/types/user'
+import { prepareAuthRedirect } from '@/lib/auth/prepare-auth-redirect'
 import { getSupabaseBrowserClient, getSupabaseEcommerce } from './client'
 import { ECOMMERCE_TABLES } from './contract'
-import { getUrl } from '@/lib/utils/url'
-import { getRuntimeStoreId } from '@/lib/utils/store'
 
 // Helper para manejar timeouts
 async function withTimeout<T>(
@@ -20,14 +19,32 @@ async function withTimeout<T>(
   ])
 }
 
+// El mensaje genérico que cubre las cuatro razones por las que
+// prepareAuthRedirect puede negarse (Turnstile, límite de envíos, tienda no
+// resuelta, servicio no disponible): ninguna es información que el
+// formulario deba distinguir para quien está registrándose.
+const PREPARE_AUTH_REDIRECT_ERROR = 'No se pudo iniciar el registro. Intenta de nuevo en un momento.'
+
 /**
- * Registrar un nuevo usuario
+ * Registrar un nuevo usuario.
+ *
+ * D23: el perfil YA NO se crea aquí -- ni por un trigger (nunca existió,
+ * D23's "known terrain") ni por el insert manual de reserva que este
+ * archivo hacía antes tras esperar un segundo. Ese insert usaba
+ * getRuntimeStoreId() para signup_store_id, la misma resolución por host que
+ * D23 prohíbe como base de atribución: se ejecutaba justo después de crear
+ * la cuenta, mucho antes de que la persona confirmara el correo, así que
+ * ganaba SIEMPRE la carrera contra cualquier finalización hecha en el
+ * callback. app/auth/callback/page.tsx (vía lib/auth/finalize-signup-action.ts)
+ * es ahora el único lugar donde se crea el perfil, ligado al intent que
+ * prepareAuthRedirect acaba de mintear -- idempotente, y sin la carrera.
  */
 export async function signUp(
   email: string,
   password: string,
   firstName?: string,
-  lastName?: string
+  lastName?: string,
+  turnstileToken: string | null = null,
 ): Promise<AuthResult> {
   try {
     const supabase = getSupabaseBrowserClient()
@@ -36,6 +53,11 @@ export async function signUp(
         success: false,
         error: 'Supabase no configurado',
       }
+    }
+
+    const prepared = await prepareAuthRedirect({ email, purpose: 'signup', path: '/auth/callback', turnstileToken })
+    if (!prepared.ok) {
+      return { success: false, error: PREPARE_AUTH_REDIRECT_ERROR }
     }
 
     const result = await withTimeout(
@@ -47,7 +69,7 @@ export async function signUp(
             first_name: firstName || '',
             last_name: lastName || '',
           },
-          emailRedirectTo: getUrl('/auth/callback'),
+          emailRedirectTo: prepared.redirectTo,
         },
       }),
       15000,
@@ -63,49 +85,8 @@ export async function signUp(
       }
     }
 
-    // El perfil se crea automáticamente con el trigger
-    // Intentar obtener el perfil después de un breve delay
-    let userProfile: UserProfile | undefined
-    if (data?.user) {
-      // Esperar un momento para que el trigger se ejecute
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-
-      const profileResult = await getUserProfile(data.user!.id)
-      if (profileResult.success && profileResult.user) {
-        userProfile = profileResult.user
-      } else {
-        const profilesClient = getSupabaseEcommerce()
-        if (profilesClient) {
-          // The store this profile is born in: the storefront the user is
-          // registering ON, resolved by host (D8). getRuntimeStoreId() already
-          // collapses the "no real default store" placeholder to null, so a
-          // registration with no resolvable store (e.g. no host match) records
-          // no origin instead of a bogus default.
-          const signupStoreId = await getRuntimeStoreId()
-          const { error: insertError } = await profilesClient
-            .from(ECOMMERCE_TABLES.userProfiles)
-            .insert({
-              id: data.user!.id,
-              email: data.user!.email || email,
-              first_name: firstName || null,
-              last_name: lastName || null,
-              signup_store_id: signupStoreId,
-            })
-          if (!insertError) {
-            userProfile = {
-              id: data.user!.id,
-              email: data.user!.email || email,
-              first_name: firstName || null,
-              last_name: lastName || null,
-            }
-          }
-        }
-      }
-    }
-
     return {
       success: true,
-      user: userProfile,
       emailSent: data?.session === null, // Si no hay sesión, se envió email de confirmación
     }
   } catch (error: any) {
@@ -497,9 +478,17 @@ export async function updateUserProfile(
 }
 
 /**
- * Reenviar email de confirmación
+ * Reenviar email de confirmación.
+ *
+ * D25: pasa por el mismo prepareAuthRedirect que signUp -- reusa el límite
+ * de envíos (60s/5 por hora) en vez de confiar solo en el propio de GoTrue,
+ * y mintea un intent nuevo (D24: cada link vive una hora) para que el link
+ * reenviado siga resolviendo la tienda correcta en el hook.
  */
-export async function resendConfirmationEmail(email: string): Promise<{ success: boolean; error?: string }> {
+export async function resendConfirmationEmail(
+  email: string,
+  turnstileToken: string | null = null,
+): Promise<{ success: boolean; error?: string }> {
   try {
     const supabase = getSupabaseBrowserClient()
     if (!supabase) {
@@ -508,12 +497,18 @@ export async function resendConfirmationEmail(email: string): Promise<{ success:
         error: 'Supabase no configurado',
       }
     }
+
+    const prepared = await prepareAuthRedirect({ email, purpose: 'signup', path: '/auth/callback', turnstileToken })
+    if (!prepared.ok) {
+      return { success: false, error: PREPARE_AUTH_REDIRECT_ERROR }
+    }
+
     const result = await withTimeout(
       supabase.auth.resend({
         type: 'signup',
         email,
         options: {
-          emailRedirectTo: getUrl('/auth/callback'),
+          emailRedirectTo: prepared.redirectTo,
         },
       }),
       10000,
@@ -539,9 +534,18 @@ export async function resendConfirmationEmail(email: string): Promise<{ success:
 }
 
 /**
- * Enviar email de recuperación de contraseña
+ * Enviar email de recuperación de contraseña.
+ *
+ * D26's Turnstile gate and D25's reused rate limit both live in
+ * prepareAuthRedirect, called here before GoTrue -- resetPasswordForEmail
+ * itself already never reveals whether `email` belongs to an account (D24),
+ * so this wrapper only ever adds a generic, equally uninformative failure on
+ * top, never a distinguishing one.
  */
-export async function resetPassword(email: string): Promise<{ success: boolean; error?: string }> {
+export async function resetPassword(
+  email: string,
+  turnstileToken: string | null = null,
+): Promise<{ success: boolean; error?: string }> {
   try {
     const supabase = getSupabaseBrowserClient()
     if (!supabase) {
@@ -551,15 +555,18 @@ export async function resetPassword(email: string): Promise<{ success: boolean; 
       }
     }
 
+    const prepared = await prepareAuthRedirect({ email, purpose: 'recovery', path: '/auth/reset-password', turnstileToken })
+    if (!prepared.ok) {
+      return { success: false, error: PREPARE_AUTH_REDIRECT_ERROR }
+    }
+
     // `redirectTo` es el nombre real de la opción: resetPasswordForEmail ignora
-    // `emailRedirectTo` (eso es de signUp/resend), así que hasta ahora el correo
-    // salía sin redirect_to y GoTrue caía al Site URL — un solo host para todos
-    // los inquilinos. Es lo que llena `{{ .RedirectTo }}` en la plantilla, y sin
-    // él el link de `token_hash` (D7) no sabría a qué subdominio volver; la
-    // cookie de sesión es host-only, así que volver al host equivocado no sirve.
+    // `emailRedirectTo` (eso es de signUp/resend). prepared.redirectTo ya es la
+    // URL del subdominio persistido (D8), minteada por prepareAuthRedirect --
+    // nunca window.location ni un header sin verificar.
     const result = await withTimeout(
       supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: getUrl('/auth/reset-password'),
+        redirectTo: prepared.redirectTo,
       }),
       10000,
       'resetPassword'

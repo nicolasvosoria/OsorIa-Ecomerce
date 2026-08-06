@@ -65,7 +65,7 @@ describe("login page password recovery entry", () => {
     await user.type(within(recovery).getByLabelText(t.auth.email), "duena@tienda.test")
     await user.click(within(recovery).getByRole("button", { name: t.header.sendRecoveryLink }))
 
-    await waitFor(() => expect(resetPassword).toHaveBeenCalledWith("duena@tienda.test"))
+    await waitFor(() => expect(resetPassword).toHaveBeenCalledWith("duena@tienda.test", null))
     expect(await within(recovery).findByRole("heading", { name: t.header.emailSent })).toBeInTheDocument()
   })
 

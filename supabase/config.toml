@@ -216,7 +216,10 @@ enable_signup = true
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
 # If enabled, users need to confirm their email address before signing in.
-enable_confirmations = false
+# D11's signup-confirmation catalog kind only ever gets sent (and the Send
+# Email Hook below only ever fires with email_action_type=signup) when this
+# is true. Slice 7 enables the matching setting on the real project.
+enable_confirmations = true
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
 secure_password_change = false
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
@@ -241,11 +244,13 @@ otp_expiry = 3600
 # subject = "You have been invited"
 # content_path = "./supabase/templates/invite.html"
 
-# Uncomment to customize notification email template
-# [auth.email.notification.password_changed]
-# enabled = true
-# subject = "Your password has been changed"
-# content_path = "./templates/password_changed_notification.html"
+# D11's password-changed catalog kind is GoTrue's own built-in notification
+# (GOTRUE_MAILER_NOTIFICATIONS_PASSWORD_CHANGED_ENABLED, off by default) --
+# turned on so it reaches the Send Email Hook below like every other Auth
+# catalog kind, instead of silently never firing. Slice 7 enables the
+# matching setting on the real project.
+[auth.email.notification.password_changed]
+enabled = true
 
 [auth.sms]
 # Allow/disallow new user signups via SMS to your project.
@@ -385,6 +390,23 @@ deno_version = 2
 [functions."email-worker"]
 enabled = true
 verify_jwt = false
+
+# D15: the Send Email Hook. The caller is GoTrue over HTTP, not a Supabase
+# session, so there is no user JWT to verify either -- authorization is the
+# Standard Webhooks signature the function itself checks against
+# AUTH_EMAIL_HOOK_SECRET. import_map maps the bare `@react-email/*`
+# specifiers lib/email/render.tsx and its siblings use (Next's bundler
+# resolves those from node_modules; Deno needs the explicit npm: mapping).
+# NOT registered under [auth.hook.send_email] here: this slice only AUTHORS
+# and locally verifies the function (its own tests, and invoking it directly
+# with a hand-signed payload) -- wiring GoTrue itself to call it, locally or
+# on the real project, is slice 7's job (see the runbook), so today's local
+# stack's existing Auth email behavior is unaffected by this function merely
+# existing.
+[functions."auth-email-hook"]
+enabled = true
+verify_jwt = false
+import_map = "./functions/import_map.json"
 
 [analytics]
 enabled = true

@@ -1,4 +1,4 @@
-import type { ResendSendEmailResult } from "./resend-client";
+import type { ResendSendEmailResult } from "./resend-client.ts";
 
 export type ClaimedOutboxRow = {
   id: string;

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { getSupabaseBrowserClient, getSupabaseEcommerce } from '@/lib/supabase/client'
-import { getRuntimeStoreId } from '@/lib/utils/store'
+import { prepareAuthRedirect } from '@/lib/auth/prepare-auth-redirect'
 import { mockSupabaseClient } from '../__mocks__/supabase'
 
 // Mock del cliente de Supabase
@@ -9,45 +9,25 @@ vi.mock('@/lib/supabase/client', () => ({
   getSupabaseEcommerce: vi.fn(),
 }))
 
-// Mock de la resolución de tienda (D8): cada prueba fija qué tienda "resuelve"
-// el host, en vez de depender del cookie real del entorno jsdom.
-vi.mock('@/lib/utils/store', () => ({
-  getRuntimeStoreId: vi.fn(),
+// D23: signUp() no crea el perfil -- prepareAuthRedirect (Turnstile, límite
+// de envíos, mint del auth intent) es la única pieza server-side que llama,
+// y aquí se mockea entera: la prueba de su comportamiento real vive en
+// tests/security/prepare-auth-redirect.test.ts.
+vi.mock('@/lib/auth/prepare-auth-redirect', () => ({
+  prepareAuthRedirect: vi.fn(),
 }))
-
-// Mock de getUserProfile
-vi.mock('@/lib/supabase/auth-api', async () => {
-  const actual = await vi.importActual('@/lib/supabase/auth-api')
-  return {
-    ...actual,
-    getUserProfile: vi.fn(),
-  }
-})
 
 // Importar después del mock
 import { signUp } from '@/lib/supabase/auth-api'
-import * as authApi from '@/lib/supabase/auth-api'
 
 describe('signUp - Creación de cuentas nuevas', () => {
-  function mockProfileLookup(profile: Record<string, unknown>) {
-    vi.mocked(mockSupabaseClient.from).mockReturnValue({
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      single: vi.fn().mockResolvedValue({ data: profile, error: null }),
-      insert: vi.fn().mockResolvedValue({ error: null }),
-    } as any)
-  }
-
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(getSupabaseBrowserClient).mockReturnValue(mockSupabaseClient as any)
     vi.mocked(getSupabaseEcommerce).mockReturnValue(mockSupabaseClient as any)
-    vi.mocked(getRuntimeStoreId).mockResolvedValue(null)
-    mockProfileLookup({
-      id: 'user-123',
-      email: 'test@example.com',
-      first_name: 'Juan',
-      last_name: 'Pérez',
+    vi.mocked(prepareAuthRedirect).mockResolvedValue({
+      ok: true,
+      redirectTo: 'https://tienda.osoria.help/auth/callback?intent=preview-token',
     })
   })
 
@@ -57,36 +37,9 @@ describe('signUp - Creación de cuentas nuevas', () => {
       email: 'test@example.com',
     }
 
-    const mockSession = {
-      user: mockUser,
-      access_token: 'token-123',
-    }
-
-    // Mock de signUp exitoso
     vi.mocked(mockSupabaseClient.auth.signUp).mockResolvedValue({
-      data: {
-        user: mockUser,
-        session: mockSession,
-      },
+      data: { user: mockUser, session: { user: mockUser, access_token: 'token-123' } },
       error: null,
-    })
-
-    mockProfileLookup({
-      id: 'user-123',
-      email: 'test@example.com',
-      first_name: 'Juan',
-      last_name: 'Pérez',
-    })
-
-    // Mock de getUserProfile exitoso
-    vi.mocked(authApi.getUserProfile).mockResolvedValue({
-      success: true,
-      user: {
-        id: 'user-123',
-        email: 'test@example.com',
-        first_name: 'Juan',
-        last_name: 'Pérez',
-      },
     })
 
     const result = await signUp(
@@ -97,10 +50,15 @@ describe('signUp - Creación de cuentas nuevas', () => {
     )
 
     expect(result.success).toBe(true)
-    expect(result.user).toBeDefined()
-    expect(result.user?.email).toBe('test@example.com')
-    expect(result.user?.first_name).toBe('Juan')
-    expect(result.user?.last_name).toBe('Pérez')
+    // D23: la creación del perfil se movió al callback (lib/auth/finalize-
+    // signup-action.ts) -- signUp ya no devuelve un `user`.
+    expect(result.user).toBeUndefined()
+    expect(prepareAuthRedirect).toHaveBeenCalledWith({
+      email: 'test@example.com',
+      purpose: 'signup',
+      path: '/auth/callback',
+      turnstileToken: null,
+    })
     expect(mockSupabaseClient.auth.signUp).toHaveBeenCalledWith({
       email: 'test@example.com',
       password: 'password123',
@@ -109,47 +67,32 @@ describe('signUp - Creación de cuentas nuevas', () => {
           first_name: 'Juan',
           last_name: 'Pérez',
         },
-        emailRedirectTo: expect.any(String),
+        emailRedirectTo: 'https://tienda.osoria.help/auth/callback?intent=preview-token',
       },
     })
   })
 
-  it('debe registrar un usuario sin nombre y apellido', async () => {
-    const mockUser = {
-      id: 'user-456',
-      email: 'test2@example.com',
-    }
-
+  it('debe pasar el turnstileToken recibido a prepareAuthRedirect', async () => {
     vi.mocked(mockSupabaseClient.auth.signUp).mockResolvedValue({
-      data: {
-        user: mockUser,
-        session: { user: mockUser, access_token: 'token' },
-      },
+      data: { user: { id: 'user-456', email: 'test2@example.com' }, session: null },
       error: null,
     })
 
-    mockProfileLookup({
-      id: 'user-456',
-      email: 'test2@example.com',
-      first_name: null,
-      last_name: null,
-    })
+    await signUp('test2@example.com', 'password123', undefined, undefined, 'a-real-turnstile-token')
 
-    vi.mocked(authApi.getUserProfile).mockResolvedValue({
-      success: true,
-      user: {
-        id: 'user-456',
-        email: 'test2@example.com',
-        first_name: null,
-        last_name: null,
-      },
-    })
+    expect(prepareAuthRedirect).toHaveBeenCalledWith(
+      expect.objectContaining({ turnstileToken: 'a-real-turnstile-token' }),
+    )
+  })
 
-    const result = await signUp('test2@example.com', 'password123')
+  it('debe rechazar el registro sin llamar a Supabase cuando prepareAuthRedirect lo niega', async () => {
+    vi.mocked(prepareAuthRedirect).mockResolvedValue({ ok: false, reason: 'turnstile_failed' })
 
-    expect(result.success).toBe(true)
-    expect(result.user?.first_name).toBeNull()
-    expect(result.user?.last_name).toBeNull()
+    const result = await signUp('test@example.com', 'password123')
+
+    expect(result.success).toBe(false)
+    expect(result.error).toBeTruthy()
+    expect(mockSupabaseClient.auth.signUp).not.toHaveBeenCalled()
   })
 
   it('debe manejar errores de Supabase', async () => {
@@ -168,93 +111,6 @@ describe('signUp - Creación de cuentas nuevas', () => {
     expect(result.error).toBe(errorMessage)
   })
 
-  it('debe crear el perfil manualmente si el trigger falla', async () => {
-    const mockUser = {
-      id: 'user-789',
-      email: 'test3@example.com',
-    }
-
-    vi.mocked(mockSupabaseClient.auth.signUp).mockResolvedValue({
-      data: {
-        user: mockUser,
-        session: { user: mockUser, access_token: 'token' },
-      },
-      error: null,
-    })
-
-    // Mock de getUserProfile fallando (trigger no funcionó)
-    vi.mocked(authApi.getUserProfile).mockResolvedValue({
-      success: false,
-      error: 'Perfil no encontrado',
-    })
-
-    vi.mocked(getRuntimeStoreId).mockResolvedValue('store-abc-123')
-
-    // Mock de insert exitoso
-    const mockInsert = vi.fn().mockReturnValue({
-      error: null,
-    })
-    vi.mocked(mockSupabaseClient.from).mockReturnValue({
-      insert: vi.fn().mockReturnValue(mockInsert),
-    } as any)
-
-    // Necesitamos mockear el from correctamente
-    const fromChain = {
-      insert: vi.fn().mockResolvedValue({ error: null }),
-    }
-    vi.mocked(mockSupabaseClient.from).mockReturnValue(fromChain as any)
-
-    await signUp(
-      'test3@example.com',
-      'password123',
-      'María',
-      'González'
-    )
-
-    // En este caso, el código intentará crear el perfil manualmente
-    // pero como el mock no está completo, verificamos que al menos se intentó
-    expect(mockSupabaseClient.auth.signUp).toHaveBeenCalled()
-    // El perfil creado manualmente carga la tienda desde la que se registró (D8)
-    expect(fromChain.insert).toHaveBeenCalledWith(
-      expect.objectContaining({ signup_store_id: 'store-abc-123' })
-    )
-  })
-
-  it('debe registrar signup_store_id null cuando no hay tienda resuelta (host admin o sin store real)', async () => {
-    const mockUser = {
-      id: 'user-no-store',
-      email: 'sin-tienda@example.com',
-    }
-
-    vi.mocked(mockSupabaseClient.auth.signUp).mockResolvedValue({
-      data: {
-        user: mockUser,
-        session: { user: mockUser, access_token: 'token' },
-      },
-      error: null,
-    })
-
-    vi.mocked(authApi.getUserProfile).mockResolvedValue({
-      success: false,
-      error: 'Perfil no encontrado',
-    })
-
-    // Sin host resoluble (o el placeholder 'default'), getRuntimeStoreId ya lo
-    // normaliza a null: nunca debe grabarse un store_id inventado.
-    vi.mocked(getRuntimeStoreId).mockResolvedValue(null)
-
-    const fromChain = {
-      insert: vi.fn().mockResolvedValue({ error: null }),
-    }
-    vi.mocked(mockSupabaseClient.from).mockReturnValue(fromChain as any)
-
-    await signUp('sin-tienda@example.com', 'password123')
-
-    expect(fromChain.insert).toHaveBeenCalledWith(
-      expect.objectContaining({ signup_store_id: null })
-    )
-  })
-
   it('debe retornar emailSent cuando no hay sesión (confirmación requerida)', async () => {
     const mockUser = {
       id: 'user-999',
@@ -267,23 +123,6 @@ describe('signUp - Creación de cuentas nuevas', () => {
         session: null, // Sin sesión = email de confirmación enviado
       },
       error: null,
-    })
-
-    mockProfileLookup({
-      id: 'user-999',
-      email: 'test4@example.com',
-      first_name: null,
-      last_name: null,
-    })
-
-    vi.mocked(authApi.getUserProfile).mockResolvedValue({
-      success: true,
-      user: {
-        id: 'user-999',
-        email: 'test4@example.com',
-        first_name: null,
-        last_name: null,
-      },
     })
 
     const result = await signUp('test4@example.com', 'password123')
@@ -300,5 +139,6 @@ describe('signUp - Creación de cuentas nuevas', () => {
 
     expect(result.success).toBe(false)
     expect(result.error).toBe('Supabase no configurado')
+    expect(prepareAuthRedirect).not.toHaveBeenCalled()
   })
 })

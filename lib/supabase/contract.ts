@@ -13,6 +13,7 @@ export const ECOMMERCE_TABLES = {
   appFonts: "app_fonts",
   appThemeVersions: "app_theme_versions",
   appThemes: "app_themes",
+  authIntents: "auth_intents",
   carts: "carts",
   componentStyles: "component_styles",
   emailOutbox: "email_outbox",
@@ -57,10 +58,12 @@ export const ECOMMERCE_VIEWS = {
 
 export const ECOMMERCE_FUNCTIONS = {
   canUserManageStore: "can_user_manage_store",
+  checkAndRecordSendAttempt: "check_and_record_send_attempt",
   claimEmailOutboxBatch: "claim_email_outbox_batch",
   confirmStoreMailboxVerification: "confirm_store_mailbox_verification",
   createOrderWithNotifications: "create_order_with_notifications",
   decrementInventory: "decrement_inventory",
+  finalizeCustomerProfile: "finalize_customer_profile",
   generateOrderNumber: "generate_order_number",
   incrementItemViews: "increment_item_views",
   isComponentStylesAdmin: "is_component_styles_admin",

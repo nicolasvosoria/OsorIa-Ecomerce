@@ -7,6 +7,7 @@ const exchangeCodeForSession = vi.hoisted(() => vi.fn());
 const getSession = vi.hoisted(() => vi.fn());
 const isCurrentUserAdminOrUnverified = vi.hoisted(() => vi.fn());
 const currentUserMustChangePassword = vi.hoisted(() => vi.fn());
+const finalizeCustomerSignup = vi.hoisted(() => vi.fn());
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: routerPush }),
@@ -27,6 +28,13 @@ vi.mock("@/lib/supabase/permissions-api", () => ({
   currentUserMustChangePassword,
 }));
 
+// D23: mockeado como un no-op exitoso salvo que un test lo diga -- su
+// comportamiento real (idempotencia, consumo de un solo uso) se prueba en
+// supabase/checks/verify-email-platform-contract.sql, no aquí (D41).
+vi.mock("@/lib/auth/finalize-signup-action", () => ({
+  finalizeCustomerSignup,
+}));
+
 import AuthCallback from "@/app/auth/callback/page";
 
 describe("auth callback safe return destinations", () => {
@@ -44,6 +52,7 @@ describe("auth callback safe return destinations", () => {
     });
     exchangeCodeForSession.mockResolvedValue({ data: { session: { access_token: "token" } }, error: null });
     getSession.mockResolvedValue({ data: { session: null }, error: null });
+    finalizeCustomerSignup.mockResolvedValue({ ok: true });
     isCurrentUserAdminOrUnverified.mockResolvedValue(true);
     currentUserMustChangePassword.mockResolvedValue(false);
   });
@@ -211,5 +220,49 @@ describe("auth callback safe return destinations", () => {
     await waitFor(() => {
       expect(routerPush).toHaveBeenCalledWith("/admin/orders");
     });
+  });
+
+  // D23: la finalización solo se intenta tras un exchangeCodeForSession
+  // FRESCO -- nunca en la rama "ya había sesión" (no hay confirmación que
+  // atar a un intent ahí), y siempre con lo que traiga `intent` en la URL.
+  it("finalizes the customer profile with the intent token after a fresh code exchange", async () => {
+    searchParamsGet.mockImplementation((key: string) => {
+      const values: Record<string, string | null> = {
+        code: "auth-code",
+        error: null,
+        error_description: null,
+        next: null,
+        redirect: null,
+        intent: "raw-intent-token",
+      };
+      return values[key] ?? null;
+    });
+
+    render(<AuthCallback />);
+
+    await waitFor(() => {
+      expect(finalizeCustomerSignup).toHaveBeenCalledWith("raw-intent-token");
+    });
+  });
+
+  it("never finalizes a profile when the callback only found an existing session (no fresh code)", async () => {
+    searchParamsGet.mockImplementation((key: string) => {
+      const values: Record<string, string | null> = {
+        code: null,
+        error: null,
+        error_description: null,
+        next: null,
+        redirect: null,
+      };
+      return values[key] ?? null;
+    });
+    getSession.mockResolvedValue({ data: { session: { access_token: "existing" } }, error: null });
+
+    render(<AuthCallback />);
+
+    await waitFor(() => {
+      expect(routerPush).toHaveBeenCalled();
+    });
+    expect(finalizeCustomerSignup).not.toHaveBeenCalled();
   });
 });

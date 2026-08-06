@@ -2,10 +2,10 @@ import type { CSSProperties } from "react";
 
 import { Heading, Text } from "@react-email/components";
 
-import { EmailAction, EmailLayout } from "./components";
-import { EMAIL_COPY } from "./copy";
-import { getAdminUrl, getTenantUrl } from "./urls";
-import type { EmailTemplateInput } from "./types";
+import { EmailAction, EmailLayout } from "./components.tsx";
+import { EMAIL_COPY } from "./copy.ts";
+import { getAdminUrl, getTenantUrl } from "./urls.ts";
+import type { EmailTemplateInput } from "./types.ts";
 
 export function EmailTemplate({ input }: { input: EmailTemplateInput }) {
   const copy = EMAIL_COPY[input.kind];
@@ -43,10 +43,16 @@ function getTemplateText(input: EmailTemplateInput): string {
 
 function getAction(input: EmailTemplateInput): { href: string } | undefined {
   switch (input.kind) {
+    // Customer-facing (D8): reached from a tenant storefront's own /auth
+    // journey (header signup modal, password recovery dialog), never the
+    // admin console, so the link returns to that SAME tenant subdomain.
     case "signup-confirmation":
+    case "password-recovery": return { href: getTenantUrl(input.branding.validatedSubdomain, input.data.actionPath) };
+    // Owner/admin-facing: these three are only ever reached from inside the
+    // admin console (accepting an invite, confirming a mailbox from
+    // /admin/settings), so the link lands there.
     case "owner-invite":
     case "new-user-invite":
-    case "password-recovery":
     case "store-mailbox-verification": return { href: getAdminUrl(input.data.actionPath) };
     case "password-changed": return undefined;
     case "membership-acceptance": return { href: getAdminUrl("/login") };

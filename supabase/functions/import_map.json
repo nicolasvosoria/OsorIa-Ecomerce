@@ -1,0 +1,10 @@
+{
+  "imports": {
+    "react": "npm:react@19.2.1",
+    "react-dom": "npm:react-dom@19.2.1",
+    "react-dom/server": "npm:react-dom@19.2.1/server",
+    "react/jsx-runtime": "npm:react@19.2.1/jsx-runtime",
+    "@react-email/components": "npm:@react-email/components@1.0.12",
+    "@react-email/render": "npm:@react-email/render@2.1.0"
+  }
+}

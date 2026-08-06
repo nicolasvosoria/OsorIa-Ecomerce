@@ -123,7 +123,7 @@ describe("Header password recovery", () => {
     await user.click(screen.getByRole("button", { name: t.header.sendRecoveryLink }))
 
     await waitFor(() =>
-      expect(authApiMock.resetPassword).toHaveBeenCalledWith("cliente@tienda.test"),
+      expect(authApiMock.resetPassword).toHaveBeenCalledWith("cliente@tienda.test", null),
     )
     expect(await screen.findByRole("heading", { name: t.header.emailSent })).toBeInTheDocument()
   })

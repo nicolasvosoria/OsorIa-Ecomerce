@@ -1,8 +1,8 @@
 import { render } from "@react-email/render";
 
-import { EMAIL_COPY } from "./copy";
-import { EmailTemplate } from "./templates";
-import type { EmailTemplateInput, RenderedEmail } from "./types";
+import { EMAIL_COPY } from "./copy.ts";
+import { EmailTemplate } from "./templates.tsx";
+import type { EmailTemplateInput, RenderedEmail } from "./types.ts";
 
 export async function renderEmail(input: EmailTemplateInput): Promise<RenderedEmail> {
   const [html, text] = await Promise.all([

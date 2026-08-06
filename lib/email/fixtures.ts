@@ -1,4 +1,4 @@
-import type { EmailTemplateInput, EmailTemplateKind, TenantEmailBranding } from "./types";
+import type { EmailTemplateInput, EmailTemplateKind, TenantEmailBranding } from "./types.ts";
 
 const PREVIEW_BRANDING: TenantEmailBranding = {
   displayName: "Cumbre Dorada Café",

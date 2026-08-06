@@ -1,4 +1,4 @@
-import type { EmailTemplateKind } from "./types";
+import type { EmailTemplateKind } from "./types.ts";
 
 export type EmailCopy = {
   subject: (storeName: string, reference?: string) => string;

@@ -1,4 +1,4 @@
-import type { EmailTemplateKind } from "./types";
+import type { EmailTemplateKind } from "./types.ts";
 
 const AUTH_SENDER = "Osoria <auth@mail.osoria.help>";
 const COMMERCE_SENDER_DOMAIN = "mail.osoria.help";

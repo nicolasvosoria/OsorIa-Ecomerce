@@ -189,6 +189,54 @@ export type Database = {
         }
         Relationships: []
       }
+      auth_intents: {
+        Row: {
+          consumed_at: string | null
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          purpose: string
+          store_id: string
+          token_hash: string
+        }
+        Insert: {
+          consumed_at?: string | null
+          created_at?: string
+          email: string
+          expires_at: string
+          id?: string
+          purpose: string
+          store_id: string
+          token_hash: string
+        }
+        Update: {
+          consumed_at?: string | null
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          purpose?: string
+          store_id?: string
+          token_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "auth_intents_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "auth_intents_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores_legacy"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cart_items: {
         Row: {
           cart_id: string
@@ -2611,6 +2659,16 @@ export type Database = {
       }
       decrement_inventory: {
         Args: { p_items: Json; p_order_id: string; p_store_id: string }
+        Returns: Json
+      }
+      finalize_customer_profile: {
+        Args: {
+          p_email: string
+          p_first_name: string
+          p_last_name: string
+          p_token_hash: string
+          p_user_id: string
+        }
         Returns: Json
       }
       generate_order_number: {

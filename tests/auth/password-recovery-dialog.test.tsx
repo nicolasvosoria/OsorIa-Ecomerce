@@ -65,7 +65,7 @@ describe("PasswordRecoveryDialog", () => {
     await user.type(emailField(), "duena@tienda.test")
     await user.click(sendButton())
 
-    await waitFor(() => expect(resetPassword).toHaveBeenCalledWith("duena@tienda.test"))
+    await waitFor(() => expect(resetPassword).toHaveBeenCalledWith("duena@tienda.test", null))
     expect(await screen.findByRole("heading", { name: t.header.emailSent })).toBeInTheDocument()
     expect(screen.getByText("duena@tienda.test")).toBeInTheDocument()
     expect(toastSuccess).toHaveBeenCalled()

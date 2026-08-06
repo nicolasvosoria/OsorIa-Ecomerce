@@ -26,7 +26,7 @@ function TestComponent() {
           <div data-testid="user-email">{user?.email || 'Sin usuario'}</div>
           <button
             data-testid="register-btn"
-            onClick={() => register('test@example.com', 'password123', 'Juan', 'Pérez')}
+            onClick={() => register('test@example.com', 'password123', 'Juan', 'Pérez', null)}
           >
             Registrar
           </button>
@@ -121,7 +121,8 @@ describe('AuthContext - Contexto de autenticación', () => {
         'test@example.com',
         'password123',
         'Juan',
-        'Pérez'
+        'Pérez',
+        null
       )
     })
   })

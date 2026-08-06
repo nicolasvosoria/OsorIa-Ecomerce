@@ -30,6 +30,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { Trash2, Plus, Minus } from "lucide-react"
 import { toast } from "sonner"
 import { PasswordRecoveryDialog } from "@/components/auth/password-recovery-dialog"
+import { TurnstileWidget } from "@/components/auth/turnstile-widget"
 import { deferStateUpdate } from "@/lib/react/defer-state-update"
 import { ADMIN_ACCESS_DENIED_PATH, FORCE_PASSWORD_CHANGE_PATH, getAuthReturnPath, resolvePostAuthDestination } from "@/lib/auth-return-intent"
 import { currentUserMustChangePassword, isCurrentUserAdminOrUnverified } from "@/lib/supabase/permissions-api"
@@ -113,6 +114,7 @@ export function Header() {
   const [lastName, setLastName] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
   const [forgotPasswordModalOpen, setForgotPasswordModalOpen] = useState(false)
   const [pendingLoginReturnPath, setPendingLoginReturnPath] = useState<string | null>(null)
   const openedLoginReturnIntentRef = useRef<string | null>(null)
@@ -1405,6 +1407,7 @@ export function Header() {
             setShowPassword(false)
             setShowConfirmPassword(false)
             setIsRegisterMode(false)
+            setTurnstileToken(null)
           }
         }}
       >
@@ -1446,7 +1449,7 @@ export function Header() {
                   return
                 }
                 // Registrar usuario
-                const result = await register(email, password, firstName, lastName)
+                const result = await register(email, password, firstName, lastName, turnstileToken)
                 if (result.success) {
                   await refreshUser()
                   if (result.emailSent) {
@@ -1463,7 +1466,7 @@ export function Header() {
                       duration: 3000,
                     })
                   }
-                  
+
                   setLoginModalOpen(false)
                   setEmail("")
                   setPassword("")
@@ -1473,6 +1476,7 @@ export function Header() {
                   setShowPassword(false)
                   setShowConfirmPassword(false)
                   setIsRegisterMode(false)
+                  setTurnstileToken(null)
                 } else {
                   toast.error(t.header.errorCreatingAccount, {
                     description: result.error || "Por favor, intenta nuevamente",
@@ -1694,6 +1698,11 @@ export function Header() {
                 </div>
               </div>
             )}
+
+            {/* D26: solo en el registro, no en el login -- no-op (no
+                renderiza nada) hasta que NEXT_PUBLIC_TURNSTILE_SITE_KEY esté
+                configurada. */}
+            {isRegisterMode && <TurnstileWidget onToken={setTurnstileToken} />}
 
             <div className="flex flex-col gap-2 pt-4">
               <Button

@@ -2,7 +2,7 @@ import type { CSSProperties, ReactNode } from "react";
 
 import { Body, Button, Container, Head, Html, Img, Section, Text } from "@react-email/components";
 
-import type { TenantEmailBranding } from "./types";
+import type { TenantEmailBranding } from "./types.ts";
 
 const DEFAULT_PRIMARY_COLOR = "#4a5568"; // pizarra-serena — DESIGN.md
 const HEX_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;

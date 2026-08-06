@@ -16,7 +16,7 @@ declare
   v_missing text[];
 begin
   select array_agg(required_table order by required_table) into v_missing
-  from (values ('email_outbox'), ('email_send_attempts'), ('store_mailbox_verifications')) req(required_table)
+  from (values ('email_outbox'), ('email_send_attempts'), ('store_mailbox_verifications'), ('auth_intents')) req(required_table)
   where to_regclass(format('ecommerce.%I', req.required_table)) is null;
 
   if v_missing is not null then
@@ -34,7 +34,8 @@ begin
     ('store_contact', 'reply_to_email'), ('store_contact', 'reply_to_pending_email'), ('store_contact', 'reply_to_verified_at'),
     ('store_contact', 'order_mailbox_email'), ('store_contact', 'order_mailbox_pending_email'), ('store_contact', 'order_mailbox_verified_at'),
     ('email_outbox', 'idempotency_key'), ('email_outbox', 'attempt_count'), ('email_outbox', 'provider_message_id'), ('email_outbox', 'last_error'),
-    ('orders', 'idempotency_key'), ('orders', 'payload_fingerprint')
+    ('orders', 'idempotency_key'), ('orders', 'payload_fingerprint'),
+    ('auth_intents', 'store_id'), ('auth_intents', 'purpose'), ('auth_intents', 'token_hash'), ('auth_intents', 'expires_at'), ('auth_intents', 'consumed_at')
   ) req(required_table, required_column)
   where not exists (
     select 1 from information_schema.columns c
@@ -122,7 +123,7 @@ declare
   v_missing text[];
 begin
   select array_agg(required_table order by required_table) into v_missing
-  from (values ('email_outbox'), ('email_send_attempts'), ('store_mailbox_verifications')) req(required_table)
+  from (values ('email_outbox'), ('email_send_attempts'), ('store_mailbox_verifications'), ('auth_intents')) req(required_table)
   where not exists (
     select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace
     where n.nspname = 'ecommerce' and c.relname = req.required_table and c.relrowsecurity is true
@@ -140,12 +141,12 @@ begin
   select array_agg(msg) into v_violations
   from (
     select format('anon has %s on ecommerce.%s', priv, tbl) as msg
-    from unnest(array['email_outbox', 'email_send_attempts', 'store_mailbox_verifications']) tbl
+    from unnest(array['email_outbox', 'email_send_attempts', 'store_mailbox_verifications', 'auth_intents']) tbl
     cross join unnest(array['select', 'insert', 'update', 'delete']) priv
     where has_table_privilege('anon', format('ecommerce.%I', tbl), priv)
     union all
     select format('authenticated has %s on ecommerce.%s', priv, tbl)
-    from unnest(array['email_outbox', 'email_send_attempts', 'store_mailbox_verifications']) tbl
+    from unnest(array['email_outbox', 'email_send_attempts', 'store_mailbox_verifications', 'auth_intents']) tbl
     cross join unnest(array['select', 'insert', 'update', 'delete']) priv
     where has_table_privilege('authenticated', format('ecommerce.%I', tbl), priv)
   ) v;
@@ -159,8 +160,34 @@ begin
     and has_table_privilege('service_role', 'ecommerce.email_outbox', 'insert')
     and has_table_privilege('service_role', 'ecommerce.store_mailbox_verifications', 'select')
     and has_table_privilege('service_role', 'ecommerce.email_send_attempts', 'select')
+    and has_table_privilege('service_role', 'ecommerce.auth_intents', 'select')
+    and has_table_privilege('service_role', 'ecommerce.auth_intents', 'insert')
   ) then
     raise exception 'service_role must retain full access to the email platform tables';
+  end if;
+end $$;
+
+-- D23/D30: same posture as create_order_with_notifications/transition_order_status
+-- -- service_role only, since finalize_customer_profile inserts into
+-- user_profiles as its owner without granting callers table access.
+do $$
+declare
+  v_violations text[];
+begin
+  select array_agg(msg) into v_violations
+  from (
+    select 'anon can EXECUTE ecommerce.finalize_customer_profile' as msg
+    where has_function_privilege('anon', 'ecommerce.finalize_customer_profile(uuid, text, text, text, text)', 'execute')
+    union all
+    select 'authenticated can EXECUTE ecommerce.finalize_customer_profile'
+    where has_function_privilege('authenticated', 'ecommerce.finalize_customer_profile(uuid, text, text, text, text)', 'execute')
+    union all
+    select 'service_role cannot EXECUTE ecommerce.finalize_customer_profile'
+    where not has_function_privilege('service_role', 'ecommerce.finalize_customer_profile(uuid, text, text, text, text)', 'execute')
+  ) v;
+
+  if v_violations is not null then
+    raise exception 'finalize_customer_profile grant contract broken: %', array_to_string(v_violations, '; ');
   end if;
 end $$;
 
@@ -307,6 +334,174 @@ begin
   -- Unknown token gets the exact same generic response (no enumeration).
   if ecommerce.confirm_store_mailbox_verification('not-a-real-hash') <> jsonb_build_object('ok', false, 'reason', 'invalid_or_expired') then
     raise exception 'D24-style posture: an unknown token must return the same generic invalid_or_expired response';
+  end if;
+end $$;
+
+-- -----------------------------------------------------------------------------
+-- Slice 5: D23's auth_intents + ecommerce.finalize_customer_profile.
+-- Mint is a plain insert (lib/auth/auth-intents.ts's mintAuthIntent has no
+-- authorization decision to make -- the store was already resolved
+-- trustworthily server-side before this ever runs), so this block mints by
+-- hand exactly the way that TS helper does. Every guarantee the verify
+-- criteria name for this piece lives here: intent integrity/expiry/single-use
+-- consumption, idempotent callback finalization, and that attribution can
+-- never be redirected to a tenant other than the one the intent recorded.
+-- -----------------------------------------------------------------------------
+do $$
+declare
+  v_owner_id uuid := gen_random_uuid();
+  v_store_a_id uuid;
+  v_store_b_id uuid;
+  v_user_id uuid := gen_random_uuid();
+  v_other_user_id uuid := gen_random_uuid();
+  v_token_hash text := encode(digest('auth-intent-check-token-1', 'sha256'), 'hex');
+  v_result jsonb;
+  v_expires_at timestamptz;
+  v_created_at timestamptz;
+  v_profile_count integer;
+  v_signup_store_id uuid;
+begin
+  insert into auth.users (id, email, encrypted_password, email_confirmed_at, created_at, updated_at, raw_app_meta_data, raw_user_meta_data, aud, role)
+  values
+    (v_owner_id, 'auth-intent-check-owner@example.com', 'x', now(), now(), now(), '{}', '{}', 'authenticated', 'authenticated'),
+    (v_user_id, 'nueva@example.com', 'x', now(), now(), now(), '{}', '{}', 'authenticated', 'authenticated'),
+    (v_other_user_id, 'otra@example.com', 'x', now(), now(), now(), '{}', '{}', 'authenticated', 'authenticated');
+  insert into ecommerce.user_profiles (id, email, role) values (v_owner_id, 'auth-intent-check-owner@example.com', 'user');
+  v_store_a_id := ecommerce.provision_store('auth-intent-check-store-a', 'Auth Intent Check Store A', v_owner_id, 'COP');
+  v_store_b_id := ecommerce.provision_store('auth-intent-check-store-b', 'Auth Intent Check Store B', v_owner_id, 'COP');
+
+  -- Mint: bound to store A, one-hour expiry (D24).
+  insert into ecommerce.auth_intents (store_id, purpose, email, token_hash, expires_at)
+  values (v_store_a_id, 'signup', 'nueva@example.com', v_token_hash, now() + interval '1 hour');
+
+  select expires_at, created_at into v_expires_at, v_created_at
+  from ecommerce.auth_intents where token_hash = v_token_hash;
+  if v_expires_at is null or abs(extract(epoch from (v_expires_at - v_created_at)) - 3600) > 5 then
+    raise exception 'D24: auth intent must expire exactly one hour after creation, got a % second window', extract(epoch from (v_expires_at - v_created_at));
+  end if;
+
+  -- Idempotent finalize, part 1: first call for v_user_id creates the profile
+  -- attributed to store A -- the store the intent recorded, never anything
+  -- else, because the function has no other way to learn a store id at all.
+  -- This IS the "attribution cannot be redirected to another tenant" proof:
+  -- store B exists and is a real, valid store, but nothing about this call
+  -- can make the profile land there.
+  v_result := ecommerce.finalize_customer_profile(v_user_id, 'nueva@example.com', 'Nueva', 'Cliente', v_token_hash);
+  if (v_result ->> 'ok')::boolean is not true or (v_result ->> 'created')::boolean is not true then
+    raise exception 'Expected the fresh intent to finalize a new profile, got %', v_result;
+  end if;
+  if (v_result ->> 'store_id')::uuid <> v_store_a_id then
+    raise exception 'D23: the finalized profile must be attributed to the intent''s own store (A), got %', v_result ->> 'store_id';
+  end if;
+
+  select signup_store_id into v_signup_store_id from ecommerce.user_profiles where id = v_user_id;
+  if v_signup_store_id <> v_store_a_id or v_signup_store_id = v_store_b_id then
+    raise exception 'D23: user_profiles.signup_store_id must be store A, never store B, got %', v_signup_store_id;
+  end if;
+
+  -- Idempotent finalize, part 2: a second call for the SAME user (a reload,
+  -- React StrictMode's double-invoke) is a no-op success, not a second row
+  -- and not a "token already consumed" failure.
+  v_result := ecommerce.finalize_customer_profile(v_user_id, 'nueva@example.com', 'Nueva', 'Cliente', v_token_hash);
+  if (v_result ->> 'ok')::boolean is not true or (v_result ->> 'created')::boolean is not false then
+    raise exception 'D23: a second finalize call for the same user must be an idempotent no-op, got %', v_result;
+  end if;
+
+  select count(*) into v_profile_count from ecommerce.user_profiles where id = v_user_id;
+  if v_profile_count <> 1 then
+    raise exception 'D23: running finalize twice must leave exactly one profile, found %', v_profile_count;
+  end if;
+
+  -- Single-use consumption, independent of the idempotency shortcut above: a
+  -- DIFFERENT user attempting to spend the SAME already-consumed token must
+  -- be rejected -- this is what stops a replayed/guessed token from ever
+  -- attributing a second, different account to store A.
+  v_result := ecommerce.finalize_customer_profile(v_other_user_id, 'otra@example.com', 'Otra', 'Persona', v_token_hash);
+  if (v_result ->> 'ok')::boolean is not false or (v_result ->> 'reason') <> 'invalid_or_expired_intent' then
+    raise exception 'D24: a second use of an already-consumed intent must be rejected, got %', v_result;
+  end if;
+  if exists (select 1 from ecommerce.user_profiles where id = v_other_user_id) then
+    raise exception 'D24: a rejected finalize must never create a profile';
+  end if;
+
+  -- Expiry (D24): an intent past its expires_at is rejected even though it
+  -- was never consumed.
+  insert into ecommerce.auth_intents (store_id, purpose, email, token_hash, expires_at)
+  values (v_store_a_id, 'signup', 'expirada@example.com', encode(digest('auth-intent-check-token-expired', 'sha256'), 'hex'), now() - interval '1 minute');
+  v_result := ecommerce.finalize_customer_profile(gen_random_uuid(), 'expirada@example.com', 'Expirada', 'Cliente', encode(digest('auth-intent-check-token-expired', 'sha256'), 'hex'));
+  if (v_result ->> 'ok')::boolean is not false or (v_result ->> 'reason') <> 'invalid_or_expired_intent' then
+    raise exception 'D24: an expired intent must be rejected, got %', v_result;
+  end if;
+
+  -- No enumeration: an unknown token gets the EXACT same generic response as
+  -- the already-consumed and expired cases above.
+  if ecommerce.finalize_customer_profile(gen_random_uuid(), 'nadie@example.com', 'Nadie', 'Cliente', 'not-a-real-hash')
+     <> jsonb_build_object('ok', false, 'reason', 'invalid_or_expired_intent') then
+    raise exception 'D24-style posture: an unknown intent token must return the same generic invalid_or_expired_intent response';
+  end if;
+end $$;
+
+-- -----------------------------------------------------------------------------
+-- Finding 1 (slice-5 verifier, live PostgREST + a real GoTrue session): the
+-- grant assertion above (has_function_privilege) proved the CATALOG was
+-- right while the calling code was still broken --
+-- lib/auth/finalize-signup-action.ts called this RPC through the session's
+-- own `authenticated`-role client, which a real PostgREST request rejected
+-- with 42501. `has_function_privilege` alone can't catch that: it reads the
+-- grant, it never places a call. Reproduced here the SAME way the
+-- orders-grant-check block above proves its own bypass -- under SET LOCAL
+-- ROLE, the exact mechanism PostgREST itself uses to enforce a resolved
+-- JWT role per request, not just a privilege-catalog read.
+--
+-- What this DOES prove: the app's pre-fix call path (authenticated) is
+-- genuinely rejected, and the app's actual call path since the fix
+-- (service_role) genuinely succeeds, under real Postgres grant enforcement.
+-- What this does NOT prove: that the TypeScript in
+-- lib/auth/finalize-signup-action.ts actually builds and sends the request
+-- as service_role (tests/security/finalize-signup-action.test.ts proves
+-- that, at the mocked-client level) or that PostgREST's own JWT-to-role
+-- resolution behaves the same way over a real HTTP call with a live GoTrue
+-- session -- only that last mile needs the verifier's own live rig.
+-- -----------------------------------------------------------------------------
+do $$
+declare
+  v_owner_id uuid := gen_random_uuid();
+  v_store_id uuid;
+  v_user_id uuid := gen_random_uuid();
+  v_token_hash text := encode(digest('finalize-role-check-token', 'sha256'), 'hex');
+  v_result jsonb;
+begin
+  insert into auth.users (id, email, encrypted_password, email_confirmed_at, created_at, updated_at, raw_app_meta_data, raw_user_meta_data, aud, role)
+  values
+    (v_owner_id, 'finalize-role-check-owner@example.com', 'x', now(), now(), now(), '{}', '{}', 'authenticated', 'authenticated'),
+    (v_user_id, 'finalize-role-check-user@example.com', 'x', now(), now(), now(), '{}', '{}', 'authenticated', 'authenticated');
+  insert into ecommerce.user_profiles (id, email, role) values (v_owner_id, 'finalize-role-check-owner@example.com', 'user');
+  v_store_id := ecommerce.provision_store('finalize-role-check-store', 'Finalize Role Check Store', v_owner_id, 'COP');
+
+  insert into ecommerce.auth_intents (store_id, purpose, email, token_hash, expires_at)
+  values (v_store_id, 'signup', 'finalize-role-check-user@example.com', v_token_hash, now() + interval '1 hour');
+
+  -- The exact bypass Finding 1 exploited: the app's pre-fix call path (the
+  -- session's own authenticated client) must be rejected outright.
+  set local role authenticated;
+  begin
+    perform ecommerce.finalize_customer_profile(v_user_id, 'finalize-role-check-user@example.com', 'Ana', 'Lovelace', v_token_hash);
+    raise exception 'Finding 1 reopened: authenticated could EXECUTE ecommerce.finalize_customer_profile directly';
+  exception when insufficient_privilege then null;
+  end;
+  reset role;
+
+  if exists (select 1 from ecommerce.auth_intents where token_hash = v_token_hash and consumed_at is not null) then
+    raise exception 'A rejected authenticated call must never consume the intent';
+  end if;
+
+  -- The app's actual call path since Finding 1's fix: service_role must succeed.
+  set local role service_role;
+  v_result := ecommerce.finalize_customer_profile(v_user_id, 'finalize-role-check-user@example.com', 'Ana', 'Lovelace', v_token_hash);
+  reset role;
+
+  if (v_result ->> 'ok')::boolean is not true then
+    raise exception 'service_role must be able to finalize a customer profile through the app''s own call path, got %', v_result;
   end if;
 end $$;
 
