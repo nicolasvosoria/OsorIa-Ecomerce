@@ -15,8 +15,8 @@ export async function updateOrderStatusAction(
     return { success: false, error: authorization.error };
   }
 
-  const { supabase, storeId } = authorization;
-  const updated = await updateOrderStatus(orderId, status, storeId, supabase);
+  const { supabase, storeId, userId } = authorization;
+  const updated = await updateOrderStatus(orderId, status, storeId, userId, supabase);
   if (!updated) {
     return { success: false, error: "No se pudo actualizar el estado del pedido" };
   }

@@ -71,9 +71,9 @@ export async function PATCH(request: NextRequest) {
 
     const auth = await authorizeStoreAdmin(request);
     if ("error" in auth) return adminErrorResponse(auth);
-    const { supabase, storeId } = auth;
+    const { supabase, storeId, userId } = auth;
 
-    const updated = await updateOrderStatus(orderId, status, storeId, supabase);
+    const updated = await updateOrderStatus(orderId, status, storeId, userId, supabase);
     if (!updated) {
       return NextResponse.json(
         { error: "No se pudo actualizar el estado del pedido" },

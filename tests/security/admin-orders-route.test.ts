@@ -30,13 +30,20 @@ function makeCookieStore() {
   };
 }
 
-function makeCanManageStoreRpc(canManage: boolean) {
-  return vi.fn(async (fnName: string) => {
-    if (fnName !== "can_user_manage_store") {
-      throw new Error(`unexpected rpc ${fnName}`);
+// D30: the route's PATCH now also reaches ecommerce.transition_order_status
+// (lib/orders/order-status-writer.ts), so this stubs both RPCs the service
+// schema is asked for -- membership (can_user_manage_store) and the status
+// transition itself, echoing back the requested status the same way the real
+// function returns the updated row.
+function makeServiceRpc(canManage: boolean) {
+  return vi.fn(async (fnName: string, params?: Record<string, unknown>) => {
+    if (fnName === "can_user_manage_store") {
+      return { data: canManage, error: null };
     }
-
-    return { data: canManage, error: null };
+    if (fnName === "transition_order_status") {
+      return { data: { ok: true, order: { id: params?.p_order_id, status: params?.p_next_status } }, error: null };
+    }
+    throw new Error(`unexpected rpc ${fnName}`);
   });
 }
 
@@ -86,7 +93,7 @@ function makeServiceSchema(options: {
   }
 
   const schema = {
-    rpc: makeCanManageStoreRpc(canManage),
+    rpc: makeServiceRpc(canManage),
     from: vi.fn((table: string) => {
       fromTables.push(table);
       return makeBuilder(table);
@@ -186,20 +193,33 @@ describe("admin orders route", () => {
   });
 
   it("scopes the status update to the trusted store for an authorized admin", async () => {
-    const { schema, eqCalls } = makeServiceSchema({ canManage: true });
+    // D30: the status write now goes through ecommerce.transition_order_status,
+    // which does its own store scoping INSIDE the locked function -- this
+    // proves the route hands it the trusted store_id (never a client-supplied
+    // one) and the authenticated admin's user_id. "confirmed" is a
+    // non-lifecycle target (D11), so this stays a pure scoping/wiring test;
+    // which notification kind attaches to which target status is covered by
+    // tests/orders/order-status-writer.test.ts, and the graph/authorization
+    // enforcement itself is proven against real Postgres in
+    // verify-email-platform-contract.sql.
+    const { schema } = makeServiceSchema({ canManage: true });
     createClient.mockReturnValue({ schema: vi.fn().mockReturnValue(schema) });
 
     const response = await PATCH(
-      makePatchRequest({ orderId: "order-1", status: "shipped" }),
+      makePatchRequest({ orderId: "order-1", status: "confirmed" }),
     );
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ ok: true });
-    expect(eqCalls).toContainEqual({
-      table: "orders",
-      column: "store_id",
-      value: STORE_ID,
-    });
+    expect(schema.rpc).toHaveBeenCalledWith(
+      "transition_order_status",
+      expect.objectContaining({
+        p_order_id: "order-1",
+        p_store_id: STORE_ID,
+        p_user_id: "admin-1",
+        p_next_status: "confirmed",
+      }),
+    );
   });
 
   it("rejects a malformed status payload", async () => {

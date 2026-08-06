@@ -4,11 +4,28 @@ import type { TenantEmailBranding } from "@/lib/email/types"
 import { isStoreIdentityReadinessEnforced } from "@/lib/checkout/identity-readiness-gate"
 import type { StoreIdentityView } from "@/lib/supabase/store-identity-api"
 
-// Shape ecommerce.create_order_with_notifications expects for each element of
-// p_notifications -- see that migration's comment for why rendering happens
-// here in TS rather than in SQL (D13).
+// D11: the four order-lifecycle kinds ecommerce.transition_order_status can
+// enqueue, keyed by the order status they land on. confirmed/processing are
+// deliberately absent -- they enqueue nothing (lib/orders/order-status-writer.ts
+// never calls buildOrderLifecycleNotification for them).
+const ORDER_LIFECYCLE_TEMPLATE_KIND = {
+  shipped: "order-shipped",
+  delivered: "order-delivered",
+  cancelled: "order-cancelled",
+  returned: "order-returned",
+} as const
+
+export type OrderLifecycleStatus = keyof typeof ORDER_LIFECYCLE_TEMPLATE_KIND
+
+// Shape ecommerce.create_order_with_notifications and
+// ecommerce.transition_order_status expect for each notification they're
+// handed -- see those migrations' comments for why rendering happens here in
+// TS rather than in SQL (D13).
 export type OrderOutboxNotification = {
-  templateKind: "order-received" | "merchant-new-order"
+  templateKind:
+    | "order-received"
+    | "merchant-new-order"
+    | (typeof ORDER_LIFECYCLE_TEMPLATE_KIND)[OrderLifecycleStatus]
   recipientEmail: string
   fromAddress: string
   replyToAddress: string | null
@@ -82,6 +99,45 @@ export async function buildOrderOutboxNotifications(
   return [customerReceipt, merchantNotification]
 }
 
+export type OrderLifecycleNotificationContext = {
+  identity: StoreIdentityView
+  orderNumber: string
+  customerName: string
+  customerEmail: string
+  idempotencyKey: string
+  trackingCode?: string
+  returnReason?: string
+}
+
+// D11: the ONE customer message a transition into shipped/delivered/cancelled/
+// returned carries -- called by lib/orders/order-status-writer.ts for exactly
+// those four target statuses, never for confirmed/processing. Unlike
+// buildOrderOutboxNotifications' merchant leg, there's no missing-recipient
+// case to degrade around: the recipient is always the order's own
+// customer_email, a required column set at checkout regardless of the
+// store's D31 identity-readiness state, so that gate does not apply here.
+export async function buildOrderLifecycleNotification(
+  targetStatus: OrderLifecycleStatus,
+  context: OrderLifecycleNotificationContext,
+): Promise<OrderOutboxNotification> {
+  const branding = toTenantEmailBranding(context.identity)
+  const verifiedReplyTo = context.identity.replyToVerifiedAt ? context.identity.replyToEmail : null
+
+  return renderNotification({
+    templateKind: ORDER_LIFECYCLE_TEMPLATE_KIND[targetStatus],
+    branding,
+    verifiedReplyTo,
+    recipientEmail: context.customerEmail,
+    data: {
+      customerName: context.customerName,
+      orderNumber: context.orderNumber,
+      ...(context.trackingCode ? { trackingCode: context.trackingCode } : {}),
+      ...(context.returnReason ? { returnReason: context.returnReason } : {}),
+    },
+    idempotencyKey: context.idempotencyKey,
+  })
+}
+
 // The verified order mailbox (A8's readiness field) is the intended target;
 // store_contact.contact_email predates this feature and is the next
 // best-known address while D31 keeps the readiness gate unenforced. A store
@@ -120,11 +176,11 @@ function toTenantEmailBranding(identity: StoreIdentityView): TenantEmailBranding
 }
 
 async function renderNotification(input: {
-  templateKind: "order-received" | "merchant-new-order"
+  templateKind: OrderOutboxNotification["templateKind"]
   branding: TenantEmailBranding
   verifiedReplyTo: string | null
   recipientEmail: string
-  data: { customerName: string; orderNumber: string }
+  data: { customerName: string; orderNumber: string; trackingCode?: string; returnReason?: string }
   idempotencyKey: string
 }): Promise<OrderOutboxNotification> {
   const sender = resolveEmailSender(input.templateKind, input.branding.displayName, input.verifiedReplyTo)

@@ -2657,6 +2657,16 @@ export type Database = {
         Returns: Json
       }
       storage_root_store_id: { Args: { object_name: string }; Returns: string }
+      transition_order_status: {
+        Args: {
+          p_next_status: string
+          p_notification?: Json
+          p_order_id: string
+          p_store_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       user_manages_any_store: { Args: { p_user_id: string }; Returns: boolean }
     }
     Enums: {

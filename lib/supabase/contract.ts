@@ -70,6 +70,7 @@ export const ECOMMERCE_FUNCTIONS = {
   provisionStore: "provision_store",
   pruneEmailOutbox: "prune_email_outbox",
   requestStoreMailboxVerification: "request_store_mailbox_verification",
+  transitionOrderStatus: "transition_order_status",
   userManagesAnyStore: "user_manages_any_store",
 } as const satisfies Record<string, EcommerceFunctionName>;
 

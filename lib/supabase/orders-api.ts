@@ -8,6 +8,7 @@ import {
   StoreIdentityNotReadyError,
   writeOrderAtomically,
 } from "@/lib/checkout/order-writer";
+import { transitionOrderStatusAtomically } from "@/lib/orders/order-status-writer";
 
 // Tipos para pedidos
 export interface Order {
@@ -1882,19 +1883,18 @@ export async function getOrdersForUser(
 }
 
 /**
- * Actualizar el estado de un pedido
+ * Actualizar el estado de un pedido (D29/D30): pasa por
+ * ecommerce.transition_order_status (lib/orders/order-status-writer.ts), que
+ * valida la transición contra el grafo congelado, revisa su propia
+ * autorización/tenencia, y encola atómicamente el aviso de ciclo de vida
+ * (D11) cuando el estado destino lo requiere.
  */
 export async function updateOrderStatus(
   orderId: string,
   status: Order["status"],
-  storeId?: string,
+  storeId: string,
+  userId: string,
   supabaseOverride?: any,
-  additionalData?: {
-    payment_status?: Order["payment_status"];
-    shipped_at?: string;
-    delivered_at?: string;
-    cancelled_at?: string;
-  },
 ): Promise<boolean> {
   try {
     const supabase = supabaseOverride ?? getSupabaseEcommerce();
@@ -1903,53 +1903,17 @@ export async function updateOrderStatus(
       return false;
     }
 
-    const updateData: any = { status };
-
-    if (status === "confirmed" && !additionalData?.shipped_at) {
-      updateData.confirmed_at = new Date().toISOString();
-    }
-    if (status === "shipped") {
-      updateData.shipped_at =
-        additionalData?.shipped_at || new Date().toISOString();
-    }
-    if (status === "delivered") {
-      updateData.delivered_at =
-        additionalData?.delivered_at || new Date().toISOString();
-    }
-    if (status === "cancelled") {
-      updateData.cancelled_at =
-        additionalData?.cancelled_at || new Date().toISOString();
-    }
-
-    if (additionalData?.payment_status) {
-      updateData.payment_status = additionalData.payment_status;
-    }
-
-    let updateQuery = supabase
-      .from(ECOMMERCE_TABLES.orders)
-      .update(updateData)
-      .eq("id", orderId);
-    if (storeId) {
-      updateQuery = updateQuery.eq("store_id", storeId);
-    }
-
-    const result = (await withTimeout(
-      updateQuery,
-      10000,
-      "updateOrderStatus",
-    )) as { error: any };
-
-    if (result.error) {
-      console.error(
-        "[Orders] Error al actualizar estado del pedido:",
-        result.error,
-      );
-      return false;
-    }
+    await transitionOrderStatusAtomically({
+      supabase,
+      orderId,
+      storeId,
+      userId,
+      nextStatus: status,
+    });
 
     return true;
   } catch (error: any) {
-    console.error("[Orders] Error inesperado al actualizar estado:", error);
+    console.error("[Orders] Error al actualizar estado del pedido:", error);
     return false;
   }
 }
