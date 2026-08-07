@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Loader } from "@/components/ui/loader"
 import { ArrowLeft, ShoppingBag } from "lucide-react"
 import { buildLocalCartSummary } from "@/lib/cart/cart-summary"
+import { formatPrice } from "@/lib/commerce/utils"
 import { useLanguage } from "@/contexts/language-context"
 import { toast } from "sonner"
 import Link from "next/link"
@@ -30,7 +31,7 @@ import { enabledPaymentMethodIds } from "@/lib/checkout/payment-methods"
 import type { CheckoutOrderInput } from "@/lib/checkout/schemas"
 import type { Translations } from "@/lib/i18n/translations"
 import type { ShippingDestination, ShippingResolutionItem, ShippingResolutionStatus } from "@/lib/shipping/resolver"
-import { formatShippingResolutionLabel } from "@/lib/shipping/status-display"
+import { shippingStatusLabelKeyForBuyer } from "@/lib/shipping/status-label"
 import { buildWhatsAppLink } from "@/lib/stores/whatsapp-contact"
 
 // D23: the live quote's own vocabulary of states -- "resolved" carries one of
@@ -529,7 +530,7 @@ export default function CheckoutPage() {
                 <div className="flex justify-between gap-4 text-sm">
                   <span className="text-muted-foreground">{t.cart.shipping}</span>
                   <span className="text-right text-muted-foreground">
-                    {renderShippingQuote(shippingQuote, t.checkout, localSummary.currencyCode)}
+                    {renderShippingQuote(shippingQuote, t, localSummary.currencyCode)}
                   </span>
                 </div>
                 <div className="flex justify-between text-lg font-bold pt-2 border-t">
@@ -658,18 +659,22 @@ function needsShippingCoordinationNote(quote: ShippingQuoteState): boolean {
   return quote.kind === "resolved" && (quote.status === "agreed" || quote.status === "out_of_zone")
 }
 
-function renderShippingQuote(quote: ShippingQuoteState, t: Translations["checkout"], currencyCode: string) {
-  if (quote.kind === "idle") return t.shippingSelectDestination
-  if (quote.kind === "blocked") return t.shippingBlocked
-  if (quote.kind === "failed") return t.shippingQuoteFailed
+function renderShippingQuote(quote: ShippingQuoteState, t: Translations, currencyCode: string) {
+  if (quote.kind === "idle") return t.checkout.shippingSelectDestination
+  if (quote.kind === "blocked") return t.checkout.shippingBlocked
+  if (quote.kind === "failed") return t.checkout.shippingQuoteFailed
   if (quote.kind === "loading") {
     return (
       <span className="inline-flex items-center gap-2">
         <Loader size="sm" />
-        {t.shippingCalculating}
+        {t.checkout.shippingCalculating}
       </span>
     )
   }
 
-  return formatShippingResolutionLabel(quote.status, quote.amount, currencyCode, t)
+  // D23/A15: BUYER-facing -- agreed and out_of_zone collapse onto the same
+  // phrase (lib/shipping/status-label.ts), the same one the success page and
+  // the order detail use, so this live quote can't drift from either.
+  const labelKey = shippingStatusLabelKeyForBuyer(quote.status)
+  return labelKey ? t.orders.shippingStatusLabels.buyer[labelKey] : formatPrice(quote.amount, currencyCode)
 }

@@ -34,8 +34,8 @@ export interface OrderDetail {
   subtotal: number;
   shippingCost: number;
   // D23: nullable -- a legacy order placed before shipping_status existed.
-  // shippingStatusLabelKey (lib/shipping/status-label.ts) renders a null the
-  // same way it always rendered: the amount.
+  // shippingStatusLabelKeyForBuyer (lib/shipping/status-label.ts) renders a
+  // null the same way it always rendered: the amount.
   shippingStatus: ShippingResolutionStatus | null;
   totalAmount: number;
   lines: OrderDetailLine[];

@@ -92,11 +92,13 @@ describe("AdminOrderDetailPage", () => {
   })
 })
 
-// D23: the admin must never disagree with what the buyer already saw on the
-// success page and the order detail -- same status, same phrase. A legacy
+// D23/A15: the admin is STORE-facing, so unlike the buyer-facing success
+// page and order detail it does NOT collapse out_of_zone onto agreed's own
+// phrase -- to the owner a coverage gap in their own zones is a different
+// fact from their coordinate-shipping policy working as intended. A legacy
 // order with no shipping_status (nullable since S9) has to keep rendering
 // the way it always did instead of crashing.
-describe("AdminOrderDetailPage shipping status rendering (D23)", () => {
+describe("AdminOrderDetailPage shipping status rendering (D23/A15)", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     authorizeActiveStoreAdmin.mockResolvedValue({
@@ -127,10 +129,11 @@ describe("AdminOrderDetailPage shipping status rendering (D23)", () => {
     expect(screen.getByText("A convenir con la tienda")).toBeInTheDocument()
   })
 
-  it("shows the same coordinate phrase for a destination outside every zone", async () => {
+  it("shows its OWN coverage-gap phrase for a destination outside every zone, distinct from agreed's", async () => {
     await renderOrderDetailPage("out_of_zone", 0)
 
-    expect(screen.getByText("A convenir con la tienda")).toBeInTheDocument()
+    expect(screen.getByText("Fuera de zona configurada")).toBeInTheDocument()
+    expect(screen.queryByText("A convenir con la tienda")).not.toBeInTheDocument()
   })
 
   it("shows Gratis for a ladder's free rung, distinct from the coordinate phrase", async () => {

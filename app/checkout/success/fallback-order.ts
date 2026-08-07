@@ -26,8 +26,8 @@ export interface SuccessPageOrderSummary {
   subtotal: number;
   shippingCost: number;
   // D23: nullable -- a legacy order placed before this column existed. See
-  // shippingStatusLabelKey (lib/shipping/status-label.ts) for how a null
-  // renders (the amount, same as it always did).
+  // shippingStatusLabelKeyForBuyer (lib/shipping/status-label.ts) for how a
+  // null renders (the amount, same as it always did).
   shippingStatus: ShippingResolutionStatus | null;
   totalAmount: number;
   currencyCode: string;

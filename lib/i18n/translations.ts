@@ -135,19 +135,16 @@ export interface Translations {
     country: string
     notes: string
     paymentMethod: string
-    shippingConfirmedByStore: string
     guestLoginCta: string
     unitPrice: string
     // D14/D11: coordination copy naming the store and its real WhatsApp contact
     shippingCoordinationContact: string
     shippingCoordinationCta: string
-    // D23: the live shipping quote's vocabulary -- one word per resolution
-    // status/transitional state, never a back-computed number standing in
-    // for a word. shippingFree/shippingOutOfZone plug into
-    // lib/shipping/status-display.ts, the shared mapping a later order
-    // detail screen reuses so the two surfaces can't drift.
-    shippingFree: string
-    shippingOutOfZone: string
+    // D23/A15: this screen's OWN transitional/failure states -- a resolved
+    // status instead reads orders.shippingStatusLabels.buyer (through
+    // shippingStatusLabelKeyForBuyer, lib/shipping/status-label.ts), the same
+    // vocabulary the success page and the order detail use, so this live
+    // quote can't drift from what a buyer sees on either of those.
     shippingBlocked: string
     shippingQuoteFailed: string
     shippingCalculating: string
@@ -273,14 +270,29 @@ export interface Translations {
       failed: string
       refunded: string
     }
-    // D23: the checkout quote, the success page, the order detail, the admin
-    // order page and the orders export all read the same two phrases through
-    // shippingStatusLabelKey (lib/shipping/status-label.ts) -- "rate" and a
-    // legacy null render the formatted amount instead, never a phrase here.
+    // D23/A15: lib/shipping/status-label.ts is the one file mapping a stored
+    // shipping_status to a key here, split by audience. BUYER-facing screens
+    // (the checkout quote, the success page, the order detail) read `.buyer`
+    // through shippingStatusLabelKeyForBuyer -- "agreed" and "out_of_zone"
+    // collapse onto the same phrase, since to a buyer both just mean "settle
+    // it with the store". STORE-facing screens (the admin order detail, the
+    // orders export) read `.store` through shippingStatusLabelKeyForStore
+    // instead: "out_of_zone" keeps its own phrase there, because to the
+    // owner it's a coverage gap in their own zones, not their
+    // coordinate-shipping policy working as intended. "free" matches on
+    // both; "rate" and a legacy null render the formatted amount instead
+    // (or, in the export's own text column, nothing), never a phrase here.
     shippingStatusColumnLabel: string
     shippingStatusLabels: {
-      agreed: string
-      free: string
+      buyer: {
+        agreed: string
+        free: string
+      }
+      store: {
+        agreed: string
+        outOfZone: string
+        free: string
+      }
     }
   }
   // General
@@ -582,13 +594,10 @@ export const translations: Record<Language, Translations> = {
       country: 'País',
       notes: 'Notas',
       paymentMethod: 'Método de pago',
-      shippingConfirmedByStore: 'El costo de envío lo confirma la tienda al coordinar la entrega',
       guestLoginCta: 'Inicia sesión',
       unitPrice: 'Precio unitario',
       shippingCoordinationContact: 'Coordinas la entrega directamente con {storeName} por WhatsApp.',
       shippingCoordinationCta: 'Escribir por WhatsApp',
-      shippingFree: 'Gratis',
-      shippingOutOfZone: 'Tu municipio no tiene una tarifa de envío configurada. Coordina la entrega directamente con la tienda.',
       shippingBlocked: 'Esta tienda todavía no envía a tu municipio. Contáctala para coordinar antes de continuar con la compra.',
       shippingQuoteFailed: 'No pudimos calcular el envío en este momento. Intenta de nuevo.',
       shippingCalculating: 'Calculando el envío...',
@@ -716,8 +725,15 @@ export const translations: Record<Language, Translations> = {
       },
       shippingStatusColumnLabel: 'Estado de Envío',
       shippingStatusLabels: {
-        agreed: 'A convenir con la tienda',
-        free: 'Gratis',
+        buyer: {
+          agreed: 'A convenir con la tienda',
+          free: 'Gratis',
+        },
+        store: {
+          agreed: 'A convenir con la tienda',
+          outOfZone: 'Fuera de zona configurada',
+          free: 'Gratis',
+        },
       },
     },
     common: {
@@ -1014,13 +1030,10 @@ export const translations: Record<Language, Translations> = {
       country: 'Country',
       notes: 'Notes',
       paymentMethod: 'Payment method',
-      shippingConfirmedByStore: 'The store confirms the shipping cost when coordinating delivery',
       guestLoginCta: 'Log in',
       unitPrice: 'Unit price',
       shippingCoordinationContact: 'You coordinate delivery directly with {storeName} on WhatsApp.',
       shippingCoordinationCta: 'Message on WhatsApp',
-      shippingFree: 'Free',
-      shippingOutOfZone: "Your municipality doesn't have a shipping rate configured yet. Coordinate delivery directly with the store.",
       shippingBlocked: "This store doesn't ship to your municipality yet. Contact them to coordinate before continuing your purchase.",
       shippingQuoteFailed: "We couldn't calculate shipping right now. Please try again.",
       shippingCalculating: 'Calculating shipping...',
@@ -1147,8 +1160,15 @@ export const translations: Record<Language, Translations> = {
       },
       shippingStatusColumnLabel: 'Shipping status',
       shippingStatusLabels: {
-        agreed: 'Arranged with the store',
-        free: 'Free',
+        buyer: {
+          agreed: 'Arranged with the store',
+          free: 'Free',
+        },
+        store: {
+          agreed: 'Arranged with the store',
+          outOfZone: 'Outside a configured zone',
+          free: 'Free',
+        },
       },
     },
     common: {
@@ -1445,13 +1465,10 @@ export const translations: Record<Language, Translations> = {
       country: 'País',
       notes: 'Observações',
       paymentMethod: 'Método de pagamento',
-      shippingConfirmedByStore: 'A loja confirma o custo de frete ao combinar a entrega',
       guestLoginCta: 'Entrar',
       unitPrice: 'Preço unitário',
       shippingCoordinationContact: 'Você combina a entrega diretamente com {storeName} pelo WhatsApp.',
       shippingCoordinationCta: 'Enviar mensagem no WhatsApp',
-      shippingFree: 'Grátis',
-      shippingOutOfZone: 'Seu município ainda não tem uma tarifa de frete configurada. Combine a entrega diretamente com a loja.',
       shippingBlocked: 'Esta loja ainda não envia para o seu município. Fale com a loja para combinar antes de continuar a compra.',
       shippingQuoteFailed: 'Não conseguimos calcular o frete agora. Tente novamente.',
       shippingCalculating: 'Calculando o frete...',
@@ -1577,8 +1594,15 @@ export const translations: Record<Language, Translations> = {
       },
       shippingStatusColumnLabel: 'Status do frete',
       shippingStatusLabels: {
-        agreed: 'A combinar com a loja',
-        free: 'Grátis',
+        buyer: {
+          agreed: 'A combinar com a loja',
+          free: 'Grátis',
+        },
+        store: {
+          agreed: 'A combinar com a loja',
+          outOfZone: 'Fora de uma zona configurada',
+          free: 'Grátis',
+        },
       },
     },
     common: {

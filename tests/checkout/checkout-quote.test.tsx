@@ -87,6 +87,7 @@ import { formatPrice } from "@/lib/commerce/utils"
 import { translations } from "@/lib/i18n/translations"
 
 const t = translations.es.checkout
+const buyerShippingLabels = translations.es.orders.shippingStatusLabels.buyer
 
 function renderCheckoutPage() {
   render(
@@ -173,15 +174,15 @@ describe("Checkout quote: changing the municipality changes the amount and the t
   })
 })
 
-describe("Checkout quote: the four resolution statuses each render their own treatment (D23)", () => {
-  it("agreed: shows the coordinate-with-the-store copy, not a number", async () => {
+describe("Checkout quote: the four resolution statuses each render their own treatment (D23/A15)", () => {
+  it("agreed: shows the buyer-facing coordinate-with-the-store copy, not a number", async () => {
     getCheckoutShippingQuoteMock.mockResolvedValueOnce(resolvedQuote("agreed", 0))
 
     renderCheckoutPage()
     await selectDepartment()
     await selectMunicipality("Medellín")
 
-    expect(await screen.findByText(t.shippingConfirmedByStore)).toBeInTheDocument()
+    expect(await screen.findByText(buyerShippingLabels.agreed)).toBeInTheDocument()
     // amount is 0, so the total equals the subtotal's own $100.000 -- the
     // real assertion is that the total row stopped showing the placeholder.
     expect(screen.queryByText(t.totalPendingShipping)).not.toBeInTheDocument()
@@ -205,21 +206,25 @@ describe("Checkout quote: the four resolution statuses each render their own tre
     await selectDepartment()
     await selectMunicipality("Medellín")
 
-    expect(await screen.findByText(t.shippingFree)).toBeInTheDocument()
+    expect(await screen.findByText(buyerShippingLabels.free)).toBeInTheDocument()
     // amount is 0, so the total equals the subtotal's own $100.000 -- the
     // real assertion is that the total row stopped showing the placeholder.
     expect(screen.queryByText(t.totalPendingShipping)).not.toBeInTheDocument()
   })
 
-  it("out_of_zone: shows its own coordination copy, distinct from agreed's", async () => {
+  // A15: buyer-facing surfaces collapse out_of_zone onto agreed's own phrase
+  // -- to a buyer both just mean "settle it with the store directly". Only
+  // STORE-facing surfaces (the admin order detail, the export) keep them
+  // apart; see tests/shipping/status-label.test.ts for that distinction.
+  it("out_of_zone: collapses onto the SAME buyer-facing copy as agreed's", async () => {
     getCheckoutShippingQuoteMock.mockResolvedValueOnce(resolvedQuote("out_of_zone", 0))
 
     renderCheckoutPage()
     await selectDepartment()
     await selectMunicipality("Medellín")
 
-    expect(await screen.findByText(t.shippingOutOfZone)).toBeInTheDocument()
-    expect(screen.queryByText(t.shippingConfirmedByStore)).not.toBeInTheDocument()
+    expect(await screen.findByText(buyerShippingLabels.agreed)).toBeInTheDocument()
+    expect(screen.queryByText(t.totalPendingShipping)).not.toBeInTheDocument()
   })
 })
 

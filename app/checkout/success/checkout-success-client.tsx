@@ -20,7 +20,7 @@ import { useLanguage } from "@/contexts/language-context";
 import { deferStateUpdate } from "@/lib/react/defer-state-update";
 import { formatPrice } from "@/lib/commerce/utils";
 import { PAYMENT_METHODS } from "@/lib/checkout/payment-methods";
-import { shippingStatusLabelKey } from "@/lib/shipping/status-label";
+import { shippingStatusLabelKeyForBuyer } from "@/lib/shipping/status-label";
 
 interface CheckoutSuccessClientProps {
   initialOrderNumber: string | null;
@@ -49,15 +49,15 @@ export function CheckoutSuccessClient({
     ? PAYMENT_METHODS.find((method) => method.id === orderSummary.paymentMethod)
         ?.label ?? orderSummary.paymentMethod
     : null;
-  // D23: "rate" and a legacy null render the formatted amount; "agreed" and
-  // "out_of_zone" collapse onto the same phrase, "free" onto its own -- see
-  // shippingStatusLabelKey for why.
+  // D23/A15: BUYER-facing -- "rate" and a legacy null render the formatted
+  // amount; "agreed" and "out_of_zone" collapse onto the same phrase, "free"
+  // onto its own -- see shippingStatusLabelKeyForBuyer for why.
   const shippingLabelKey = orderSummary
-    ? shippingStatusLabelKey(orderSummary.shippingStatus)
+    ? shippingStatusLabelKeyForBuyer(orderSummary.shippingStatus)
     : null;
   const shippingDisplay = orderSummary
     ? shippingLabelKey
-      ? t.orders.shippingStatusLabels[shippingLabelKey]
+      ? t.orders.shippingStatusLabels.buyer[shippingLabelKey]
       : formatPrice(orderSummary.shippingCost, orderSummary.currencyCode)
     : null;
 
