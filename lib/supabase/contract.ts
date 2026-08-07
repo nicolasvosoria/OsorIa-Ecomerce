@@ -40,6 +40,7 @@ export const ECOMMERCE_TABLES = {
   storeIntegrations: "store_integrations",
   storeItems: "store_items",
   storeMailboxVerifications: "store_mailbox_verifications",
+  storeShippingSettings: "store_shipping_settings",
   storeUserRoles: "store_user_roles",
   storeUsers: "store_users",
   stores: "stores",

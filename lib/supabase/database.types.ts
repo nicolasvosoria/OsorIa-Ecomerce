@@ -1821,45 +1821,6 @@ export type Database = {
           },
         ]
       }
-      store_commerce_settings: {
-        Row: {
-          free_shipping_threshold: number | null
-          shipping_enabled: boolean | null
-          store_id: string
-          tax_rate: number | null
-          updated_at: string | null
-        }
-        Insert: {
-          free_shipping_threshold?: number | null
-          shipping_enabled?: boolean | null
-          store_id: string
-          tax_rate?: number | null
-          updated_at?: string | null
-        }
-        Update: {
-          free_shipping_threshold?: number | null
-          shipping_enabled?: boolean | null
-          store_id?: string
-          tax_rate?: number | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "store_commerce_settings_store_id_fkey"
-            columns: ["store_id"]
-            isOneToOne: true
-            referencedRelation: "stores"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "store_commerce_settings_store_id_fkey"
-            columns: ["store_id"]
-            isOneToOne: true
-            referencedRelation: "stores_legacy"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       store_contact: {
         Row: {
           address: string | null
@@ -2171,6 +2132,42 @@ export type Database = {
             foreignKeyName: "store_seo_keywords_store_id_fkey"
             columns: ["store_id"]
             isOneToOne: false
+            referencedRelation: "stores_legacy"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      store_shipping_settings: {
+        Row: {
+          mode: string
+          store_id: string
+          unmatched_destination_action: string
+          updated_at: string
+        }
+        Insert: {
+          mode?: string
+          store_id: string
+          unmatched_destination_action?: string
+          updated_at?: string
+        }
+        Update: {
+          mode?: string
+          store_id?: string
+          unmatched_destination_action?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_shipping_settings_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: true
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "store_shipping_settings_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: true
             referencedRelation: "stores_legacy"
             referencedColumns: ["id"]
           },
@@ -2633,7 +2630,6 @@ export type Database = {
           deleted_at: string | null
           domain: string | null
           favicon_url: string | null
-          free_shipping_threshold: number | null
           id: string | null
           is_active: boolean | null
           is_public: boolean | null
@@ -2644,10 +2640,8 @@ export type Database = {
           seo_description: string | null
           seo_keywords: string[] | null
           seo_title: string | null
-          shipping_enabled: boolean | null
           store_name: string | null
           subdomain: string | null
-          tax_rate: number | null
           updated_at: string | null
         }
         Relationships: []

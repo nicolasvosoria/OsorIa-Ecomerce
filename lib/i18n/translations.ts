@@ -126,6 +126,21 @@ export interface Translations {
     guestLoginCta: string
     unitPrice: string
   }
+  // Envío: configuración del modo de envío de la tienda (D31)
+  shipping: {
+    settingsTitle: string
+    settingsSubtitle: string
+    modeLabel: string
+    modeCoordinate: string
+    modeOwnRates: string
+    saveButton: string
+    saving: string
+    savedToast: string
+    saveErrorToast: string
+    summaryTitle: string
+    summaryModeLabel: string
+    summaryConfigureLink: string
+  }
   // Pedidos
   orders: {
     title: string
@@ -459,6 +474,20 @@ export const translations: Record<Language, Translations> = {
       guestLoginCta: 'Inicia sesión',
       unitPrice: 'Precio unitario',
     },
+    shipping: {
+      settingsTitle: 'Envío',
+      settingsSubtitle: 'Define cómo se calcula el envío en tu tienda.',
+      modeLabel: 'Modo de envío',
+      modeCoordinate: 'Coordinar con el cliente',
+      modeOwnRates: 'Tarifas propias',
+      saveButton: 'Guardar',
+      saving: 'Guardando...',
+      savedToast: 'Modo de envío actualizado',
+      saveErrorToast: 'No se pudo guardar el modo de envío',
+      summaryTitle: 'Envío',
+      summaryModeLabel: 'Modo actual',
+      summaryConfigureLink: 'Configurar envío',
+    },
     orders: {
       title: 'Pedidos',
       orderNumber: 'Número de pedido',
@@ -786,6 +815,20 @@ export const translations: Record<Language, Translations> = {
       guestLoginCta: 'Log in',
       unitPrice: 'Unit price',
     },
+    shipping: {
+      settingsTitle: 'Shipping',
+      settingsSubtitle: 'Define how shipping is calculated for your store.',
+      modeLabel: 'Shipping mode',
+      modeCoordinate: 'Coordinate with the customer',
+      modeOwnRates: 'My own rates',
+      saveButton: 'Save',
+      saving: 'Saving...',
+      savedToast: 'Shipping mode updated',
+      saveErrorToast: 'Could not save the shipping mode',
+      summaryTitle: 'Shipping',
+      summaryModeLabel: 'Current mode',
+      summaryConfigureLink: 'Configure shipping',
+    },
     orders: {
       title: 'Orders',
       orderNumber: 'Order number',
@@ -1112,6 +1155,20 @@ export const translations: Record<Language, Translations> = {
       shippingConfirmedByStore: 'A loja confirma o custo de frete ao combinar a entrega',
       guestLoginCta: 'Entrar',
       unitPrice: 'Preço unitário',
+    },
+    shipping: {
+      settingsTitle: 'Envio',
+      settingsSubtitle: 'Defina como o frete é calculado na sua loja.',
+      modeLabel: 'Modo de envio',
+      modeCoordinate: 'Combinar com o cliente',
+      modeOwnRates: 'Minhas próprias tarifas',
+      saveButton: 'Salvar',
+      saving: 'Salvando...',
+      savedToast: 'Modo de envio atualizado',
+      saveErrorToast: 'Não foi possível salvar o modo de envio',
+      summaryTitle: 'Envio',
+      summaryModeLabel: 'Modo atual',
+      summaryConfigureLink: 'Configurar envio',
     },
     orders: {
       title: 'Pedidos',

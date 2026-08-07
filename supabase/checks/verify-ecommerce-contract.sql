@@ -65,9 +65,9 @@ begin
     ('inventory_movements'),('item_categories'),('item_images'),('item_metrics'),('item_option_values'),
     ('item_options'),('item_seo'),('item_tags'),('item_variants'),('order_addresses'),('order_items'),
     ('orders'),('order_combo_snapshots'),('payment_transactions'),('permissions'),('product_combo_components'),
-    ('product_combos'),('role_permissions'),('roles'),('shipments'),('store_branding'),('store_commerce_settings'),
+    ('product_combos'),('role_permissions'),('roles'),('shipments'),('store_branding'),
     ('store_contact'),('store_integrations'),('store_items'),('store_seo'),('store_seo_keywords'),
-    ('store_user_roles'),('store_users'),('stores'),('user_profiles')
+    ('store_shipping_settings'),('store_user_roles'),('store_users'),('stores'),('user_profiles')
   ) req(required_table)
   where to_regclass(format('ecommerce.%I', req.required_table)) is null;
 
