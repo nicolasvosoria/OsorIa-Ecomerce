@@ -1,11 +1,12 @@
 "use client"
 
-import { useForm, type UseFormReturn } from "react-hook-form"
+import { useForm, useWatch, type UseFormReturn } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { toast } from "sonner"
 
 import { PaymentMethodSection } from "@/components/checkout/payment-method-section"
 import { SubmitOrderButton } from "@/components/checkout/submit-order-button"
+import { ShippingLocationPicker, type ShippingLocationValue } from "@/components/shipping/shipping-location-picker"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FormField } from "@/components/ui/form-field"
 import { Input } from "@/components/ui/input"
@@ -15,13 +16,20 @@ import { guestCheckoutFormSchema, type GuestCheckoutFormValues } from "@/lib/che
 // Contrato externo del formulario: lo consumen también la página de checkout y
 // el fallback de la página de éxito, así que se mantiene en camelCase aunque
 // el formulario valide internamente contra el schema compartido (snake_case).
+// D2/D30: departmentCode/departmentName/municipalityCode/locationId son la
+// copia estructurada que el picker resuelve; city sigue siendo el nombre del
+// municipio, mismo campo de siempre.
 export interface GuestCustomerData {
   firstName: string
   lastName: string
   email: string
   phone: string
   address: string
+  departmentCode?: string
+  departmentName?: string
   city?: string
+  municipalityCode?: string
+  locationId?: string
   postalCode?: string
   country?: string
   notes?: string
@@ -39,7 +47,11 @@ const DEFAULT_VALUES: GuestCheckoutFormValues = {
   customer_email: "",
   customer_phone: "",
   shipping_address: "",
+  shipping_department_code: "",
+  shipping_department_name: "",
   shipping_city: "",
+  shipping_municipality_code: "",
+  shipping_location_id: "",
   shipping_postal_code: "",
   shipping_country: "Colombia",
   payment_method: enabledPaymentMethodIds()[0],
@@ -58,7 +70,11 @@ export function GuestCheckoutForm({ onComplete, isLoading = false }: GuestChecko
       email: values.customer_email,
       phone: values.customer_phone,
       address: values.shipping_address,
+      departmentCode: values.shipping_department_code,
+      departmentName: values.shipping_department_name,
       city: values.shipping_city,
+      municipalityCode: values.shipping_municipality_code,
+      locationId: values.shipping_location_id,
       postalCode: values.shipping_postal_code,
       country: values.shipping_country,
       paymentMethod: values.payment_method,
@@ -178,7 +194,25 @@ function ShippingAddressCard({
   form: UseFormReturn<GuestCheckoutFormValues>
   isLoading: boolean
 }) {
-  const { register, formState } = form
+  const { register, formState, setValue, control } = form
+  const [departmentCode, departmentName, municipalityCode, locationId, city] = useWatch({
+    control,
+    name: [
+      "shipping_department_code",
+      "shipping_department_name",
+      "shipping_municipality_code",
+      "shipping_location_id",
+      "shipping_city",
+    ],
+  })
+
+  const applyLocation = (next: ShippingLocationValue) => {
+    setValue("shipping_department_code", next.departmentCode, { shouldValidate: true })
+    setValue("shipping_department_name", next.departmentName, { shouldValidate: true })
+    setValue("shipping_municipality_code", next.municipalityCode, { shouldValidate: true })
+    setValue("shipping_location_id", next.municipalityId, { shouldValidate: true })
+    setValue("shipping_city", next.municipalityName, { shouldValidate: true })
+  }
 
   return (
     <Card>
@@ -202,18 +236,23 @@ function ShippingAddressCard({
           )}
         </FormField>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField id="shipping_city" label="Ciudad (opcional)">
-            {(fieldProps) => (
-              <Input
-                {...fieldProps}
-                placeholder="Bogotá"
-                disabled={isLoading}
-                {...register("shipping_city")}
-              />
-            )}
-          </FormField>
+        <ShippingLocationPicker
+          value={{
+            departmentCode: departmentCode || "",
+            departmentName: departmentName || "",
+            municipalityCode: municipalityCode || "",
+            municipalityId: locationId || "",
+            municipalityName: city || "",
+          }}
+          onChange={applyLocation}
+          departmentError={formState.errors.shipping_department_code?.message}
+          municipalityError={
+            formState.errors.shipping_location_id?.message ?? formState.errors.shipping_city?.message
+          }
+          disabled={isLoading}
+        />
 
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField id="shipping_postal_code" label="Código Postal (opcional)">
             {(fieldProps) => (
               <Input
@@ -224,18 +263,18 @@ function ShippingAddressCard({
               />
             )}
           </FormField>
-        </div>
 
-        <FormField id="shipping_country" label="País (opcional)">
-          {(fieldProps) => (
-            <Input
-              {...fieldProps}
-              placeholder="Colombia"
-              disabled={isLoading}
-              {...register("shipping_country")}
-            />
-          )}
-        </FormField>
+          <FormField id="shipping_country" label="País (opcional)">
+            {(fieldProps) => (
+              <Input
+                {...fieldProps}
+                placeholder="Colombia"
+                disabled={isLoading}
+                {...register("shipping_country")}
+              />
+            )}
+          </FormField>
+        </div>
       </CardContent>
     </Card>
   )

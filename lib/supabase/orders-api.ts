@@ -34,6 +34,13 @@ export interface Order {
   shipping_city: string;
   shipping_postal_code: string;
   shipping_country: string;
+  // D2/D30: shipping_location_id es el FK a co_locations; los otros tres son
+  // su copia congelada al momento de la compra (shipping_city ya carga el
+  // nombre del municipio). Nulos solo en pedidos anteriores a esta migración.
+  shipping_location_id?: number | null;
+  shipping_department_code?: string | null;
+  shipping_department_name?: string | null;
+  shipping_municipality_code?: string | null;
   shipping_notes?: string | null;
   payment_method?: string | null;
   payment_status: "pending" | "paid" | "failed" | "refunded";
@@ -169,6 +176,15 @@ export interface CreateOrderData {
   shipping_city: string;
   shipping_postal_code: string;
   shipping_country?: string;
+  // D2/D30: shipping_location_id llega como string (el id de co_locations
+  // convertido a texto por el picker, D28) -- writeOrderAtomically lo manda
+  // tal cual dentro de p_order y ecommerce.create_order_with_notifications lo
+  // castea a bigint. shipping_department_code/name y shipping_municipality_code
+  // son su copia congelada, resuelta por el mismo picker.
+  shipping_location_id: string;
+  shipping_department_code: string;
+  shipping_department_name: string;
+  shipping_municipality_code: string;
   shipping_notes?: string;
   payment_method?: string;
   payment_status?: "pending" | "paid" | "failed" | "refunded";
@@ -893,6 +909,58 @@ async function applyAuthoritativePricing(
   });
 }
 
+type AuthoritativeShippingDestination = {
+  shipping_department_code: string;
+  shipping_department_name: string;
+  shipping_municipality_code: string;
+  shipping_city: string;
+};
+
+/**
+ * D2/D30/A10: el picker elige shipping_location_id, pero el texto congelado
+ * (departamento, municipio) que de verdad se guarda sale de co_locations, no
+ * de lo que el cliente mande junto al id -- el FK solo prueba que el id
+ * existe, nunca que el texto que lo acompaña coincide con él. Mismo
+ * principio que applyAuthoritativePricing ya aplica al precio (D21: un valor
+ * que manda el cliente nunca se confía), aplicado ahora al destino. Si el id
+ * no resuelve, el pedido no se crea -- ver el catch de createOrder.
+ */
+async function resolveAuthoritativeShippingDestination(
+  supabase: any,
+  locationId: string,
+): Promise<AuthoritativeShippingDestination> {
+  const result = (await withTimeout(
+    supabase
+      .from(ECOMMERCE_TABLES.coLocations)
+      .select("department_code, department_name, municipality_code, municipality_name")
+      .eq("id", locationId)
+      .single(),
+    10000,
+    "resolveAuthoritativeShippingDestination",
+  )) as {
+    data: {
+      department_code: string;
+      department_name: string;
+      municipality_code: string;
+      municipality_name: string;
+    } | null;
+    error: any;
+  };
+
+  if (result.error || !result.data) {
+    throw new Error(
+      "El destino de envío seleccionado ya no es válido. Vuelve a elegir el departamento y el municipio.",
+    );
+  }
+
+  return {
+    shipping_department_code: result.data.department_code,
+    shipping_department_name: result.data.department_name,
+    shipping_municipality_code: result.data.municipality_code,
+    shipping_city: result.data.municipality_name,
+  };
+}
+
 /**
  * Validar inventario antes de crear una orden.
  * Verifica que todos los productos tengan suficiente stock disponible en el
@@ -1230,6 +1298,13 @@ export async function createOrder(
     const sanitizedItems = orderData.items.map(stripUntrustedComboSnapshotMetadata);
     const preparedItems = await prepareComboOrderItems(sanitizedItems, supabase);
     const pricedItems = await applyAuthoritativePricing(preparedItems, supabase);
+    // A10: el destino congelado (departamento, municipio) sale del catálogo,
+    // nunca de lo que el cliente mandó junto al id -- ver el comentario de
+    // resolveAuthoritativeShippingDestination.
+    const shippingDestination = await resolveAuthoritativeShippingDestination(
+      supabase,
+      orderData.shipping_location_id,
+    );
 
     const recalculatedSubtotal = pricedItems.reduce(
       (sum, item) => sum + Number(item.total_price || 0),
@@ -1246,6 +1321,7 @@ export async function createOrder(
 
     const normalizedOrderData: CreateOrderData = {
       ...orderData,
+      ...shippingDestination,
       items: pricedItems,
       subtotal: recalculatedSubtotal,
       shipping_cost: shippingCost,

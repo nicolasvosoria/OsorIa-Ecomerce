@@ -1,6 +1,6 @@
 "use server"
 
-import { formatSavedAddressLine, type SavedAddress } from "@/lib/account/saved-address"
+import type { SavedAddress } from "@/lib/account/saved-address"
 import { computeCheckoutPayloadFingerprint } from "@/lib/checkout/idempotency"
 import { CheckoutIdempotencyConflictError, StoreIdentityNotReadyError } from "@/lib/checkout/order-writer"
 import { checkoutOrderSchema } from "@/lib/checkout/schemas"
@@ -23,7 +23,21 @@ export type PlaceCheckoutOrderResult =
   | { success: true; orderNumber: string; orderId: string }
   | { success: false; error: string; validationResult?: InventoryValidationResult }
 
-export type CheckoutPrefill = { phone: string; address: string } | null
+type CheckoutContactPrefill = { phone: string; address: string }
+
+// D24: el checkout autenticado precarga el destino estructurado (departamento
+// y municipio) igual que precarga teléfono y dirección -- sale SOLO de la
+// dirección predeterminada de la libreta (nunca del último pedido, que hoy
+// nunca guardó un destino estructurado para empezar).
+type CheckoutLocationPrefill = {
+  departmentCode: string
+  departmentName: string
+  city: string
+  municipalityCode: string
+  locationId: string
+}
+
+export type CheckoutPrefill = (CheckoutContactPrefill & CheckoutLocationPrefill) | null
 
 const IDENTITY_NOT_READY_MESSAGE =
   "Esta tienda todavía no completó su configuración y no puede recibir pedidos en este momento."
@@ -109,7 +123,9 @@ export async function placeCheckoutOrder(
 // copiar el último pedido. El teléfono y la dirección se guardan por separado,
 // así que cada campo decide su fuente por su cuenta: lo guardado manda y el
 // último pedido rellena el hueco que quede. Quien todavía no ha guardado nada,
-// que hoy es casi todo el mundo, conserva el comportamiento anterior.
+// que hoy es casi todo el mundo, conserva el comportamiento anterior. D24: el
+// destino estructurado (departamento/municipio) viaja siempre junto a "saved",
+// nunca lo completa el último pedido.
 export async function getCheckoutPrefill(): Promise<CheckoutPrefill> {
   const session = await resolveServerAuthSession()
   if (!session) {
@@ -127,6 +143,7 @@ export async function getCheckoutPrefill(): Promise<CheckoutPrefill> {
   }
 
   return {
+    ...saved,
     phone: saved.phone || lastOrder.phone,
     address: saved.address || lastOrder.address,
   }
@@ -134,10 +151,19 @@ export async function getCheckoutPrefill(): Promise<CheckoutPrefill> {
 
 type SavedAccountData = { phone: string | null; defaultAddress: SavedAddress | null }
 
+// El destino estructurado se lee tal cual de la dirección guardada -- a
+// diferencia de phone/address, no tiene una segunda fuente (el último pedido)
+// de la que rellenar el hueco.
 function toPrefillFields(saved: SavedAccountData): NonNullable<CheckoutPrefill> {
+  const location = saved.defaultAddress
   return {
     phone: saved.phone ?? "",
-    address: saved.defaultAddress ? formatSavedAddressLine(saved.defaultAddress) : "",
+    address: location?.addressLine1 ?? "",
+    departmentCode: location?.departmentCode ?? "",
+    departmentName: location?.departmentName ?? "",
+    city: location?.city ?? "",
+    municipalityCode: location?.municipalityCode ?? "",
+    locationId: location?.locationId ?? "",
   }
 }
 
@@ -160,7 +186,7 @@ async function readSavedAccountData(session: ServerAuthSession): Promise<SavedAc
 
 async function prefillFromMostRecentOrder(
   session: ServerAuthSession,
-): Promise<CheckoutPrefill> {
+): Promise<CheckoutContactPrefill | null> {
   const lastOrder = await getMostRecentOrderByUserId(
     session.userId,
     ecommerceForSession(session.client),

@@ -1,3 +1,4 @@
+import { createElement, createContext, useContext, type ReactNode } from "react"
 import { render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
@@ -27,6 +28,51 @@ vi.mock("@/app/auth/cuenta/actions", () => ({
 }))
 vi.mock("sonner", () => ({ toast: { error: toastError, success: toastSuccess } }))
 
+// D24: AddressForm embeds the same ShippingLocationPicker as the checkout
+// (D28) -- two departments here (not just one) so the "edit" test can prove a
+// picked destination really changes, not just re-pick the only option there is.
+vi.mock("@/lib/shipping/locations-api", () => ({
+  listDepartments: vi.fn().mockResolvedValue([
+    { code: "05", name: "Antioquia" },
+    { code: "76", name: "Valle del Cauca" },
+  ]),
+  listMunicipalitiesByDepartment: vi.fn((departmentCode: string) =>
+    Promise.resolve(
+      departmentCode === "76"
+        ? [{ id: 2, code: "76001", name: "Cali", departmentCode: "76", departmentName: "Valle del Cauca" }]
+        : [{ id: 1, code: "05001", name: "Medellín", departmentCode: "05", departmentName: "Antioquia" }],
+    ),
+  ),
+}))
+
+// Real (Radix) selects only mount their SelectContent when open, which
+// requires jsdom pointer-capture polyfills this suite doesn't set up. Mirrors
+// the mock used by tests/components/authenticated-checkout-form.test.tsx.
+const SelectContext = createContext<{ onValueChange?: (value: string) => void }>({})
+
+vi.mock("@/components/ui/select", () => ({
+  Select: ({
+    children,
+    onValueChange,
+  }: {
+    children: ReactNode
+    value?: string
+    onValueChange?: (value: string) => void
+  }) => createElement(SelectContext.Provider, { value: { onValueChange } }, children),
+  SelectContent: ({ children }: { children: ReactNode }) => createElement("div", {}, children),
+  SelectItem: ({ children, value }: { children: ReactNode; value: string }) => {
+    const { onValueChange } = useContext(SelectContext)
+    return createElement(
+      "button",
+      { type: "button", onClick: () => onValueChange?.(value) },
+      children,
+    )
+  },
+  SelectTrigger: ({ children, id }: { children: ReactNode; id?: string }) =>
+    createElement("div", { id }, children),
+  SelectValue: ({ placeholder }: { placeholder?: string }) => createElement("span", {}, placeholder),
+}))
+
 import { AddressBook } from "@/app/auth/cuenta/address-book"
 import { LanguageProvider } from "@/contexts/language-context"
 import type { SavedAddress } from "@/lib/account/saved-address"
@@ -38,7 +84,11 @@ const HOME: SavedAddress = {
   id: "address-home",
   label: "Casa",
   addressLine1: "Calle 10 # 4-5",
-  city: "Bogotá",
+  departmentCode: "05",
+  departmentName: "Antioquia",
+  city: "Medellín",
+  municipalityCode: "05001",
+  locationId: "1",
   postalCode: "110111",
   country: "Colombia",
   isDefault: true,
@@ -48,14 +98,18 @@ const OFFICE: SavedAddress = {
   id: "address-office",
   label: "Oficina",
   addressLine1: "Cra 7 # 32-16",
-  city: "Bogotá",
+  departmentCode: "05",
+  departmentName: "Antioquia",
+  city: "Medellín",
+  municipalityCode: "05001",
+  locationId: "1",
   postalCode: null,
   country: "Colombia",
   isDefault: false,
 }
 
-const HOME_LINE = "Calle 10 # 4-5, Bogotá, 110111, Colombia"
-const OFFICE_LINE = "Cra 7 # 32-16, Bogotá, Colombia"
+const HOME_LINE = "Calle 10 # 4-5, Medellín, Antioquia, 110111, Colombia"
+const OFFICE_LINE = "Cra 7 # 32-16, Medellín, Antioquia, Colombia"
 // La sucesora aparece sin título propio, así que se nombra con su línea al lado.
 const OFFICE_DESCRIBED = `Oficina (${OFFICE_LINE})`
 
@@ -108,13 +162,19 @@ describe("AddressBook without saved addresses", () => {
 
     await user.click(screen.getByRole("button", { name: t.account.addAddress }))
     await user.type(screen.getByLabelText(t.checkout.address), "Calle 10 # 4-5")
+    await user.click(await screen.findByText("Antioquia"))
+    await user.click(await screen.findByText("Medellín"))
     await user.click(screen.getByRole("button", { name: t.common.save }))
 
     await waitFor(() =>
       expect(createSavedAddress).toHaveBeenCalledWith({
         label: "",
         addressLine1: "Calle 10 # 4-5",
-        city: "",
+        departmentCode: "05",
+        departmentName: "Antioquia",
+        city: "Medellín",
+        municipalityCode: "05001",
+        locationId: "1",
         postalCode: "",
         country: "Colombia",
       }),
@@ -187,14 +247,19 @@ describe("AddressBook with saved addresses", () => {
     )
     expect(screen.getByLabelText(t.checkout.address)).toHaveValue(OFFICE.addressLine1)
 
-    await user.clear(screen.getByLabelText(t.checkout.city))
-    await user.type(screen.getByLabelText(t.checkout.city), "Medellín")
+    await user.click(await screen.findByText("Valle del Cauca"))
+    await user.click(await screen.findByText("Cali"))
     await user.click(screen.getByRole("button", { name: t.common.save }))
 
     await waitFor(() =>
       expect(updateSavedAddress).toHaveBeenCalledWith({
         addressId: OFFICE.id,
-        draft: expect.objectContaining({ city: "Medellín", addressLine1: OFFICE.addressLine1 }),
+        draft: expect.objectContaining({
+          city: "Cali",
+          departmentCode: "76",
+          departmentName: "Valle del Cauca",
+          addressLine1: OFFICE.addressLine1,
+        }),
       }),
     )
   })

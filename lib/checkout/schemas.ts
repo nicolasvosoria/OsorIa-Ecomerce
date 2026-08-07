@@ -29,7 +29,16 @@ export const checkoutOrderSchema = z.object({
   customer_email: z.string().trim().email("El correo electrónico no es válido"),
   customer_phone: z.string().optional(),
   shipping_address: z.string().trim().min(1, "La dirección es requerida"),
-  shipping_city: z.string().default(""),
+  // D28: los dos selects encadenados (departamento, luego municipio filtrado)
+  // escriben estos cuatro campos juntos -- shipping_location_id es el FK a
+  // co_locations (D2/D30) y los otros tres son su copia congelada al momento
+  // de la compra. shipping_city sigue siendo el nombre del municipio, mismo
+  // campo de siempre, ahora poblado por el picker en vez de texto libre.
+  shipping_department_code: z.string().trim().min(1, "Selecciona un departamento"),
+  shipping_department_name: z.string().trim().min(1, "Selecciona un departamento"),
+  shipping_city: z.string().trim().min(1, "Selecciona un municipio"),
+  shipping_municipality_code: z.string().trim().min(1, "Selecciona un municipio"),
+  shipping_location_id: z.string().trim().min(1, "Selecciona un municipio"),
   shipping_postal_code: z.string().default(""),
   shipping_country: z.string().optional(),
   shipping_notes: z.string().optional(),
@@ -67,9 +76,25 @@ export type GuestCheckoutFormValues = z.input<typeof guestCheckoutFormSchema>
 
 // Lo que edita un usuario autenticado: el correo ya viene de su cuenta (es su
 // identidad), pero el nombre puede faltar en el perfil, así que el formulario
-// lo pide igual que el invitado y lo precarga cuando el perfil lo trae.
+// lo pide igual que el invitado y lo precarga cuando el perfil lo trae. D24:
+// misma tarjeta de envío que el invitado -- dirección, departamento y
+// municipio -- así que se listan explícitamente aquí; a diferencia de
+// guestCheckoutFormSchema (que usa .omit y hereda campos nuevos solos), este
+// .pick exige agregar cada campo nuevo a mano o el formulario autenticado se
+// queda sin él en silencio.
 export const authenticatedCheckoutFormSchema = checkoutOrderSchema
-  .pick({ customer_first_name: true, customer_last_name: true, shipping_address: true })
+  .pick({
+    customer_first_name: true,
+    customer_last_name: true,
+    shipping_address: true,
+    shipping_department_code: true,
+    shipping_department_name: true,
+    shipping_city: true,
+    shipping_municipality_code: true,
+    shipping_location_id: true,
+    shipping_postal_code: true,
+    shipping_country: true,
+  })
   .extend({
     customer_phone: requiredPhoneField,
     payment_method: paymentMethodField,

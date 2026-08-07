@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
+import { ShippingLocationPicker, type ShippingLocationValue } from "@/components/shipping/shipping-location-picker";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
@@ -52,6 +53,19 @@ export function AddressForm({
     (field: keyof SavedAddressDraftInput) => (event: React.ChangeEvent<HTMLInputElement>) =>
       setFields((current) => ({ ...current, [field]: event.target.value }));
 
+  // D24: la libreta usa el mismo picker de dos selects encadenados que el
+  // checkout (D28) -- ver ese componente para el fetch de departamentos y
+  // municipios.
+  const applyLocation = (next: ShippingLocationValue) =>
+    setFields((current) => ({
+      ...current,
+      departmentCode: next.departmentCode,
+      departmentName: next.departmentName,
+      city: next.municipalityName,
+      municipalityCode: next.municipalityCode,
+      locationId: next.municipalityId,
+    }));
+
   // Sin `required` nativo a propósito, igual que el cambio de contraseña: el
   // navegador redacta ese aviso en su idioma y aquí la interfaz habla el del
   // producto.
@@ -77,17 +91,17 @@ export function AddressForm({
           />
         )}
       </FormField>
+      <ShippingLocationPicker
+        value={{
+          departmentCode: fields.departmentCode,
+          departmentName: fields.departmentName,
+          municipalityCode: fields.municipalityCode,
+          municipalityId: fields.locationId,
+          municipalityName: fields.city,
+        }}
+        onChange={applyLocation}
+      />
       <div className="grid gap-4 sm:grid-cols-2">
-        <FormField id="address-city" label={t.checkout.city}>
-          {(field) => (
-            <Input
-              {...field}
-              autoComplete="address-level2"
-              value={fields.city}
-              onChange={editField("city")}
-            />
-          )}
-        </FormField>
         <FormField id="address-postal-code" label={t.checkout.postalCode}>
           {(field) => (
             <Input
@@ -98,17 +112,17 @@ export function AddressForm({
             />
           )}
         </FormField>
+        <FormField id="address-country" label={t.checkout.country}>
+          {(field) => (
+            <Input
+              {...field}
+              autoComplete="country-name"
+              value={fields.country}
+              onChange={editField("country")}
+            />
+          )}
+        </FormField>
       </div>
-      <FormField id="address-country" label={t.checkout.country}>
-        {(field) => (
-          <Input
-            {...field}
-            autoComplete="country-name"
-            value={fields.country}
-            onChange={editField("country")}
-          />
-        )}
-      </FormField>
       <div className="flex flex-col gap-2 sm:flex-row">
         <Button type="submit" disabled={isPending}>
           {isPending ? (
@@ -132,7 +146,11 @@ function toEditableFields(editing: SavedAddress | null): SavedAddressDraftInput 
   return {
     label: editing?.label ?? "",
     addressLine1: editing?.addressLine1 ?? "",
+    departmentCode: editing?.departmentCode ?? "",
+    departmentName: editing?.departmentName ?? "",
     city: editing?.city ?? "",
+    municipalityCode: editing?.municipalityCode ?? "",
+    locationId: editing?.locationId ?? "",
     postalCode: editing?.postalCode ?? "",
     country: editing?.country ?? DEFAULT_ADDRESS_COUNTRY,
   };

@@ -1302,6 +1302,10 @@ export type Database = {
           shipping_city: string | null
           shipping_cost: number | null
           shipping_country: string | null
+          shipping_department_code: string | null
+          shipping_department_name: string | null
+          shipping_location_id: number | null
+          shipping_municipality_code: string | null
           shipping_notes: string | null
           shipping_postal_code: string | null
           status: Database["ecommerce"]["Enums"]["order_status"] | null
@@ -1342,6 +1346,10 @@ export type Database = {
           shipping_city?: string | null
           shipping_cost?: number | null
           shipping_country?: string | null
+          shipping_department_code?: string | null
+          shipping_department_name?: string | null
+          shipping_location_id?: number | null
+          shipping_municipality_code?: string | null
           shipping_notes?: string | null
           shipping_postal_code?: string | null
           status?: Database["ecommerce"]["Enums"]["order_status"] | null
@@ -1382,6 +1390,10 @@ export type Database = {
           shipping_city?: string | null
           shipping_cost?: number | null
           shipping_country?: string | null
+          shipping_department_code?: string | null
+          shipping_department_name?: string | null
+          shipping_location_id?: number | null
+          shipping_municipality_code?: string | null
           shipping_notes?: string | null
           shipping_postal_code?: string | null
           status?: Database["ecommerce"]["Enums"]["order_status"] | null
@@ -1393,6 +1405,13 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "orders_shipping_location_id_fkey"
+            columns: ["shipping_location_id"]
+            isOneToOne: false
+            referencedRelation: "co_locations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "orders_store_id_fkey"
             columns: ["store_id"]
@@ -2352,9 +2371,13 @@ export type Database = {
           city: string | null
           country: string
           created_at: string
+          department_code: string | null
+          department_name: string | null
           id: string
           is_default: boolean
           label: string | null
+          location_id: number | null
+          municipality_code: string | null
           postal_code: string | null
           updated_at: string
           user_id: string
@@ -2364,9 +2387,13 @@ export type Database = {
           city?: string | null
           country?: string
           created_at?: string
+          department_code?: string | null
+          department_name?: string | null
           id?: string
           is_default?: boolean
           label?: string | null
+          location_id?: number | null
+          municipality_code?: string | null
           postal_code?: string | null
           updated_at?: string
           user_id: string
@@ -2376,14 +2403,26 @@ export type Database = {
           city?: string | null
           country?: string
           created_at?: string
+          department_code?: string | null
+          department_name?: string | null
           id?: string
           is_default?: boolean
           label?: string | null
+          location_id?: number | null
+          municipality_code?: string | null
           postal_code?: string | null
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_addresses_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "co_locations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_profiles: {
         Row: {

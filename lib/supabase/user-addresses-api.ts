@@ -7,7 +7,11 @@ type UserAddressRow = {
   id: string
   label: string | null
   address_line_1: string
+  department_code: string | null
+  department_name: string | null
   city: string | null
+  municipality_code: string | null
+  location_id: number | null
   postal_code: string | null
   country: string
   is_default: boolean
@@ -15,7 +19,8 @@ type UserAddressRow = {
 
 type AddressTarget = { userId: string; addressId: string }
 
-const ADDRESS_COLUMNS = "id, label, address_line_1, city, postal_code, country, is_default"
+const ADDRESS_COLUMNS =
+  "id, label, address_line_1, department_code, department_name, city, municipality_code, location_id, postal_code, country, is_default"
 
 const ADDRESS_NOT_FOUND = "Esa dirección ya no existe en tu libreta."
 
@@ -204,18 +209,31 @@ function toAddressFields(draft: SavedAddressDraft) {
   return {
     label: draft.label,
     address_line_1: draft.addressLine1,
+    department_code: draft.departmentCode,
+    department_name: draft.departmentName,
     city: draft.city,
+    municipality_code: draft.municipalityCode,
+    location_id: Number(draft.locationId),
     postal_code: draft.postalCode,
     country: draft.country,
   }
 }
 
+// department_code/department_name/city/municipality_code/location_id caen a
+// "" al leer: las columnas son nullable en la base (así lo exige el rollback
+// del ledger), pero el schema de aplicación las exige en toda dirección
+// guardada desde este cambio, así que "" solo aparece en una fila guardada
+// antes de esta migración -- no hay ninguna en producción hoy.
 function toSavedAddress(row: UserAddressRow): SavedAddress {
   return {
     id: row.id,
     label: row.label,
     addressLine1: row.address_line_1,
-    city: row.city,
+    departmentCode: row.department_code ?? "",
+    departmentName: row.department_name ?? "",
+    city: row.city ?? "",
+    municipalityCode: row.municipality_code ?? "",
+    locationId: row.location_id !== null ? String(row.location_id) : "",
     postalCode: row.postal_code,
     country: row.country,
     isDefault: row.is_default,
