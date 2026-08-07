@@ -145,6 +145,62 @@ export interface Translations {
     summaryTitle: string
     summaryModeLabel: string
     summaryConfigureLink: string
+    // D3/D5/D6/D8/D10: zonas de envío, sus destinos y su escalera de tarifas (S7).
+    zones: {
+      sectionTitle: string
+      sectionDescription: string
+      addButton: string
+      createTitle: string
+      editTitle: string
+      emptyTitle: string
+      emptyDescription: string
+      nameLabel: string
+      namePlaceholder: string
+      destinationsLabel: string
+      departmentPlaceholder: string
+      addWholeDepartmentButton: string
+      addMunicipalityButton: string
+      municipalitySearchPlaceholder: string
+      loadingMunicipalities: string
+      noMunicipalitiesFound: string
+      wholeDepartmentPrefix: string
+      removeDestinationLabel: string
+      destinationsColumn: string
+      basisColumn: string
+      actionsColumn: string
+      basisLabel: string
+      basisFlat: string
+      basisOrderValue: string
+      basisWeight: string
+      flatAmountLabel: string
+      rangesLabel: string
+      rangeFromLabel: string
+      rangeToLabel: string
+      rangeToPlaceholder: string
+      rangeAmountLabel: string
+      addRangeButton: string
+      removeRangeLabel: string
+      codCommissionNote: string
+      missingWeightTitle: string
+      missingWeightDescription: string
+      viewProductLink: string
+      saveButton: string
+      saving: string
+      cancelButton: string
+      savedToast: string
+      saveErrorToast: string
+      deleteTitle: string
+      deleteDescription: string
+      deleteConfirmButton: string
+      deletedToast: string
+      deleteErrorToast: string
+      unmatchedDestinationTitle: string
+      unmatchedDestinationDescription: string
+      unmatchedDestinationBlock: string
+      unmatchedDestinationAllow: string
+      unmatchedDestinationSavedToast: string
+      unmatchedDestinationSaveErrorToast: string
+    }
   }
   // Pedidos
   orders: {
@@ -497,6 +553,64 @@ export const translations: Record<Language, Translations> = {
       summaryTitle: 'Envío',
       summaryModeLabel: 'Modo actual',
       summaryConfigureLink: 'Configurar envío',
+      zones: {
+        sectionTitle: 'Zonas de envío',
+        sectionDescription: 'Define las zonas de entrega, sus destinos y su escalera de tarifas.',
+        addButton: 'Agregar zona',
+        createTitle: 'Nueva zona de envío',
+        editTitle: 'Editar zona de envío',
+        emptyTitle: 'Todavía no hay zonas de envío',
+        emptyDescription: 'Agrega una zona para empezar a cobrar envío según el destino.',
+        nameLabel: 'Nombre de la zona',
+        namePlaceholder: 'Ej. Eje Cafetero',
+        destinationsLabel: 'Destinos',
+        departmentPlaceholder: 'Selecciona un departamento',
+        addWholeDepartmentButton: 'Agregar departamento completo',
+        addMunicipalityButton: 'Agregar municipio…',
+        municipalitySearchPlaceholder: 'Buscar municipio…',
+        loadingMunicipalities: 'Cargando municipios…',
+        noMunicipalitiesFound: 'Sin resultados',
+        wholeDepartmentPrefix: 'Todo:',
+        removeDestinationLabel: 'Quitar destino',
+        destinationsColumn: 'Destinos',
+        basisColumn: 'Tarifa',
+        actionsColumn: 'Acciones',
+        basisLabel: 'Tipo de tarifa',
+        basisFlat: 'Tarifa fija',
+        basisOrderValue: 'Por valor del pedido',
+        basisWeight: 'Por peso',
+        flatAmountLabel: 'Monto',
+        rangesLabel: 'Rangos',
+        rangeFromLabel: 'Desde',
+        rangeToLabel: 'Hasta',
+        rangeToPlaceholder: 'Sin límite',
+        rangeAmountLabel: 'Monto',
+        addRangeButton: 'Agregar rango',
+        removeRangeLabel: 'Quitar rango',
+        codCommissionNote:
+          'El monto ya debe incluir cualquier comisión de recaudo contraentrega que quieras cobrar. Los agregadores en Colombia cobran entre 4% y 4.3% del valor recaudado, con un mínimo de COP 4.900 a 5.700.',
+        missingWeightTitle: 'Faltan productos con peso cargado',
+        missingWeightDescription:
+          'No puedes activar una tarifa por peso hasta que estos productos tengan peso:',
+        viewProductLink: 'Editar producto',
+        saveButton: 'Guardar zona',
+        saving: 'Guardando...',
+        cancelButton: 'Cancelar',
+        savedToast: 'Zona de envío guardada',
+        saveErrorToast: 'No se pudo guardar la zona de envío',
+        deleteTitle: '¿Eliminar esta zona?',
+        deleteDescription: 'Sus destinos y su escalera de tarifas se eliminarán junto con ella. Esta acción no se puede deshacer.',
+        deleteConfirmButton: 'Eliminar',
+        deletedToast: 'Zona de envío eliminada',
+        deleteErrorToast: 'No se pudo eliminar la zona de envío',
+        unmatchedDestinationTitle: 'Destino sin zona configurada',
+        unmatchedDestinationDescription:
+          'Qué pasa en el checkout cuando el destino del cliente no coincide con ninguna zona.',
+        unmatchedDestinationBlock: 'Bloquear la compra',
+        unmatchedDestinationAllow: 'Permitirla y coordinar el envío después',
+        unmatchedDestinationSavedToast: 'Acción para destinos sin zona actualizada',
+        unmatchedDestinationSaveErrorToast: 'No se pudo guardar la acción para destinos sin zona',
+      },
     },
     orders: {
       title: 'Pedidos',
@@ -843,6 +957,63 @@ export const translations: Record<Language, Translations> = {
       summaryTitle: 'Shipping',
       summaryModeLabel: 'Current mode',
       summaryConfigureLink: 'Configure shipping',
+      zones: {
+        sectionTitle: 'Shipping zones',
+        sectionDescription: 'Define your delivery zones, their destinations and their rate ladder.',
+        addButton: 'Add zone',
+        createTitle: 'New shipping zone',
+        editTitle: 'Edit shipping zone',
+        emptyTitle: 'No shipping zones yet',
+        emptyDescription: 'Add a zone to start charging shipping by destination.',
+        nameLabel: 'Zone name',
+        namePlaceholder: 'E.g. Coffee Region',
+        destinationsLabel: 'Destinations',
+        departmentPlaceholder: 'Select a department',
+        addWholeDepartmentButton: 'Add the whole department',
+        addMunicipalityButton: 'Add municipality…',
+        municipalitySearchPlaceholder: 'Search municipality…',
+        loadingMunicipalities: 'Loading municipalities…',
+        noMunicipalitiesFound: 'No results',
+        wholeDepartmentPrefix: 'Whole:',
+        removeDestinationLabel: 'Remove destination',
+        destinationsColumn: 'Destinations',
+        basisColumn: 'Rate',
+        actionsColumn: 'Actions',
+        basisLabel: 'Rate type',
+        basisFlat: 'Flat rate',
+        basisOrderValue: 'By order value',
+        basisWeight: 'By weight',
+        flatAmountLabel: 'Amount',
+        rangesLabel: 'Ranges',
+        rangeFromLabel: 'From',
+        rangeToLabel: 'To',
+        rangeToPlaceholder: 'No limit',
+        rangeAmountLabel: 'Amount',
+        addRangeButton: 'Add range',
+        removeRangeLabel: 'Remove range',
+        codCommissionNote:
+          'The amount should already include any cash-on-delivery collection fee you want to charge. Colombian aggregators charge 4%-4.3% of the collected amount, with a minimum of COP 4,900-5,700.',
+        missingWeightTitle: 'Products missing weight',
+        missingWeightDescription: 'You cannot activate a weight-based rate until these products have a weight:',
+        viewProductLink: 'Edit product',
+        saveButton: 'Save zone',
+        saving: 'Saving...',
+        cancelButton: 'Cancel',
+        savedToast: 'Shipping zone saved',
+        saveErrorToast: 'Could not save the shipping zone',
+        deleteTitle: 'Delete this zone?',
+        deleteDescription: 'Its destinations and rate ladder will be deleted along with it. This action cannot be undone.',
+        deleteConfirmButton: 'Delete',
+        deletedToast: 'Shipping zone deleted',
+        deleteErrorToast: 'Could not delete the shipping zone',
+        unmatchedDestinationTitle: 'Destination with no configured zone',
+        unmatchedDestinationDescription:
+          'What happens at checkout when the customer\'s destination matches no zone.',
+        unmatchedDestinationBlock: 'Block the purchase',
+        unmatchedDestinationAllow: 'Allow it and coordinate shipping afterward',
+        unmatchedDestinationSavedToast: 'Unmatched destination action updated',
+        unmatchedDestinationSaveErrorToast: 'Could not save the unmatched destination action',
+      },
     },
     orders: {
       title: 'Orders',
@@ -1189,6 +1360,62 @@ export const translations: Record<Language, Translations> = {
       summaryTitle: 'Envio',
       summaryModeLabel: 'Modo atual',
       summaryConfigureLink: 'Configurar envio',
+      zones: {
+        sectionTitle: 'Zonas de frete',
+        sectionDescription: 'Defina as zonas de entrega, seus destinos e sua escada de tarifas.',
+        addButton: 'Adicionar zona',
+        createTitle: 'Nova zona de frete',
+        editTitle: 'Editar zona de frete',
+        emptyTitle: 'Ainda não há zonas de frete',
+        emptyDescription: 'Adicione uma zona para começar a cobrar frete por destino.',
+        nameLabel: 'Nome da zona',
+        namePlaceholder: 'Ex. Eixo Cafeeiro',
+        destinationsLabel: 'Destinos',
+        departmentPlaceholder: 'Selecione um departamento',
+        addWholeDepartmentButton: 'Adicionar departamento completo',
+        addMunicipalityButton: 'Adicionar município…',
+        municipalitySearchPlaceholder: 'Buscar município…',
+        loadingMunicipalities: 'Carregando municípios…',
+        noMunicipalitiesFound: 'Sem resultados',
+        wholeDepartmentPrefix: 'Todo:',
+        removeDestinationLabel: 'Remover destino',
+        destinationsColumn: 'Destinos',
+        basisColumn: 'Tarifa',
+        actionsColumn: 'Ações',
+        basisLabel: 'Tipo de tarifa',
+        basisFlat: 'Tarifa fixa',
+        basisOrderValue: 'Por valor do pedido',
+        basisWeight: 'Por peso',
+        flatAmountLabel: 'Valor',
+        rangesLabel: 'Faixas',
+        rangeFromLabel: 'De',
+        rangeToLabel: 'Até',
+        rangeToPlaceholder: 'Sem limite',
+        rangeAmountLabel: 'Valor',
+        addRangeButton: 'Adicionar faixa',
+        removeRangeLabel: 'Remover faixa',
+        codCommissionNote:
+          'O valor já deve incluir qualquer comissão de coleta contra entrega que você queira cobrar. Os agregadores na Colômbia cobram entre 4% e 4,3% do valor coletado, com mínimo de COP 4.900 a 5.700.',
+        missingWeightTitle: 'Faltam produtos com peso cadastrado',
+        missingWeightDescription: 'Você não pode ativar uma tarifa por peso até que estes produtos tenham peso:',
+        viewProductLink: 'Editar produto',
+        saveButton: 'Salvar zona',
+        saving: 'Salvando...',
+        cancelButton: 'Cancelar',
+        savedToast: 'Zona de frete salva',
+        saveErrorToast: 'Não foi possível salvar a zona de frete',
+        deleteTitle: 'Excluir esta zona?',
+        deleteDescription: 'Seus destinos e sua escada de tarifas serão excluídos junto com ela. Esta ação não pode ser desfeita.',
+        deleteConfirmButton: 'Excluir',
+        deletedToast: 'Zona de frete excluída',
+        deleteErrorToast: 'Não foi possível excluir a zona de frete',
+        unmatchedDestinationTitle: 'Destino sem zona configurada',
+        unmatchedDestinationDescription: 'O que acontece no checkout quando o destino do cliente não corresponde a nenhuma zona.',
+        unmatchedDestinationBlock: 'Bloquear a compra',
+        unmatchedDestinationAllow: 'Permitir e combinar o frete depois',
+        unmatchedDestinationSavedToast: 'Ação para destinos sem zona atualizada',
+        unmatchedDestinationSaveErrorToast: 'Não foi possível salvar a ação para destinos sem zona',
+      },
     },
     orders: {
       title: 'Pedidos',

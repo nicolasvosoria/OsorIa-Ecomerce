@@ -9,14 +9,23 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { ShippingModeForm } from "@/app/admin/settings/shipping/components/shipping-mode-form"
 
-const { authorizeActiveStoreAdmin, loadShippingSettings, redirect } = vi.hoisted(() => ({
+const {
+  authorizeActiveStoreAdmin,
+  loadShippingSettings,
+  listShippingZones,
+  findMissingWeightProducts,
+  redirect,
+} = vi.hoisted(() => ({
   authorizeActiveStoreAdmin: vi.fn(),
   loadShippingSettings: vi.fn(),
+  listShippingZones: vi.fn(),
+  findMissingWeightProducts: vi.fn(),
   redirect: vi.fn(),
 }))
 
 vi.mock("@/lib/supabase/active-store", () => ({ authorizeActiveStoreAdmin }))
 vi.mock("@/lib/supabase/shipping-settings-api", () => ({ loadShippingSettings }))
+vi.mock("@/lib/supabase/shipping-zones-api", () => ({ listShippingZones, findMissingWeightProducts }))
 vi.mock("next/navigation", () => ({ redirect }))
 
 import ShippingSettingsPage from "@/app/admin/settings/shipping/page"
@@ -40,6 +49,8 @@ describe("ShippingSettingsPage", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     authorizeActiveStoreAdmin.mockResolvedValue(GRANT)
+    listShippingZones.mockResolvedValue([])
+    findMissingWeightProducts.mockResolvedValue([])
   })
 
   it("reads the ACTIVE store's saved mode back and hands it to the form as its default", async () => {

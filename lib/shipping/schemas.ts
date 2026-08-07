@@ -33,3 +33,215 @@ export function toSelectableShippingMode(mode: ShippingMode): SelectableShipping
 export function shippingModeLabelKey(mode: ShippingMode): "modeCoordinate" | "modeOwnRates" {
   return toSelectableShippingMode(mode) === "own_rates" ? "modeOwnRates" : "modeCoordinate"
 }
+
+// D7: what a checkout quote does when a destination matches no configured
+// zone. Modeled by store_shipping_settings since wave 1; this is the slice
+// that finally gives it a UI, because "no matching zone" only means
+// something once zones exist.
+export const UNMATCHED_DESTINATION_ACTIONS = ["block", "allow_with_coordination"] as const
+
+export type UnmatchedDestinationAction = (typeof UNMATCHED_DESTINATION_ACTIONS)[number]
+
+export const unmatchedDestinationActionFormSchema = z.object({
+  unmatchedDestinationAction: z.enum(UNMATCHED_DESTINATION_ACTIONS),
+})
+
+export type UnmatchedDestinationActionFormValues = z.infer<typeof unmatchedDestinationActionFormSchema>
+
+// D6: a zone's rate ladder basis. Chosen once per zone -- every row of its
+// ladder shares it (D5: "one rate ladder per zone").
+export const SHIPPING_RATE_BASES = ["flat", "order_value", "weight"] as const
+
+export type ShippingRateBasis = (typeof SHIPPING_RATE_BASES)[number]
+
+// Same one-mapping-many-readers shape as shippingModeLabelKey above: the
+// zone editor's basis Select and the zones table's basis column both read
+// through this instead of each keeping its own basis-to-label mapping.
+export function shippingRateBasisLabelKey(
+  basis: ShippingRateBasis,
+): "basisFlat" | "basisOrderValue" | "basisWeight" {
+  if (basis === "order_value") return "basisOrderValue"
+  if (basis === "weight") return "basisWeight"
+  return "basisFlat"
+}
+
+const REQUIRED_ZONE_NAME_MESSAGE = "El nombre de la zona es requerido"
+const MIN_ONE_DESTINATION_MESSAGE = "Agrega al menos un destino a la zona"
+const DUPLICATE_DESTINATION_MESSAGE = "Hay destinos repetidos en la zona"
+const MIN_ONE_RANGE_MESSAGE = "Agrega al menos un rango de tarifa"
+const NEGATIVE_AMOUNT_MESSAGE = "El monto no puede ser negativo"
+const NEGATIVE_RANGE_BOUND_MESSAGE = "El valor no puede ser negativo"
+const RANGE_TO_BEFORE_FROM_MESSAGE = "El límite superior debe ser mayor al inferior"
+
+function isNonNegativeNumber(value: string): boolean {
+  const parsed = Number(value)
+  return value.trim() !== "" && Number.isFinite(parsed) && parsed >= 0
+}
+
+// Numeric fields stay strings end to end (lib/products/schemas.ts's own
+// requiredWeightGrams/positiveBasePrice precedent) -- parsed to numbers only
+// at the API boundary, never coerced inside the schema.
+const nonNegativeAmount = z.string().refine(isNonNegativeNumber, NEGATIVE_AMOUNT_MESSAGE)
+const nonNegativeRangeBound = z.string().refine(isNonNegativeNumber, NEGATIVE_RANGE_BOUND_MESSAGE)
+
+const rateRangeRowSchema = z
+  .object({
+    from: nonNegativeRangeBound,
+    // Vacío = sin límite superior (infinito): solo tiene sentido en el
+    // último escalón de la escalera; findShippingLadderGaps es quien lo exige.
+    to: z.string(),
+    amount: nonNegativeAmount,
+  })
+  .refine(
+    (row) => row.to.trim() === "" || (isNonNegativeNumber(row.to) && Number(row.to) > Number(row.from)),
+    { message: RANGE_TO_BEFORE_FROM_MESSAGE, path: ["to"] },
+  )
+
+export type ShippingRateRangeRowValues = z.infer<typeof rateRangeRowSchema>
+
+const flatRateLadderSchema = z.object({
+  basis: z.literal("flat"),
+  amount: nonNegativeAmount,
+})
+
+const orderValueRateLadderSchema = z.object({
+  basis: z.literal("order_value"),
+  ranges: z.array(rateRangeRowSchema).min(1, MIN_ONE_RANGE_MESSAGE),
+})
+
+const weightRateLadderSchema = z.object({
+  basis: z.literal("weight"),
+  ranges: z.array(rateRangeRowSchema).min(1, MIN_ONE_RANGE_MESSAGE),
+})
+
+// D6's three storage shapes (flat vs. ranged) as a discriminated union, not
+// one row shape with unused nullable fields -- an illegal state (a flat rate
+// carrying bounds, or a ranged rate missing them) is unrepresentable rather
+// than merely unchecked.
+export const shippingRateLadderSchema = z.discriminatedUnion("basis", [
+  flatRateLadderSchema,
+  orderValueRateLadderSchema,
+  weightRateLadderSchema,
+])
+
+export type ShippingRateLadder = z.infer<typeof shippingRateLadderSchema>
+
+// The editor form keeps `amount` and `ranges` around together regardless of
+// the chosen basis -- useFieldArray needs a fixed `ranges` path to exist,
+// and switching `basis` shouldn't discard whichever one the owner isn't
+// looking at. toRateLadderPayload narrows this down to the real ladder
+// shape only at the validation boundary (submit, and the server action).
+export type ShippingRateLadderFormValues = {
+  basis: ShippingRateBasis
+  amount: string
+  ranges: ShippingRateRangeRowValues[]
+}
+
+export function toRateLadderPayload(values: ShippingRateLadderFormValues): unknown {
+  if (values.basis === "flat") {
+    return { basis: "flat", amount: values.amount }
+  }
+  return { basis: values.basis, ranges: values.ranges }
+}
+
+const destinationSchema = z.object({
+  departmentCode: z.string().min(1),
+  municipalityCode: z.string().nullable(),
+})
+
+export type ShippingZoneDestinationInput = z.infer<typeof destinationSchema>
+
+function destinationKey(destination: ShippingZoneDestinationInput): string {
+  return `${destination.departmentCode}:${destination.municipalityCode ?? ""}`
+}
+
+// Deliberately permissive (no refine, no basis-conditional requirement):
+// this is here only so the RHF form's inferred type has a `rateLadder` key
+// at all, matching react-hook-form + zodResolver's usual shape (one schema,
+// one full set of form values -- lib/combos/schemas.ts's comboSchema is the
+// local precedent). The real, basis-conditional validation is a SEPARATE
+// check (toRateLadderPayload + shippingRateLadderSchema +
+// findShippingLadderGaps) run by hand at submit, never by this resolver --
+// if the strict rateRangeRowSchema lived here instead, a flat zone's inert
+// placeholder range row (basis=flat never shows or needs it) would fail
+// validation on a field the owner can't even see.
+const looseRateLadderFieldSchema = z.object({
+  basis: z.enum(SHIPPING_RATE_BASES),
+  amount: z.string(),
+  ranges: z.array(z.object({ from: z.string(), to: z.string(), amount: z.string() })),
+})
+
+export const shippingZoneFormSchema = z.object({
+  name: z.string().trim().min(1, REQUIRED_ZONE_NAME_MESSAGE),
+  destinations: z
+    .array(destinationSchema)
+    .min(1, MIN_ONE_DESTINATION_MESSAGE)
+    .refine(
+      (destinations) => new Set(destinations.map(destinationKey)).size === destinations.length,
+      DUPLICATE_DESTINATION_MESSAGE,
+    ),
+  rateLadder: looseRateLadderFieldSchema,
+})
+
+export type ShippingZoneFormValues = z.infer<typeof shippingZoneFormSchema>
+
+// Alias used by the editor's components: same shape, names the whole-form
+// value rather than the schema it happens to come from.
+export type ZoneEditorFormValues = ShippingZoneFormValues
+
+export type ShippingLadderGapIssue = {
+  code: "not_starting_at_zero" | "gap" | "overlap" | "not_open_ended"
+  message: string
+}
+
+const LADDER_MUST_START_AT_ZERO_MESSAGE = "El primer rango de la escalera debe empezar en 0"
+const LADDER_GAP_MESSAGE = "La escalera de tarifas tiene un vacío entre dos rangos"
+const LADDER_OVERLAP_MESSAGE = "La escalera de tarifas tiene rangos que se superponen"
+const LADDER_MUST_END_OPEN_MESSAGE = "El último rango de la escalera debe quedar sin límite superior"
+
+// D6: "a zone's ladder MUST cover 0 to infinity with no gaps". This is a
+// cross-row invariant a CHECK constraint cannot express, so -- following
+// lib/home-discount-popup.ts's validateHomeDiscountPopupAdminStatus, the
+// only local precedent for a save-gating validator that lives outside zod --
+// it's a plain function over the already-shape-validated ladder, called both
+// by the editor for a live indicator and by the save path to block an
+// incomplete ladder (D6), not merely warn about it.
+export function findShippingLadderGaps(ladder: ShippingRateLadder): ShippingLadderGapIssue[] {
+  if (ladder.basis === "flat") {
+    return []
+  }
+
+  const ranges = [...ladder.ranges]
+    .map((range) => ({
+      from: Number(range.from),
+      to: range.to.trim() === "" ? null : Number(range.to),
+    }))
+    .sort((a, b) => a.from - b.from)
+
+  const issues: ShippingLadderGapIssue[] = []
+
+  if (ranges[0].from !== 0) {
+    issues.push({ code: "not_starting_at_zero", message: LADDER_MUST_START_AT_ZERO_MESSAGE })
+  }
+
+  for (let index = 0; index < ranges.length - 1; index += 1) {
+    const current = ranges[index]
+    const next = ranges[index + 1]
+
+    if (current.to === null) {
+      issues.push({ code: "overlap", message: LADDER_OVERLAP_MESSAGE })
+      continue
+    }
+    if (current.to < next.from) {
+      issues.push({ code: "gap", message: LADDER_GAP_MESSAGE })
+    } else if (current.to > next.from) {
+      issues.push({ code: "overlap", message: LADDER_OVERLAP_MESSAGE })
+    }
+  }
+
+  if (ranges[ranges.length - 1].to !== null) {
+    issues.push({ code: "not_open_ended", message: LADDER_MUST_END_OPEN_MESSAGE })
+  }
+
+  return issues
+}

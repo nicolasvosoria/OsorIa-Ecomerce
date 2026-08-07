@@ -1785,6 +1785,146 @@ export type Database = {
           },
         ]
       }
+      shipping_rates: {
+        Row: {
+          amount: number
+          basis: string
+          created_at: string
+          id: string
+          range_from: number | null
+          range_to: number | null
+          zone_id: string
+        }
+        Insert: {
+          amount: number
+          basis: string
+          created_at?: string
+          id?: string
+          range_from?: number | null
+          range_to?: number | null
+          zone_id: string
+        }
+        Update: {
+          amount?: number
+          basis?: string
+          created_at?: string
+          id?: string
+          range_from?: number | null
+          range_to?: number | null
+          zone_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shipping_rates_zone_id_fkey"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "shipping_zones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shipping_zone_destinations: {
+        Row: {
+          created_at: string
+          department_code: string
+          id: string
+          municipality_code: string | null
+          store_id: string
+          zone_id: string
+        }
+        Insert: {
+          created_at?: string
+          department_code: string
+          id?: string
+          municipality_code?: string | null
+          store_id: string
+          zone_id: string
+        }
+        Update: {
+          created_at?: string
+          department_code?: string
+          id?: string
+          municipality_code?: string | null
+          store_id?: string
+          zone_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shipping_zone_destinations_municipality_fk"
+            columns: ["department_code", "municipality_code"]
+            isOneToOne: false
+            referencedRelation: "co_locations"
+            referencedColumns: ["department_code", "municipality_code"]
+          },
+          {
+            foreignKeyName: "shipping_zone_destinations_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shipping_zone_destinations_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores_legacy"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shipping_zone_destinations_zone_id_fkey"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "shipping_zones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shipping_zone_destinations_zone_store_fk"
+            columns: ["zone_id", "store_id"]
+            isOneToOne: false
+            referencedRelation: "shipping_zones"
+            referencedColumns: ["id", "store_id"]
+          },
+        ]
+      }
+      shipping_zones: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          store_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          store_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          store_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shipping_zones_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shipping_zones_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores_legacy"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shop_config: {
         Row: {
           config: Json
