@@ -88,7 +88,7 @@ export const WHYUS_DEFAULTS = {
     },
     {
       icon: "shipping",
-      title: "Envío Gratis",
+      title: "Envíos a Todo el País",
       description: "Entrega en 10 Días",
       link: "",
     },

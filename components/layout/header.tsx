@@ -1373,15 +1373,19 @@ export function Header() {
                 {/* Línea separadora */}
                 <div className="border-t mb-4" style={{ borderColor: "var(--border)" }}></div>
                 
-                {/* Total */}
-                <div className="flex items-center justify-between mb-4">
+                {/* Subtotal: el envío todavía no se conoce sin destino, así que el
+                    drawer no puede prometer un total — eso queda para el checkout. */}
+                <div className="flex items-center justify-between mb-1">
                   <span className="text-lg font-inter font-semibold" style={{ color: "var(--foreground)" }}>
-                    {t.cart.total}:
+                    {t.cart.subtotal}:
                   </span>
                   <span className="text-2xl font-inter font-bold" style={{ color: "var(--primary)" }}>
-                    {localCartSummary.formattedTotal}
+                    {localCartSummary.formattedSubtotal}
                   </span>
                 </div>
+                <p className="text-xs font-inter mb-4" style={{ color: "var(--muted-foreground)" }}>
+                  {t.cart.shippingCalculatedAtCheckout}
+                </p>
                 <Button
                   className="w-full"
                   style={{

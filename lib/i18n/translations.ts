@@ -101,6 +101,7 @@ export interface Translations {
     emptyDescription: string
     subtotal: string
     shipping: string
+    shippingCalculatedAtCheckout: string
     discount: string
     total: string
     checkout: string
@@ -529,6 +530,7 @@ export const translations: Record<Language, Translations> = {
       emptyDescription: 'Agrega productos a tu carrito para comenzar',
       subtotal: 'Subtotal',
       shipping: 'Envío',
+      shippingCalculatedAtCheckout: 'El envío se calcula en el checkout',
       discount: 'Descuento',
       total: 'Total',
       checkout: 'Finalizar compra',
@@ -948,6 +950,7 @@ export const translations: Record<Language, Translations> = {
       emptyDescription: 'Add products to your cart to get started',
       subtotal: 'Subtotal',
       shipping: 'Shipping',
+      shippingCalculatedAtCheckout: 'Shipping is calculated at checkout',
       discount: 'Discount',
       total: 'Total',
       checkout: 'Checkout',
@@ -1366,6 +1369,7 @@ export const translations: Record<Language, Translations> = {
       emptyDescription: 'Adicione produtos ao seu carrinho para começar',
       subtotal: 'Subtotal',
       shipping: 'Frete',
+      shippingCalculatedAtCheckout: 'O frete é calculado no checkout',
       discount: 'Desconto',
       total: 'Total',
       checkout: 'Finalizar compra',
