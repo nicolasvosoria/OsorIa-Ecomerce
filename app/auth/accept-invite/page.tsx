@@ -11,6 +11,7 @@ import { FormField } from "@/components/ui/form-field"
 import { Input } from "@/components/ui/input"
 import { useAuth } from "@/contexts/auth-context"
 import { blamePasswordFields, findPasswordProblem, MIN_PASSWORD_LENGTH, type PasswordFieldErrors } from "@/lib/account/password-rule"
+import { useFocusOnViewChange } from "@/lib/hooks/use-focus-on-view-change"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { updatePassword } from "@/lib/supabase/auth-api"
 import { completeInviteSetup } from "./actions"
@@ -91,6 +92,7 @@ function PasswordSetupCard() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSigningOut, setIsSigningOut] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<PasswordFieldErrors>({})
+  const headingRef = useFocusOnViewChange<HTMLHeadingElement>("ready")
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -136,12 +138,16 @@ function PasswordSetupCard() {
 
   return (
     <div className="flex min-h-dvh items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-md" role="status" aria-live="polite">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
             <KeyRound className="h-8 w-8 text-primary" />
           </div>
-          <CardTitle className="text-2xl">Elige tu contraseña</CardTitle>
+          <CardTitle asChild className="text-2xl">
+            <h1 ref={headingRef} tabIndex={-1} className="outline-none">
+              Elige tu contraseña
+            </h1>
+          </CardTitle>
           <CardDescription>Te invitaron a la plataforma. Elige una contraseña para entrar.</CardDescription>
         </CardHeader>
         <CardContent>
@@ -184,12 +190,18 @@ function PasswordSetupCard() {
 }
 
 function StatusCard({ icon, title, description }: { icon: React.ReactNode; title: string; description: string }) {
+  const headingRef = useFocusOnViewChange<HTMLHeadingElement>(title)
+
   return (
     <div className="flex min-h-dvh items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-md" role="status" aria-live="polite">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">{icon}</div>
-          <CardTitle className="text-2xl">{title}</CardTitle>
+          <CardTitle asChild className="text-2xl">
+            <h1 ref={headingRef} tabIndex={-1} className="outline-none">
+              {title}
+            </h1>
+          </CardTitle>
           <CardDescription>{description}</CardDescription>
         </CardHeader>
       </Card>

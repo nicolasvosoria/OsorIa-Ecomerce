@@ -95,4 +95,37 @@ describe("StoreIdentityPanel", () => {
     )
     await waitFor(() => expect(toastError).toHaveBeenCalledWith("Ingresa un correo válido."))
   })
+
+  // B2: the placeholder ("correo@tutienda.com") is identical for both fields,
+  // so only a real accessible name -- not the placeholder -- can tell them
+  // apart for assistive tech.
+  it("gives the reply-to and order-mailbox inputs distinct accessible names", () => {
+    render(<StoreIdentityPanel initial={INCOMPLETE_IDENTITY} />)
+
+    const replyToInput = screen.getByLabelText("Correo de respuesta")
+    const orderMailboxInput = screen.getByLabelText("Buzón de pedidos")
+
+    expect(replyToInput).not.toBe(orderMailboxInput)
+    expect(replyToInput).toHaveAttribute("type", "email")
+    expect(orderMailboxInput).toHaveAttribute("type", "email")
+  })
+
+  // B4: sending a verification link must change what the panel shows, not
+  // just fire a toast that auto-dismisses -- otherwise the owner has no way
+  // to tell the send worked and may resend into the rate limiter.
+  it("reflects a successful verification request as a pending badge, without waiting for a reload", async () => {
+    requestMailboxVerification.mockResolvedValue({ success: true, pendingEmail: "hola@cumbre.example" })
+    const user = userEvent.setup()
+    render(<StoreIdentityPanel initial={INCOMPLETE_IDENTITY} />)
+
+    expect(screen.getByText("Sin configurar")).toBeInTheDocument()
+
+    const [replyToInput] = screen.getAllByPlaceholderText("correo@tutienda.com")
+    await user.clear(replyToInput)
+    await user.type(replyToInput, "hola@cumbre.example")
+    await user.click(screen.getAllByRole("button", { name: "Enviar enlace de verificación" })[0])
+
+    await waitFor(() => expect(screen.getByText("Pendiente de confirmación")).toBeInTheDocument())
+    expect(screen.queryByText("Sin configurar")).not.toBeInTheDocument()
+  })
 })

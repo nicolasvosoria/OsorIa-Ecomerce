@@ -47,4 +47,26 @@ describe("MailboxVerificationPage", () => {
     expect(confirmStoreMailboxVerification).not.toHaveBeenCalled()
     expect(screen.getByText("Enlace no válido")).toBeInTheDocument()
   })
+
+  // B9: neither branch may be a dead end -- the owner arrived from an email
+  // and can't be expected to know or type /admin/settings by hand.
+  it("offers a way back to Configuración on both the success and failure branch", async () => {
+    getSupabaseServiceClient.mockReturnValue({})
+    confirmStoreMailboxVerification.mockResolvedValue({ ok: true, field: "reply_to" })
+
+    const successPage = await MailboxVerificationPage({ searchParams: Promise.resolve({ token: "valid" }) })
+    const { unmount } = render(successPage)
+    expect(screen.getByRole("link", { name: "Ir a Configuración" })).toHaveAttribute(
+      "href",
+      "https://admin.osoria.help/admin/settings",
+    )
+    unmount()
+
+    const failurePage = await MailboxVerificationPage({ searchParams: Promise.resolve({}) })
+    render(failurePage)
+    expect(screen.getByRole("link", { name: "Ir a Configuración" })).toHaveAttribute(
+      "href",
+      "https://admin.osoria.help/admin/settings",
+    )
+  })
 })

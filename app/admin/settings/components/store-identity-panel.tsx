@@ -30,6 +30,16 @@ export function StoreIdentityPanel({ initial }: { initial: StoreIdentityView }) 
   const [identity, setIdentity] = useState(initial)
   const readiness = getStoreIdentityReadiness(identity)
 
+  // A successful send starts verification but never completes it here (the
+  // owner confirms from the emailed link), so the panel only ever has a new
+  // PENDING address to reflect -- never a freshly verified one (B4).
+  const applyPendingEmail = (field: MailboxVerificationField, pendingEmail: string) =>
+    setIdentity((current) =>
+      field === "reply_to"
+        ? { ...current, replyToPendingEmail: pendingEmail }
+        : { ...current, orderMailboxPendingEmail: pendingEmail },
+    )
+
   return (
     <Card>
       <CardHeader>
@@ -53,6 +63,7 @@ export function StoreIdentityPanel({ initial }: { initial: StoreIdentityView }) 
             description="A dónde llegan las respuestas cuando un cliente contesta un correo de la tienda."
             verifiedEmail={identity.replyToEmail}
             pendingEmail={identity.replyToPendingEmail}
+            onVerificationRequested={(pendingEmail) => applyPendingEmail("reply_to", pendingEmail)}
           />
           <MailboxVerificationRow
             field="order_mailbox"
@@ -60,6 +71,7 @@ export function StoreIdentityPanel({ initial }: { initial: StoreIdentityView }) 
             description="El correo operativo de la tienda para las notificaciones de pedidos."
             verifiedEmail={identity.orderMailboxEmail}
             pendingEmail={identity.orderMailboxPendingEmail}
+            onVerificationRequested={(pendingEmail) => applyPendingEmail("order_mailbox", pendingEmail)}
           />
         </div>
       </CardContent>
@@ -71,7 +83,7 @@ function ReadinessChecklist({ missingFields }: { missingFields: StoreIdentityFie
   const missing = new Set(missingFields)
 
   return (
-    <ul className="grid gap-2 sm:grid-cols-2">
+    <ul className="grid gap-2 sm:grid-cols-2" role="status" aria-live="polite">
       {READINESS_FIELD_ORDER.map((field) => {
         const isMissing = missing.has(field)
         return (
@@ -149,18 +161,25 @@ function IdentityFieldsForm({
   )
 }
 
+const MAILBOX_FIELD_INPUT_IDS: Record<MailboxVerificationField, string> = {
+  reply_to: "store-reply-to",
+  order_mailbox: "store-order-mailbox",
+}
+
 function MailboxVerificationRow({
   field,
   label,
   description,
   verifiedEmail,
   pendingEmail,
+  onVerificationRequested,
 }: {
   field: MailboxVerificationField
   label: string
   description: string
   verifiedEmail: string | null
   pendingEmail: string | null
+  onVerificationRequested: (pendingEmail: string) => void
 }) {
   const [email, setEmail] = useState(pendingEmail ?? verifiedEmail ?? "")
   const [isPending, startTransition] = useTransition()
@@ -175,28 +194,33 @@ function MailboxVerificationRow({
         return
       }
 
+      onVerificationRequested(result.pendingEmail)
       toast.success("Enviamos un enlace de verificación a ese correo")
     })
   }
 
   return (
     <div className="space-y-2 rounded-md border border-border p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2" role="status" aria-live="polite">
         <div className="flex items-center gap-2">
           <Mail className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
           <span className="text-sm font-medium">{label}</span>
         </div>
         <MailboxStatusBadge verifiedEmail={verifiedEmail} pendingEmail={pendingEmail} />
       </div>
-      <p className="text-sm text-muted-foreground">{description}</p>
-      <form onSubmit={submit} className="flex flex-col gap-2 sm:flex-row">
-        <Input
-          type="email"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-          placeholder="correo@tutienda.com"
-          className="sm:max-w-xs"
-        />
+      <form onSubmit={submit} className="flex flex-col gap-2 sm:flex-row sm:items-start">
+        <FormField id={MAILBOX_FIELD_INPUT_IDS[field]} label={label} hint={description}>
+          {(controlField) => (
+            <Input
+              {...controlField}
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="correo@tutienda.com"
+              className="sm:max-w-xs"
+            />
+          )}
+        </FormField>
         <Button type="submit" variant="outline" disabled={isPending} className="gap-2">
           {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           Enviar enlace de verificación

@@ -15,6 +15,7 @@ import {
 import { FormField } from "@/components/ui/form-field"
 import { Input } from "@/components/ui/input"
 import { useLanguage } from "@/contexts/language-context"
+import { useFocusOnViewChange } from "@/lib/hooks/use-focus-on-view-change"
 import { resetPassword } from "@/lib/supabase/auth-api"
 
 interface PasswordRecoveryDialogProps {
@@ -65,6 +66,12 @@ function RecoveryLinkRequest({ onCancel, onBackToSignIn }: RecoveryLinkRequestPr
   const [emailError, setEmailError] = useState<string | undefined>(undefined)
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
   const turnstileRef = useRef<TurnstileWidgetHandle>(null)
+  // Keyed on `sentTo` itself: the ref only ever attaches to a DOM node once
+  // the confirmation view mounts, so the effect must re-fire exactly on that
+  // transition. It also runs once on the dialog's initial open, but the ref
+  // is unattached (null) then -- a harmless no-op that doesn't fight Radix's
+  // own focus into the email field.
+  const confirmationHeadingRef = useFocusOnViewChange<HTMLHeadingElement>(sentTo)
 
   const requestRecoveryLink = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -100,9 +107,11 @@ function RecoveryLinkRequest({ onCancel, onBackToSignIn }: RecoveryLinkRequestPr
 
   if (sentTo) {
     return (
-      <>
+      <div role="status" aria-live="polite">
         <DialogHeader>
-          <DialogTitle className="text-xl">{t.header.emailSent}</DialogTitle>
+          <DialogTitle ref={confirmationHeadingRef} tabIndex={-1} className="text-xl outline-none">
+            {t.header.emailSent}
+          </DialogTitle>
           <DialogDescription>{t.header.forgotPasswordDescription2}</DialogDescription>
         </DialogHeader>
 
@@ -130,7 +139,7 @@ function RecoveryLinkRequest({ onCancel, onBackToSignIn }: RecoveryLinkRequestPr
             </Button>
           </div>
         </div>
-      </>
+      </div>
     )
   }
 
@@ -149,7 +158,6 @@ function RecoveryLinkRequest({ onCancel, onBackToSignIn }: RecoveryLinkRequestPr
               type="email"
               required
               placeholder={t.header.emailPlaceholder}
-              className="placeholder:opacity-50"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
             />

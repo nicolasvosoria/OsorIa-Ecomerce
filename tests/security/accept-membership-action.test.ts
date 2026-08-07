@@ -31,19 +31,21 @@ describe("acceptMembershipInviteAction (D21)", () => {
 
     const result = await acceptMembershipInviteAction("plaintext-token")
 
-    expect(result).toEqual({ success: true })
+    expect(result).toEqual({ outcome: "accepted" })
     expect(rpc).toHaveBeenCalledWith("accept_membership_invite", {
       p_user_id: "member-1",
       p_token_hash: "hashed-token",
     })
   })
 
+  // B5: missing a session says nothing about the token itself, so it must
+  // stay recoverable ("unavailable") instead of the terminal "invalid" outcome.
   it("refuses without a session instead of ever calling the RPC", async () => {
     resolveServerAuthSession.mockResolvedValue(null)
 
     const result = await acceptMembershipInviteAction("plaintext-token")
 
-    expect(result).toEqual({ success: false, error: "Inicia sesión para aceptar esta invitación." })
+    expect(result).toEqual({ outcome: "unavailable", error: "Inicia sesión para aceptar esta invitación." })
     expect(getServiceEcommerceClient).not.toHaveBeenCalled()
   })
 
@@ -57,16 +59,20 @@ describe("acceptMembershipInviteAction (D21)", () => {
 
     const result = await acceptMembershipInviteAction("plaintext-token")
 
-    expect(result).toEqual({ success: false, error: GENERIC_ERROR })
+    expect(result).toEqual({ outcome: "invalid", error: GENERIC_ERROR })
   })
 
-  it("reports the same generic message on an RPC-level error too", async () => {
+  // B5: an RPC-level (transport) error is not a rejection of the token, so it
+  // must come back as the recoverable "unavailable" outcome -- keeping the
+  // accept button alive -- instead of the terminal, byte-identical GENERIC_ERROR.
+  it("reports a distinct, recoverable outcome on an RPC-level (transport) error", async () => {
     resolveServerAuthSession.mockResolvedValue({ userId: "member-1", email: "socio@correo.com" })
     const rpc = vi.fn().mockResolvedValue({ data: null, error: { message: "boom" } })
     getServiceEcommerceClient.mockReturnValue({ rpc })
 
     const result = await acceptMembershipInviteAction("plaintext-token")
 
-    expect(result).toEqual({ success: false, error: GENERIC_ERROR })
+    expect(result.outcome).toBe("unavailable")
+    expect(result).not.toEqual({ outcome: "invalid", error: GENERIC_ERROR })
   })
 })

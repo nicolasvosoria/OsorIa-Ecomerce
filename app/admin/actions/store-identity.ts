@@ -25,6 +25,13 @@ const MAILBOX_REQUEST_ERRORS: Record<string, string> = {
   rate_limited: "Ya enviamos un enlace hace poco. Espera un momento antes de volver a intentarlo.",
 }
 
+// The panel has no other way to learn the send succeeded: it must reflect the
+// new pending address in its badge and checklist right away, not just show a
+// toast that auto-dismisses (B4).
+export type RequestMailboxVerificationResult =
+  | { success: true; pendingEmail: string }
+  | { success: false; error: string }
+
 export async function updateStoreIdentityFields(input: unknown): Promise<AdminActionResult> {
   const parsed = updateStoreIdentitySchema.safeParse(input)
   if (!parsed.success) {
@@ -59,7 +66,7 @@ export async function updateStoreIdentityFields(input: unknown): Promise<AdminAc
 // hands the SECURITY DEFINER function everything it needs to enqueue an
 // immutable outbox snapshot in the same transaction as the rate-limit record
 // and the pending-email write (D30).
-export async function requestMailboxVerification(input: unknown): Promise<AdminActionResult> {
+export async function requestMailboxVerification(input: unknown): Promise<RequestMailboxVerificationResult> {
   const parsed = requestMailboxVerificationSchema.safeParse(input)
   if (!parsed.success) {
     return { success: false, error: INVALID_INPUT }
@@ -112,5 +119,5 @@ export async function requestMailboxVerification(input: unknown): Promise<AdminA
   }
 
   revalidatePath(SETTINGS_PATH)
-  return { success: true }
+  return { success: true, pendingEmail: email }
 }

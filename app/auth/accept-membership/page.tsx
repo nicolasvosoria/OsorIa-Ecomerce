@@ -53,7 +53,9 @@ function StatusCard({
     <div className="flex min-h-dvh items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl">{title}</CardTitle>
+          <CardTitle asChild className="text-2xl">
+            <h1>{title}</h1>
+          </CardTitle>
           <CardDescription>{description}</CardDescription>
         </CardHeader>
         {children ? <CardContent>{children}</CardContent> : null}

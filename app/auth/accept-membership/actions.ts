@@ -5,9 +5,17 @@ import { ECOMMERCE_FUNCTIONS } from "@/lib/supabase/contract"
 import { getServiceEcommerceClient } from "@/lib/supabase/service-client"
 import { resolveServerAuthSession } from "@/lib/supabase/server-auth-session"
 
-export type AcceptMembershipInviteResult = { success: true } | { success: false; error: string }
+// B5: "the RPC explicitly rejected this token" and "nothing told us either
+// way" are different situations for the caller -- only the first justifies
+// destroying the accept button for good, so they're separate outcomes
+// instead of collapsing into one `success: false`.
+export type AcceptMembershipInviteResult =
+  | { outcome: "accepted" }
+  | { outcome: "invalid"; error: string }
+  | { outcome: "unavailable"; error: string }
 
 const GENERIC_ERROR = "Este enlace no es válido, ya se usó o ya expiró."
+const TRANSPORT_ERROR = "No pudimos completar la solicitud. Intenta de nuevo."
 
 // D21: the intended-user check happens entirely inside
 // ecommerce.accept_membership_invite. This action supplies p_user_id from
@@ -19,12 +27,12 @@ const GENERIC_ERROR = "Este enlace no es válido, ya se usó o ya expiró."
 export async function acceptMembershipInviteAction(token: string): Promise<AcceptMembershipInviteResult> {
   const session = await resolveServerAuthSession()
   if (!session) {
-    return { success: false, error: "Inicia sesión para aceptar esta invitación." }
+    return { outcome: "unavailable", error: "Inicia sesión para aceptar esta invitación." }
   }
 
   const supabase = getServiceEcommerceClient()
   if (!supabase) {
-    return { success: false, error: "Supabase no configurado" }
+    return { outcome: "unavailable", error: "Supabase no configurado" }
   }
 
   const { data, error } = await supabase.rpc(ECOMMERCE_FUNCTIONS.acceptMembershipInvite, {
@@ -32,9 +40,13 @@ export async function acceptMembershipInviteAction(token: string): Promise<Accep
     p_token_hash: hashVerificationToken(token),
   })
 
-  if (error || !data?.ok) {
-    return { success: false, error: GENERIC_ERROR }
+  if (error) {
+    return { outcome: "unavailable", error: TRANSPORT_ERROR }
   }
 
-  return { success: true }
+  if (!data?.ok) {
+    return { outcome: "invalid", error: GENERIC_ERROR }
+  }
+
+  return { outcome: "accepted" }
 }

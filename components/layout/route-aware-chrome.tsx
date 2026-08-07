@@ -21,10 +21,22 @@ interface RouteAwareChromeProps {
 }
 
 const ADMIN_CHROME_BASES = ["/admin", "/dashboard"]
+const AUTH_JOURNEY_BASE = "/auth"
+// The two /auth screens that are genuinely of cara al cliente: the storefront
+// header links straight to /auth/cuenta (D14), and /auth/cuenta-confirmada is
+// where a fresh signup lands. Every other /auth screen (login, invites,
+// mailbox/password recovery) is provisioning/access to the panel, not the
+// shop, so it stays out of the storefront chrome.
+const STOREFRONT_AUTH_ROUTES = ["/auth/cuenta", "/auth/cuenta-confirmada"]
 
 export function isAdminChromeRoute(pathname: string | null): boolean {
   if (!pathname) return false
   return ADMIN_CHROME_BASES.some((base) => isRouteOrDescendant(pathname, base))
+}
+
+function isChromelessAuthRoute(pathname: string | null): boolean {
+  if (!pathname || !isRouteOrDescendant(pathname, AUTH_JOURNEY_BASE)) return false
+  return !STOREFRONT_AUTH_ROUTES.some((route) => isRouteOrDescendant(pathname, route))
 }
 
 export function RouteAwareChrome({ children, isNeutralPage = false }: RouteAwareChromeProps) {
@@ -39,14 +51,14 @@ export function RouteAwareChrome({ children, isNeutralPage = false }: RouteAware
   // y ahí el pathname miente todavía más: sigue siendo "/" o "/shop". Por eso la
   // señal la trae el servidor desde el header que estampó el proxy (D3), y deja
   // el aviso solo, sin nada del chrome de tienda alrededor.
-  // El login del auth journey, en cambio, sí llega por navegación real, así que
-  // aquí el pathname basta. Pertenece al viaje de autenticación y no a la
-  // tienda: entra sin su chrome, y solo él (D3), porque el resto de /auth son
-  // pantallas de cara al cliente.
+  // El viaje de autenticación, en cambio, sí llega por navegación real, así que
+  // aquí el pathname basta: es aprovisionamiento y acceso al panel, no la
+  // tienda, así que entra sin su chrome salvo las dos pantallas que sí son de
+  // cara al cliente (isChromelessAuthRoute).
   const isStorefrontRoute =
     isStorefrontHost &&
     !isAdminChromeRoute(pathname) &&
-    pathname !== "/auth/login" &&
+    !isChromelessAuthRoute(pathname) &&
     !isNeutralPage
   // The header and footer stay selectable inside the preview iframe (they reuse
   // the same `EditableWrapper`), while the rest of the storefront chrome — the

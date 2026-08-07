@@ -1,11 +1,16 @@
 import { createRef } from "react"
-import { render, waitFor } from "@testing-library/react"
+import { render, screen, waitFor } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
 import { TurnstileWidget, type TurnstileWidgetHandle } from "@/components/auth/turnstile-widget"
 
 describe("TurnstileWidget", () => {
   const originalSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
+  // Several tests below replace this with a Proxy to observe/drive the
+  // appended <script>: restoring it here keeps that override from leaking
+  // into later tests, which would otherwise silently intercept their
+  // appendChild calls too.
+  const originalAppendChild = document.head.appendChild
 
   afterEach(() => {
     if (originalSiteKey === undefined) {
@@ -14,6 +19,7 @@ describe("TurnstileWidget", () => {
       process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY = originalSiteKey
     }
     delete window.turnstile
+    document.head.appendChild = originalAppendChild
     document.querySelectorAll("script").forEach((script) => script.remove())
   })
 
@@ -87,5 +93,53 @@ describe("TurnstileWidget", () => {
 
     expect(reset).toHaveBeenCalledWith("widget-1")
     expect(onToken).toHaveBeenLastCalledWith(null)
+  })
+
+  // B1: a rejected script load must not brick every later mount. The first
+  // mount's script errors out; a second, later mount (a reopened dialog) must
+  // still be able to load Cloudflare's script instead of replaying the same
+  // cached rejection forever. A fresh module instance keeps this test's
+  // outcome independent of whatever the earlier tests above left in the
+  // module-level script-load cache.
+  it("shows a visible, generic error when the script fails to load, and retries on the next mount", async () => {
+    process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY = "test-site-key"
+    vi.resetModules()
+    const { TurnstileWidget: FreshTurnstileWidget } = await import("@/components/auth/turnstile-widget")
+
+    const onToken = vi.fn()
+    const appendedScripts: HTMLScriptElement[] = []
+    document.head.appendChild = new Proxy(document.head.appendChild.bind(document.head), {
+      apply(target, thisArg, args) {
+        const script = args[0] as HTMLScriptElement
+        appendedScripts.push(script)
+        return target.apply(thisArg, args as [Node])
+      },
+    })
+
+    const { unmount } = render(<FreshTurnstileWidget onToken={onToken} />)
+    queueMicrotask(() => appendedScripts[0]?.onerror?.(new Event("error")))
+
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "No pudimos cargar la verificación de seguridad. Recarga la página.",
+      ),
+    )
+    expect(onToken).not.toHaveBeenCalled()
+    unmount()
+
+    // Reopening (a fresh mount) must attempt the script again instead of
+    // reusing the rejected promise cached by the first attempt.
+    const render_ = vi.fn((_container: HTMLElement, options: { callback: (token: string) => void }) => {
+      options.callback("solved-token")
+      return "widget-2"
+    })
+    render(<FreshTurnstileWidget onToken={onToken} />)
+    queueMicrotask(() => {
+      window.turnstile = { render: render_, remove: vi.fn(), reset: vi.fn() }
+      appendedScripts[1]?.onload?.(new Event("load"))
+    })
+
+    await waitFor(() => expect(render_).toHaveBeenCalled())
+    expect(onToken).toHaveBeenCalledWith("solved-token")
   })
 })

@@ -71,6 +71,20 @@ describe("PasswordRecoveryDialog", () => {
     expect(toastSuccess).toHaveBeenCalled()
   })
 
+  // B8: the form view is destroyed wholesale when the confirmation view
+  // mounts in its place -- without a live region and a focus move, a
+  // screen-reader user hears nothing change.
+  it("announces the confirmation view as a live region and moves focus to its heading", async () => {
+    const user = openRecoveryDialog()
+
+    await user.type(emailField(), "duena@tienda.test")
+    await user.click(sendButton())
+
+    const heading = await screen.findByRole("heading", { name: t.header.emailSent })
+    expect(heading.closest('[role="status"]')).toBeTruthy()
+    await waitFor(() => expect(heading).toHaveFocus())
+  })
+
   // El dueño que pierde la clave temporal no puede quedarse creyendo que el link
   // salió cuando Supabase lo rechazó: no hay otra vía de vuelta que ésta.
   it("surfaces a failed request instead of claiming the link was sent", async () => {

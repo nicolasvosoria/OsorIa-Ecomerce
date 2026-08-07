@@ -122,7 +122,7 @@ describe("requestMailboxVerification", () => {
   it("renders the verification email and calls the RPC with the hashed token, never the plaintext", async () => {
     const result = await requestMailboxVerification({ field: "reply_to", email: "pedidos@cumbre.example" })
 
-    expect(result).toEqual({ success: true })
+    expect(result).toEqual({ success: true, pendingEmail: "pedidos@cumbre.example" })
     expect(renderEmail).toHaveBeenCalledWith(
       expect.objectContaining({
         kind: "store-mailbox-verification",
