@@ -105,7 +105,9 @@ export async function confirmStoreMailboxVerification(
     p_token_hash: hashVerificationToken(token),
   });
 
-  if (error || !data?.ok) {
+  assertQuerySucceeded("la confirmación del correo", error);
+
+  if (!data?.ok) {
     return { ok: false };
   }
 

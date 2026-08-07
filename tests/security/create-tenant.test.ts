@@ -150,6 +150,24 @@ describe("createTenant: D20 native invite for an unknown owner", () => {
     expect(insertInvitedProfile).not.toHaveBeenCalled()
   })
 
+  // C2/D24: a genuine limiter-check failure must read to the caller EXACTLY
+  // like a real rate limit -- inviteNewIdentity gives it its own outcome so
+  // an operator's logs can tell them apart, but nothing downstream may turn
+  // that into a new signal.
+  it("gives a limiter-check failure the exact same response as a genuine rate limit", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: "store-1", error: null })
+    const service = serviceWith(rpc)
+    resolveAuthIdentityByEmail.mockResolvedValue({ exists: false })
+
+    inviteNewIdentity.mockResolvedValue({ outcome: "rate_limited" })
+    const rateLimited = await createTenant(input, ACTOR_ID, service)
+
+    inviteNewIdentity.mockResolvedValue({ outcome: "rate_limit_check_failed" })
+    const checkFailed = await createTenant(input, ACTOR_ID, service)
+
+    expect(checkFailed).toEqual(rateLimited)
+  })
+
   // The compensation verify criterion's "new identity" direction, at the
   // createTenant assembly level: provisionOrCompensate is handed the
   // freshly-invited userId, never a pre-existing one.
@@ -207,5 +225,25 @@ describe("createTenant: D21 pending acceptance for an owner who already exists",
     expect(result.success).toBe(false)
     expect(service.del).toHaveBeenCalledWith()
     expect(service.deleteEq).toHaveBeenCalledWith("id", "store-1")
+  })
+
+  // D24, same shape as the D20 native-invite branch's own byte-identical
+  // assertion above: request_membership_invite's internal limiter-check
+  // failure must read to this caller EXACTLY like a genuine rate limit --
+  // mintPendingMembershipInvite gives it its own outcome so an operator's
+  // logs can tell them apart, but nothing downstream may turn that into a
+  // new, differently-worded signal.
+  it("gives a pending-invite limiter-check failure the exact same response as a genuine rate limit", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: "store-1", error: null })
+    const service = serviceWith(rpc)
+    resolveAuthIdentityByEmail.mockResolvedValue({ exists: true, userId: "existing-uid" })
+
+    mintPendingMembershipInvite.mockResolvedValue({ outcome: "rate_limited" })
+    const rateLimited = await createTenant(input, ACTOR_ID, service)
+
+    mintPendingMembershipInvite.mockResolvedValue({ outcome: "rate_limit_check_failed" })
+    const checkFailed = await createTenant(input, ACTOR_ID, service)
+
+    expect(checkFailed).toEqual(rateLimited)
   })
 })

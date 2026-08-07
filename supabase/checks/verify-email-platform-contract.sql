@@ -33,7 +33,7 @@ begin
     ('stores', 'legal_name'),
     ('store_contact', 'reply_to_email'), ('store_contact', 'reply_to_pending_email'), ('store_contact', 'reply_to_verified_at'),
     ('store_contact', 'order_mailbox_email'), ('store_contact', 'order_mailbox_pending_email'), ('store_contact', 'order_mailbox_verified_at'),
-    ('email_outbox', 'idempotency_key'), ('email_outbox', 'attempt_count'), ('email_outbox', 'provider_message_id'), ('email_outbox', 'last_error'),
+    ('email_outbox', 'idempotency_key'), ('email_outbox', 'attempt_count'), ('email_outbox', 'rejection_count'), ('email_outbox', 'claim_generation'), ('email_outbox', 'provider_message_id'), ('email_outbox', 'last_error'),
     ('orders', 'idempotency_key'), ('orders', 'payload_fingerprint'),
     ('auth_intents', 'store_id'), ('auth_intents', 'purpose'), ('auth_intents', 'token_hash'), ('auth_intents', 'expires_at'), ('auth_intents', 'consumed_at'),
     ('pending_membership_invites', 'store_id'), ('pending_membership_invites', 'intended_user_id'), ('pending_membership_invites', 'role_name'),
@@ -54,6 +54,33 @@ do $$
 begin
   if to_regprocedure('ecommerce.create_order_with_notifications(uuid, text, text, jsonb, jsonb, jsonb)') is null then
     raise exception 'Missing ecommerce.create_order_with_notifications(uuid, text, text, jsonb, jsonb, jsonb)';
+  end if;
+end $$;
+
+-- The race fix's own load-bearing precondition: CREATE OR REPLACE cannot
+-- change a function's argument list, so mark_email_outbox_sent and
+-- mark_email_outbox_failed's claim_generation parameter required an
+-- explicit DROP of their old signatures before recreating them (see
+-- 20260806000400_ecommerce_email_outbox_transient_retry.sql). If either old,
+-- unguarded signature is still resolvable here, the fencing fix has a silent
+-- bypass: a caller (or an old cached PostgREST schema cache entry) could
+-- still reach the pre-fencing write path.
+do $$
+begin
+  if to_regprocedure('ecommerce.mark_email_outbox_sent(uuid, text)') is not null then
+    raise exception 'The old, unguarded ecommerce.mark_email_outbox_sent(uuid, text) must not still exist as a live overload';
+  end if;
+  if to_regprocedure('ecommerce.mark_email_outbox_failed(uuid, text, text)') is not null then
+    raise exception 'The old, unguarded ecommerce.mark_email_outbox_failed(uuid, text, text) must not still exist as a live overload';
+  end if;
+  if to_regprocedure('ecommerce.mark_email_outbox_sent(uuid, text, integer)') is null then
+    raise exception 'Missing the fencing-guarded ecommerce.mark_email_outbox_sent(uuid, text, integer)';
+  end if;
+  if to_regprocedure('ecommerce.mark_email_outbox_failed(uuid, integer, text, text)') is null then
+    raise exception 'Missing the fencing-guarded ecommerce.mark_email_outbox_failed(uuid, integer, text, text)';
+  end if;
+  if to_regprocedure('ecommerce.mark_email_outbox_transient_failure(uuid, integer, text, text)') is null then
+    raise exception 'Missing the fencing-guarded ecommerce.mark_email_outbox_transient_failure(uuid, integer, text, text)';
   end if;
 end $$;
 
@@ -531,9 +558,9 @@ begin
 end $$;
 
 -- -----------------------------------------------------------------------------
--- Finding 1 (live PostgREST + a real GoTrue session): the
--- grant assertion above (has_function_privilege) proved the CATALOG was
--- right while the calling code was still broken --
+-- finalize-profile-requires-service-role (live PostgREST + a real GoTrue
+-- session): the grant assertion above (has_function_privilege) proved the
+-- CATALOG was right while the calling code was still broken --
 -- lib/auth/finalize-signup-action.ts called this RPC through the session's
 -- own `authenticated`-role client, which a real PostgREST request rejected
 -- with 42501. `has_function_privilege` alone can't catch that: it reads the
@@ -571,12 +598,12 @@ begin
   insert into ecommerce.auth_intents (store_id, purpose, email, token_hash, expires_at)
   values (v_store_id, 'signup', 'finalize-role-check-user@example.com', v_token_hash, now() + interval '1 hour');
 
-  -- The exact bypass Finding 1 exploited: the app's pre-fix call path (the
+  -- The exact bypass this rule closes: the app's pre-fix call path (the
   -- session's own authenticated client) must be rejected outright.
   set local role authenticated;
   begin
     perform ecommerce.finalize_customer_profile(v_user_id, 'finalize-role-check-user@example.com', 'Ana', 'Lovelace', v_token_hash);
-    raise exception 'Finding 1 reopened: authenticated could EXECUTE ecommerce.finalize_customer_profile directly';
+    raise exception 'finalize-profile-requires-service-role reopened: authenticated could EXECUTE ecommerce.finalize_customer_profile directly';
   exception when insufficient_privilege then null;
   end;
   reset role;
@@ -585,7 +612,7 @@ begin
     raise exception 'A rejected authenticated call must never consume the intent';
   end if;
 
-  -- The app's actual call path since Finding 1's fix: service_role must succeed.
+  -- The app's actual call path since this rule's fix: service_role must succeed.
   set local role service_role;
   v_result := ecommerce.finalize_customer_profile(v_user_id, 'finalize-role-check-user@example.com', 'Ana', 'Lovelace', v_token_hash);
   reset role;
@@ -605,8 +632,10 @@ declare
   v_claimed_by_a integer;
   v_claimed_by_b integer;
   v_attempt_count integer;
+  v_rejection_count integer;
   v_status text;
   v_next_attempt_at timestamptz;
+  v_gen integer;
 begin
   select id into v_store_id from ecommerce.stores where subdomain = 'contract-check-store';
 
@@ -655,36 +684,46 @@ begin
   values (v_store_id, 'store-mailbox-verification', 'c@example.com', 'idem-outbox-c', 'Osoria <auth@mail.osoria.help>', 's', 'h', 't')
   returning id into v_row_c;
 
+  -- Every mark_email_outbox_failed call below passes the CURRENT
+  -- claim_generation (the fencing token claim_email_outbox_batch just
+  -- minted) and asserts it returns true -- the legitimate, lease-holding
+  -- path must still work under the new guard.
   perform ecommerce.claim_email_outbox_batch('worker-a', 10);
-  perform ecommerce.mark_email_outbox_failed(v_row_c, 'boom-1', null);
-  select attempt_count, status, next_attempt_at into v_attempt_count, v_status, v_next_attempt_at from ecommerce.email_outbox where id = v_row_c;
-  if v_attempt_count <> 1 or v_status <> 'pending' or v_next_attempt_at > now() + interval '2 seconds' then
-    raise exception 'Failure 1 of 4 must reschedule immediately and stay pending, got attempt_count=%, status=%, delay=%s',
-      v_attempt_count, v_status, extract(epoch from (v_next_attempt_at - now()));
+  select claim_generation into v_gen from ecommerce.email_outbox where id = v_row_c;
+  if ecommerce.mark_email_outbox_failed(v_row_c, v_gen, 'boom-1', null) is not true then
+    raise exception 'A worker holding the current claim_generation must still be able to mark_email_outbox_failed';
+  end if;
+  select attempt_count, rejection_count, status, next_attempt_at into v_attempt_count, v_rejection_count, v_status, v_next_attempt_at from ecommerce.email_outbox where id = v_row_c;
+  if v_attempt_count <> 1 or v_rejection_count <> 1 or v_status <> 'pending' or v_next_attempt_at > now() + interval '2 seconds' then
+    raise exception 'Failure 1 of 4 must reschedule immediately and stay pending, got attempt_count=%, rejection_count=%, status=%, delay=%s',
+      v_attempt_count, v_rejection_count, v_status, extract(epoch from (v_next_attempt_at - now()));
   end if;
 
   update ecommerce.email_outbox set next_attempt_at = now() where id = v_row_c;
   perform ecommerce.claim_email_outbox_batch('worker-a', 10);
-  perform ecommerce.mark_email_outbox_failed(v_row_c, 'boom-2', null);
-  select attempt_count, next_attempt_at into v_attempt_count, v_next_attempt_at from ecommerce.email_outbox where id = v_row_c;
-  if v_attempt_count <> 2 or abs(extract(epoch from (v_next_attempt_at - now())) - 60) > 5 then
-    raise exception 'Failure 2 of 4 must reschedule ~1 minute out, got attempt_count=%, delay=%s', v_attempt_count, extract(epoch from (v_next_attempt_at - now()));
+  select claim_generation into v_gen from ecommerce.email_outbox where id = v_row_c;
+  perform ecommerce.mark_email_outbox_failed(v_row_c, v_gen, 'boom-2', null);
+  select attempt_count, rejection_count, next_attempt_at into v_attempt_count, v_rejection_count, v_next_attempt_at from ecommerce.email_outbox where id = v_row_c;
+  if v_attempt_count <> 2 or v_rejection_count <> 2 or abs(extract(epoch from (v_next_attempt_at - now())) - 60) > 5 then
+    raise exception 'Failure 2 of 4 must reschedule ~1 minute out, got attempt_count=%, rejection_count=%, delay=%s', v_attempt_count, v_rejection_count, extract(epoch from (v_next_attempt_at - now()));
   end if;
 
   update ecommerce.email_outbox set next_attempt_at = now() where id = v_row_c;
   perform ecommerce.claim_email_outbox_batch('worker-a', 10);
-  perform ecommerce.mark_email_outbox_failed(v_row_c, 'boom-3', 'daily_quota_exceeded');
-  select attempt_count, next_attempt_at into v_attempt_count, v_next_attempt_at from ecommerce.email_outbox where id = v_row_c;
-  if v_attempt_count <> 3 or abs(extract(epoch from (v_next_attempt_at - now())) - 300) > 5 then
-    raise exception 'Failure 3 of 4 must reschedule ~5 minutes out, got attempt_count=%, delay=%s', v_attempt_count, extract(epoch from (v_next_attempt_at - now()));
+  select claim_generation into v_gen from ecommerce.email_outbox where id = v_row_c;
+  perform ecommerce.mark_email_outbox_failed(v_row_c, v_gen, 'boom-3', 'daily_quota_exceeded');
+  select attempt_count, rejection_count, next_attempt_at into v_attempt_count, v_rejection_count, v_next_attempt_at from ecommerce.email_outbox where id = v_row_c;
+  if v_attempt_count <> 3 or v_rejection_count <> 3 or abs(extract(epoch from (v_next_attempt_at - now())) - 300) > 5 then
+    raise exception 'Failure 3 of 4 must reschedule ~5 minutes out, got attempt_count=%, rejection_count=%, delay=%s', v_attempt_count, v_rejection_count, extract(epoch from (v_next_attempt_at - now()));
   end if;
 
   update ecommerce.email_outbox set next_attempt_at = now() where id = v_row_c;
   perform ecommerce.claim_email_outbox_batch('worker-a', 10);
-  perform ecommerce.mark_email_outbox_failed(v_row_c, 'boom-4-final', 'daily_quota_exceeded');
-  select attempt_count, status into v_attempt_count, v_status from ecommerce.email_outbox where id = v_row_c;
-  if v_attempt_count <> 4 or v_status <> 'failed' then
-    raise exception 'D16: the 4th attempt''s failure (the third retry) must be terminal, got attempt_count=%, status=%', v_attempt_count, v_status;
+  select claim_generation into v_gen from ecommerce.email_outbox where id = v_row_c;
+  perform ecommerce.mark_email_outbox_failed(v_row_c, v_gen, 'boom-4-final', 'daily_quota_exceeded');
+  select attempt_count, rejection_count, status into v_attempt_count, v_rejection_count, v_status from ecommerce.email_outbox where id = v_row_c;
+  if v_attempt_count <> 4 or v_rejection_count <> 4 or v_status <> 'failed' then
+    raise exception 'D16/A10: the 4th genuine rejection (the third retry) must be terminal, got attempt_count=%, rejection_count=%, status=%', v_attempt_count, v_rejection_count, v_status;
   end if;
 
   -- D36: the quota failure that just terminaled the row must be visible in
@@ -705,6 +744,250 @@ begin
   end if;
   if not exists (select 1 from ecommerce.email_outbox where id = v_row_b) then
     raise exception 'D17: a row inside the 30-day window must survive pruning';
+  end if;
+end $$;
+
+-- -----------------------------------------------------------------------------
+-- The exact counter-example the verifier reproduced against real Postgres,
+-- turned into a regression check: a row whose send already succeeded (the
+-- state a mark_email_outbox_sent failure leaves -- claimed once, still
+-- `processing`, per lib/email/outbox-worker.ts's already-fixed
+-- markSentFailed path) must NEVER reach `failed`, no matter how many times
+-- its lease expires and a REPLAY of the same Idempotency-Key errors
+-- transiently (a Resend 5xx here, matching the repro's http_503). Without
+-- this migration's mark_email_outbox_transient_failure, this fails outright
+-- (undefined function); with the pre-fix mark_email_outbox_failed called
+-- instead for each replay error, the row terminals `failed` on the 4th
+-- claim -- exactly the corruption the verifier proved live.
+-- -----------------------------------------------------------------------------
+do $$
+declare
+  v_store_id uuid;
+  v_row_id uuid;
+  v_status text;
+  v_attempt_count integer;
+  v_rejection_count integer;
+  v_last_error_code text;
+  v_gen integer;
+begin
+  select id into v_store_id from ecommerce.stores where subdomain = 'contract-check-store';
+
+  insert into ecommerce.email_outbox (store_id, template_kind, recipient_email, idempotency_key, from_address, subject, html_body, text_body)
+  values (v_store_id, 'store-mailbox-verification', 'transient@example.com', 'idem-outbox-transient', 'Osoria <auth@mail.osoria.help>', 's', 'h', 't')
+  returning id into v_row_id;
+
+  -- Attempt 1: claimed and (per the repro) delivered by Resend -- simulated
+  -- here by simply never marking it `sent`, same ambiguous state a real
+  -- mark_email_outbox_sent failure leaves.
+  perform ecommerce.claim_email_outbox_batch('transient-worker', 10);
+
+  -- Three REPLAY sends of the SAME row, each erroring transiently, each
+  -- reclaimed via the expired-lease path -- exactly like a worker ticking
+  -- once a minute against a 2-minute lease would. Each mark_email_outbox_
+  -- transient_failure call passes the CURRENT claim_generation and asserts
+  -- true: the legitimate, lease-holding path still works under the fence.
+  for i in 1..3 loop
+    update ecommerce.email_outbox set lease_expires_at = now() - interval '1 second' where id = v_row_id;
+    perform ecommerce.claim_email_outbox_batch('transient-worker', 10);
+    select claim_generation into v_gen from ecommerce.email_outbox where id = v_row_id;
+    if ecommerce.mark_email_outbox_transient_failure(v_row_id, v_gen, 'service unavailable', 'http_503') is not true then
+      raise exception 'A worker holding the current claim_generation must still be able to mark_email_outbox_transient_failure';
+    end if;
+  end loop;
+
+  select status, attempt_count, rejection_count, last_error_code
+  into v_status, v_attempt_count, v_rejection_count, v_last_error_code
+  from ecommerce.email_outbox where id = v_row_id;
+
+  if v_status <> 'processing' then
+    raise exception 'D16/A10: a row whose send already succeeded must never reach failed after transient replay noise, got status=%', v_status;
+  end if;
+  if v_rejection_count <> 0 then
+    raise exception 'D16/A10: transient replay failures must never advance the genuine-rejection ladder, got rejection_count=%', v_rejection_count;
+  end if;
+  if v_attempt_count <> 4 then
+    raise exception 'Expected 4 total claims (1 original + 3 reclaims) on attempt_count, got %', v_attempt_count;
+  end if;
+  if v_last_error_code <> 'http_503' then
+    raise exception 'D36: the transient failure''s error code must stay visible on the row, got %', v_last_error_code;
+  end if;
+end $$;
+
+-- -----------------------------------------------------------------------------
+-- The ladder's other half: transient noise must never let a GENUINELY
+-- rejected send skip attempts either. Two transient replay failures
+-- interleaved with four real ones must still take exactly four genuine
+-- rejections to terminal -- never fewer just because attempt_count (bumped
+-- by every claim, transient or not) raced ahead of rejection_count.
+-- -----------------------------------------------------------------------------
+do $$
+declare
+  v_store_id uuid;
+  v_row_id uuid;
+  v_status text;
+  v_rejection_count integer;
+  v_gen integer;
+begin
+  select id into v_store_id from ecommerce.stores where subdomain = 'contract-check-store';
+
+  insert into ecommerce.email_outbox (store_id, template_kind, recipient_email, idempotency_key, from_address, subject, html_body, text_body)
+  values (v_store_id, 'store-mailbox-verification', 'mixed@example.com', 'idem-outbox-mixed', 'Osoria <auth@mail.osoria.help>', 's', 'h', 't')
+  returning id into v_row_id;
+
+  -- Two transient replay failures first (never touching rejection_count).
+  perform ecommerce.claim_email_outbox_batch('mixed-worker', 10);
+  select claim_generation into v_gen from ecommerce.email_outbox where id = v_row_id;
+  perform ecommerce.mark_email_outbox_transient_failure(v_row_id, v_gen, 'timeout', 'network_error');
+
+  update ecommerce.email_outbox set lease_expires_at = now() - interval '1 second' where id = v_row_id;
+  perform ecommerce.claim_email_outbox_batch('mixed-worker', 10);
+  select claim_generation into v_gen from ecommerce.email_outbox where id = v_row_id;
+  perform ecommerce.mark_email_outbox_transient_failure(v_row_id, v_gen, 'timeout', 'network_error');
+
+  -- Now four genuine rejections in a row -- must take all four to terminal.
+  for i in 1..4 loop
+    update ecommerce.email_outbox set lease_expires_at = now() - interval '1 second', next_attempt_at = now() where id = v_row_id;
+    perform ecommerce.claim_email_outbox_batch('mixed-worker', 10);
+    select claim_generation into v_gen from ecommerce.email_outbox where id = v_row_id;
+    perform ecommerce.mark_email_outbox_failed(v_row_id, v_gen, 'invalid recipient', 'validation_error');
+
+    select status, rejection_count into v_status, v_rejection_count from ecommerce.email_outbox where id = v_row_id;
+    if i < 4 and v_status = 'failed' then
+      raise exception 'D16/A10: transient noise must never shorten the four-attempt ladder -- terminal after only % genuine rejection(s)', i;
+    end if;
+  end loop;
+
+  if v_status <> 'failed' or v_rejection_count <> 4 then
+    raise exception 'Expected exactly 4 genuine rejections to terminal-fail the row despite the transient noise, got status=%, rejection_count=%', v_status, v_rejection_count;
+  end if;
+end $$;
+
+-- -----------------------------------------------------------------------------
+-- The race a second verifier pass reproduced against real Postgres (once
+-- forcing timestamps in one session, once across four genuinely separate
+-- psql connections to rule out a single-transaction artifact): none of the
+-- three mark_email_outbox_* functions guarded their UPDATE against the
+-- caller still holding the CURRENT claim. In production each RPC call
+-- commits on its own (PostgREST invokes claim/send/mark separately, no
+-- transaction spans them) and lib/email/outbox-worker.ts sends over plain
+-- HTTP with no timeout tied to the 2-minute lease -- so a worker whose
+-- Resend call outlives its lease can have its STALE response resolve after
+-- a second worker already reclaimed, sent and marked the row `sent`.
+-- Reproduced here: worker-a claims (generation 1), its lease is
+-- force-expired before it ever marks anything, worker-b reclaims
+-- (generation 2, proven distinct from generation 1 below) and marks the row
+-- sent -- then worker-a's stale response FINALLY arrives and tries to mark
+-- it failed, still carrying generation 1. That must no-op: the row must
+-- stay `sent`, with its real provider_message_id, rejection_count and
+-- last_error_code completely untouched.
+-- -----------------------------------------------------------------------------
+do $$
+declare
+  v_store_id uuid;
+  v_row_id uuid;
+  v_gen_a integer;
+  v_gen_b integer;
+  v_status text;
+  v_provider_message_id text;
+  v_rejection_count integer;
+  v_last_error_code text;
+  v_applied boolean;
+begin
+  select id into v_store_id from ecommerce.stores where subdomain = 'contract-check-store';
+
+  insert into ecommerce.email_outbox (store_id, template_kind, recipient_email, idempotency_key, from_address, subject, html_body, text_body)
+  values (v_store_id, 'store-mailbox-verification', 'race-sent@example.com', 'idem-outbox-race-sent', 'Osoria <auth@mail.osoria.help>', 's', 'h', 't')
+  returning id into v_row_id;
+
+  -- worker-a claims first -- generation 1. Its send is imagined to be still
+  -- in flight against Resend when its lease expires below.
+  perform ecommerce.claim_email_outbox_batch('worker-a', 10);
+  select claim_generation into v_gen_a from ecommerce.email_outbox where id = v_row_id;
+
+  -- worker-a's lease expires (Resend degradation, no client-side timeout)
+  -- before it ever marks anything -- worker-b reclaims.
+  update ecommerce.email_outbox set lease_expires_at = now() - interval '1 second' where id = v_row_id;
+  perform ecommerce.claim_email_outbox_batch('worker-b', 10);
+  select claim_generation into v_gen_b from ecommerce.email_outbox where id = v_row_id;
+  if v_gen_b = v_gen_a then
+    raise exception 'worker-b''s reclaim must mint a NEW claim_generation, still got %', v_gen_b;
+  end if;
+
+  -- worker-b's send genuinely succeeds and marks the row sent -- the
+  -- legitimate, current-generation path must still work.
+  v_applied := ecommerce.mark_email_outbox_sent(v_row_id, 'resend-msg-race-1', v_gen_b);
+  if v_applied is not true then
+    raise exception 'worker-b holds the current claim_generation and must be able to mark_email_outbox_sent';
+  end if;
+
+  -- worker-a's STALE response finally resolves and tries to mark the SAME
+  -- row failed, still carrying its now-superseded generation 1. This must
+  -- be rejected outright -- the row already has a real Resend delivery.
+  v_applied := ecommerce.mark_email_outbox_failed(v_row_id, v_gen_a, 'stale timeout', 'http_503');
+  if v_applied is not false then
+    raise exception 'A stale mark_email_outbox_failed (superseded claim_generation) must be rejected, not applied';
+  end if;
+
+  select status, provider_message_id, rejection_count, last_error_code
+  into v_status, v_provider_message_id, v_rejection_count, v_last_error_code
+  from ecommerce.email_outbox where id = v_row_id;
+
+  if v_status <> 'sent' then
+    raise exception 'The race: a stale mark_email_outbox_failed must never flip an already-sent row, got status=%', v_status;
+  end if;
+  if v_provider_message_id <> 'resend-msg-race-1' then
+    raise exception 'The genuine Resend delivery''s provider_message_id must survive a stale competing write, got %', v_provider_message_id;
+  end if;
+  if v_rejection_count <> 0 then
+    raise exception 'A rejected stale write must never advance rejection_count, got %', v_rejection_count;
+  end if;
+  if v_last_error_code is not null then
+    raise exception 'A rejected stale write must never poison last_error_code on an already-sent row, got %', v_last_error_code;
+  end if;
+end $$;
+
+-- Same race, the other mark function: a stale mark_email_outbox_transient_
+-- failure must not poison last_error_code (D36) on a row a NEWER generation
+-- already finalized -- and must not move it off `sent` either.
+do $$
+declare
+  v_store_id uuid;
+  v_row_id uuid;
+  v_gen_a integer;
+  v_gen_b integer;
+  v_status text;
+  v_last_error_code text;
+  v_applied boolean;
+begin
+  select id into v_store_id from ecommerce.stores where subdomain = 'contract-check-store';
+
+  insert into ecommerce.email_outbox (store_id, template_kind, recipient_email, idempotency_key, from_address, subject, html_body, text_body)
+  values (v_store_id, 'store-mailbox-verification', 'race-transient@example.com', 'idem-outbox-race-transient', 'Osoria <auth@mail.osoria.help>', 's', 'h', 't')
+  returning id into v_row_id;
+
+  perform ecommerce.claim_email_outbox_batch('worker-a', 10);
+  select claim_generation into v_gen_a from ecommerce.email_outbox where id = v_row_id;
+
+  update ecommerce.email_outbox set lease_expires_at = now() - interval '1 second' where id = v_row_id;
+  perform ecommerce.claim_email_outbox_batch('worker-b', 10);
+  select claim_generation into v_gen_b from ecommerce.email_outbox where id = v_row_id;
+
+  v_applied := ecommerce.mark_email_outbox_sent(v_row_id, 'resend-msg-race-2', v_gen_b);
+  if v_applied is not true then
+    raise exception 'worker-b holds the current claim_generation and must be able to mark_email_outbox_sent';
+  end if;
+
+  v_applied := ecommerce.mark_email_outbox_transient_failure(v_row_id, v_gen_a, 'stale timeout', 'http_503');
+  if v_applied is not false then
+    raise exception 'A stale mark_email_outbox_transient_failure (superseded claim_generation) must be rejected, not applied';
+  end if;
+
+  select status, last_error_code into v_status, v_last_error_code from ecommerce.email_outbox where id = v_row_id;
+  if v_status <> 'sent' then
+    raise exception 'The race: a stale mark_email_outbox_transient_failure must never move an already-sent row off sent, got status=%', v_status;
+  end if;
+  if v_last_error_code is not null then
+    raise exception 'D36: a rejected stale write must never poison last_error_code on an already-sent row, got %', v_last_error_code;
   end if;
 end $$;
 
@@ -866,10 +1149,10 @@ begin
 end $$;
 
 -- -----------------------------------------------------------------------------
--- Finding 1: the merchant notification is OPTIONAL during
--- D31's pre-enforcement window, but only in a checkable shape -- always
--- exactly one order-received, at most one merchant-new-order, nothing else.
--- See 20260805000600_ecommerce_checkout_optional_merchant_notification.sql.
+-- merchant-notification-optional: the merchant notification is OPTIONAL
+-- during D31's pre-enforcement window, but only in a checkable shape --
+-- always exactly one order-received, at most one merchant-new-order, nothing
+-- else. See 20260805000600_ecommerce_checkout_optional_merchant_notification.sql.
 -- -----------------------------------------------------------------------------
 do $$
 declare
@@ -890,7 +1173,7 @@ begin
       'templateKind', 'order-received', 'recipientEmail', 'buyer2@example.com',
       'fromAddress', 'Contract Check Store vía Osoria <pedidos@mail.osoria.help>', 'replyToAddress', null,
       'subject', 'Recibimos tu pedido', 'htmlBody', '<p>h</p>', 'textBody', 't',
-      'idempotencyKey', 'checkout:' || v_store_id::text || ':finding1-receipt-only:order-received'
+      'idempotencyKey', 'checkout:' || v_store_id::text || ':merchant-notification-optional-receipt-only:order-received'
     )
   );
 
@@ -904,113 +1187,113 @@ begin
     'order_number', ecommerce.generate_order_number(v_store_id)
   );
   v_result := ecommerce.create_order_with_notifications(
-    v_store_id, 'finding1-receipt-only', 'fingerprint-f1a', v_order, v_items, v_receipt_only
+    v_store_id, 'merchant-notification-optional-receipt-only', 'fp-receipt-only', v_order, v_items, v_receipt_only
   );
   if (v_result ->> 'ok')::boolean is not true then
-    raise exception 'Finding 1: a single order-received notification must be accepted, got %', v_result;
+    raise exception 'merchant-notification-optional: a single order-received notification must be accepted, got %', v_result;
   end if;
 
   select count(*) into v_outbox_count from ecommerce.email_outbox
-  where idempotency_key like 'checkout:' || v_store_id::text || ':finding1-receipt-only:%';
+  where idempotency_key like 'checkout:' || v_store_id::text || ':merchant-notification-optional-receipt-only:%';
   if v_outbox_count <> 1 then
-    raise exception 'Finding 1: expected exactly one outbox row for the receipt-only order, got %', v_outbox_count;
+    raise exception 'merchant-notification-optional: expected exactly one outbox row for the receipt-only order, got %', v_outbox_count;
   end if;
 
   -- Every OTHER shape the RPC must still reject, one at a time -- checkable
   -- by structure, never "one or two, whatever".
   begin
     perform ecommerce.create_order_with_notifications(
-      v_store_id, 'finding1-zero-receipts', 'fingerprint-f1b',
+      v_store_id, 'merchant-notification-optional-zero-receipts', 'fp-zero-receipts',
       v_order || jsonb_build_object('order_number', ecommerce.generate_order_number(v_store_id)),
       v_items, '[]'::jsonb
     );
-    raise exception 'Finding 1: zero notifications must raise';
+    raise exception 'merchant-notification-optional: zero notifications must raise';
   exception when others then null;
   end;
 
   begin
     perform ecommerce.create_order_with_notifications(
-      v_store_id, 'finding1-no-receipt', 'fingerprint-f1c',
+      v_store_id, 'merchant-notification-optional-no-receipt', 'fp-no-receipt',
       v_order || jsonb_build_object('order_number', ecommerce.generate_order_number(v_store_id)),
       v_items,
       jsonb_build_array(jsonb_build_object(
         'templateKind', 'merchant-new-order', 'recipientEmail', 'tienda@example.com',
         'fromAddress', 'x', 'replyToAddress', null, 'subject', 's', 'htmlBody', 'h', 'textBody', 't',
-        'idempotencyKey', 'checkout:' || v_store_id::text || ':finding1-no-receipt:merchant-new-order'
+        'idempotencyKey', 'checkout:' || v_store_id::text || ':merchant-notification-optional-no-receipt:merchant-new-order'
       ))
     );
-    raise exception 'Finding 1: a merchant notification with NO order-received must raise';
+    raise exception 'merchant-notification-optional: a merchant notification with NO order-received must raise';
   exception when others then null;
   end;
 
   begin
     perform ecommerce.create_order_with_notifications(
-      v_store_id, 'finding1-two-receipts', 'fingerprint-f1d',
+      v_store_id, 'merchant-notification-optional-two-receipts', 'fp-two-receipts',
       v_order || jsonb_build_object('order_number', ecommerce.generate_order_number(v_store_id)),
       v_items,
       jsonb_build_array(
         jsonb_build_object(
           'templateKind', 'order-received', 'recipientEmail', 'a@example.com',
           'fromAddress', 'x', 'replyToAddress', null, 'subject', 's', 'htmlBody', 'h', 'textBody', 't',
-          'idempotencyKey', 'checkout:' || v_store_id::text || ':finding1-two-receipts:order-received-1'
+          'idempotencyKey', 'checkout:' || v_store_id::text || ':merchant-notification-optional-two-receipts:order-received-1'
         ),
         jsonb_build_object(
           'templateKind', 'order-received', 'recipientEmail', 'b@example.com',
           'fromAddress', 'x', 'replyToAddress', null, 'subject', 's', 'htmlBody', 'h', 'textBody', 't',
-          'idempotencyKey', 'checkout:' || v_store_id::text || ':finding1-two-receipts:order-received-2'
+          'idempotencyKey', 'checkout:' || v_store_id::text || ':merchant-notification-optional-two-receipts:order-received-2'
         )
       )
     );
-    raise exception 'Finding 1: two order-received notifications must raise';
+    raise exception 'merchant-notification-optional: two order-received notifications must raise';
   exception when others then null;
   end;
 
   begin
     perform ecommerce.create_order_with_notifications(
-      v_store_id, 'finding1-two-merchants', 'fingerprint-f1e',
+      v_store_id, 'merchant-notification-optional-two-merchants', 'fp-two-merchants',
       v_order || jsonb_build_object('order_number', ecommerce.generate_order_number(v_store_id)),
       v_items,
       jsonb_build_array(
         jsonb_build_object(
           'templateKind', 'order-received', 'recipientEmail', 'a@example.com',
           'fromAddress', 'x', 'replyToAddress', null, 'subject', 's', 'htmlBody', 'h', 'textBody', 't',
-          'idempotencyKey', 'checkout:' || v_store_id::text || ':finding1-two-merchants:order-received'
+          'idempotencyKey', 'checkout:' || v_store_id::text || ':merchant-notification-optional-two-merchants:order-received'
         ),
         jsonb_build_object(
           'templateKind', 'merchant-new-order', 'recipientEmail', 'b@example.com',
           'fromAddress', 'x', 'replyToAddress', null, 'subject', 's', 'htmlBody', 'h', 'textBody', 't',
-          'idempotencyKey', 'checkout:' || v_store_id::text || ':finding1-two-merchants:merchant-1'
+          'idempotencyKey', 'checkout:' || v_store_id::text || ':merchant-notification-optional-two-merchants:merchant-1'
         ),
         jsonb_build_object(
           'templateKind', 'merchant-new-order', 'recipientEmail', 'c@example.com',
           'fromAddress', 'x', 'replyToAddress', null, 'subject', 's', 'htmlBody', 'h', 'textBody', 't',
-          'idempotencyKey', 'checkout:' || v_store_id::text || ':finding1-two-merchants:merchant-2'
+          'idempotencyKey', 'checkout:' || v_store_id::text || ':merchant-notification-optional-two-merchants:merchant-2'
         )
       )
     );
-    raise exception 'Finding 1: two merchant-new-order notifications must raise';
+    raise exception 'merchant-notification-optional: two merchant-new-order notifications must raise';
   exception when others then null;
   end;
 
   begin
     perform ecommerce.create_order_with_notifications(
-      v_store_id, 'finding1-unknown-kind', 'fingerprint-f1f',
+      v_store_id, 'merchant-notification-optional-unknown-kind', 'fp-unknown-kind',
       v_order || jsonb_build_object('order_number', ecommerce.generate_order_number(v_store_id)),
       v_items,
       jsonb_build_array(
         jsonb_build_object(
           'templateKind', 'order-received', 'recipientEmail', 'a@example.com',
           'fromAddress', 'x', 'replyToAddress', null, 'subject', 's', 'htmlBody', 'h', 'textBody', 't',
-          'idempotencyKey', 'checkout:' || v_store_id::text || ':finding1-unknown-kind:order-received'
+          'idempotencyKey', 'checkout:' || v_store_id::text || ':merchant-notification-optional-unknown-kind:order-received'
         ),
         jsonb_build_object(
           'templateKind', 'something-else', 'recipientEmail', 'b@example.com',
           'fromAddress', 'x', 'replyToAddress', null, 'subject', 's', 'htmlBody', 'h', 'textBody', 't',
-          'idempotencyKey', 'checkout:' || v_store_id::text || ':finding1-unknown-kind:other'
+          'idempotencyKey', 'checkout:' || v_store_id::text || ':merchant-notification-optional-unknown-kind:other'
         )
       )
     );
-    raise exception 'Finding 1: an unrecognized templateKind must raise';
+    raise exception 'merchant-notification-optional: an unrecognized templateKind must raise';
   exception when others then null;
   end;
 
@@ -1020,16 +1303,17 @@ begin
     select 1 from ecommerce.orders
     where store_id = v_store_id
       and idempotency_key in (
-        'finding1-zero-receipts', 'finding1-no-receipt', 'finding1-two-receipts',
-        'finding1-two-merchants', 'finding1-unknown-kind'
+        'merchant-notification-optional-zero-receipts', 'merchant-notification-optional-no-receipt',
+        'merchant-notification-optional-two-receipts', 'merchant-notification-optional-two-merchants',
+        'merchant-notification-optional-unknown-kind'
       )
   ) then
-    raise exception 'Finding 1: a rejected notification shape must never leave an order behind';
+    raise exception 'merchant-notification-optional: a rejected notification shape must never leave an order behind';
   end if;
 end $$;
 
 -- -----------------------------------------------------------------------------
--- Finding 2: the checkout follow-ups that run after the
+-- checkout-followups-converge: the checkout follow-ups that run after the
 -- atomic order write (inventory decrement, shipping address, payment
 -- transaction) converge to exactly one effect per order across a retried
 -- follow-up sequence -- never zero, never twice. See
@@ -1058,11 +1342,11 @@ begin
   insert into ecommerce.store_items
     (store_id, item_name, base_price, currency_code, track_inventory, inventory_quantity, is_active, is_available_for_sale)
   values
-    (v_store_id, 'Finding 2 Widget', 10000, 'COP', true, 5, true, true)
+    (v_store_id, 'Checkout Followup Widget', 10000, 'COP', true, 5, true, true)
   returning id into v_item_id;
 
   v_order := jsonb_build_object(
-    'customer_type', 'guest', 'customer_email', 'finding2@example.com',
+    'customer_type', 'guest', 'customer_email', 'checkout-followup@example.com',
     'customer_first_name', 'Ada', 'customer_last_name', 'Lovelace',
     'shipping_address', 'Calle 789', 'shipping_city', 'Bogotá', 'shipping_postal_code', '110111',
     'payment_method', 'cash_on_delivery', 'subtotal', 20000, 'total_amount', 20000,
@@ -1070,24 +1354,24 @@ begin
   );
   v_items := jsonb_build_array(
     jsonb_build_object(
-      'product_id', v_item_id::text, 'product_name', 'Finding 2 Widget',
+      'product_id', v_item_id::text, 'product_name', 'Checkout Followup Widget',
       'unit_price', 10000, 'quantity', 2, 'total_price', 20000
     )
   );
   v_notifications := jsonb_build_array(
     jsonb_build_object(
-      'templateKind', 'order-received', 'recipientEmail', 'finding2@example.com',
+      'templateKind', 'order-received', 'recipientEmail', 'checkout-followup@example.com',
       'fromAddress', 'Contract Check Store vía Osoria <pedidos@mail.osoria.help>', 'replyToAddress', null,
       'subject', 'Recibimos tu pedido', 'htmlBody', '<p>h</p>', 'textBody', 't',
-      'idempotencyKey', 'checkout:' || v_store_id::text || ':finding2-order:order-received'
+      'idempotencyKey', 'checkout:' || v_store_id::text || ':checkout-followup-order:order-received'
     )
   );
 
   v_result := ecommerce.create_order_with_notifications(
-    v_store_id, 'finding2-order', 'fingerprint-f2', v_order, v_items, v_notifications
+    v_store_id, 'checkout-followup-order', 'fp-checkout-followup', v_order, v_items, v_notifications
   );
   if (v_result ->> 'ok')::boolean is not true then
-    raise exception 'Finding 2 setup: expected the order to be created, got %', v_result;
+    raise exception 'checkout-followups-converge setup: expected the order to be created, got %', v_result;
   end if;
   v_order_id := (v_result -> 'order' ->> 'id')::uuid;
 
@@ -1099,11 +1383,11 @@ begin
   select ecommerce.decrement_inventory(v_order_id, v_store_id, v_decrement_items) into v_shortages;
   select inventory_quantity into v_quantity_after from ecommerce.store_items where id = v_item_id;
   if v_quantity_after <> 3 or jsonb_array_length(v_shortages) <> 0 then
-    raise exception 'Finding 2: first decrement must take inventory from 5 to 3 with no shortages, got quantity=%, shortages=%', v_quantity_after, v_shortages;
+    raise exception 'checkout-followups-converge: first decrement must take inventory from 5 to 3 with no shortages, got quantity=%, shortages=%', v_quantity_after, v_shortages;
   end if;
 
   if not exists (select 1 from ecommerce.orders where id = v_order_id and inventory_decremented_at is not null) then
-    raise exception 'Finding 2: inventory_decremented_at must be set after the first successful decrement';
+    raise exception 'checkout-followups-converge: inventory_decremented_at must be set after the first successful decrement';
   end if;
 
   -- Retried follow-up (e.g. the customer's page reload after the first
@@ -1112,10 +1396,10 @@ begin
   select ecommerce.decrement_inventory(v_order_id, v_store_id, v_decrement_items) into v_shortages;
   select inventory_quantity into v_quantity_after from ecommerce.store_items where id = v_item_id;
   if v_quantity_after <> 3 then
-    raise exception 'Finding 2: a retried decrement for the SAME order must never decrement twice, inventory is now % (expected 3, unchanged)', v_quantity_after;
+    raise exception 'checkout-followups-converge: a retried decrement for the SAME order must never decrement twice, inventory is now % (expected 3, unchanged)', v_quantity_after;
   end if;
   if jsonb_array_length(v_shortages) <> 0 then
-    raise exception 'Finding 2: a retried, already-decremented order must report no shortages, got %', v_shortages;
+    raise exception 'checkout-followups-converge: a retried, already-decremented order must report no shortages, got %', v_shortages;
   end if;
 
   -- A plain double-submit (no failure in between, just a second call) must
@@ -1123,7 +1407,7 @@ begin
   perform ecommerce.decrement_inventory(v_order_id, v_store_id, v_decrement_items);
   select inventory_quantity into v_quantity_after from ecommerce.store_items where id = v_item_id;
   if v_quantity_after <> 3 then
-    raise exception 'Finding 2: a third call (double-submit) must still never decrement twice, inventory is now %', v_quantity_after;
+    raise exception 'checkout-followups-converge: a third call (double-submit) must still never decrement twice, inventory is now %', v_quantity_after;
   end if;
 
   -- Shipping address: the SAME (order_id, address_type) upsert the app now
@@ -1138,21 +1422,21 @@ begin
 
   select count(*) into v_address_count from ecommerce.order_addresses where order_id = v_order_id;
   if v_address_count <> 1 then
-    raise exception 'Finding 2: a retried shipping address upsert must converge to exactly one row, found %', v_address_count;
+    raise exception 'checkout-followups-converge: a retried shipping address upsert must converge to exactly one row, found %', v_address_count;
   end if;
 
   -- Payment transaction: the SAME idempotency_key (the checkout's own,
   -- reused across a retry) must converge to exactly one row too.
   insert into ecommerce.payment_transactions (id, order_id, idempotency_key, provider, transaction_type, amount, currency_code, status)
-  values (gen_random_uuid(), v_order_id, 'finding2-order', 'cash_on_delivery', 'payment', 20000, 'COP', 'pending')
+  values (gen_random_uuid(), v_order_id, 'checkout-followup-order', 'cash_on_delivery', 'payment', 20000, 'COP', 'pending')
   on conflict (idempotency_key) do nothing;
   insert into ecommerce.payment_transactions (id, order_id, idempotency_key, provider, transaction_type, amount, currency_code, status)
-  values (gen_random_uuid(), v_order_id, 'finding2-order', 'cash_on_delivery', 'payment', 20000, 'COP', 'pending')
+  values (gen_random_uuid(), v_order_id, 'checkout-followup-order', 'cash_on_delivery', 'payment', 20000, 'COP', 'pending')
   on conflict (idempotency_key) do nothing;
 
   select count(*) into v_payment_count from ecommerce.payment_transactions where order_id = v_order_id;
   if v_payment_count <> 1 then
-    raise exception 'Finding 2: a retried payment_transactions upsert must converge to exactly one row, found %', v_payment_count;
+    raise exception 'checkout-followups-converge: a retried payment_transactions upsert must converge to exactly one row, found %', v_payment_count;
   end if;
 end $$;
 
@@ -1630,6 +1914,61 @@ begin
     raise exception 'D24-style posture: an unknown membership invite token must return the same generic invalid_or_expired response';
   end if;
 end $$;
+
+-- -----------------------------------------------------------------------------
+-- D24, parallel to the sibling fix on the D20 native-invite path:
+-- request_membership_invite's OWN internal check_and_record_send_attempt
+-- call can fail on its own terms (lock timeout, broken grant, any other
+-- runtime error) rather than reporting the limit was hit -- that must return
+-- the distinct, non-enumerable rate_limit_check_failed reason instead of
+-- unwinding the whole call as a raw error. Simulated by temporarily
+-- replacing check_and_record_send_attempt so it always raises -- reverted
+-- via ROLLBACK TO SAVEPOINT immediately after, so every other block in this
+-- file (before and after) keeps the REAL function.
+-- -----------------------------------------------------------------------------
+savepoint before_broken_send_attempt_limiter;
+
+create or replace function ecommerce.check_and_record_send_attempt(
+  p_store_id uuid,
+  p_purpose text,
+  p_recipient_email text
+)
+returns boolean
+language plpgsql
+security definer
+set search_path to 'ecommerce', 'pg_temp'
+as $$
+begin
+  raise exception 'simulated check_and_record_send_attempt outage';
+end;
+$$;
+
+do $$
+declare
+  v_owner_id uuid;
+  v_store_id uuid;
+  v_member_id uuid;
+  v_result jsonb;
+  v_token_hash text := encode(digest('membership-invite-check-token-limiter-outage', 'sha256'), 'hex');
+begin
+  select id into v_owner_id from auth.users where email = 'membership-invite-owner@example.com';
+  select id into v_store_id from ecommerce.stores where subdomain = 'membership-invite-check-store';
+  select id into v_member_id from auth.users where email = 'membership-invite-member@example.com';
+
+  v_result := ecommerce.request_membership_invite(
+    v_owner_id, v_store_id, v_member_id, 'membership-invite-member@example.com', 'admin', v_token_hash,
+    'Osoria <auth@mail.osoria.help>', 'subj', '<p>h</p>', 't', 'idem-mi-limiter-outage'
+  );
+  if (v_result ->> 'ok')::boolean is not false or v_result ->> 'reason' <> 'rate_limit_check_failed' then
+    raise exception 'D24: a check_and_record_send_attempt failure inside request_membership_invite must return rate_limit_check_failed, not bubble up as a raw error, got %', v_result;
+  end if;
+
+  if exists (select 1 from ecommerce.pending_membership_invites where token_hash = v_token_hash) then
+    raise exception 'D24: a failed-closed limiter check must never mint a pending invite';
+  end if;
+end $$;
+
+rollback to savepoint before_broken_send_attempt_limiter;
 
 -- -----------------------------------------------------------------------------
 -- Role boundary: the grant assertions above prove the CATALOG is

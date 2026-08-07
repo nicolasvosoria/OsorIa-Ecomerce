@@ -378,6 +378,7 @@ export type Database = {
       email_outbox: {
         Row: {
           attempt_count: number
+          claim_generation: number
           created_at: string
           from_address: string
           html_body: string
@@ -391,6 +392,7 @@ export type Database = {
           next_attempt_at: string
           provider_message_id: string | null
           recipient_email: string
+          rejection_count: number
           reply_to_address: string | null
           sent_at: string | null
           status: string
@@ -402,6 +404,7 @@ export type Database = {
         }
         Insert: {
           attempt_count?: number
+          claim_generation?: number
           created_at?: string
           from_address: string
           html_body: string
@@ -415,6 +418,7 @@ export type Database = {
           next_attempt_at?: string
           provider_message_id?: string | null
           recipient_email: string
+          rejection_count?: number
           reply_to_address?: string | null
           sent_at?: string | null
           status?: string
@@ -426,6 +430,7 @@ export type Database = {
         }
         Update: {
           attempt_count?: number
+          claim_generation?: number
           created_at?: string
           from_address?: string
           html_body?: string
@@ -439,6 +444,7 @@ export type Database = {
           next_attempt_at?: string
           provider_message_id?: string | null
           recipient_email?: string
+          rejection_count?: number
           reply_to_address?: string | null
           sent_at?: string | null
           status?: string
@@ -2531,6 +2537,7 @@ export type Database = {
           quota_failures: number | null
           row_count: number | null
           status: string | null
+          transient_failures: number | null
         }
         Relationships: []
       }
@@ -2668,6 +2675,7 @@ export type Database = {
         Args: { p_batch_size?: number; p_worker_id: string }
         Returns: {
           attempt_count: number
+          claim_generation: number
           created_at: string
           from_address: string
           html_body: string
@@ -2681,6 +2689,7 @@ export type Database = {
           next_attempt_at: string
           provider_message_id: string | null
           recipient_email: string
+          rejection_count: number
           reply_to_address: string | null
           sent_at: string | null
           status: string
@@ -2738,12 +2747,30 @@ export type Database = {
       is_public_store: { Args: { p_store_id: string }; Returns: boolean }
       is_storage_admin: { Args: never; Returns: boolean }
       mark_email_outbox_failed: {
-        Args: { p_error_code?: string; p_error_message: string; p_id: string }
-        Returns: undefined
+        Args: {
+          p_claim_generation: number
+          p_error_code?: string
+          p_error_message: string
+          p_id: string
+        }
+        Returns: boolean
       }
       mark_email_outbox_sent: {
-        Args: { p_id: string; p_provider_message_id: string }
-        Returns: undefined
+        Args: {
+          p_claim_generation: number
+          p_id: string
+          p_provider_message_id: string
+        }
+        Returns: boolean
+      }
+      mark_email_outbox_transient_failure: {
+        Args: {
+          p_claim_generation: number
+          p_error_code?: string
+          p_error_message: string
+          p_id: string
+        }
+        Returns: boolean
       }
       provision_store: {
         Args: {

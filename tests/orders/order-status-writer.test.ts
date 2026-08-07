@@ -53,7 +53,9 @@ const IDENTITY = {
 
 const RENDERED_EMAIL = { subject: "Actualización de tu pedido", html: "<p>h</p>", text: "t" }
 
-function makeSupabase(options: { orderRow?: any; rpcResult?: { data?: any; error?: any } } = {}) {
+function makeSupabase(
+  options: { orderRow?: any; orderSummaryError?: any; rpcResult?: { data?: any; error?: any } } = {},
+) {
   const rpc = vi.fn().mockResolvedValue(
     options.rpcResult ?? { data: { ok: true, order: { id: ORDER_ID } }, error: null },
   )
@@ -61,8 +63,8 @@ function makeSupabase(options: { orderRow?: any; rpcResult?: { data?: any; error
     select: vi.fn(() => builder),
     eq: vi.fn(() => builder),
     maybeSingle: vi.fn(async () => ({
-      data: "orderRow" in options ? options.orderRow : ORDER_SUMMARY_ROW,
-      error: null,
+      data: options.orderSummaryError ? null : "orderRow" in options ? options.orderRow : ORDER_SUMMARY_ROW,
+      error: options.orderSummaryError ?? null,
     })),
   }
   const from = vi.fn(() => builder)
@@ -190,6 +192,39 @@ describe("transitionOrderStatusAtomically", () => {
         nextStatus: "delivered",
       }),
     ).rejects.toThrow(InvalidOrderStatusTransitionError)
+  })
+
+  // C3: fetchOrderSummary's own "not_found" branch (:84) is justified because
+  // the RPC's own not_found check surfaces the real rejection -- that only
+  // holds when there truly is no error. A transient query error must not
+  // take the same silent branch: the transition still commits (this is a
+  // best-effort lookup for notification content, not the authorization
+  // check), but it must no longer be silent.
+  it("logs a structured warning (not the not-found silence) when fetching the order summary errors transiently, and still commits the transition without a notification", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+    const supabase = makeSupabase({ orderSummaryError: { message: "connection reset" } })
+
+    await transitionOrderStatusAtomically({
+      supabase,
+      orderId: ORDER_ID,
+      storeId: STORE_ID,
+      userId: USER_ID,
+      nextStatus: "shipped",
+    })
+
+    expect(renderEmail).not.toHaveBeenCalled()
+    const [, params] = supabase.rpc.mock.calls[0]
+    expect(params.p_notification).toBeNull()
+
+    expect(warnSpy).toHaveBeenCalledTimes(1)
+    const logged = JSON.parse(warnSpy.mock.calls[0][0])
+    expect(logged).toMatchObject({
+      level: "warn",
+      storeId: STORE_ID,
+      orderId: ORDER_ID,
+      error: "connection reset",
+    })
+    warnSpy.mockRestore()
   })
 
   it("surfaces an RPC transport error instead of swallowing it", async () => {

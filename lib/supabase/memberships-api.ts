@@ -226,7 +226,9 @@ async function inviteAndProvisionMember(
     purpose: "new_user_invite",
   });
 
-  if (invited.outcome === "rate_limited") {
+  // D24: a real limiter-check failure reads identically to a genuine rate
+  // limit -- see InviteNewIdentityResult's rate_limit_check_failed comment.
+  if (invited.outcome === "rate_limited" || invited.outcome === "rate_limit_check_failed") {
     return { success: false, error: RATE_LIMITED_INVITE_ERROR };
   }
   if (invited.outcome === "email_exists") {
@@ -269,7 +271,10 @@ async function sendPendingMembershipInvite(
   if (result.outcome === "invited") {
     return { success: true, outcome: "pending_acceptance" };
   }
-  if (result.outcome === "rate_limited") {
+  // D24: same shape as inviteAndProvisionMember's own rate_limit_check_failed
+  // handling above -- request_membership_invite's internal limiter check can
+  // fail on its own terms, and must read identically to a genuine rate limit.
+  if (result.outcome === "rate_limited" || result.outcome === "rate_limit_check_failed") {
     return { success: false, error: RATE_LIMITED_INVITE_ERROR };
   }
   if (result.outcome === "not_authorized") {

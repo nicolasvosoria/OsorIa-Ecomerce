@@ -12,7 +12,17 @@ export type AuthSendPurpose = "signup" | "recovery";
 
 export type PrepareAuthRedirectResult =
   | { ok: true; redirectTo: string }
-  | { ok: false; reason: "turnstile_failed" | "rate_limited" | "store_unresolved" | "service_unavailable" };
+  | {
+      ok: false;
+      reason: "turnstile_failed" | "rate_limited" | "rate_limit_check_failed" | "store_unresolved" | "service_unavailable";
+    };
+
+// D24: every prepareAuthRedirect caller (lib/supabase/auth-api.ts) already
+// collapses ALL of these reasons into the SAME generic copy regardless of
+// which one fired -- rate_limit_check_failed is a real outcome, distinct
+// from rate_limited (below), but adding it here changes nothing the user
+// sees, only what an operator reading structured logs can tell apart.
+type SendAttemptOutcome = "allowed" | "rate_limited" | "rate_limit_check_failed";
 
 // The one server hop signUp/resetPassword (lib/supabase/auth-api.ts) make
 // before ever calling GoTrue: D26's Turnstile gate, D25's reused rate limit,
@@ -44,9 +54,9 @@ export async function prepareAuthRedirect(input: {
     return { ok: false, reason: "service_unavailable" };
   }
 
-  const allowed = await ensureAuthSendAllowed(supabase, storeId, input.purpose, input.email);
-  if (!allowed) {
-    return { ok: false, reason: "rate_limited" };
+  const sendAttempt = await ensureAuthSendAllowed(supabase, storeId, input.purpose, input.email);
+  if (sendAttempt !== "allowed") {
+    return { ok: false, reason: sendAttempt };
   }
 
   const identity = await loadStoreIdentity(supabase, storeId);
@@ -71,12 +81,25 @@ async function ensureAuthSendAllowed(
   storeId: string,
   purpose: AuthSendPurpose,
   email: string,
-): Promise<boolean> {
+): Promise<SendAttemptOutcome> {
   const { data, error } = await supabase.rpc(ECOMMERCE_FUNCTIONS.checkAndRecordSendAttempt, {
     p_store_id: storeId,
     p_purpose: `auth:${purpose}`,
     p_recipient_email: email,
   });
 
-  return !error && data === true;
+  if (error) {
+    console.error(
+      JSON.stringify({
+        level: "error",
+        msg: "prepare-auth-redirect: check_and_record_send_attempt failed, failing closed",
+        storeId,
+        purpose: `auth:${purpose}`,
+        error: error.message,
+      }),
+    );
+    return "rate_limit_check_failed";
+  }
+
+  return data === true ? "allowed" : "rate_limited";
 }

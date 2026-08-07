@@ -80,8 +80,11 @@ async function buildLifecycleNotificationIfNeeded(
 ): Promise<OrderOutboxNotification | null> {
   if (!isLifecycleStatus(input.nextStatus)) return null
 
+  // fetchOrderSummary itself distinguishes not-found from a transient query
+  // error (logging only the latter); either way there's nothing to render a
+  // notification from, so this returns null and p_notification stays null.
   const summary = await fetchOrderSummary(input.supabase, input.orderId, input.storeId)
-  if (!summary) return null // the RPC's own not_found check surfaces the real rejection
+  if (!summary) return null
 
   const identity = await loadStoreIdentity(input.supabase, input.storeId)
 
@@ -112,13 +115,35 @@ async function fetchOrderSummary(
     .eq("store_id", storeId)
     .maybeSingle()
 
-  if (error || !data) return null
+  if (error) {
+    logOrderSummaryFetchFailed(orderId, storeId, error)
+    return null
+  }
+  if (!data) return null // the RPC's own not_found check surfaces the real rejection
 
   return {
     orderNumber: data.order_number,
     customerName: `${data.customer_first_name ?? ""} ${data.customer_last_name ?? ""}`.trim(),
     customerEmail: data.customer_email,
   }
+}
+
+// D36's convention for making an operational shortfall visible (same
+// {level, msg, ...} shape lib/checkout/order-notifications.ts's
+// logMissingMerchantRecipient and supabase/functions/email-worker use): a
+// transient query error here must never take the same silent branch as a
+// genuine not-found, or the lifecycle transition commits with the
+// customer's shipped/delivered email never enqueued and no trace of why.
+function logOrderSummaryFetchFailed(orderId: string, storeId: string, error: unknown): void {
+  console.warn(
+    JSON.stringify({
+      level: "warn",
+      msg: "order-status-writer: failed to fetch order summary, lifecycle notification skipped",
+      storeId,
+      orderId,
+      error: (error as { message?: string })?.message ?? String(error),
+    }),
+  )
 }
 
 function interpretRpcResult(data: any): Order {

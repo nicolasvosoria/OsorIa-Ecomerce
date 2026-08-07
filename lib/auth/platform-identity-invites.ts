@@ -50,6 +50,13 @@ export async function resolveAuthIdentityByEmail(
 export type InviteNewIdentityResult =
   | { outcome: "invited"; userId: string }
   | { outcome: "rate_limited" }
+  // D24: check_and_record_send_attempt itself failed to run (transport,
+  // permission) rather than reporting the limit was hit -- a distinct
+  // outcome from rate_limited so an operator's structured logs can tell a
+  // broken limiter apart from a busy one, WITHOUT giving the caller a new
+  // signal to enumerate accounts with: every consumer maps this to the
+  // exact same copy as rate_limited (stores-admin-api.ts, memberships-api.ts).
+  | { outcome: "rate_limit_check_failed" }
   // The email was claimed by a concurrent request between the caller's own
   // resolveAuthIdentityByEmail check and this call -- not this module's
   // failure to compensate, since no identity was created here.
@@ -73,9 +80,9 @@ export async function inviteNewIdentity(
     names?: { firstName?: string; lastName?: string };
   },
 ): Promise<InviteNewIdentityResult> {
-  const allowed = await ensureInviteSendAllowed(service, input.storeId, input.purpose, input.email);
-  if (!allowed) {
-    return { outcome: "rate_limited" };
+  const sendAttempt = await ensureInviteSendAllowed(service, input.storeId, input.purpose, input.email);
+  if (sendAttempt !== "allowed") {
+    return { outcome: sendAttempt };
   }
 
   const authAdmin = getServiceAuthAdminClient();
@@ -127,14 +134,27 @@ async function ensureInviteSendAllowed(
   storeId: string,
   purpose: InvitePurpose,
   email: string,
-): Promise<boolean> {
+): Promise<"allowed" | "rate_limited" | "rate_limit_check_failed"> {
   const { data, error } = await service.rpc(ECOMMERCE_FUNCTIONS.checkAndRecordSendAttempt, {
     p_store_id: storeId,
     p_purpose: purpose,
     p_recipient_email: email,
   });
 
-  return !error && data === true;
+  if (error) {
+    console.error(
+      JSON.stringify({
+        level: "error",
+        msg: "platform-identity-invites: check_and_record_send_attempt failed, failing closed",
+        storeId,
+        purpose,
+        error: error.message,
+      }),
+    );
+    return "rate_limit_check_failed";
+  }
+
+  return data === true ? "allowed" : "rate_limited";
 }
 
 // Reads back the CURRENT app_metadata before writing: auth.users is a shared
@@ -213,6 +233,12 @@ export type MintPendingMembershipInviteOutcome =
   | { outcome: "invited" }
   | { outcome: "not_authorized" }
   | { outcome: "rate_limited" }
+  // D24, same shape as InviteNewIdentityResult's own rate_limit_check_failed:
+  // request_membership_invite's OWN internal check_and_record_send_attempt
+  // call failed to run (not a false return -- see the migration's exception
+  // handler) rather than reporting the limit was hit. Every consumer maps
+  // this to the exact same copy as rate_limited (stores-admin-api.ts).
+  | { outcome: "rate_limit_check_failed" }
   | { outcome: "invalid_role" }
   | { outcome: "error"; error: string };
 
@@ -263,13 +289,29 @@ export async function mintPendingMembershipInvite(
     return { outcome: "error", error: error.message };
   }
   if (!data?.ok) {
+    if (data?.reason === "rate_limit_check_failed") {
+      console.error(
+        JSON.stringify({
+          level: "error",
+          msg: "platform-identity-invites: request_membership_invite's check_and_record_send_attempt failed, failing closed",
+          storeId: input.storeId,
+          intendedUserId: input.intendedUserId,
+          error: data?.detail,
+        }),
+      );
+    }
     return toPendingInviteOutcome(data?.reason);
   }
 
   return { outcome: "invited" };
 }
 
-const PENDING_INVITE_REJECTION_REASONS = ["not_authorized", "rate_limited", "invalid_role"] as const;
+const PENDING_INVITE_REJECTION_REASONS = [
+  "not_authorized",
+  "rate_limited",
+  "rate_limit_check_failed",
+  "invalid_role",
+] as const;
 
 function toPendingInviteOutcome(reason: unknown): MintPendingMembershipInviteOutcome {
   const known = PENDING_INVITE_REJECTION_REASONS.find((candidate) => candidate === reason);

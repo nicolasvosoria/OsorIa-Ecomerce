@@ -95,6 +95,21 @@ describe('signUp - Creación de cuentas nuevas', () => {
     expect(mockSupabaseClient.auth.signUp).not.toHaveBeenCalled()
   })
 
+  // C2/D24: prepareAuthRedirect gives a genuine rate-limit-check failure its
+  // own distinct `reason` (visible to operators via structured logs), but
+  // this caller collapses EVERY `ok:false` reason into the same generic
+  // copy -- the person registering must never see a different message than
+  // a real rate limit would produce.
+  it('debe mostrar el mismo mensaje genérico sin importar si prepareAuthRedirect se negó por límite real o por falla del limitador', async () => {
+    vi.mocked(prepareAuthRedirect).mockResolvedValue({ ok: false, reason: 'rate_limited' })
+    const rateLimited = await signUp('test@example.com', 'password123')
+
+    vi.mocked(prepareAuthRedirect).mockResolvedValue({ ok: false, reason: 'rate_limit_check_failed' })
+    const checkFailed = await signUp('test@example.com', 'password123')
+
+    expect(checkFailed).toEqual(rateLimited)
+  })
+
   it('debe manejar errores de Supabase', async () => {
     const errorMessage = 'Email already registered'
     vi.mocked(mockSupabaseClient.auth.signUp).mockResolvedValue({

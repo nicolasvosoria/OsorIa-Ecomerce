@@ -93,6 +93,27 @@ describe("inviteNewIdentity (D20/D22/D25)", () => {
     expect(admin.inviteUserByEmail).not.toHaveBeenCalled()
   })
 
+  // C2/D24: a genuine RPC failure must NOT collapse into the same
+  // rate_limited outcome as a busy limiter -- that reads to an operator as
+  // "wait a minute" when the limiter itself is actually down. Still fails
+  // closed (never touches auth.users), but with its own distinct outcome
+  // logged distinctly for the operator; every consumer maps it back to the
+  // same user copy as rate_limited (stores-admin-api.test.ts asserts that).
+  it("fails closed with a distinct outcome, not rate_limited, when the limiter RPC itself errors", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {})
+    const service = serviceWith({ data: null, error: { message: "permission denied" } })
+    const admin = mockAuthAdmin()
+
+    const result = await inviteNewIdentity(service, input)
+
+    expect(result).toEqual({ outcome: "rate_limit_check_failed" })
+    expect(admin.inviteUserByEmail).not.toHaveBeenCalled()
+    expect(consoleError).toHaveBeenCalledTimes(1)
+    const logged = JSON.parse(consoleError.mock.calls[0][0])
+    expect(logged).toMatchObject({ level: "error", storeId: "store-1", purpose: "new_user_invite" })
+    consoleError.mockRestore()
+  })
+
   it("mints the intent, invites via GoTrue with a store-subdomain redirect carrying it, and flags app_metadata", async () => {
     const service = serviceWith({ data: true, error: null })
     const admin = mockAuthAdmin()
@@ -307,5 +328,39 @@ describe("mintPendingMembershipInvite (D21)", () => {
     })
 
     expect(result).toEqual({ outcome: "rate_limited" })
+  })
+
+  // D24, parallel to inviteNewIdentity's own fix: request_membership_invite's
+  // OWN internal check_and_record_send_attempt call can fail on its own
+  // terms (the migration catches it and returns this reason instead of
+  // letting it unwind as a raw RPC error) -- must read as its own distinct,
+  // logged outcome, never the generic {outcome:"error"} bucket every
+  // consumer would otherwise map to a differently-worded message.
+  it("fails closed with a distinct outcome, not a generic error, when request_membership_invite's own limiter check fails", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {})
+    const service = serviceWith({
+      data: { ok: false, reason: "rate_limit_check_failed", detail: "lock timeout" },
+      error: null,
+    })
+
+    const result = await mintPendingMembershipInvite(service, {
+      actorUserId: "owner-1",
+      storeId: "store-1",
+      intendedUserId: "member-1",
+      email: "socio@correo.com",
+      roleName: "admin",
+      branding,
+    })
+
+    expect(result).toEqual({ outcome: "rate_limit_check_failed" })
+    expect(consoleError).toHaveBeenCalledTimes(1)
+    const logged = JSON.parse(consoleError.mock.calls[0][0])
+    expect(logged).toMatchObject({
+      level: "error",
+      storeId: "store-1",
+      intendedUserId: "member-1",
+      error: "lock timeout",
+    })
+    consoleError.mockRestore()
   })
 })

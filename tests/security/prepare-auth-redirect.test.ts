@@ -91,13 +91,25 @@ describe("prepareAuthRedirect", () => {
     expect(mintAuthIntent).not.toHaveBeenCalled()
   })
 
-  it("fails closed (denies) when the rate-limit RPC call itself errors", async () => {
+  // C2/D24: a genuine RPC failure must fail closed (deny) too, but with its
+  // OWN outcome -- collapsing it into rate_limited reads to an operator as
+  // "the customer is just sending too many requests" when the limiter
+  // itself is actually down, with nothing to chase. Logged distinctly for
+  // the operator; every caller still shows the same generic copy either way
+  // (lib/supabase/auth-api.ts's PREPARE_AUTH_REDIRECT_ERROR, proven in
+  // tests/auth/signUp.test.ts).
+  it("fails closed with a distinct reason, not rate_limited, when the rate-limit RPC call itself errors", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {})
     rpc.mockResolvedValue({ data: null, error: { message: "db unavailable" } })
 
     const result = await prepareAuthRedirect({ email: "x@example.com", purpose: "signup", path: "/auth/callback", turnstileToken: null })
 
-    expect(result).toEqual({ ok: false, reason: "rate_limited" })
+    expect(result).toEqual({ ok: false, reason: "rate_limit_check_failed" })
     expect(mintAuthIntent).not.toHaveBeenCalled()
+    expect(consoleError).toHaveBeenCalledTimes(1)
+    const logged = JSON.parse(consoleError.mock.calls[0][0])
+    expect(logged).toMatchObject({ level: "error", storeId: "store-1", purpose: "auth:signup" })
+    consoleError.mockRestore()
   })
 
   // D24: the reply for an unknown vs a known recipient must be

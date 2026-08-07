@@ -543,6 +543,38 @@ describe("addStoreMember (D20/D21)", () => {
     });
   });
 
+  // C2/D24: a genuine limiter-check failure must read exactly like a real
+  // rate limit to whoever sees this response -- only the operator's
+  // structured logs (lib/auth/platform-identity-invites.ts) can tell them apart.
+  it("surfaces a limiter-check failure with the SAME friendly Spanish message as a genuine rate limit", async () => {
+    resolveAuthIdentityByEmail.mockResolvedValue({ exists: false });
+    inviteNewIdentity.mockResolvedValue({ outcome: "rate_limit_check_failed" });
+    const { service } = mockEcommerceService(null);
+
+    const result = await addStoreMember(STORE_ID, ACTOR_ID, "nuevo@correo.com", "admin", service);
+
+    expect(result).toEqual({
+      success: false,
+      error: "Ya enviamos una invitación hace poco. Espera un momento antes de volver a intentarlo.",
+    });
+  });
+
+  // D24, parallel to the D20 native-invite branch's own byte-identical
+  // assertion above: request_membership_invite's internal limiter-check
+  // failure must read to this caller EXACTLY like a genuine rate limit.
+  it("gives a pending-invite limiter-check failure the SAME response as a genuine rate limit", async () => {
+    resolveAuthIdentityByEmail.mockResolvedValue({ exists: true, userId: "existing-uid" })
+    const { service } = mockEcommerceService(null)
+
+    mintPendingMembershipInvite.mockResolvedValue({ outcome: "rate_limited" })
+    const rateLimited = await addStoreMember(STORE_ID, ACTOR_ID, "socio@correo.com", "admin", service)
+
+    mintPendingMembershipInvite.mockResolvedValue({ outcome: "rate_limit_check_failed" })
+    const checkFailed = await addStoreMember(STORE_ID, ACTOR_ID, "socio@correo.com", "admin", service)
+
+    expect(checkFailed).toEqual(rateLimited)
+  })
+
   // The compensation verify criterion's "already existed" direction, at the
   // addStoreMember assembly level: an identity resolveAuthIdentityByEmail
   // found pre-existing is NEVER passed to provisionOrCompensate at all.

@@ -28,16 +28,48 @@ Qué mirar:
   correo inválido, un dominio que rebota, etc.
 - **`status = 'processing'` con filas viejas (`oldest_created_at` de hace
   horas).** El worker corre cada minuto y cada lease dura 2 minutos; si algo
-  sigue `processing` mucho más que eso, el worker se cayó a mitad de un batch
-  sin que el próximo tick lo haya reclamado todavía. Confirmar que el cron
-  `email-outbox-worker` sigue `active` (`select active from cron.job where
-  jobname = 'email-outbox-worker'`) antes de investigar más.
+  sigue `processing` mucho más que eso hay cuatro causas posibles, y
+  `attempt_count`/`rejection_count`/`claim_generation`/`last_error_code`
+  (misma query de "Inspeccionar filas concretas" de abajo, cambiando
+  `where status = 'failed'` por `where status = 'processing'`) distinguen
+  entre ellas:
+  - `attempt_count` estático (no sube entre dos revisiones), `created_at`
+    de menos de 20 horas. El worker no se está ejecutando. Confirmar que
+    el cron `email-outbox-worker` sigue `active` (`select active from
+    cron.job where jobname = 'email-outbox-worker'`) antes de investigar más.
+  - `attempt_count` sube tick a tick, `rejection_count = 0` y `last_error_code`
+    es nulo o viejo (no cambia entre reintentos). `mark_email_outbox_sent`
+    está fallando de forma persistente para esa fila -- Resend ya la
+    entregó, pero la marca no cuaja. Es la misma situación que
+    `markSentFailed` en los logs estructurados (abajo) -- revisar ahí.
+  - `attempt_count` sube tick a tick, `rejection_count = 0` y `last_error_code`
+    SÍ cambia entre revisiones (`http_5xx`, `rate_limit_exceeded`,
+    `concurrent_idempotent_requests`, `network_error`). Resend (o la red)
+    está fallando de forma transitoria en el REENVÍO de esa fila -- que, por
+    el propio idempotency-key de Resend, puede muy bien ser el mismo caso de
+    arriba (una entrega que sí llegó, atrapada detrás de un
+    `mark_email_outbox_sent` que nunca cuajó) o simplemente un intento nuevo
+    que aún no logra hablar con Resend. Ninguna de las dos avanza hacia
+    `failed` -- ver la sección "Garantías D16/A10" más abajo. Es la misma
+    situación que `transientFailed` en los logs estructurados -- si el
+    contador sigue positivo corrida tras corrida, es un incidente de Resend
+    o de red, no un bug de esta fila.
+  - `attempt_count` estático, `created_at` de más de 20 horas y `status`
+    todavía `processing`. El worker DEJÓ deliberadamente de reclamar esta
+    fila para no reenviarla fuera de la ventana de 24h en la que el
+    Idempotency-Key de Resend garantiza devolver la respuesta cacheada (ver
+    "Garantías D16/A10" -- la fila nunca fue marcada `failed`, pero tampoco
+    se le sigue insistiendo). Requiere intervención manual: buscar el
+    mensaje en el dashboard de Resend por destinatario/asunto/fecha para
+    confirmar si se entregó, y decidir a mano si reencolar (nueva fila, con
+    un `idempotency_key` nuevo) o dar por resuelta.
 
 ## Inspeccionar filas concretas
 
 ```sql
 select id, store_id, template_kind, recipient_email, status, attempt_count,
-       last_error_code, last_error, created_at, updated_at
+       rejection_count, claim_generation, last_error_code, last_error,
+       created_at, updated_at
 from ecommerce.email_outbox
 where status = 'failed'
 order by updated_at desc
@@ -46,11 +78,221 @@ limit 50;
 
 ## Logs estructurados
 
-El worker emite una línea JSON por invocación (`{"level":"info","msg":"email-outbox-worker
-batch complete","claimed":N,"sent":N,"failed":N}`) y una por error de RPC
-(`claim_email_outbox_batch` / `mark_email_outbox_sent` / `mark_email_outbox_failed`).
-Se leen desde el dashboard de Supabase → Edge Functions → `email-worker` → Logs,
-o vía `supabase functions logs email-worker` con el proyecto enlazado.
+El worker emite una línea JSON por invocación, en una de dos formas según si
+pudo reclamar un lote o no:
+
+- **Corrida normal** (con o sin filas que procesar): status HTTP 200,
+  `{"level":"info","msg":"email-outbox-worker batch complete","ok":true,"claimed":N,"sent":N,"failed":N,"markSentFailed":N,"transientFailed":N,"staleWrites":N}`.
+  `markSentFailed` cuenta las filas que Resend SÍ entregó (`sendEmail`
+  devolvió `ok:true`) pero cuya llamada a `mark_email_outbox_sent` falló --
+  la fila queda `processing`, su lease expira, y el siguiente tick vuelve a
+  reclamarla y reintenta la marca (D16). Es autocurable, y esa fila NUNCA
+  debe terminar en `failed` por esto (`markFailed` nunca se llama en este
+  caso -- ver `lib/email/outbox-worker.ts`). Un `markSentFailed` puntual, en
+  una sola corrida, no requiere acción. Si el contador sigue en positivo
+  corrida tras corrida -- sobre todo si son los mismos `id` repitiéndose en
+  las líneas `mark_email_outbox_sent failed` de abajo -- ya no es una falla
+  transitoria: revisar el grant de `ecommerce.mark_email_outbox_sent` a
+  `service_role` (D14) y el estado de la base antes de asumir que se va a
+  resolver solo.
+  `transientFailed` cuenta las filas cuyo envío (o REENVÍO -- ver la
+  sección "Garantías D16/A10" abajo) falló de forma transitoria
+  (`lib/email/resend-client.ts`'s `retryable`: cualquier 5xx, `rate_limit_
+  exceeded`, `concurrent_idempotent_requests`, o un fallo de red que ni
+  siquiera llegó a Resend). Igual que `markSentFailed`, es autocurable por
+  el mismo mecanismo de lease -- esa fila NUNCA debe terminar en `failed`
+  por esto tampoco (`markFailed` no se llama; se llama `mark_email_outbox_
+  transient_failure`, que solo registra `last_error`/`last_error_code` sin
+  tocar `status` ni `rejection_count`). Un `transientFailed` puntual no
+  requiere acción; si sigue positivo corrida tras corrida es un incidente
+  de disponibilidad de Resend (o de red), no un bug de esta fila -- revisar
+  `email_outbox_health.transient_failures` para ver cuántas filas están en
+  ese estado en total.
+  `staleWrites` cuenta las llamadas a `mark_email_outbox_sent` /
+  `mark_email_outbox_failed` / `mark_email_outbox_transient_failure` cuya
+  RPC corrió bien pero cuyo `claim_generation` ya no era el vigente -- una
+  reclamación más reciente (de este mismo worker en un tick posterior, o de
+  otro) ya le ganó la fila. La escritura se rechaza correctamente (ver
+  "Garantías D16/A10" abajo); no es un error para reintentar (el trabajo que
+  describía ya es nulo), pero tampoco cuenta como `sent`/`failed`/
+  `transientFailed` -- nada de eso ocurrió de verdad. Un `staleWrites`
+  puntual no requiere acción (es la concurrencia funcionando como debe). Si
+  el contador es sostenidamente positivo -- sobre todo con los mismos `id`
+  repitiéndose en las líneas `... stale: claim_generation no longer
+  current` de abajo -- es la señal de que el lease de 2 minutos se está
+  quedando corto para la latencia real de Resend: considerar subir la
+  duración del lease en `claim_email_outbox_batch`
+  (`20260806000400_ecommerce_email_outbox_transient_retry.sql`) o investigar
+  por qué Resend está respondiendo tan lento.
+- **Claim roto** (la corrida entera falla): status HTTP 500,
+  `{"level":"error","msg":"email-outbox-worker batch failed","ok":false,"reason":"claim_failed","error":"..."}`.
+  Significa que `claim_email_outbox_batch` en sí falló -- un grant revocado,
+  una firma cambiada, un lock que no cede -- no que la cola esté vacía. Antes
+  de esta corrección un claim roto se veía IDÉNTICO a una cola vacía
+  (`{"claimed":0,"sent":0,"failed":0}`, HTTP 200) en cada uno de los 1440
+  ticks diarios; un 500 con `"reason":"claim_failed"` es justamente el caso
+  que dejó de esconderse. El campo `error` trae el mensaje de Postgres tal
+  cual. `net.http_post` (el mecanismo del cron, ver
+  `20260805000400_ecommerce_email_worker_provisioning.sql`) también registra
+  el status_code de cada invocación en `net._http_response` -- útil si los
+  logs de Edge Functions ya rotaron:
+  ```sql
+  select id, status_code, content, error_msg, created
+  from net._http_response
+  order by created desc
+  limit 10;
+  ```
+
+Además de estas dos líneas por invocación, cada RPC individual que falla dentro
+de una corrida deja su propia línea de error (`claim_email_outbox_batch` /
+`mark_email_outbox_sent` / `mark_email_outbox_failed` /
+`mark_email_outbox_transient_failure`), con el `id` de la fila cuando aplica.
+Todo se lee desde el dashboard de Supabase → Edge Functions → `email-worker`
+→ Logs, o vía `supabase functions logs email-worker` con el proyecto
+enlazado.
+
+## Garantías D16/A10: un correo que Resend aceptó nunca termina `failed`
+
+### Parte 1 -- ruido transitorio en el REENVÍO (un solo llamador)
+
+Un verificador reprodujo, contra Postgres real, que la fila que deja un
+`mark_email_outbox_sent` fallido (Resend YA entregó el correo, pero la marca
+de "enviado" no cuajó -- ver `markSentFailed` arriba) podía terminar
+`failed` si los REENVÍOS que la reclamaban por lease vencido fallaban de
+forma transitoria (un 5xx de Resend, `rate_limit_exceeded`, un corte de
+red) tres veces seguidas: `claim_email_outbox_batch` subía `attempt_count`
+en cada reclamo sin importar la razón, y `mark_email_outbox_failed` leía
+esa misma columna para decidir cuándo terminar la fila -- cuatro reclamos,
+sin importar cuántos eran ruido transitorio, se leían como cuatro intentos
+genuinos.
+
+Confirmado contra la documentación oficial de Resend
+(resend.com/docs/dashboard/emails/idempotency-keys, sección "How it
+works"): reenviar la MISMA `Idempotency-Key` de un envío que ya tuvo éxito
+devuelve esa MISMA respuesta cacheada -- Resend nunca vuelve a evaluar el
+payload en un reenvío, así que un reenvío jamás puede volver como un
+rechazo nuevo de un mensaje que ya aceptó, MIENTRAS esa clave siga
+retenida. Los propios docs acotan esa retención a **24 horas** -- pasado
+ese punto Resend ya no tiene una respuesta cacheada que devolver, así que
+un "reenvío" a esa altura se evalúa como un envío genuinamente nuevo (ver
+la Parte 3 abajo). Dentro de esa ventana, un no-2xx en un reenvío solo
+puede ser el propio transporte de Resend sin poder responder (`5xx`,
+`rate_limit_exceeded`, `concurrent_idempotent_requests` -- su propio caso
+documentado de "hay una petición con esta clave en vuelo, reintenta más
+tarde") -- cero evidencia sobre el destino del mensaje, en un reenvío o en
+un primer intento por igual -- o la palabra autorizada y repetible de
+Resend sobre ESE payload exacto (cualquier otro 4xx, incluidos los códigos
+de cuota de D18), que un reenvío solo puede repetir, nunca inventar.
+
+**La corrección** (`20260806000400_ecommerce_email_outbox_transient_retry.sql`):
+
+- `lib/email/resend-client.ts` etiqueta cada fallo con `retryable`: cualquier
+  5xx, `rate_limit_exceeded` o `concurrent_idempotent_requests` es
+  `retryable:true`; cualquier otro 4xx (incluidas las cuotas D18) es
+  `retryable:false` -- sin cambios de comportamiento para las cuotas, que
+  siguen avanzando la escalera terminal exactamente como antes.
+- `lib/email/outbox-worker.ts` bifurca en `retryable`: `false` llama a
+  `markFailed` (sin cambios); `true` llama a la nueva
+  `markTransientFailure`, que solo registra `last_error`/`last_error_code`
+  (visibilidad D36) sin tocar `status` ni la escalera -- la fila queda
+  `processing` y su lease vencido es lo que la vuelve a reclamar, reusando
+  el mismo mecanismo que ya existía para `markSentFailed`.
+- La escalera de cuatro intentos (D16/A10: inmediato, +1 min, +5 min,
+  terminal al cuarto) ahora corre sobre su PROPIA columna,
+  `rejection_count`, que solo `mark_email_outbox_failed` incrementa --
+  nunca un `claim`. `attempt_count` sigue existiendo sin cambios (sigue
+  subiendo en cada `claim`, por cualquier razón) y conserva su rol de
+  diagnóstico de arriba ("worker no corre" vs. "algo está atascado"); la
+  escalera terminal ya no puede leerlo ni ser contaminada por ruido
+  transitorio.
+- `email_outbox_health` suma una columna `transient_failures`, mismo
+  patrón que `quota_failures`, para que este estado sea visible sin tener
+  que inspeccionar filas una por una.
+
+### Parte 2 -- la carrera (llamadores concurrentes/tardíos)
+
+Una segunda pasada del verificador reprodujo, dos veces contra Postgres
+real (una forzando timestamps en una sola sesión, otra a través de cuatro
+conexiones `psql` genuinamente separadas para descartar un artefacto de
+transacción única), que la Parte 1 no bastaba: ninguna de las tres
+`mark_email_outbox_*` protegía su `UPDATE` contra que quien llama ya no
+fuera el dueño de la reclamación VIGENTE. En producción cada llamada RPC es
+su propia transacción, confirmada al instante (PostgREST invoca
+claim/send/mark por separado -- ninguna transacción de base de datos
+abarca claim->send->mark), y `lib/email/outbox-worker.ts` envía por HTTP
+plano sin ningún timeout atado al lease de 2 minutos. Entonces: el worker A
+reclama (su envío a Resend tarda más que su lease -- una degradación de
+Resend por sí sola puede causarlo) -> el worker B reclama la misma fila y
+la marca `sent` con un `provider_message_id` real -> la respuesta TARDÍA
+de A finalmente resuelve y llama a `mark_email_outbox_failed` -- sin nada
+que lo impidiera, eso devolvía una fila YA entregada hacia `failed`. El
+mismo hueco dejaba que un `mark_email_outbox_transient_failure` tardío
+estampara un `last_error_code` falso sobre una fila ya `sent`,
+envenenando en silencio la señal D36 de esa fila.
+
+**La corrección:** un token de fencing monótono, `claim_generation`, que
+`claim_email_outbox_batch` acuña en cada reclamo (fresco, reintento
+programado o reclamo por lease vencida) y que las tres `mark_email_outbox_*`
+exigen de vuelta, aplicando su escritura solo si todavía coincide con el
+valor VIGENTE de la fila. Se eligió sobre la otra opción evaluada
+(`WHERE ... AND locked_by = p_worker_id`) porque `WORKER_ID`
+(`supabase/functions/email-worker/index.ts`) se genera una vez por
+ISOLATE de Deno, no por invocación -- un isolate de edge-runtime se
+mantiene caliente a través de muchos ticks de cron, así que el MISMO
+worker puede legítimamente reclamar su propia fila abandonada en un tick
+posterior. `locked_by = p_worker_id` habría dejado pasar la respuesta
+tardía de ESE mismo worker (un problema ABA: misma identidad, reclamo
+distinto). Un contador estrictamente creciente no tiene esa colisión.
+
+Una escritura tardía rechazada no es un error para reintentar (el trabajo
+que describe ya es nulo -- quien tiene la generación VIGENTE ya resolvió
+la fila, o lo hará), pero tampoco debe desaparecer (D36): las tres
+`mark_email_outbox_*` ahora devuelven `boolean` (`true` = aplicada,
+`false` = rechazada por fencing) en vez de `void`/error, y
+`lib/email/outbox-worker.ts` convierte un `false` en el contador
+`staleWrites` (ver "Logs estructurados" arriba) en vez de contarlo como
+`sent`/`failed`/`transientFailed`.
+
+Verificado manualmente además con 5 conexiones `psql` genuinamente
+separadas reproduciendo la secuencia completa (claim A, expirar lease,
+claim B, `mark_email_outbox_sent` de B, `mark_email_outbox_failed` tardío
+de A) -- la fila terminó `sent`, con el `provider_message_id` real de B,
+`rejection_count = 0` y `last_error_code` intacto.
+
+### Parte 3 -- alcance honesto: la ventana de 24 horas de Resend
+
+Toda la Parte 1 (que un no-2xx en un reenvío no es evidencia de rechazo)
+depende de la retención de 24 horas de Resend para el Idempotency-Key.
+Una versión anterior de este archivo y de los comentarios de la migración
+afirmaban la garantía "nunca `failed`" sin acotarla -- cierto del CÓDIGO
+(`mark_email_outbox_failed` sigue sin llamarse jamás ante un fallo
+retryable, para siempre), pero exagerado como historia de seguridad una
+vez que la suposición de la que depende deja de sostenerse: pasadas 24
+horas, un "reenvío" ya no tiene garantizado devolver la respuesta cacheada
+-- Resend puede procesarlo como un envío genuinamente nuevo, arriesgando
+una SEGUNDA entrega de un correo que ya salió una vez (la garantía D1
+original, no esta).
+
+`claim_email_outbox_batch` ahora deja de reclamar (y por lo tanto de
+reenviar contra Resend) una fila `processing` ambigua una vez que lleva 20
+horas sin resolverse -- 4 horas de margen bajo el límite de 24. Esa fila
+NUNCA se marca `failed` (esa garantía sigue siendo incondicional) pero
+tampoco se le sigue insistiendo pasado el punto donde hacerlo es seguro:
+simplemente deja de ser reclamada, quedando visible vía
+`email_outbox_health` y el diagnóstico de "processing con filas viejas"
+de arriba para que un operador la resuelva a mano -- la misma postura de
+observabilidad v1 (D36) que cualquier otro caso de fila atascada en este
+archivo, no una automatización nueva.
+
+La prueba de que la fila del ejemplo NUNCA termina `failed` (que una fila
+genuinamente rechazada SÍ sigue terminando exactamente al cuarto intento
+sin que el ruido transitorio la adelante ni la retrase, y que una
+escritura tardía/con `claim_generation` superada se rechaza sin corromper
+una fila ya resuelta) es transaccional y vive en
+`supabase/checks/verify-email-platform-contract.sql` -- la capa de Vitest
+mockea `claimBatch`/`sendEmail`/`markSent`/`markFailed`/
+`markTransientFailure` por completo y no puede probar ninguna de estas
+garantías.
 
 ## Retención (D17)
 
@@ -357,6 +599,24 @@ compartido (`ecommerce.find_auth_user_id_by_email`, nunca solo
   `membership-acceptance` (D11); la membresía real solo se escribe cuando
   esa MISMA identidad autenticada la acepta explícitamente en
   `/auth/accept-membership`.
+
+**D24, en ambas ramas:** un fallo del propio limitador (`ecommerce.check_
+and_record_send_attempt`, D25) -- no el límite alcanzado, sino la
+comprobación en sí fallando (lock timeout, un grant roto) -- nunca debe
+leerse distinto de un rate-limit genuino para quien ve la respuesta. La
+rama D20 lo distingue en TS (`ensureInviteSendAllowed` en `lib/auth/
+platform-identity-invites.ts`, ya que llama la RPC directamente); la rama
+D21 lo distingue DENTRO de `ecommerce.request_membership_invite`
+(`20260806000500_ecommerce_membership_invite_limiter_failure.sql`), que
+aísla esa llamada interna en su propio bloque para devolver
+`rate_limit_check_failed` en vez de dejar que el error entero se propague
+como un mensaje genérico distinto. Ambas ramas terminan en el mismo
+outcome (`rate_limit_check_failed`), mapeado en `lib/supabase/stores-
+admin-api.ts` y `lib/supabase/memberships-api.ts` al MISMO texto en
+español que un rate-limit real -- la única forma de distinguirlos es el
+log estructurado que cada rama emite (`console.error` en
+`lib/auth/platform-identity-invites.ts`, con `storeId`/`purpose` o
+`storeId`/`intendedUserId` según la rama).
 
 El correo de invitación nativo (`owner-invite`/`new-user-invite`) sigue el
 mismo destino que todo lo demás desde la slice 5: se renderiza en

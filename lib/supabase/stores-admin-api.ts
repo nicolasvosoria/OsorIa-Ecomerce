@@ -195,11 +195,19 @@ const RATE_LIMITED_INVITE_ERROR =
 
 const NEW_OWNER_INVITE_ERRORS: Partial<Record<string, string>> = {
   rate_limited: RATE_LIMITED_INVITE_ERROR,
+  // D24: a real limiter-check failure reads identically to a genuine rate
+  // limit -- see InviteNewIdentityResult's rate_limit_check_failed comment.
+  rate_limit_check_failed: RATE_LIMITED_INVITE_ERROR,
   email_exists: "Ese correo acaba de registrarse en la plataforma. Intenta de nuevo.",
 };
 
 const PENDING_OWNER_INVITE_ERRORS: Partial<Record<string, string>> = {
   rate_limited: RATE_LIMITED_INVITE_ERROR,
+  // D24: same shape as NEW_OWNER_INVITE_ERRORS' own rate_limit_check_failed --
+  // a real limiter-check failure inside request_membership_invite must read
+  // identically to a genuine rate limit, never fall through to the generic
+  // PROVISION_FAILED_ERROR below.
+  rate_limit_check_failed: RATE_LIMITED_INVITE_ERROR,
   not_authorized: "No tienes permiso para invitar a esta persona",
   invalid_role: PROVISION_FAILED_ERROR,
 };

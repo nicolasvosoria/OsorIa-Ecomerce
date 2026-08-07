@@ -73,6 +73,7 @@ export const ECOMMERCE_FUNCTIONS = {
   isStorageAdmin: "is_storage_admin",
   markEmailOutboxFailed: "mark_email_outbox_failed",
   markEmailOutboxSent: "mark_email_outbox_sent",
+  markEmailOutboxTransientFailure: "mark_email_outbox_transient_failure",
   provisionStore: "provision_store",
   pruneEmailOutbox: "prune_email_outbox",
   requestMembershipInvite: "request_membership_invite",
