@@ -69,7 +69,7 @@ describe("OrderDetailClient owned order", () => {
     expect(screen.getByText(/2 ×/)).toBeInTheDocument()
     expect(screen.getByText("Confirmado")).toBeInTheDocument()
     expect(screen.getByText("Pago: Pagado")).toBeInTheDocument()
-    expect(screen.getByText("COP 50.000")).toBeInTheDocument()
+    expect(screen.getByText("$ 50.000")).toBeInTheDocument()
     expect(screen.getByText("Cra 1 # 2-3")).toBeInTheDocument()
     expect(screen.getByText(/Pago contra entrega/)).toBeInTheDocument()
   })

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { useLanguage } from "@/contexts/language-context";
-import { formatCartMoney } from "@/lib/cart/cart-summary";
+import { formatPrice } from "@/lib/commerce/utils";
 import { formatOrderDate } from "@/lib/orders/format-order-date";
 import type { OrdersPageView, OrdersListItem } from "./load-orders-view";
 import {
@@ -91,7 +91,7 @@ function OrderRow({ order }: { order: OrdersListItem }) {
             {t.orders.paymentStatusColumn}: {t.orders.paymentStatus[order.paymentStatus]}
           </Badge>
           <span className="font-bold">
-            {formatCartMoney(order.totalAmount, order.currencyCode, language)}
+            {formatPrice(order.totalAmount, order.currencyCode)}
           </span>
           {/* Cada fila repite el mismo rótulo, así que el número entra en el
               nombre accesible: "Ver detalle" a secas no dice de cuál. */}

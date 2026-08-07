@@ -12,9 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useLanguage } from "@/contexts/language-context";
-import { formatCartMoney } from "@/lib/cart/cart-summary";
+import { formatPrice } from "@/lib/commerce/utils";
 import { PAYMENT_METHODS } from "@/lib/checkout/payment-methods";
-import type { Language } from "@/lib/i18n/translations";
 import { formatOrderDate } from "@/lib/orders/format-order-date";
 import type { OrderDetail, OrderDetailView } from "./load-order-detail-view";
 
@@ -78,7 +77,7 @@ function OrderDetailPage({ order }: { order: OrderDetail }) {
         </div>
 
         <div className="space-y-6">
-          <OrderLinesCard order={order} language={language} />
+          <OrderLinesCard order={order} />
           <OrderShippingCard order={order} />
         </div>
       </div>
@@ -102,9 +101,9 @@ function OrderDetailHeading({ orderNumber }: { orderNumber: string }) {
   );
 }
 
-function OrderLinesCard({ order, language }: { order: OrderDetail; language: Language }) {
+function OrderLinesCard({ order }: { order: OrderDetail }) {
   const { t } = useLanguage();
-  const money = (amount: number) => formatCartMoney(amount, order.currencyCode, language);
+  const money = (amount: number) => formatPrice(amount, order.currencyCode);
 
   return (
     // `CardTitle` pinta un <div>: sin rol de encabezado, las dos secciones del
