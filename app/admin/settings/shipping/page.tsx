@@ -4,8 +4,15 @@ import { AdminPageContainer } from "@/components/admin/page-container"
 import { AdminPageHeader } from "@/components/admin/page-header"
 import { translations } from "@/lib/i18n/translations"
 import { toSelectableShippingMode } from "@/lib/shipping/schemas"
+import { getStoreIdentityReadiness } from "@/lib/stores/identity-readiness"
+import { buildWhatsAppLink } from "@/lib/stores/whatsapp-contact"
 import { authorizeActiveStoreAdmin } from "@/lib/supabase/active-store"
 import { loadShippingSettings } from "@/lib/supabase/shipping-settings-api"
+import { loadStoreIdentity } from "@/lib/supabase/store-identity-api"
+import {
+  ShippingContactPendingNotice,
+  type ShippingContactPendingReason,
+} from "./components/shipping-contact-pending-notice"
 import { ShippingModeForm } from "./components/shipping-mode-form"
 
 const copy = translations.es.shipping
@@ -21,11 +28,26 @@ export default async function ShippingSettingsPage() {
   }
 
   const { supabase, storeId } = authorization
-  const settings = await loadShippingSettings(supabase, storeId)
+  const [settings, identity] = await Promise.all([
+    loadShippingSettings(supabase, storeId),
+    loadStoreIdentity(supabase, storeId),
+  ])
+  const readiness = getStoreIdentityReadiness(identity)
+  const phoneMissing = readiness.missingFields.includes("phone")
+  // A9: a phone can be present (so it clears the identity gate) and still be
+  // unusable for WhatsApp -- same "owner needs to see this" treatment as a
+  // missing one, distinct copy for what's actually wrong.
+  const phoneInvalid = !phoneMissing && buildWhatsAppLink(identity.phone ?? "") === null
+  // D14/F10: pending only matters for the mode that actually needs the
+  // phone -- an own_rates store missing or breaking it isn't blocked on
+  // anything here.
+  const contactPendingReason: ShippingContactPendingReason | null =
+    settings.mode !== "coordinate" ? null : phoneMissing ? "missing" : phoneInvalid ? "invalid" : null
 
   return (
     <AdminPageContainer maxWidth="4xl">
       <AdminPageHeader title={copy.settingsTitle} subtitle={copy.settingsSubtitle} />
+      {contactPendingReason && <ShippingContactPendingNotice reason={contactPendingReason} />}
       <ShippingModeForm defaultValues={{ mode: toSelectableShippingMode(settings.mode) }} />
     </AdminPageContainer>
   )

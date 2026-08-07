@@ -18,6 +18,10 @@ import { sectionLabel } from "@/lib/section-editor/sections-registry"
 interface RouteAwareChromeProps {
   children: ReactNode
   isNeutralPage?: boolean
+  // D14: resolved server-side (lib/supabase/store-contact-public.ts, called
+  // from TenantScopedShell) and handed down -- this client component never
+  // queries the store itself, only renders what it is given.
+  contactPhone?: string | null
 }
 
 const ADMIN_CHROME_BASES = ["/admin", "/dashboard"]
@@ -39,7 +43,7 @@ function isChromelessAuthRoute(pathname: string | null): boolean {
   return !STOREFRONT_AUTH_ROUTES.some((route) => isRouteOrDescendant(pathname, route))
 }
 
-export function RouteAwareChrome({ children, isNeutralPage = false }: RouteAwareChromeProps) {
+export function RouteAwareChrome({ children, isNeutralPage = false, contactPhone = null }: RouteAwareChromeProps) {
   const pathname = usePathname()
   const hasHydrated = useHasHydrated()
   // El host admin (Plan 12) no tiene storefront: allí el proxy sirve la consola
@@ -89,7 +93,7 @@ export function RouteAwareChrome({ children, isNeutralPage = false }: RouteAware
   return (
     <CheckoutLoginIntentProvider>
       {isAdminChromeRoute(pathname) ? pageMain : <MainContentWrapper>{pageMain}</MainContentWrapper>}
-      {showStorefrontChrome && <FloatingContactButton />}
+      {showStorefrontChrome && <FloatingContactButton phone={contactPhone} />}
     </CheckoutLoginIntentProvider>
   )
 }

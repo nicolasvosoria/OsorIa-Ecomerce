@@ -40,6 +40,7 @@ import {
 } from "@/lib/stores/neutral-page"
 import { metadataBaseFromEnvironment } from "@/lib/metadata/metadata-base"
 import { getActivePairing } from "@/lib/supabase/fonts-api"
+import { loadPublicStoreContactPhone } from "@/lib/supabase/store-contact-public"
 import {
   buildPairingStylesheetUrl,
   shouldLoadFontStylesheet,
@@ -127,6 +128,11 @@ export async function TenantScopedShell({
   // aviso saldría vestido de otro inquilino.
   const isUnknownTenant =
     requestHeaders.get(UNKNOWN_TENANT_HEADER) === UNKNOWN_TENANT_VALUE
+  // D14: loaded here, not inside the client FloatingContactButton, so the
+  // dedicated public loader stays the only thing that ever queries
+  // store_contact from the storefront -- an unknown tenant has no store to
+  // query, same guard StoreProvider/StylesProvider/ThemeProvider use above.
+  const contactPhone = isUnknownTenant ? null : await loadPublicStoreContactPhone()
 
   return (
     <LanguageProvider>
@@ -148,7 +154,7 @@ export async function TenantScopedShell({
                               <Suspense fallback={null}>
                                 <AdminRedirect />
                               </Suspense>
-                              <RouteAwareChrome isNeutralPage={isNeutralPage}>
+                              <RouteAwareChrome isNeutralPage={isNeutralPage} contactPhone={contactPhone}>
                                 {children}
                               </RouteAwareChrome>
                               {isDevelopment && <DebugGrid />}

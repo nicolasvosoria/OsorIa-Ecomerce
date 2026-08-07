@@ -130,6 +130,9 @@ export interface Translations {
     shippingConfirmedByStore: string
     guestLoginCta: string
     unitPrice: string
+    // D14/D11: coordination copy naming the store and its real WhatsApp contact
+    shippingCoordinationContact: string
+    shippingCoordinationCta: string
   }
   // Envío: configuración del modo de envío de la tienda (D31)
   shipping: {
@@ -145,6 +148,14 @@ export interface Translations {
     summaryTitle: string
     summaryModeLabel: string
     summaryConfigureLink: string
+    // D14/F10: the coordinate mode's WhatsApp phone prerequisite, marked pending
+    contactPhonePendingTitle: string
+    contactPhonePendingDescription: string
+    contactPhonePendingCta: string
+    // A9: a saved phone that can't build a valid WhatsApp link (wrong digit count, etc.)
+    contactPhoneInvalidTitle: string
+    contactPhoneInvalidDescription: string
+    contactPhoneInvalidCta: string
   }
   // Pedidos
   orders: {
@@ -483,6 +494,8 @@ export const translations: Record<Language, Translations> = {
       shippingConfirmedByStore: 'El costo de envío lo confirma la tienda al coordinar la entrega',
       guestLoginCta: 'Inicia sesión',
       unitPrice: 'Precio unitario',
+      shippingCoordinationContact: 'Coordinas la entrega directamente con {storeName} por WhatsApp.',
+      shippingCoordinationCta: 'Escribir por WhatsApp',
     },
     shipping: {
       settingsTitle: 'Envío',
@@ -497,6 +510,14 @@ export const translations: Record<Language, Translations> = {
       summaryTitle: 'Envío',
       summaryModeLabel: 'Modo actual',
       summaryConfigureLink: 'Configurar envío',
+      contactPhonePendingTitle: 'Falta tu teléfono de contacto',
+      contactPhonePendingDescription:
+        'Coordinas el envío con tus clientes por WhatsApp, pero todavía no configuraste un teléfono.',
+      contactPhonePendingCta: 'Completar en Configuración',
+      contactPhoneInvalidTitle: 'Tu teléfono no sirve para WhatsApp',
+      contactPhoneInvalidDescription:
+        'Guardaste un teléfono, pero no arma un enlace válido de WhatsApp. Revisa el número en Configuración.',
+      contactPhoneInvalidCta: 'Corregir en Configuración',
     },
     orders: {
       title: 'Pedidos',
@@ -829,6 +850,8 @@ export const translations: Record<Language, Translations> = {
       shippingConfirmedByStore: 'The store confirms the shipping cost when coordinating delivery',
       guestLoginCta: 'Log in',
       unitPrice: 'Unit price',
+      shippingCoordinationContact: 'You coordinate delivery directly with {storeName} on WhatsApp.',
+      shippingCoordinationCta: 'Message on WhatsApp',
     },
     shipping: {
       settingsTitle: 'Shipping',
@@ -843,6 +866,14 @@ export const translations: Record<Language, Translations> = {
       summaryTitle: 'Shipping',
       summaryModeLabel: 'Current mode',
       summaryConfigureLink: 'Configure shipping',
+      contactPhonePendingTitle: 'Your contact phone is missing',
+      contactPhonePendingDescription:
+        'You coordinate shipping with your customers on WhatsApp, but you have not set a phone yet.',
+      contactPhonePendingCta: 'Complete it in Settings',
+      contactPhoneInvalidTitle: "Your phone doesn't work for WhatsApp",
+      contactPhoneInvalidDescription:
+        'You saved a phone, but it does not build a valid WhatsApp link. Check the number in Settings.',
+      contactPhoneInvalidCta: 'Fix it in Settings',
     },
     orders: {
       title: 'Orders',
@@ -1175,6 +1206,8 @@ export const translations: Record<Language, Translations> = {
       shippingConfirmedByStore: 'A loja confirma o custo de frete ao combinar a entrega',
       guestLoginCta: 'Entrar',
       unitPrice: 'Preço unitário',
+      shippingCoordinationContact: 'Você combina a entrega diretamente com {storeName} pelo WhatsApp.',
+      shippingCoordinationCta: 'Enviar mensagem no WhatsApp',
     },
     shipping: {
       settingsTitle: 'Envio',
@@ -1189,6 +1222,14 @@ export const translations: Record<Language, Translations> = {
       summaryTitle: 'Envio',
       summaryModeLabel: 'Modo atual',
       summaryConfigureLink: 'Configurar envio',
+      contactPhonePendingTitle: 'Falta o seu telefone de contato',
+      contactPhonePendingDescription:
+        'Você combina o envio com seus clientes pelo WhatsApp, mas ainda não configurou um telefone.',
+      contactPhonePendingCta: 'Completar em Configurações',
+      contactPhoneInvalidTitle: 'Seu telefone não funciona no WhatsApp',
+      contactPhoneInvalidDescription:
+        'Você salvou um telefone, mas ele não gera um link válido do WhatsApp. Revise o número em Configurações.',
+      contactPhoneInvalidCta: 'Corrigir em Configurações',
     },
     orders: {
       title: 'Pedidos',

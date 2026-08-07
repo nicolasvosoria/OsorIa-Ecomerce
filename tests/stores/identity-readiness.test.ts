@@ -37,4 +37,11 @@ describe("getStoreIdentityReadiness", () => {
     expect(readiness.ready).toBe(false)
     expect(readiness.missingFields).toEqual(["orderMailbox"])
   })
+
+  it("marks phone pending on its own when it's the only thing missing (D14/F10: the coordinate mode's WhatsApp prerequisite)", () => {
+    const readiness = getStoreIdentityReadiness({ ...COMPLETE, phone: null })
+
+    expect(readiness.ready).toBe(false)
+    expect(readiness.missingFields).toEqual(["phone"])
+  })
 })

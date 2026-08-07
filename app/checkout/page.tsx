@@ -14,18 +14,27 @@ import Link from "next/link"
 import { useAuth } from "@/contexts/auth-context"
 import { AuthenticatedCheckoutForm } from "@/components/checkout/authenticated-checkout-form"
 import { GuestLoginBanner } from "@/components/checkout/guest-login-banner"
-import { getCheckoutPrefill, placeCheckoutOrder, type CheckoutPrefill } from "@/app/checkout/actions"
+import {
+  getCheckoutPrefill,
+  getCheckoutStoreContactPhone,
+  placeCheckoutOrder,
+  type CheckoutPrefill,
+} from "@/app/checkout/actions"
+import { useStore } from "@/contexts/store-context"
 import { enabledPaymentMethodIds } from "@/lib/checkout/payment-methods"
 import type { CheckoutOrderInput } from "@/lib/checkout/schemas"
+import { buildWhatsAppLink } from "@/lib/stores/whatsapp-contact"
 
 export default function CheckoutPage() {
   const router = useRouter()
   const localCart = useLocalCart()
   const { user, isAuthenticated, isLoading: authLoading } = useAuth()
   const { language, t } = useLanguage()
+  const { store } = useStore()
   const [customerData, setCustomerData] = useState<GuestCustomerData | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [prefill, setPrefill] = useState<CheckoutPrefill>(null)
+  const [contactPhone, setContactPhone] = useState<string | null>(null)
   // D28: un solo id por carga de página, reenviado sin cambios en cada
   // reintento de este mismo intento de compra (doble clic, error transitorio
   // y "intentar de nuevo"). Una recarga de página genera uno nuevo a propósito
@@ -56,6 +65,21 @@ export default function CheckoutPage() {
     }
   }, [isAuthenticated])
 
+  // D14/D11: names who the customer is coordinating the shipment with. No
+  // phone on file just means whatsappHref stays null and the coordination
+  // note below never renders -- same "absent, not a fallback" rule as
+  // components/ui/floating-contact-button.tsx.
+  useEffect(() => {
+    let cancelled = false
+    getCheckoutStoreContactPhone().then((phone) => {
+      if (!cancelled) setContactPhone(phone)
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const hasLocalItems = localCart.items.length > 0
   const localSummary = buildLocalCartSummary({
     items: localCart.items,
@@ -63,6 +87,7 @@ export default function CheckoutPage() {
     total: localCart.getTotal(),
     language,
   })
+  const whatsappHref = contactPhone ? buildWhatsAppLink(contactPhone) : null
 
   useEffect(() => {
     // Redirigir si el carrito está vacío, solo una vez hidratado desde localStorage
@@ -385,6 +410,22 @@ export default function CheckoutPage() {
                   <span>{localSummary.formattedTotal}</span>
                 </div>
               </div>
+
+              {whatsappHref && store?.store_name && (
+                <div className="pt-2 text-xs text-muted-foreground">
+                  <p>
+                    {t.checkout.shippingCoordinationContact.replace("{storeName}", store.store_name)}{" "}
+                    <Link
+                      href={whatsappHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-medium underline underline-offset-4"
+                    >
+                      {t.checkout.shippingCoordinationCta}
+                    </Link>
+                  </p>
+                </div>
+              )}
 
               <div className="pt-4 text-xs text-muted-foreground">
                 <p>

@@ -17,6 +17,7 @@ import {
   type ServerAuthSession,
 } from "@/lib/supabase/server-auth-session"
 import { getServiceEcommerceClient } from "@/lib/supabase/service-client"
+import { loadPublicStoreContactPhone } from "@/lib/supabase/store-contact-public"
 import { findDefaultUserAddress } from "@/lib/supabase/user-addresses-api"
 
 export type PlaceCheckoutOrderResult =
@@ -130,6 +131,15 @@ export async function getCheckoutPrefill(): Promise<CheckoutPrefill> {
     phone: saved.phone || lastOrder.phone,
     address: saved.address || lastOrder.address,
   }
+}
+
+// D14/D11: names who the customer is coordinating the shipment with -- the
+// checkout page is a client component and must not query the store itself
+// (lib/supabase/store-contact-public.ts is the one place that does). No
+// phone on file just means the coordination note never renders, same as the
+// WhatsApp button in components/ui/floating-contact-button.tsx.
+export async function getCheckoutStoreContactPhone(): Promise<string | null> {
+  return loadPublicStoreContactPhone()
 }
 
 type SavedAccountData = { phone: string | null; defaultAddress: SavedAddress | null }

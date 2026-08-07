@@ -37,6 +37,10 @@ vi.mock("@/contexts/auth-context", () => ({
 vi.mock("@/app/checkout/actions", () => ({
   placeCheckoutOrder: vi.fn(),
   getCheckoutPrefill: vi.fn().mockResolvedValue(null),
+  getCheckoutStoreContactPhone: vi.fn().mockResolvedValue(null),
+}))
+vi.mock("@/contexts/store-context", () => ({
+  useStore: () => ({ store: null }),
 }))
 vi.mock("@/components/checkout/guest-checkout-form", () => ({
   GuestCheckoutForm: () => <div data-testid="guest-checkout-form" />,
