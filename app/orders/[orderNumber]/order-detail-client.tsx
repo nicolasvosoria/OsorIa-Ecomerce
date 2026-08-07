@@ -15,6 +15,7 @@ import { useLanguage } from "@/contexts/language-context";
 import { formatPrice } from "@/lib/commerce/utils";
 import { PAYMENT_METHODS } from "@/lib/checkout/payment-methods";
 import { formatOrderDate } from "@/lib/orders/format-order-date";
+import { shippingStatusLabelKey } from "@/lib/shipping/status-label";
 import type { OrderDetail, OrderDetailView } from "./load-order-detail-view";
 
 const ORDERS_HISTORY_PATH = "/orders";
@@ -104,6 +105,12 @@ function OrderDetailHeading({ orderNumber }: { orderNumber: string }) {
 function OrderLinesCard({ order }: { order: OrderDetail }) {
   const { t } = useLanguage();
   const money = (amount: number) => formatPrice(amount, order.currencyCode);
+  // D23: "rate" and a legacy null render the amount; "agreed" and
+  // "out_of_zone" collapse onto the same phrase, "free" onto its own.
+  const shippingLabelKey = shippingStatusLabelKey(order.shippingStatus);
+  const shippingDisplay = shippingLabelKey
+    ? t.orders.shippingStatusLabels[shippingLabelKey]
+    : money(order.shippingCost);
 
   return (
     // `CardTitle` pinta un <div>: sin rol de encabezado, las dos secciones del
@@ -144,7 +151,7 @@ function OrderLinesCard({ order }: { order: OrderDetail }) {
           </div>
           <div className="flex justify-between">
             <dt className="text-muted-foreground">{t.cart.shipping}</dt>
-            <dd>{money(order.shippingCost)}</dd>
+            <dd>{shippingDisplay}</dd>
           </div>
           <div className="flex justify-between text-base font-bold">
             <dt>{t.cart.total}</dt>

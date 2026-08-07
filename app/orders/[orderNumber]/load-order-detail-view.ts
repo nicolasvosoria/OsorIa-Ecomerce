@@ -5,6 +5,7 @@ import {
   type OrderItem,
   type OrderWithItems,
 } from "@/lib/supabase/orders-api";
+import type { ShippingResolutionStatus } from "@/lib/shipping/resolver";
 
 export interface OrderDetailLine {
   id: string;
@@ -32,6 +33,10 @@ export interface OrderDetail {
   currencyCode: string;
   subtotal: number;
   shippingCost: number;
+  // D23: nullable -- a legacy order placed before shipping_status existed.
+  // shippingStatusLabelKey (lib/shipping/status-label.ts) renders a null the
+  // same way it always rendered: the amount.
+  shippingStatus: ShippingResolutionStatus | null;
   totalAmount: number;
   lines: OrderDetailLine[];
   shipping: OrderDetailShipping;
@@ -71,6 +76,7 @@ function toOrderDetail(order: OrderWithItems): OrderDetail {
     currencyCode: order.currency_code,
     subtotal: order.subtotal,
     shippingCost: order.shipping_cost,
+    shippingStatus: order.shipping_status ?? null,
     totalAmount: order.total_amount,
     lines: order.items.map(toOrderDetailLine),
     shipping: {

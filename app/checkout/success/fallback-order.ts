@@ -10,6 +10,7 @@ import {
   resolveServerAuthSession,
 } from "@/lib/supabase/server-auth-session";
 import { getServiceEcommerceClient } from "@/lib/supabase/service-client";
+import type { ShippingResolutionStatus } from "@/lib/shipping/resolver";
 
 export interface SuccessPageOrderItem {
   id: string;
@@ -22,6 +23,12 @@ export interface SuccessPageOrderItem {
 
 export interface SuccessPageOrderSummary {
   items: SuccessPageOrderItem[];
+  subtotal: number;
+  shippingCost: number;
+  // D23: nullable -- a legacy order placed before this column existed. See
+  // shippingStatusLabelKey (lib/shipping/status-label.ts) for how a null
+  // renders (the amount, same as it always did).
+  shippingStatus: ShippingResolutionStatus | null;
   totalAmount: number;
   currencyCode: string;
   paymentMethod: string | null;
@@ -125,6 +132,9 @@ function mapOrderToOrderSummary(
       totalPrice: item.total_price,
       currencyCode: item.currency_code,
     })),
+    subtotal: order.subtotal,
+    shippingCost: order.shipping_cost,
+    shippingStatus: order.shipping_status ?? null,
     totalAmount: order.total_amount,
     currencyCode: order.currency_code,
     paymentMethod: order.payment_method ?? null,
