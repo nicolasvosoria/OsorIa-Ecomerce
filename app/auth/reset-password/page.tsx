@@ -20,8 +20,8 @@ import {
   type PasswordFieldErrors,
 } from "@/lib/account/password-rule"
 import { getAuthReturnPath, resolvePostAuthDestination } from "@/lib/auth-return-intent"
+import { claimEmailLink, readEmailLink, type EmailLinkRejection } from "@/lib/auth/claim-email-link"
 import { updatePassword } from "@/lib/supabase/auth-api"
-import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { isCurrentUserAdminOrUnverified } from "@/lib/supabase/permissions-api"
 
 export default function ResetPasswordPage() {
@@ -34,7 +34,7 @@ export default function ResetPasswordPage() {
 
 type RecoveryPhase =
   | { step: "verifying" }
-  | { step: "linkRejected"; reason: LinkRejection }
+  | { step: "linkRejected"; reason: EmailLinkRejection }
   | { step: "newPassword"; exit: RecoveryExit }
   | { step: "updated"; exit: RecoveryExit }
 
@@ -53,7 +53,12 @@ function ResetPasswordFlow() {
     if (claimStarted.current) return
     claimStarted.current = true
 
-    claimRecoverySession(readRecoveryLink({ tokenHash, linkType, code })).then(async (claim) => {
+    // El tipo se exige y se restringe a "recovery": esta pantalla solo completa
+    // una recuperación, y un token de alta o de cambio de correo no tiene nada
+    // que hacer aquí (a diferencia de app/auth/callback, que acepta cualquiera).
+    const link = readEmailLink({ tokenHash, linkType, code, acceptType: (type) => type === "recovery" })
+
+    claimEmailLink(link).then(async (claim) => {
       if (claim.outcome === "rejected") {
         setPhase({ step: "linkRejected", reason: claim.reason })
         return
@@ -107,70 +112,6 @@ async function resolveRecoveryExit(returnPath: string | null): Promise<RecoveryE
   }
 }
 
-type RecoveryLink =
-  | { kind: "tokenHash"; tokenHash: string }
-  | { kind: "code"; code: string }
-  | { kind: "absent" }
-
-// Un correo de recuperación puede llegar de dos formas y ninguna es el hash
-// implícito heredado (#access_token), que este proyecto ya no puede emitir:
-// `token_hash` es la preferida (D7) porque verifyOtp no depende del navegador
-// que pidió el link, y `?code` es lo que la plantilla de Supabase sigue enviando
-// hasta que el operador la cambie en el panel.
-function readRecoveryLink({
-  tokenHash,
-  linkType,
-  code,
-}: {
-  tokenHash: string | null
-  linkType: string | null
-  code: string | null
-}): RecoveryLink {
-  // El tipo se exige: esta pantalla solo completa una recuperación, y un token
-  // de alta o de cambio de correo no tiene nada que hacer aquí.
-  if (tokenHash && linkType === "recovery") {
-    return { kind: "tokenHash", tokenHash }
-  }
-  if (code) {
-    return { kind: "code", code }
-  }
-  return { kind: "absent" }
-}
-
-type LinkRejection =
-  | { cause: "noTokenInLink" }
-  | { cause: "verificationUnavailable" }
-  | { cause: "refusedByAuth"; detail: string }
-
-type RecoveryClaim = { outcome: "claimed" } | { outcome: "rejected"; reason: LinkRejection }
-
-async function claimRecoverySession(link: RecoveryLink): Promise<RecoveryClaim> {
-  if (link.kind === "absent") {
-    return { outcome: "rejected", reason: { cause: "noTokenInLink" } }
-  }
-
-  const supabase = getSupabaseBrowserClient()
-  if (!supabase) {
-    return { outcome: "rejected", reason: { cause: "verificationUnavailable" } }
-  }
-
-  try {
-    const { error } =
-      link.kind === "tokenHash"
-        ? await supabase.auth.verifyOtp({ token_hash: link.tokenHash, type: "recovery" })
-        : await supabase.auth.exchangeCodeForSession(link.code)
-
-    if (error) {
-      return { outcome: "rejected", reason: { cause: "refusedByAuth", detail: error.message } }
-    }
-
-    return { outcome: "claimed" }
-  } catch (error) {
-    console.error("[ResetPassword] Error al canjear el link de recuperación:", error)
-    return { outcome: "rejected", reason: { cause: "verificationUnavailable" } }
-  }
-}
-
 function VerifyingLinkScreen() {
   const { t } = useLanguage()
 
@@ -189,7 +130,7 @@ function VerifyingLinkScreen() {
   )
 }
 
-function LinkRejectedScreen({ reason }: { reason: LinkRejection }) {
+function LinkRejectedScreen({ reason }: { reason: EmailLinkRejection }) {
   const { t } = useLanguage()
   const router = useRouter()
   const [recoveryOpen, setRecoveryOpen] = useState(false)
