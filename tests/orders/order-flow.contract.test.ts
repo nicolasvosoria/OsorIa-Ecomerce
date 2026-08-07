@@ -2826,6 +2826,11 @@ describe("orders-api live order contract", () => {
           currencyCode: "COP",
         },
       ],
+      // D23: orderRow predates shipping_status (nullable since S9) -- the
+      // mapper falls back to null rather than crashing on the missing column.
+      subtotal: 50000,
+      shippingCost: 0,
+      shippingStatus: null,
       totalAmount: 50000,
       currencyCode: "COP",
       paymentMethod: "cash_on_delivery",

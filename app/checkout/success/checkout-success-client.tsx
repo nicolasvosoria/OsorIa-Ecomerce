@@ -20,6 +20,7 @@ import { useLanguage } from "@/contexts/language-context";
 import { deferStateUpdate } from "@/lib/react/defer-state-update";
 import { formatPrice } from "@/lib/commerce/utils";
 import { PAYMENT_METHODS } from "@/lib/checkout/payment-methods";
+import { shippingStatusLabelKey } from "@/lib/shipping/status-label";
 
 interface CheckoutSuccessClientProps {
   initialOrderNumber: string | null;
@@ -47,6 +48,17 @@ export function CheckoutSuccessClient({
   const paymentMethodLabel = orderSummary
     ? PAYMENT_METHODS.find((method) => method.id === orderSummary.paymentMethod)
         ?.label ?? orderSummary.paymentMethod
+    : null;
+  // D23: "rate" and a legacy null render the formatted amount; "agreed" and
+  // "out_of_zone" collapse onto the same phrase, "free" onto its own -- see
+  // shippingStatusLabelKey for why.
+  const shippingLabelKey = orderSummary
+    ? shippingStatusLabelKey(orderSummary.shippingStatus)
+    : null;
+  const shippingDisplay = orderSummary
+    ? shippingLabelKey
+      ? t.orders.shippingStatusLabels[shippingLabelKey]
+      : formatPrice(orderSummary.shippingCost, orderSummary.currencyCode)
     : null;
 
   useEffect(() => {
@@ -154,6 +166,14 @@ export function CheckoutSuccessClient({
                     </p>
                   </div>
                 ))}
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">{t.cart.subtotal}</span>
+                <span>{formatPrice(orderSummary.subtotal, orderSummary.currencyCode)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">{t.cart.shipping}</span>
+                <span>{shippingDisplay}</span>
               </div>
               <div className="flex justify-between text-base font-bold pt-3 border-t">
                 <span>{t.cart.total}</span>

@@ -273,6 +273,15 @@ export interface Translations {
       failed: string
       refunded: string
     }
+    // D23: the checkout quote, the success page, the order detail, the admin
+    // order page and the orders export all read the same two phrases through
+    // shippingStatusLabelKey (lib/shipping/status-label.ts) -- "rate" and a
+    // legacy null render the formatted amount instead, never a phrase here.
+    shippingStatusColumnLabel: string
+    shippingStatusLabels: {
+      agreed: string
+      free: string
+    }
   }
   // General
   common: {
@@ -705,6 +714,11 @@ export const translations: Record<Language, Translations> = {
         failed: 'Fallido',
         refunded: 'Reembolsado',
       },
+      shippingStatusColumnLabel: 'Estado de Envío',
+      shippingStatusLabels: {
+        agreed: 'A convenir con la tienda',
+        free: 'Gratis',
+      },
     },
     common: {
       loading: 'Cargando...',
@@ -1131,6 +1145,11 @@ export const translations: Record<Language, Translations> = {
         failed: 'Failed',
         refunded: 'Refunded',
       },
+      shippingStatusColumnLabel: 'Shipping status',
+      shippingStatusLabels: {
+        agreed: 'Arranged with the store',
+        free: 'Free',
+      },
     },
     common: {
       loading: 'Loading...',
@@ -1555,6 +1574,11 @@ export const translations: Record<Language, Translations> = {
         paid: 'Pago',
         failed: 'Falhou',
         refunded: 'Reembolsado',
+      },
+      shippingStatusColumnLabel: 'Status do frete',
+      shippingStatusLabels: {
+        agreed: 'A combinar com a loja',
+        free: 'Grátis',
       },
     },
     common: {

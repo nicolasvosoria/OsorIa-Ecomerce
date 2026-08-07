@@ -108,6 +108,9 @@ describe("loadOrderDetailView", () => {
         currencyCode: "COP",
         subtotal: 48000,
         shippingCost: 2000,
+        // D23: ORDER_FIXTURE predates shipping_status (nullable since S9) --
+        // the mapper falls back to null rather than crashing on the missing column.
+        shippingStatus: null,
         totalAmount: 50000,
         lines: [
           {

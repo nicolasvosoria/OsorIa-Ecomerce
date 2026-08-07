@@ -22,6 +22,8 @@ import { getOrderById, type OrderWithItems } from "@/lib/supabase/orders-api";
 import { formatPrice } from "@/lib/commerce/utils";
 import { formatOrderDateTime } from "@/lib/orders/order-format";
 import { ORDER_STATUS_LABELS } from "@/lib/orders/order-status";
+import { shippingStatusLabelKey } from "@/lib/shipping/status-label";
+import { translations } from "@/lib/i18n/translations";
 import { OrderStatusSelect } from "../components/order-status-select";
 import { PaymentStatusBadge } from "../components/payment-status-badge";
 
@@ -144,11 +146,22 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailPagePr
 }
 
 function OrderTotals({ order }: { order: OrderWithItems }) {
+  const money = (amount: number) => formatPrice(amount, order.currency_code);
+  // D23: "rate" and a legacy null render the amount; "agreed" and
+  // "out_of_zone" collapse onto the same phrase, "free" onto its own -- the
+  // same mapping the customer-facing order detail and the export use, so
+  // the admin never disagrees with what the buyer sees.
+  const shippingLabelKey = shippingStatusLabelKey(order.shipping_status ?? null);
   const rows = [
-    { label: "Subtotal", value: order.subtotal },
-    { label: "Envío", value: order.shipping_cost },
-    { label: "Impuestos", value: order.tax_amount },
-    { label: "Descuento", value: -order.discount_amount },
+    { label: "Subtotal", value: money(order.subtotal) },
+    {
+      label: "Envío",
+      value: shippingLabelKey
+        ? translations.es.orders.shippingStatusLabels[shippingLabelKey]
+        : money(order.shipping_cost),
+    },
+    { label: "Impuestos", value: money(order.tax_amount) },
+    { label: "Descuento", value: money(-order.discount_amount) },
   ];
 
   return (
@@ -156,7 +169,7 @@ function OrderTotals({ order }: { order: OrderWithItems }) {
       {rows.map((row) => (
         <div key={row.label} className="flex justify-between text-muted-foreground">
           <span>{row.label}</span>
-          <span>{formatPrice(row.value, order.currency_code)}</span>
+          <span>{row.value}</span>
         </div>
       ))}
       <div className="flex justify-between border-t border-border pt-2 text-base font-semibold text-foreground">
