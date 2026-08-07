@@ -51,14 +51,21 @@ posición real es la independencia: nadie tiene que intervenir entre el dueño y
   dueño. Una tienda solo se sirve al público cuando ambas se cumplen.
 - Una tienda recién creada nace sin publicar, de modo que el dueño puede configurarla entera antes
   de que exista para nadie.
-- El alta de un dueño se hace hoy entregándole una contraseña temporal por fuera del producto, no
-  mediante un correo de invitación.
+- El alta de un dueño o de un miembro de equipo se hace hoy por invitación: la persona recibe un
+  correo, define ahí su propia contraseña y, hasta que lo hace, su sesión solo puede aceptar la
+  invitación, definir la contraseña o cerrar sesión. Si el aprovisionamiento falla después de crear
+  una identidad nueva, esa identidad se revierte. A quien ya tiene cuenta no se le concede membresía
+  en silencio: recibe un enlace de aceptación de una hora y de un solo uso, y solo se une cuando lo
+  usa.
 
 ## Capabilities and Constraints
 
 **Confirmado**
 - Catálogo por tienda: productos, variantes, categorías, imágenes, combos.
-- Pedidos, con correo de confirmación al cliente.
+- Pedidos, con correo transaccional duradero: una cola con reintentos automáticos ante fallos
+  transitorios, recibo de compra para el cliente con la marca de la tienda, aviso aparte al comercio
+  por cada pedido nuevo, y correos de estado durante el ciclo de vida del pedido (enviado, entregado,
+  cancelado, devuelto).
 - Editor visual por tienda: tema, tipografía, composición del home y configuración de la vitrina.
 - Moneda: pesos colombianos (`COP`) por defecto, con moneda propia por tienda en el contrato de
   datos.
