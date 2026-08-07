@@ -343,3 +343,191 @@ begin
     raise exception 'service_role must retain full access to shipping zones/rates tables';
   end if;
 end $$;
+
+-- -----------------------------------------------------------------------------
+-- D23 (slice S9): ecommerce.orders.shipping_status exists and is constrained
+-- to the four resolver outcomes (A3, stored English).
+-- -----------------------------------------------------------------------------
+do $$
+begin
+  if not exists (
+    select 1 from information_schema.columns c
+    where c.table_schema = 'ecommerce' and c.table_name = 'orders' and c.column_name = 'shipping_status'
+  ) then
+    raise exception 'Missing ecommerce.orders.shipping_status';
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint con
+    join pg_class c on c.oid = con.conrelid
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'ecommerce' and c.relname = 'orders'
+      and con.conname = 'orders_shipping_status_chk' and con.contype = 'c'
+  ) then
+    raise exception 'Missing ecommerce.orders_shipping_status_chk';
+  end if;
+end $$;
+
+-- -----------------------------------------------------------------------------
+-- D26: shipping_cost/tax_amount/discount_amount are NOT NULL (pg_attribute.
+-- attnotnull, never information_schema.is_nullable -- its 'YES'/'NO' domain
+-- is the exact case-sensitive trap the co_locations block above documents).
+-- A nullable money column would let a raw insert dodge the coherence check
+-- below via NULL's three-valued logic (a CHECK only fails on an explicit
+-- false, never on unknown).
+-- -----------------------------------------------------------------------------
+do $$
+declare
+  v_missing text[];
+begin
+  select array_agg(required_column order by required_column) into v_missing
+  from (values ('subtotal'), ('shipping_cost'), ('tax_amount'), ('discount_amount'), ('total_amount')) req(required_column)
+  where not exists (
+    select 1 from pg_attribute a
+    join pg_class c on c.oid = a.attrelid
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'ecommerce' and c.relname = 'orders'
+      and a.attname = req.required_column
+      and a.attnum > 0
+      and not a.attisdropped
+      and a.attnotnull
+  );
+
+  if v_missing is not null then
+    raise exception 'ecommerce.orders money columns must be NOT NULL: %', array_to_string(v_missing, ', ');
+  end if;
+end $$;
+
+-- -----------------------------------------------------------------------------
+-- D26: non-negativity on every money column, and the one named constraint
+-- this whole slice exists for -- total_amount must equal its own components.
+-- -----------------------------------------------------------------------------
+do $$
+declare
+  v_missing text[];
+begin
+  select array_agg(required_constraint order by required_constraint) into v_missing
+  from (values
+    ('orders_subtotal_nonnegative_chk'), ('orders_shipping_cost_nonnegative_chk'),
+    ('orders_tax_amount_nonnegative_chk'), ('orders_discount_amount_nonnegative_chk'),
+    ('orders_total_amount_nonnegative_chk'), ('orders_total_amount_matches_components_chk')
+  ) req(required_constraint)
+  where not exists (
+    select 1 from pg_constraint con
+    join pg_class c on c.oid = con.conrelid
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'ecommerce' and c.relname = 'orders'
+      and con.conname = req.required_constraint and con.contype = 'c'
+  );
+
+  if v_missing is not null then
+    raise exception 'Missing named check constraints on ecommerce.orders: %', array_to_string(v_missing, ', ');
+  end if;
+end $$;
+
+-- -----------------------------------------------------------------------------
+-- A13: the coherence constraint isn't just present, it's VALIDATED -- added
+-- NOT VALID by the migration (a live store's historical orders could in
+-- principle diverge, see the migration's own comment) and then validated in
+-- the same migration, but a constraint a validation attempt left NOT VALID
+-- (a historical mismatch the operator still needs to fix) must be a visible,
+-- failing fact here, not a silent assumption the existence check above
+-- alone can't catch -- pg_constraint.convalidated, not information_schema.
+-- -----------------------------------------------------------------------------
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint con
+    join pg_class c on c.oid = con.conrelid
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'ecommerce' and c.relname = 'orders'
+      and con.conname = 'orders_total_amount_matches_components_chk'
+      and con.contype = 'c'
+      and con.convalidated
+  ) then
+    raise exception 'orders_total_amount_matches_components_chk exists but is NOT VALID -- some historical order diverges from total_amount = subtotal + shipping_cost + tax_amount - discount_amount; correct it and run `alter table ecommerce.orders validate constraint orders_total_amount_matches_components_chk;`';
+  end if;
+end $$;
+
+-- -----------------------------------------------------------------------------
+-- D23/D26 runtime: the RPC actually threads shipping_status/shipping_cost
+-- through into the inserted row, and the coherence constraint actually
+-- REJECTS a mismatched total -- not just present in the catalog, enforced.
+-- Wrapped in its own transaction, rolled back at the end (same shape
+-- verify-email-platform-contract.sql already uses for its own runtime
+-- assertions), so this script stays safe to re-run against a live stack.
+-- -----------------------------------------------------------------------------
+begin;
+
+do $$
+declare
+  v_owner_id uuid := gen_random_uuid();
+  v_store_id uuid;
+  v_reserved_order_number text;
+  v_notifications jsonb;
+  v_result jsonb;
+begin
+  insert into auth.users (id, email, encrypted_password, email_confirmed_at, created_at, updated_at, raw_app_meta_data, raw_user_meta_data, aud, role)
+  values (v_owner_id, 'shipping-contract-check-owner@example.com', 'x', now(), now(), now(), '{}', '{}', 'authenticated', 'authenticated');
+  insert into ecommerce.user_profiles (id, email, role) values (v_owner_id, 'shipping-contract-check-owner@example.com', 'user');
+  v_store_id := ecommerce.provision_store('shipping-contract-check-store', 'Shipping Contract Check Store', v_owner_id, 'COP');
+
+  v_reserved_order_number := ecommerce.generate_order_number(v_store_id);
+  v_notifications := jsonb_build_array(
+    jsonb_build_object(
+      'templateKind', 'order-received', 'recipientEmail', 'buyer@example.com',
+      'fromAddress', 'Shipping Contract Check Store vía Osoria <pedidos@mail.osoria.help>', 'replyToAddress', null,
+      'subject', 'Recibimos tu pedido', 'htmlBody', '<p>h</p>', 'textBody', 't',
+      'idempotencyKey', 'checkout:' || v_store_id::text || ':shipping-check-1:order-received'
+    )
+  );
+
+  -- D23: a coherent order (30000 + 5000 = 35000) with an explicit
+  -- shipping_status must land with BOTH columns exactly as passed -- proves
+  -- the create or replace above actually reads p_order->>'shipping_status'
+  -- instead of silently dropping it.
+  v_result := ecommerce.create_order_with_notifications(
+    v_store_id, 'shipping-check-1', 'fingerprint-shipping-check-1',
+    jsonb_build_object(
+      'customer_type', 'guest', 'customer_email', 'buyer@example.com',
+      'customer_first_name', 'Ada', 'customer_last_name', 'Lovelace',
+      'shipping_address', 'Calle 123', 'shipping_city', 'Bogotá', 'shipping_postal_code', '110111',
+      'payment_method', 'cash_on_delivery', 'subtotal', 30000, 'shipping_cost', 5000,
+      'shipping_status', 'rate', 'total_amount', 35000,
+      'order_number', v_reserved_order_number
+    ),
+    jsonb_build_array(
+      jsonb_build_object('product_name', 'Café 250g', 'unit_price', 30000, 'quantity', 1, 'total_price', 30000)
+    ),
+    v_notifications
+  );
+
+  if (v_result ->> 'ok')::boolean is not true then
+    raise exception 'D23: a coherent order carrying shipping_status should have been created, got %', v_result;
+  end if;
+  if (v_result -> 'order' ->> 'shipping_status') is distinct from 'rate' then
+    raise exception 'D23: create_order_with_notifications must thread shipping_status through into the inserted row, got %', v_result -> 'order' ->> 'shipping_status';
+  end if;
+  if (v_result -> 'order' ->> 'shipping_cost')::numeric is distinct from 5000::numeric then
+    raise exception 'D23: create_order_with_notifications must thread shipping_cost through into the inserted row, got %', v_result -> 'order' ->> 'shipping_cost';
+  end if;
+
+  -- D26: a raw insert whose total_amount does not equal subtotal +
+  -- shipping_cost + tax_amount - discount_amount (100000 + 0 + 0 - 0 =
+  -- 100000, not 999999) must be rejected by the database itself, whatever
+  -- wrote it -- proven by actually attempting it, not just checking the
+  -- constraint's name is present in the catalog.
+  begin
+    insert into ecommerce.orders (store_id, order_number, customer_email, subtotal, total_amount)
+    values (v_store_id, 'SHIP-CHK-INCOHERENT-1', 'buyer@example.com', 100000, 999999);
+    raise exception 'D26: an order whose total_amount does not equal subtotal + shipping_cost + tax_amount - discount_amount must be rejected';
+  exception when check_violation then
+    null;
+  end;
+
+  if exists (select 1 from ecommerce.orders where store_id = v_store_id and order_number = 'SHIP-CHK-INCOHERENT-1') then
+    raise exception 'D26: the rejected incoherent-total insert must have left no row behind';
+  end if;
+end $$;
+
+rollback;

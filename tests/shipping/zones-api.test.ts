@@ -1,134 +1,7 @@
 import { describe, expect, it } from "vitest"
 
 import { deleteShippingZone, listShippingZones, saveShippingZone, type SaveShippingZoneInput } from "@/lib/supabase/shipping-zones-api"
-
-// Doble en memoria de supabase-js, con el mismo encadenado
-// (.select/.eq/.neq/.in/.is/.order/.limit/.single/.maybeSingle) que
-// lib/supabase/shipping-zones-api.ts usa contra insert/update/delete/select
-// reales, para probar su lógica (guardar+leer, el rechazo de destino en
-// conflicto, el rechazo de escalera con vacío) sin tocar Postgres. La prueba
-// de contrato real contra la base viva es pnpm supabase:verify:shipping.
-type Row = Record<string, unknown>
-
-function createShippingSupabase(seed: Record<string, Row[]> = {}) {
-  const tables = new Map<string, Row[]>(Object.entries(seed).map(([table, rows]) => [table, [...rows]]))
-  let nextId = 1
-
-  function table(name: string): Row[] {
-    if (!tables.has(name)) tables.set(name, [])
-    return tables.get(name)!
-  }
-
-  function from(name: string) {
-    const rows = table(name)
-    let operation: "select" | "insert" | "update" | "delete" = "select"
-    let payload: Row | Row[] | null = null
-    const filters: { type: "eq" | "neq" | "in" | "is"; column: string; value: unknown }[] = []
-    let orderColumn: string | null = null
-    let limitCount: number | null = null
-
-    function matchesFilters(row: Row): boolean {
-      return filters.every((filter) => {
-        if (filter.type === "eq") return row[filter.column] === filter.value
-        if (filter.type === "neq") return row[filter.column] !== filter.value
-        if (filter.type === "in") return (filter.value as unknown[]).includes(row[filter.column])
-        if (filter.type === "is") return row[filter.column] === filter.value
-        return true
-      })
-    }
-
-    function execute(): { data: unknown; error: null } {
-      if (operation === "insert") {
-        const inserted = (Array.isArray(payload) ? payload : [payload]).map((row) => ({
-          id: `${name}-${nextId++}`,
-          ...(row as Row),
-        }))
-        rows.push(...inserted)
-        return { data: inserted, error: null }
-      }
-
-      if (operation === "update") {
-        const matched = rows.filter(matchesFilters)
-        matched.forEach((row) => Object.assign(row, payload as Row))
-        return { data: matched, error: null }
-      }
-
-      if (operation === "delete") {
-        const matched = rows.filter(matchesFilters)
-        const remaining = rows.filter((row) => !matched.includes(row))
-        rows.length = 0
-        rows.push(...remaining)
-        return { data: matched, error: null }
-      }
-
-      let result = rows.filter(matchesFilters)
-      if (orderColumn) {
-        const column = orderColumn
-        result = [...result].sort((a, b) => (String(a[column]) < String(b[column]) ? -1 : 1))
-      }
-      if (limitCount !== null) result = result.slice(0, limitCount)
-      return { data: result, error: null }
-    }
-
-    const builder = {
-      select: () => builder,
-      order: (column: string) => {
-        orderColumn = column
-        return builder
-      },
-      limit: (count: number) => {
-        limitCount = count
-        return builder
-      },
-      eq: (column: string, value: unknown) => {
-        filters.push({ type: "eq", column, value })
-        return builder
-      },
-      neq: (column: string, value: unknown) => {
-        filters.push({ type: "neq", column, value })
-        return builder
-      },
-      in: (column: string, values: unknown[]) => {
-        filters.push({ type: "in", column, value: values })
-        return builder
-      },
-      is: (column: string, value: unknown) => {
-        filters.push({ type: "is", column, value })
-        return builder
-      },
-      insert: (rowsToInsert: Row | Row[]) => {
-        operation = "insert"
-        payload = rowsToInsert
-        return builder
-      },
-      update: (patch: Row) => {
-        operation = "update"
-        payload = patch
-        return builder
-      },
-      delete: () => {
-        operation = "delete"
-        return builder
-      },
-      single: () => {
-        const { data } = execute()
-        const row = Array.isArray(data) ? data[0] : data
-        return Promise.resolve({ data: row ?? null, error: null })
-      },
-      maybeSingle: () => {
-        const { data } = execute()
-        const row = Array.isArray(data) ? (data[0] ?? null) : data
-        return Promise.resolve({ data: row, error: null })
-      },
-      then: (onFulfilled: (result: { data: unknown; error: null }) => unknown) =>
-        Promise.resolve(execute()).then(onFulfilled),
-    }
-
-    return builder
-  }
-
-  return { supabase: { from }, tables }
-}
+import { createShippingSupabase } from "./fake-supabase"
 
 const ANTIOQUIA_MEDELLIN = {
   department_code: "05",
@@ -265,6 +138,29 @@ describe("saveShippingZone + listShippingZones", () => {
     const { supabase } = createShippingSupabase({
       co_locations: [ANTIOQUIA_MEDELLIN],
       store_items: [{ id: "item-1", store_id: STORE_ID, item_name: "Café Especial", weight_grams: null }],
+    })
+
+    const result = await saveShippingZone(supabase as any, STORE_ID, {
+      name: "Zona Peso",
+      destinations: [{ departmentCode: "05", municipalityCode: "05001" }],
+      rateLadder: { basis: "weight", ranges: [{ from: "0", to: "", amount: "5000" }] },
+    })
+
+    expect(result.success).toBe(false)
+    expect(!result.success && result.error).toMatch(/peso/)
+  })
+
+  // A14: a combo has no weight of its own -- it weighs what its components
+  // weigh -- so the D8 gate must also catch a combo whose component still
+  // lacks one, not just a standalone product missing from the same list.
+  it("rejects activating a weight-based rate while a combo's component still lacks weight (D8/A14)", async () => {
+    const { supabase } = createShippingSupabase({
+      co_locations: [ANTIOQUIA_MEDELLIN],
+      store_items: [{ id: "component-1", store_id: STORE_ID, item_name: "Taza", weight_grams: null }],
+      product_combos: [{ id: "combo-1", store_id: STORE_ID, name: "Combo Desayuno" }],
+      product_combo_components: [
+        { id: "pcc-1", combo_id: "combo-1", product_id: "component-1", variant_id: null, quantity: 1 },
+      ],
     })
 
     const result = await saveShippingZone(supabase as any, STORE_ID, {

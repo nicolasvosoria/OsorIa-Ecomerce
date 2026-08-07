@@ -67,12 +67,21 @@ type ScriptedResponse = { data?: any; error?: any; count?: number };
 // keeps asserting the same values it always did. Tests that DO override the
 // destination (proving the catalog wins over a disagreeing client payload)
 // script their own "co_locations:select" entry instead.
+// S9: createOrder now also resolves shipping (lib/shipping/resolver.ts),
+// unconditionally, on every order -- loadShippingSettings reads this table
+// first. A missing row (this default) is the "never customized" shape D11/
+// D17 already gave store_shipping_settings, so every pre-existing test that
+// never scripts its own settings resolves the born default: mode=coordinate,
+// unmatched_destination_action=block -- status "agreed", amount 0, no zone
+// tables ever queried. Tests exercising own_rates/out_of_zone script their
+// own "store_shipping_settings:select" entry instead.
 const DEFAULT_IDENTITY_QUEUE_RESPONSES: Record<string, ScriptedResponse> = {
   "stores:select": {
     data: { store_name: "Tienda de prueba", subdomain: "tienda-de-prueba", legal_name: null },
     error: null,
   },
   "store_branding:select": { data: null, error: null },
+  "store_shipping_settings:select": { data: null, error: null },
   "co_locations:select": {
     data: {
       department_code: "11",
@@ -1373,7 +1382,13 @@ describe("orders-api live order contract", () => {
     );
   });
 
-  it("recalculates authoritative totals from the database and ignores client-sent price/discount tampering", async () => {
+  // D21/D23: shipping_cost/shipping_status are recomputed the same way price
+  // already is -- never trusted from the client, no matter what it claims
+  // the resolution was. This store is the born default (coordinate, D11/D17,
+  // see DEFAULT_IDENTITY_QUEUE_RESPONSES above), so the server-recomputed
+  // pair is amount 0 / status "agreed" regardless of the tampered shipping_cost
+  // and shipping_status the client sends below.
+  it("recalculates authoritative totals and shipping resolution from the database, ignoring client-sent price/discount/shipping tampering", async () => {
     const state = new MockSupabaseState({
       "store_items:select": [
         {
@@ -1433,6 +1448,7 @@ describe("orders-api live order contract", () => {
       subtotal: 999999,
       total_amount: 999999,
       shipping_cost: 30000,
+      shipping_status: "rate",
       tax_amount: 20000,
       discount_amount: -50000,
       items: [
@@ -1449,6 +1465,7 @@ describe("orders-api live order contract", () => {
     expect(state.inserts.orders?.[0]).toMatchObject({
       subtotal: 80000,
       shipping_cost: 0,
+      shipping_status: "agreed",
       tax_amount: 0,
       discount_amount: 0,
       total_amount: 80000,
@@ -1460,6 +1477,73 @@ describe("orders-api live order contract", () => {
     expect(insertedItems[0].unit_price).toBe(40000);
     expect(insertedItems[0].total_price).toBe(80000);
     expect(created?.items[0].total_price).toBe(80000);
+  });
+
+  // D17: the one live public store is born mode=coordinate -- after this
+  // slice deploys, its checkout must behave EXACTLY as before: shipping
+  // stays 0 and the resolution recorded is "agreed", the deployment-safety
+  // property the whole shipping plan rests on. No tampering, no own_rates
+  // settings scripted -- this is the plain born-default path.
+  it("keeps a coordinate-mode store's order at shipping_cost 0 and shipping_status agreed (D17 deployment safety)", async () => {
+    const state = new MockSupabaseState({
+      "store_items:select": [
+        { data: [{ id: "store-item-deploy-safety", base_price: 20000, currency_code: "COP" }], error: null },
+        { data: { track_inventory: false, inventory_quantity: 10 }, error: null },
+        { data: { store_id: "store-uuid-deploy-safety", track_inventory: false, inventory_quantity: 10 }, error: null },
+      ],
+      "orders:insert": [
+        {
+          data: {
+            id: "order-deploy-safety-1",
+            order_number: "A-DEPLOY-SAFETY",
+            created_at: "2026-01-01T00:00:00.000Z",
+            updated_at: "2026-01-01T00:00:00.000Z",
+          },
+          error: null,
+        },
+      ],
+      "order_items:insert": [
+        {
+          data: [
+            {
+              id: "item-deploy-safety-1",
+              order_id: "order-deploy-safety-1",
+              product_id: "store-item-deploy-safety",
+              product_name: "Campera",
+              quantity: 1,
+              unit_price: 20000,
+              total_price: 20000,
+              currency_code: "COP",
+            },
+          ],
+          error: null,
+        },
+      ],
+      "order_addresses:insert": [{ data: [{ id: "addr-deploy-safety-1" }], error: null }],
+    });
+
+    getSupabaseEcommerceMock.mockReturnValue({ from: state.from, rpc: state.rpc });
+
+    await createOrder({
+      ...baseOrderData,
+      subtotal: 20000,
+      total_amount: 20000,
+      items: [
+        {
+          product_id: "store-item-deploy-safety",
+          product_name: "Campera",
+          unit_price: 20000,
+          quantity: 1,
+          total_price: 20000,
+        },
+      ],
+    });
+
+    expect(state.inserts.orders?.[0]).toMatchObject({
+      shipping_cost: 0,
+      shipping_status: "agreed",
+      total_amount: 20000,
+    });
   });
 
   it("placeCheckoutOrder forces payment_status=pending and a whitelisted payment_method even when the client sends inflated totals and payment_status=paid", async () => {

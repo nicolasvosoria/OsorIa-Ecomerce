@@ -1283,7 +1283,7 @@ export type Database = {
           customer_phone: string | null
           customer_type: string | null
           delivered_at: string | null
-          discount_amount: number | null
+          discount_amount: number
           id: string
           idempotency_key: string | null
           inventory_decremented_at: string | null
@@ -1300,7 +1300,7 @@ export type Database = {
           shipped_at: string | null
           shipping_address: string | null
           shipping_city: string | null
-          shipping_cost: number | null
+          shipping_cost: number
           shipping_country: string | null
           shipping_department_code: string | null
           shipping_department_name: string | null
@@ -1308,10 +1308,11 @@ export type Database = {
           shipping_municipality_code: string | null
           shipping_notes: string | null
           shipping_postal_code: string | null
+          shipping_status: string | null
           status: Database["ecommerce"]["Enums"]["order_status"] | null
           store_id: string
           subtotal: number
-          tax_amount: number | null
+          tax_amount: number
           total_amount: number
           updated_at: string | null
           user_id: string | null
@@ -1327,7 +1328,7 @@ export type Database = {
           customer_phone?: string | null
           customer_type?: string | null
           delivered_at?: string | null
-          discount_amount?: number | null
+          discount_amount?: number
           id?: string
           idempotency_key?: string | null
           inventory_decremented_at?: string | null
@@ -1344,7 +1345,7 @@ export type Database = {
           shipped_at?: string | null
           shipping_address?: string | null
           shipping_city?: string | null
-          shipping_cost?: number | null
+          shipping_cost?: number
           shipping_country?: string | null
           shipping_department_code?: string | null
           shipping_department_name?: string | null
@@ -1352,10 +1353,11 @@ export type Database = {
           shipping_municipality_code?: string | null
           shipping_notes?: string | null
           shipping_postal_code?: string | null
+          shipping_status?: string | null
           status?: Database["ecommerce"]["Enums"]["order_status"] | null
           store_id: string
           subtotal?: number
-          tax_amount?: number | null
+          tax_amount?: number
           total_amount?: number
           updated_at?: string | null
           user_id?: string | null
@@ -1371,7 +1373,7 @@ export type Database = {
           customer_phone?: string | null
           customer_type?: string | null
           delivered_at?: string | null
-          discount_amount?: number | null
+          discount_amount?: number
           id?: string
           idempotency_key?: string | null
           inventory_decremented_at?: string | null
@@ -1388,7 +1390,7 @@ export type Database = {
           shipped_at?: string | null
           shipping_address?: string | null
           shipping_city?: string | null
-          shipping_cost?: number | null
+          shipping_cost?: number
           shipping_country?: string | null
           shipping_department_code?: string | null
           shipping_department_name?: string | null
@@ -1396,10 +1398,11 @@ export type Database = {
           shipping_municipality_code?: string | null
           shipping_notes?: string | null
           shipping_postal_code?: string | null
+          shipping_status?: string | null
           status?: Database["ecommerce"]["Enums"]["order_status"] | null
           store_id?: string
           subtotal?: number
-          tax_amount?: number | null
+          tax_amount?: number
           total_amount?: number
           updated_at?: string | null
           user_id?: string | null

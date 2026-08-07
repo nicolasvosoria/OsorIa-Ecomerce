@@ -9,6 +9,7 @@ import {
   writeOrderAtomically,
 } from "@/lib/checkout/order-writer";
 import { transitionOrderStatusAtomically } from "@/lib/orders/order-status-writer";
+import { resolveShipping, type ShippingResolutionItem, type ShippingResolutionStatus } from "@/lib/shipping/resolver";
 
 // Tipos para pedidos
 export interface Order {
@@ -47,6 +48,9 @@ export interface Order {
   payment_reference?: string | null;
   subtotal: number;
   shipping_cost: number;
+  // D23: cómo se resolvió shipping_cost -- ver lib/shipping/resolver.ts.
+  // Nulo solo en pedidos anteriores a esta migración.
+  shipping_status?: ShippingResolutionStatus | null;
   tax_amount: number;
   discount_amount: number;
   total_amount: number;
@@ -191,6 +195,10 @@ export interface CreateOrderData {
   payment_reference?: string;
   subtotal: number;
   shipping_cost?: number;
+  // D21/D23: nunca confiado -- createOrder siempre lo recalcula vía
+  // lib/shipping/resolver.ts e ignora lo que llegue acá, igual que ya hace
+  // con shipping_cost.
+  shipping_status?: ShippingResolutionStatus;
   tax_amount?: number;
   discount_amount?: number;
   total_amount: number;
@@ -961,6 +969,19 @@ async function resolveAuthoritativeShippingDestination(
   };
 }
 
+// Adapta un item ya repreciado (snake_case, forma de columnas) a la entrada
+// que espera el resolver de envíos (camelCase, forma de dominio) -- lib/shipping/resolver.ts
+// no conoce CreateOrderData, solo su propio ShippingResolutionItem.
+function toShippingResolutionItem(item: CreateOrderData["items"][number]): ShippingResolutionItem {
+  return {
+    productId: item.product_id ?? null,
+    variantId: item.variant_id ?? null,
+    comboId: getComboIdFromOrderItem(item),
+    productName: item.product_name,
+    quantity: item.quantity,
+  };
+}
+
 /**
  * Validar inventario antes de crear una orden.
  * Verifica que todos los productos tengan suficiente stock disponible en el
@@ -1310,29 +1331,19 @@ export async function createOrder(
       (sum, item) => sum + Number(item.total_price || 0),
       0,
     );
-    // Envío e impuestos no tienen cálculo real todavía (fuera de alcance, otro
-    // plan); se fuerzan a 0 en vez de confiar en lo que envíe el cliente.
-    const shippingCost = 0;
+    // Los impuestos no tienen cálculo real todavía (fuera de alcance, otro
+    // plan); se fuerza a 0 en vez de confiar en lo que envíe el cliente. El
+    // envío sí lo tiene desde acá -- ver la resolución más abajo, una vez se
+    // conoce resolvedStoreId.
     const taxAmount = 0;
     const discountAmount = Math.min(
       Math.max(Number(orderData.discount_amount || 0), 0),
       recalculatedSubtotal,
     );
 
-    const normalizedOrderData: CreateOrderData = {
-      ...orderData,
-      ...shippingDestination,
-      items: pricedItems,
-      subtotal: recalculatedSubtotal,
-      shipping_cost: shippingCost,
-      tax_amount: taxAmount,
-      discount_amount: discountAmount,
-      total_amount: recalculatedSubtotal + shippingCost + taxAmount - discountAmount,
-    };
-
     // Validar inventario antes de crear la orden
     const validationResult = await validateInventoryBeforeOrder(
-      normalizedOrderData.items,
+      pricedItems,
       supabase,
     );
 
@@ -1351,13 +1362,40 @@ export async function createOrder(
 
     const resolvedStoreId = await resolveOrderStoreId(
       supabase,
-      normalizedOrderData.items,
+      pricedItems,
     );
 
     if (!resolvedStoreId) {
       console.error("[Orders] No se pudo resolver la tienda del pedido");
       return null;
     }
+
+    // D21/D23: igual que la repreciación de arriba, el costo de envío y CÓMO
+    // se llegó a él nunca se confían del cliente -- se recalculan acá, contra
+    // el modo y las zonas reales de la tienda (lib/shipping/resolver.ts). D7:
+    // si el destino no matchea ninguna zona y la tienda eligió bloquear, esto
+    // lanza y la orden nunca se crea (ver el catch de createOrder).
+    const shippingResolution = await resolveShipping(supabase, {
+      storeId: resolvedStoreId,
+      destination: {
+        departmentCode: shippingDestination.shipping_department_code,
+        municipalityCode: shippingDestination.shipping_municipality_code,
+      },
+      subtotal: recalculatedSubtotal,
+      items: pricedItems.map(toShippingResolutionItem),
+    });
+
+    const normalizedOrderData: CreateOrderData = {
+      ...orderData,
+      ...shippingDestination,
+      items: pricedItems,
+      subtotal: recalculatedSubtotal,
+      shipping_cost: shippingResolution.amount,
+      shipping_status: shippingResolution.status,
+      tax_amount: taxAmount,
+      discount_amount: discountAmount,
+      total_amount: recalculatedSubtotal + shippingResolution.amount + taxAmount - discountAmount,
+    };
 
     // D27: header + items + the two D12 outbox notifications, all-or-nothing
     // behind ecommerce.create_order_with_notifications. Replaces the two

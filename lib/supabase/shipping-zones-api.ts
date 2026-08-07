@@ -37,22 +37,70 @@ const DELETE_ZONE_ERROR_MESSAGE = "No se pudo eliminar la zona de envío"
 
 // D8: "missing weight" means a product whose BASE weight is null -- a
 // variant override never rescues a product from this list, per the ledger.
+// A14: a combo has no weight_grams of its own (it weighs what its
+// components weigh), so this also flags a component product that lacks one
+// -- otherwise a store selling combos could activate a weight-based zone
+// with nothing warning it that every combo checkout is about to fail.
 export async function findMissingWeightProducts(
   supabase: any,
   storeId: string,
 ): Promise<MissingWeightProduct[]> {
-  const result = await supabase
-    .from(ECOMMERCE_TABLES.storeItems)
-    .select("id, item_name")
-    .eq("store_id", storeId)
-    .is("weight_grams", null)
-    .order("item_name")
+  const [directResult, comboComponentProducts] = await Promise.all([
+    supabase.from(ECOMMERCE_TABLES.storeItems).select("id, item_name").eq("store_id", storeId).is("weight_grams", null),
+    findMissingWeightComboComponentProducts(supabase, storeId),
+  ])
 
-  if (result.error) {
-    throw new Error("No se pudieron leer los productos sin peso", { cause: result.error })
+  if (directResult.error) {
+    throw new Error("No se pudieron leer los productos sin peso", { cause: directResult.error })
   }
 
-  return (result.data ?? []).map((row: any) => ({ id: row.id, name: row.item_name }))
+  const byId = new Map<string, MissingWeightProduct>()
+  for (const row of directResult.data ?? []) {
+    byId.set(row.id, { id: row.id, name: row.item_name })
+  }
+  for (const product of comboComponentProducts) {
+    byId.set(product.id, product)
+  }
+
+  return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name))
+}
+
+// product_combo_components carries no store_id of its own -- scoping through
+// the owning combo's store_id (rather than assuming a component's product
+// already lives in this same store) is what makes this exhaustive.
+async function findMissingWeightComboComponentProducts(
+  supabase: any,
+  storeId: string,
+): Promise<MissingWeightProduct[]> {
+  const combosResult = await supabase.from(ECOMMERCE_TABLES.productCombos).select("id").eq("store_id", storeId)
+  if (combosResult.error) {
+    throw new Error("No se pudieron leer los combos de la tienda", { cause: combosResult.error })
+  }
+
+  const comboIds = (combosResult.data ?? []).map((row: any) => row.id)
+  if (comboIds.length === 0) return []
+
+  const componentsResult = await supabase
+    .from(ECOMMERCE_TABLES.productComboComponents)
+    .select("product_id")
+    .in("combo_id", comboIds)
+  if (componentsResult.error) {
+    throw new Error("No se pudieron leer los componentes de los combos", { cause: componentsResult.error })
+  }
+
+  const componentProductIds = [...new Set((componentsResult.data ?? []).map((row: any) => row.product_id))]
+  if (componentProductIds.length === 0) return []
+
+  const productsResult = await supabase
+    .from(ECOMMERCE_TABLES.storeItems)
+    .select("id, item_name")
+    .in("id", componentProductIds)
+    .is("weight_grams", null)
+  if (productsResult.error) {
+    throw new Error("No se pudieron leer los productos de los combos sin peso", { cause: productsResult.error })
+  }
+
+  return (productsResult.data ?? []).map((row: any) => ({ id: row.id, name: row.item_name }))
 }
 
 export async function listShippingZones(supabase: any, storeId: string): Promise<ShippingZoneRecord[]> {
