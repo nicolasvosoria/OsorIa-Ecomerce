@@ -68,6 +68,21 @@ vi.mock("@/contexts/cart-context", () => ({
     getTotalItems: () => 1,
   }),
 }))
+// D29 regression guard: `subtotal` and `total` mirror each other numerically
+// today (shipping is still hardcoded to zero), so a value-based assertion on
+// the rendered string can't tell which field the drawer actually reads —
+// it would stay green even if header.tsx silently reverted to `formattedTotal`.
+// Stubbing two obviously distinct strings makes the assertion target the field.
+vi.mock("@/lib/cart/cart-summary", () => ({
+  buildLocalCartSummary: () => ({
+    lines: [{ id: "item-1", formattedLineTotal: "$ 100.000" }],
+    subtotal: 100000,
+    total: 130000,
+    currencyCode: "COP",
+    formattedSubtotal: "SUBTOTAL-STUB-111",
+    formattedTotal: "TOTAL-STUB-999",
+  }),
+}))
 vi.mock("@/contexts/wishlist-context", () => wishlistContextMock)
 vi.mock("@/contexts/admin-permissions-context", () => adminPermissionsContextMock)
 vi.mock("@/contexts/auth-context", () => ({
@@ -93,7 +108,12 @@ vi.mock("@/contexts/language-context", () => ({
         welcome: "Hola {name}",
         welcomeAdmin: "Hola admin",
       },
-      cart: { checkout: "Finalizar compra", total: "Total" },
+      cart: {
+        checkout: "Finalizar compra",
+        subtotal: "Subtotal",
+        total: "Total",
+        shippingCalculatedAtCheckout: "El envío se calcula en el checkout",
+      },
       nav: { wishlist: "Wishlist", cart: "Cart", account: "Cuenta" },
     },
     language: "es",
@@ -141,6 +161,39 @@ describe("Header cart checkout button", () => {
 
     expect(routerPush).toHaveBeenCalledWith("/checkout")
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+  })
+})
+
+describe("Header cart drawer summary label (D29)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    isAuthenticatedOverride = false
+    loginRequestCountOverride = 0
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify([]), { status: 200 })))
+  })
+
+  it("labels the cart drawer amount 'Subtotal' and notes shipping is calculated at checkout", async () => {
+    render(<Header />)
+
+    expect(await screen.findByText("Subtotal:")).toBeInTheDocument()
+    expect(screen.getByText("El envío se calcula en el checkout")).toBeInTheDocument()
+    expect(screen.queryByText("Total:")).not.toBeInTheDocument()
+  })
+})
+
+describe("Header cart drawer amount field (D29 regression guard)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    isAuthenticatedOverride = false
+    loginRequestCountOverride = 0
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify([]), { status: 200 })))
+  })
+
+  it("renders formattedSubtotal, not formattedTotal, as the drawer amount", async () => {
+    render(<Header />)
+
+    expect(await screen.findByText("SUBTOTAL-STUB-111")).toBeInTheDocument()
+    expect(screen.queryByText("TOTAL-STUB-999")).not.toBeInTheDocument()
   })
 })
 

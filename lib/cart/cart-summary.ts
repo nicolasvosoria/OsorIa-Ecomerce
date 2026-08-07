@@ -18,6 +18,11 @@ export type CartSummaryLine = {
   itemKind?: LocalCartItem['itemKind'];
 };
 
+// `total` stays alongside `subtotal` even though shipping is still hardcoded to
+// zero: app/checkout/page.tsx (untouched this slice) and the standing money-formatter
+// contract in tests/quality/cart-summary-usage.test.ts both read `formattedTotal`
+// today. A later slice adds the real shipping amount here, which is when `total`
+// will start to genuinely differ from `subtotal` instead of mirroring it.
 export type CartSummary = {
   lines: CartSummaryLine[];
   subtotal: number;
