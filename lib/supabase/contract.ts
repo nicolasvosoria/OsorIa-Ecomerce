@@ -15,6 +15,7 @@ export const ECOMMERCE_TABLES = {
   appThemes: "app_themes",
   authIntents: "auth_intents",
   carts: "carts",
+  coLocations: "co_locations",
   componentStyles: "component_styles",
   emailOutbox: "email_outbox",
   homeSectionLayout: "home_section_layout",
