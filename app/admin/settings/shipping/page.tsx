@@ -3,8 +3,8 @@ import { redirect } from "next/navigation"
 import { AdminPageContainer } from "@/components/admin/page-container"
 import { AdminPageHeader } from "@/components/admin/page-header"
 import { translations } from "@/lib/i18n/translations"
-import { toSelectableShippingMode } from "@/lib/shipping/schemas"
-import { getStoreIdentityReadiness } from "@/lib/stores/identity-readiness"
+import { toSelectableShippingMode, type ShippingMode } from "@/lib/shipping/schemas"
+import { getStoreIdentityReadiness, type StoreIdentityReadiness } from "@/lib/stores/identity-readiness"
 import { buildWhatsAppLink } from "@/lib/stores/whatsapp-contact"
 import { authorizeActiveStoreAdmin } from "@/lib/supabase/active-store"
 import { loadShippingSettings } from "@/lib/supabase/shipping-settings-api"
@@ -37,16 +37,7 @@ export default async function ShippingSettingsPage() {
     findMissingWeightProducts(supabase, storeId),
   ])
   const readiness = getStoreIdentityReadiness(identity)
-  const phoneMissing = readiness.missingFields.includes("phone")
-  // A9: a phone can be present (so it clears the identity gate) and still be
-  // unusable for WhatsApp -- same "owner needs to see this" treatment as a
-  // missing one, distinct copy for what's actually wrong.
-  const phoneInvalid = !phoneMissing && buildWhatsAppLink(identity.phone ?? "") === null
-  // D14/F10: pending only matters for the mode that actually needs the
-  // phone -- an own_rates store missing or breaking it isn't blocked on
-  // anything here.
-  const contactPendingReason: ShippingContactPendingReason | null =
-    settings.mode !== "coordinate" ? null : phoneMissing ? "missing" : phoneInvalid ? "invalid" : null
+  const contactPendingReason = resolveContactPendingReason(settings.mode, readiness, identity.phone)
 
   return (
     <AdminPageContainer maxWidth="4xl">
@@ -56,8 +47,24 @@ export default async function ShippingSettingsPage() {
       <ShippingZonesSection
         zones={zones}
         missingWeightProducts={missingWeightProducts}
-        unmatchedDestinationAction={settings.unmatchedDestinationAction ?? "block"}
+        unmatchedDestinationAction={settings.unmatchedDestinationAction}
       />
     </AdminPageContainer>
   )
+}
+
+// D14/F10: pending only matters for the mode that actually needs the phone --
+// an own_rates store missing or breaking it isn't blocked on anything here.
+// A9: a phone can be present (so it clears the identity gate) and still be
+// unusable for WhatsApp -- same "owner needs to see this" treatment as a
+// missing one, distinct copy for what's actually wrong.
+function resolveContactPendingReason(
+  mode: ShippingMode,
+  readiness: StoreIdentityReadiness,
+  phone: string | null,
+): ShippingContactPendingReason | null {
+  if (mode !== "coordinate") return null
+  if (readiness.missingFields.includes("phone")) return "missing"
+  if (buildWhatsAppLink(phone ?? "") === null) return "invalid"
+  return null
 }

@@ -5,7 +5,7 @@ import {
   type OrderItem,
   type OrderWithItems,
 } from "@/lib/supabase/orders-api";
-import type { ShippingResolutionStatus } from "@/lib/shipping/resolver";
+import type { ShippingResolutionStatus } from "@/lib/shipping/schemas";
 
 export interface OrderDetailLine {
   id: string;

@@ -1,12 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { describe, expect, it } from "vitest"
 
 import { resolveShipping, type ShippingResolutionItem } from "@/lib/shipping/resolver"
 import { createShippingSupabase, type Row } from "./fake-supabase"
-
-const { getServiceEcommerceClientMock } = vi.hoisted(() => ({ getServiceEcommerceClientMock: vi.fn() }))
-vi.mock("@/lib/supabase/service-client", () => ({ getServiceEcommerceClient: getServiceEcommerceClientMock }))
-
-import { quoteShipping } from "@/lib/shipping/quote"
 
 const STORE_ID = "store-1"
 const MEDELLIN = { departmentCode: "05", municipalityCode: "05001" }
@@ -378,6 +373,31 @@ describe("resolveShipping", () => {
     ).rejects.toThrow()
   })
 
+  // Defect fix: an unrecognized basis (shipping_rates_basis_chk should make
+  // this impossible, but the type system can't see that CHECK constraint)
+  // must fail loudly instead of silently falling into the order_value branch
+  // and pricing the shipment off the subtotal -- a wrong number the buyer
+  // pays is strictly worse than an error.
+  it("throws instead of pricing off the subtotal when a rate row carries an unrecognized basis", async () => {
+    const { supabase } = createShippingSupabase({
+      store_shipping_settings: [ownRatesSettings()],
+      shipping_zones: [{ id: "zone-1", store_id: STORE_ID, name: "Zona" }],
+      shipping_zone_destinations: [
+        { id: "dest-1", zone_id: "zone-1", store_id: STORE_ID, department_code: MEDELLIN.departmentCode, municipality_code: MEDELLIN.municipalityCode },
+      ],
+      shipping_rates: [{ id: "rate-1", zone_id: "zone-1", basis: "per_item", range_from: null, range_to: null, amount: 5000 }],
+    })
+
+    await expect(
+      resolveShipping(supabase as any, {
+        storeId: STORE_ID,
+        destination: MEDELLIN,
+        subtotal: 100000,
+        items: [],
+      }),
+    ).rejects.toThrow(/basis/)
+  })
+
   it("throws when the matched zone's ladder has a gap that leaves the order value uncovered", async () => {
     const { supabase } = createShippingSupabase({
       store_shipping_settings: [ownRatesSettings()],
@@ -417,42 +437,5 @@ describe("resolveShipping", () => {
         items: [],
       }),
     ).rejects.toThrow(/auto_quote/)
-  })
-})
-
-describe("quoteShipping", () => {
-  beforeEach(() => {
-    getServiceEcommerceClientMock.mockReset()
-  })
-
-  // D27: quoteShipping is only ever a pass-through into the exact same
-  // resolveShipping the order write calls -- this proves they cannot
-  // structurally disagree, rather than trusting two call sites to stay in
-  // sync by convention.
-  it("resolves through the same computation as resolveShipping, given an explicit client override", async () => {
-    const { supabase } = createShippingSupabase({
-      store_shipping_settings: [ownRatesSettings()],
-      ...flatZoneSeed(6000),
-    })
-
-    const input = { storeId: STORE_ID, destination: MEDELLIN, subtotal: 100000, items: [] }
-
-    const [direct, quoted] = await Promise.all([
-      resolveShipping(supabase as any, input),
-      quoteShipping(input, supabase as any),
-    ])
-
-    expect(quoted).toEqual(direct)
-    expect(getServiceEcommerceClientMock).not.toHaveBeenCalled()
-  })
-
-  it("falls back to the service client when no override is given, and refuses when it is not configured", async () => {
-    getServiceEcommerceClientMock.mockReturnValue(null)
-
-    await expect(
-      quoteShipping({ storeId: STORE_ID, destination: MEDELLIN, subtotal: 100000, items: [] }),
-    ).rejects.toThrow(/service role/)
-
-    expect(getServiceEcommerceClientMock).toHaveBeenCalledTimes(1)
   })
 })

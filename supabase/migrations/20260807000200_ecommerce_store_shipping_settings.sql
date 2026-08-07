@@ -29,7 +29,7 @@ begin;
 -- stores_legacy joins store_commerce_settings; drop the view before the table.
 drop view if exists ecommerce.stores_legacy;
 
-create table ecommerce.store_shipping_settings (
+create table if not exists ecommerce.store_shipping_settings (
   store_id uuid primary key references ecommerce.stores(id) on delete cascade,
   mode text not null default 'coordinate'
     check (mode in ('coordinate', 'own_rates', 'auto_quote')),

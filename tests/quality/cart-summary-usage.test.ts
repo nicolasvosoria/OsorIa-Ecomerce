@@ -38,7 +38,6 @@ describe('single money formatter contract', () => {
       items: [item],
       getItemSubtotal: line => line.unitPriceAmount! * line.quantity,
       total: 50000,
-      language: 'es',
     }).formattedTotal;
 
     const checkoutTotal = formatPrice(50000, 'COP');

@@ -1,5 +1,6 @@
 import { getSupabaseEcommerce } from "./client";
 import { ECOMMERCE_FUNCTIONS, ECOMMERCE_TABLES } from "./contract";
+import { translations } from "@/lib/i18n/translations";
 import { getStoreId } from "@/lib/utils/store";
 import { buildComboOrderSnapshotById } from "./combos-api";
 import type { ComboOrderSnapshot } from "@/lib/combos/types";
@@ -9,7 +10,8 @@ import {
   writeOrderAtomically,
 } from "@/lib/checkout/order-writer";
 import { transitionOrderStatusAtomically } from "@/lib/orders/order-status-writer";
-import { resolveShipping, type ShippingResolutionItem, type ShippingResolutionStatus } from "@/lib/shipping/resolver";
+import { resolveShipping, type ShippingResolutionItem } from "@/lib/shipping/resolver";
+import type { ShippingResolutionStatus } from "@/lib/shipping/schemas";
 
 // Tipos para pedidos
 export interface Order {
@@ -956,9 +958,11 @@ async function resolveAuthoritativeShippingDestination(
   };
 
   if (result.error || !result.data) {
-    throw new Error(
-      "El destino de envío seleccionado ya no es válido. Vuelve a elegir el departamento y el municipio.",
-    );
+    // D31: sourced from translations.es.checkout.invalidShippingDestination --
+    // this module has no request-scoped locale (same posture as
+    // lib/shipping/resolver.ts's UnservedDestinationError), so "es" is the
+    // fixed default rather than an independent hardcoded copy.
+    throw new Error(translations.es.checkout.invalidShippingDestination);
   }
 
   return {

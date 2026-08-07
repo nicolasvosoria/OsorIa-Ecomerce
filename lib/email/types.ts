@@ -1,4 +1,4 @@
-import type { ShippingResolutionStatus } from "@/lib/shipping/resolver";
+import type { ShippingResolutionStatus } from "@/lib/shipping/schemas";
 
 export const EMAIL_TEMPLATE_KINDS = [
   "signup-confirmation",
@@ -71,7 +71,7 @@ type OrderStatusEmailInput = OrderEmailInput & {
 // (+ variant, when the item carries one), quantity and the line's own
 // resolved total. lib/checkout/order-writer.ts reads this straight off the
 // same order items the RPC is about to persist, nothing recomputed here.
-export type OrderReceiptLine = {
+type OrderReceiptLine = {
   productName: string;
   variantTitle?: string;
   quantity: number;

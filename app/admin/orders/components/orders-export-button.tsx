@@ -31,15 +31,12 @@ async function fetchAllOrders(): Promise<OrderWithItems[]> {
   return result.orders;
 }
 
-// D23/A15: a translated phrase in a numeric column is a landmine for anyone
-// summing "Envío" in a spreadsheet, so the amount stays a plain number and
-// this dedicated text column carries the status instead. "rate" and a
-// legacy null (an order placed before shipping_status existed) leave this
-// blank on purpose -- the "Envío" number already says everything there is
-// to say about them. STORE-facing: "out_of_zone" gets its own phrase,
-// distinct from "agreed" -- a coverage gap in the owner's own zones is a
-// fact only they can act on, unlike the buyer-facing surfaces which
-// collapse the two onto the same phrase.
+// A15: store-facing audience-scoped mapping -- lib/shipping/status-label.ts.
+// A translated phrase in a numeric column is a landmine for anyone summing
+// "Envío" in a spreadsheet, so the amount stays a plain number and this
+// dedicated text column carries the status instead -- blank for "rate" and
+// a legacy null, since the "Envío" number already says everything there is
+// to say about them.
 function shippingStatusColumnValue(order: OrderWithItems): string {
   const key = shippingStatusLabelKeyForStore(order.shipping_status ?? null);
   return key ? translations.es.orders.shippingStatusLabels.store[key] : "";

@@ -49,9 +49,7 @@ export function CheckoutSuccessClient({
     ? PAYMENT_METHODS.find((method) => method.id === orderSummary.paymentMethod)
         ?.label ?? orderSummary.paymentMethod
     : null;
-  // D23/A15: BUYER-facing -- "rate" and a legacy null render the formatted
-  // amount; "agreed" and "out_of_zone" collapse onto the same phrase, "free"
-  // onto its own -- see shippingStatusLabelKeyForBuyer for why.
+  // A15: buyer-facing audience-scoped mapping -- lib/shipping/status-label.ts.
   const shippingLabelKey = orderSummary
     ? shippingStatusLabelKeyForBuyer(orderSummary.shippingStatus)
     : null;

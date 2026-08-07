@@ -10,7 +10,7 @@ import {
   resolveServerAuthSession,
 } from "@/lib/supabase/server-auth-session";
 import { getServiceEcommerceClient } from "@/lib/supabase/service-client";
-import type { ShippingResolutionStatus } from "@/lib/shipping/resolver";
+import type { ShippingResolutionStatus } from "@/lib/shipping/schemas";
 
 export interface SuccessPageOrderItem {
   id: string;

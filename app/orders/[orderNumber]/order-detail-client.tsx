@@ -105,9 +105,7 @@ function OrderDetailHeading({ orderNumber }: { orderNumber: string }) {
 function OrderLinesCard({ order }: { order: OrderDetail }) {
   const { t } = useLanguage();
   const money = (amount: number) => formatPrice(amount, order.currencyCode);
-  // D23/A15: BUYER-facing -- "rate" and a legacy null render the amount;
-  // "agreed" and "out_of_zone" collapse onto the same phrase, "free" onto
-  // its own.
+  // A15: buyer-facing audience-scoped mapping -- lib/shipping/status-label.ts.
   const shippingLabelKey = shippingStatusLabelKeyForBuyer(order.shippingStatus);
   const shippingDisplay = shippingLabelKey
     ? t.orders.shippingStatusLabels.buyer[shippingLabelKey]

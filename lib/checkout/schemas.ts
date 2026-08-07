@@ -1,6 +1,7 @@
 import { z } from "zod"
 
 import { enabledPaymentMethodIds, normalizePaymentMethod } from "@/lib/checkout/payment-methods"
+import { requiredDepartmentField, requiredMunicipalityField } from "@/lib/shipping/schemas"
 
 // Shape mínima de los items que arma el checkout; precios y totales son solo
 // informativos porque createOrder los reprecia contra la base de datos.
@@ -34,11 +35,11 @@ export const checkoutOrderSchema = z.object({
   // co_locations (D2/D30) y los otros tres son su copia congelada al momento
   // de la compra. shipping_city sigue siendo el nombre del municipio, mismo
   // campo de siempre, ahora poblado por el picker en vez de texto libre.
-  shipping_department_code: z.string().trim().min(1, "Selecciona un departamento"),
-  shipping_department_name: z.string().trim().min(1, "Selecciona un departamento"),
-  shipping_city: z.string().trim().min(1, "Selecciona un municipio"),
-  shipping_municipality_code: z.string().trim().min(1, "Selecciona un municipio"),
-  shipping_location_id: z.string().trim().min(1, "Selecciona un municipio"),
+  shipping_department_code: requiredDepartmentField,
+  shipping_department_name: requiredDepartmentField,
+  shipping_city: requiredMunicipalityField,
+  shipping_municipality_code: requiredMunicipalityField,
+  shipping_location_id: requiredMunicipalityField,
   shipping_postal_code: z.string().default(""),
   shipping_country: z.string().optional(),
   shipping_notes: z.string().optional(),

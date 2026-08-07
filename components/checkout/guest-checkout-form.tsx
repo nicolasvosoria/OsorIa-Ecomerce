@@ -1,19 +1,18 @@
 "use client"
 
-import { useEffect } from "react"
-import { useForm, useWatch, type UseFormReturn } from "react-hook-form"
+import { useForm, type UseFormReturn } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { toast } from "sonner"
 
 import { PaymentMethodSection } from "@/components/checkout/payment-method-section"
+import { ShippingDestinationFields } from "@/components/checkout/shipping-destination-fields"
 import { SubmitOrderButton } from "@/components/checkout/submit-order-button"
-import { ShippingLocationPicker, type ShippingLocationValue } from "@/components/shipping/shipping-location-picker"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FormField } from "@/components/ui/form-field"
 import { Input } from "@/components/ui/input"
 import { enabledPaymentMethodIds } from "@/lib/checkout/payment-methods"
 import { guestCheckoutFormSchema, type GuestCheckoutFormValues } from "@/lib/checkout/schemas"
-import type { ShippingDestination } from "@/lib/shipping/resolver"
+import type { ShippingDestination } from "@/lib/shipping/schemas"
 
 // Contrato externo del formulario: lo consumen también la página de checkout y
 // el fallback de la página de éxito, así que se mantiene en camelCase aunque
@@ -46,6 +45,11 @@ interface GuestCheckoutFormProps {
   // selects resolve one -- long before this form's own onComplete fires at
   // submit.
   onDestinationChange?: (destination: ShippingDestination | null) => void
+  // D7: a destination out of every configured zone (shippingQuote.kind ===
+  // "blocked") must keep "Realizar pedido" from ever submitting -- the
+  // server re-resolves and would reject it anyway, and by then it's a toast
+  // after a full round trip instead of a button that was never live.
+  shippingBlocked?: boolean
 }
 
 const DEFAULT_VALUES: GuestCheckoutFormValues = {
@@ -64,7 +68,12 @@ const DEFAULT_VALUES: GuestCheckoutFormValues = {
   payment_method: enabledPaymentMethodIds()[0],
 }
 
-export function GuestCheckoutForm({ onComplete, isLoading = false, onDestinationChange }: GuestCheckoutFormProps) {
+export function GuestCheckoutForm({
+  onComplete,
+  isLoading = false,
+  onDestinationChange,
+  shippingBlocked = false,
+}: GuestCheckoutFormProps) {
   const form = useForm<GuestCheckoutFormValues>({
     resolver: zodResolver(guestCheckoutFormSchema),
     defaultValues: DEFAULT_VALUES,
@@ -105,7 +114,7 @@ export function GuestCheckoutForm({ onComplete, isLoading = false, onDestination
         error={form.formState.errors.payment_method?.message}
       />
 
-      <SubmitOrderButton isLoading={isLoading} />
+      <SubmitOrderButton isLoading={isLoading} disabled={shippingBlocked} />
     </form>
   )
 }
@@ -204,32 +213,6 @@ function ShippingAddressCard({
   onDestinationChange?: (destination: ShippingDestination | null) => void
 }) {
   const { register, formState, setValue, control } = form
-  const [departmentCode, departmentName, municipalityCode, locationId, city] = useWatch({
-    control,
-    name: [
-      "shipping_department_code",
-      "shipping_department_name",
-      "shipping_municipality_code",
-      "shipping_location_id",
-      "shipping_city",
-    ],
-  })
-
-  // Fires on every source of a destination change, picked manually or
-  // applied from a prefill -- both land here through the same watched
-  // fields, so there is exactly one place that reports "the destination is
-  // now this" upward.
-  useEffect(() => {
-    onDestinationChange?.(departmentCode && municipalityCode ? { departmentCode, municipalityCode } : null)
-  }, [departmentCode, municipalityCode, onDestinationChange])
-
-  const applyLocation = (next: ShippingLocationValue) => {
-    setValue("shipping_department_code", next.departmentCode, { shouldValidate: true })
-    setValue("shipping_department_name", next.departmentName, { shouldValidate: true })
-    setValue("shipping_municipality_code", next.municipalityCode, { shouldValidate: true })
-    setValue("shipping_location_id", next.municipalityId, { shouldValidate: true })
-    setValue("shipping_city", next.municipalityName, { shouldValidate: true })
-  }
 
   return (
     <Card>
@@ -253,45 +236,17 @@ function ShippingAddressCard({
           )}
         </FormField>
 
-        <ShippingLocationPicker
-          value={{
-            departmentCode: departmentCode || "",
-            departmentName: departmentName || "",
-            municipalityCode: municipalityCode || "",
-            municipalityId: locationId || "",
-            municipalityName: city || "",
-          }}
-          onChange={applyLocation}
+        <ShippingDestinationFields
+          control={control}
+          setValue={setValue}
+          register={register}
           departmentError={formState.errors.shipping_department_code?.message}
           municipalityError={
             formState.errors.shipping_location_id?.message ?? formState.errors.shipping_city?.message
           }
-          disabled={isLoading}
+          isLoading={isLoading}
+          onDestinationChange={onDestinationChange}
         />
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField id="shipping_postal_code" label="Código Postal (opcional)">
-            {(fieldProps) => (
-              <Input
-                {...fieldProps}
-                placeholder="110111"
-                disabled={isLoading}
-                {...register("shipping_postal_code")}
-              />
-            )}
-          </FormField>
-
-          <FormField id="shipping_country" label="País (opcional)">
-            {(fieldProps) => (
-              <Input
-                {...fieldProps}
-                placeholder="Colombia"
-                disabled={isLoading}
-                {...register("shipping_country")}
-              />
-            )}
-          </FormField>
-        </div>
       </CardContent>
     </Card>
   )

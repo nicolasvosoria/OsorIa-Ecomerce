@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react"
+import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
 import { useForm } from "react-hook-form"
 
@@ -88,6 +88,29 @@ describe("ShippingZonesSection", () => {
     fireEvent.click(screen.getAllByRole("button", { name: /Editar zona de envío/ })[0])
 
     expect(await screen.findByDisplayValue("Eje Cafetero")).toBeInTheDocument()
+  })
+
+  // Round-3 fix: the dialog's create-vs-edit decision has to survive `zones`
+  // no longer containing the zone being edited (e.g. a server refresh landed
+  // while the dialog stayed open) -- ZoneForm used to re-derive the id from
+  // the (now missing) zone record and would have submitted a CREATE instead
+  // of the intended edit.
+  it("still submits an EDIT of the original zone when it drops out of the zones list while the dialog stays open", async () => {
+    saveShippingZoneAction.mockResolvedValue({ success: true })
+
+    const { rerender } = render(
+      <ShippingZonesSection zones={[ZONE]} missingWeightProducts={[]} unmatchedDestinationAction="block" />,
+    )
+
+    fireEvent.click(screen.getAllByRole("button", { name: /Editar zona de envío/ })[0])
+    await screen.findByDisplayValue("Eje Cafetero")
+
+    rerender(<ShippingZonesSection zones={[]} missingWeightProducts={[]} unmatchedDestinationAction="block" />)
+
+    fireEvent.click(screen.getByRole("button", { name: "Guardar zona" }))
+
+    await waitFor(() => expect(saveShippingZoneAction).toHaveBeenCalled())
+    expect(saveShippingZoneAction.mock.calls[0][1]).toBe(ZONE.id)
   })
 })
 
@@ -181,5 +204,61 @@ describe("RateLadderField", () => {
     expect(screen.getByText("Faltan productos con peso cargado")).toBeInTheDocument()
     expect(screen.getByText(/Café Especial/)).toBeInTheDocument()
     expect(screen.getByRole("link", { name: "Editar producto" })).toHaveAttribute("href", "/admin/products/item-1/edit")
+  })
+
+  // P1: nothing anywhere used to say a 0 amount means free shipping.
+  it("hints that a 0 Monto means free shipping for that range", () => {
+    render(<RateLadderHarness />)
+
+    expect(
+      screen.getByText("Un rango con Monto en 0 es envío gratis para ese tramo."),
+    ).toBeInTheDocument()
+  })
+
+  // P1: the row used to be a fixed 4-column grid with no breakpoint.
+  it("stacks a range row into two columns on narrow screens and back to four at sm", () => {
+    render(<RateLadderHarness />)
+
+    const rowContainer = screen.getByLabelText("Desde").closest("div")?.parentElement
+    expect(rowContainer).toHaveClass("grid-cols-2")
+    expect(rowContainer).toHaveClass("sm:grid-cols-[1fr_1fr_1fr_auto]")
+  })
+
+  // P0 (second half) + P1: the live gap/overlap indicator used to disappear
+  // the instant any row's amount was blank, and only ever showed the FIRST
+  // issue with the same neutral weight as an informational notice.
+  it("shows every gap/overlap issue as a destructive alert, surviving a still-blank row amount", () => {
+    render(
+      <RateLadderHarness
+        ranges={[
+          { from: "10000", to: "30000", amount: "" },
+          { from: "20000", to: "", amount: "0" },
+        ]}
+      />,
+    )
+
+    expect(screen.getByText(/primer rango/)).toBeInTheDocument()
+    expect(screen.getByText(/superponen/)).toBeInTheDocument()
+    expect(screen.getByRole("alert")).toHaveClass("text-destructive")
+  })
+})
+
+// P0: looseRateLadderFieldSchema never validates the ladder, so a blank or
+// invalid row only ever surfaces on submit -- these pin that it now lands on
+// the exact field RateLadderField renders, not just a generic toast.
+describe("ShippingZonesSection ladder validation on save (P0)", () => {
+  it("flags the exact row field and blocks the save when a ladder amount is blank", async () => {
+    render(<ShippingZonesSection zones={[ZONE]} missingWeightProducts={[]} unmatchedDestinationAction="block" />)
+
+    fireEvent.click(screen.getAllByRole("button", { name: /Editar zona de envío/ })[0])
+    await screen.findByDisplayValue("Eje Cafetero")
+
+    const amountInputs = screen.getAllByLabelText("Monto")
+    fireEvent.change(amountInputs[0], { target: { value: "" } })
+    fireEvent.click(screen.getByRole("button", { name: "Guardar zona" }))
+
+    await waitFor(() => expect(amountInputs[0]).toHaveAttribute("aria-invalid", "true"))
+    expect(await screen.findByText("El monto no puede ser negativo")).toBeInTheDocument()
+    expect(saveShippingZoneAction).not.toHaveBeenCalled()
   })
 })

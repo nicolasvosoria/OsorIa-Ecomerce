@@ -1,13 +1,13 @@
 "use client"
 
 import { useEffect } from "react"
-import { useForm, useWatch } from "react-hook-form"
+import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { toast } from "sonner"
 
 import { PaymentMethodSection } from "@/components/checkout/payment-method-section"
+import { ShippingDestinationFields } from "@/components/checkout/shipping-destination-fields"
 import { SubmitOrderButton } from "@/components/checkout/submit-order-button"
-import { ShippingLocationPicker, type ShippingLocationValue } from "@/components/shipping/shipping-location-picker"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FormField } from "@/components/ui/form-field"
 import { Input } from "@/components/ui/input"
@@ -16,7 +16,7 @@ import {
   authenticatedCheckoutFormSchema,
   type AuthenticatedCheckoutFormValues,
 } from "@/lib/checkout/schemas"
-import type { ShippingDestination } from "@/lib/shipping/resolver"
+import type { ShippingDestination } from "@/lib/shipping/schemas"
 import type { UserProfile } from "@/lib/types/user"
 import type { CheckoutPrefill } from "@/app/checkout/actions"
 
@@ -50,6 +50,11 @@ interface AuthenticatedCheckoutFormProps {
   // selects resolve one -- long before this form's own onComplete fires at
   // submit.
   onDestinationChange?: (destination: ShippingDestination | null) => void
+  // D7: a destination out of every configured zone (shippingQuote.kind ===
+  // "blocked") must keep "Realizar pedido" from ever submitting -- the
+  // server re-resolves and would reject it anyway, and by then it's a toast
+  // after a full round trip instead of a button that was never live.
+  shippingBlocked?: boolean
 }
 
 function buildDefaultValues(user: UserProfile): AuthenticatedCheckoutFormValues {
@@ -75,22 +80,13 @@ export function AuthenticatedCheckoutForm({
   isLoading = false,
   prefill,
   onDestinationChange,
+  shippingBlocked = false,
 }: AuthenticatedCheckoutFormProps) {
   const { register, handleSubmit, formState, setValue, control } = useForm<AuthenticatedCheckoutFormValues>({
     resolver: zodResolver(authenticatedCheckoutFormSchema),
     defaultValues: buildDefaultValues(user),
   })
   const { dirtyFields } = formState
-  const [departmentCode, departmentName, municipalityCode, locationId, city] = useWatch({
-    control,
-    name: [
-      "shipping_department_code",
-      "shipping_department_name",
-      "shipping_municipality_code",
-      "shipping_location_id",
-      "shipping_city",
-    ],
-  })
 
   // No pisa lo que el usuario ya haya escrito: solo completa un campo si hay
   // un valor con el que precargarlo y ese campo sigue como llegó (sin tocar).
@@ -131,22 +127,6 @@ export function AuthenticatedCheckoutForm({
     dirtyFields.shipping_location_id,
     setValue,
   ])
-
-  // Fires on every source of a destination change, picked manually or
-  // applied from the prefill above -- both land here through the same
-  // watched fields, so there is exactly one place that reports "the
-  // destination is now this" upward.
-  useEffect(() => {
-    onDestinationChange?.(departmentCode && municipalityCode ? { departmentCode, municipalityCode } : null)
-  }, [departmentCode, municipalityCode, onDestinationChange])
-
-  const applyLocation = (next: ShippingLocationValue) => {
-    setValue("shipping_department_code", next.departmentCode, { shouldValidate: true })
-    setValue("shipping_department_name", next.departmentName, { shouldValidate: true })
-    setValue("shipping_municipality_code", next.municipalityCode, { shouldValidate: true })
-    setValue("shipping_location_id", next.municipalityId, { shouldValidate: true })
-    setValue("shipping_city", next.municipalityName, { shouldValidate: true })
-  }
 
   const submitValidatedForm = (values: AuthenticatedCheckoutFormValues) => {
     onComplete({
@@ -249,45 +229,17 @@ export function AuthenticatedCheckoutForm({
             )}
           </FormField>
 
-          <ShippingLocationPicker
-            value={{
-              departmentCode: departmentCode || "",
-              departmentName: departmentName || "",
-              municipalityCode: municipalityCode || "",
-              municipalityId: locationId || "",
-              municipalityName: city || "",
-            }}
-            onChange={applyLocation}
+          <ShippingDestinationFields
+            control={control}
+            setValue={setValue}
+            register={register}
             departmentError={formState.errors.shipping_department_code?.message}
             municipalityError={
               formState.errors.shipping_location_id?.message ?? formState.errors.shipping_city?.message
             }
-            disabled={isLoading}
+            isLoading={isLoading}
+            onDestinationChange={onDestinationChange}
           />
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <FormField id="shipping_postal_code" label="Código Postal (opcional)">
-              {(fieldProps) => (
-                <Input
-                  {...fieldProps}
-                  placeholder="110111"
-                  disabled={isLoading}
-                  {...register("shipping_postal_code")}
-                />
-              )}
-            </FormField>
-
-            <FormField id="shipping_country" label="País (opcional)">
-              {(fieldProps) => (
-                <Input
-                  {...fieldProps}
-                  placeholder="Colombia"
-                  disabled={isLoading}
-                  {...register("shipping_country")}
-                />
-              )}
-            </FormField>
-          </div>
         </CardContent>
       </Card>
 
@@ -297,7 +249,7 @@ export function AuthenticatedCheckoutForm({
         error={formState.errors.payment_method?.message}
       />
 
-      <SubmitOrderButton isLoading={isLoading} />
+      <SubmitOrderButton isLoading={isLoading} disabled={shippingBlocked} />
     </form>
   )
 }

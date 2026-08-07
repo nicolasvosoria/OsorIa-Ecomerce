@@ -147,12 +147,7 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailPagePr
 
 function OrderTotals({ order }: { order: OrderWithItems }) {
   const money = (amount: number) => formatPrice(amount, order.currency_code);
-  // D23/A15: STORE-facing -- "rate" and a legacy null render the amount;
-  // "out_of_zone" gets its OWN phrase here (unlike the buyer-facing success
-  // page and order detail, which collapse it onto "agreed"): to the owner
-  // it's a coverage gap in their own zones, not their coordinate-shipping
-  // policy working as intended, so it stays visible rather than hidden
-  // inside a routine "agreed" message. "free" matches the buyer view.
+  // A15: store-facing audience-scoped mapping -- lib/shipping/status-label.ts.
   const shippingLabelKey = shippingStatusLabelKeyForStore(order.shipping_status ?? null);
   const rows = [
     { label: "Subtotal", value: money(order.subtotal) },

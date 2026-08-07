@@ -1,4 +1,4 @@
-import { ECOMMERCE_TABLES } from "./contract"
+import { ECOMMERCE_TABLES, ECOMMERCE_VIEWS } from "./contract"
 import {
   findShippingLadderGaps,
   type ShippingRateBasis,
@@ -28,12 +28,14 @@ export type SaveShippingZoneInput = {
   rateLadder: ShippingRateLadder
 }
 
-export type SaveShippingZoneResult =
-  | { success: true; zone: ShippingZoneRecord }
-  | { success: false; error: string }
-
-const SAVE_ZONE_ERROR_MESSAGE = "No se pudo guardar la zona de envío"
-const DELETE_ZONE_ERROR_MESSAGE = "No se pudo eliminar la zona de envío"
+// Shared by saveShippingZone and deleteShippingZone below: whether the
+// mutation landed, and -- only when it didn't for a reason the owner needs
+// to act on (a gap in the ladder, a destination conflict, D8's missing-weight
+// gate) -- the specific message to show. A generic infrastructure failure
+// leaves error unset so the caller's own translated copy (shipping.zones.
+// saveErrorToast/deleteErrorToast in lib/i18n/translations.ts) is what
+// renders, instead of a hardcoded duplicate of that same message.
+export type ShippingZoneMutationResult = { success: boolean; error?: string }
 
 // D8: "missing weight" means a product whose BASE weight is null -- a
 // variant override never rescues a product from this list, per the ledger.
@@ -156,7 +158,7 @@ export async function saveShippingZone(
   storeId: string,
   input: SaveShippingZoneInput,
   zoneId?: string,
-): Promise<SaveShippingZoneResult> {
+): Promise<ShippingZoneMutationResult> {
   const gapIssues = findShippingLadderGaps(input.rateLadder)
   if (gapIssues.length > 0) {
     return { success: false, error: gapIssues[0].message }
@@ -181,7 +183,7 @@ export async function saveShippingZone(
     ? await updateZoneRow(supabase, storeId, zoneId, input.name)
     : await insertZoneRow(supabase, storeId, input.name)
   if (!zoneRow) {
-    return { success: false, error: SAVE_ZONE_ERROR_MESSAGE }
+    return { success: false }
   }
 
   const destinationsSaved = await replaceZoneDestinations(supabase, storeId, zoneRow.id, input.destinations)
@@ -196,25 +198,17 @@ export async function saveShippingZone(
     if (!zoneId) {
       await deleteZoneRow(supabase, storeId, zoneRow.id).catch(() => undefined)
     }
-    return { success: false, error: SAVE_ZONE_ERROR_MESSAGE }
+    return { success: false }
   }
 
-  return {
-    success: true,
-    zone: {
-      id: zoneRow.id,
-      name: zoneRow.name,
-      destinations: await hydrateDestinationViews(supabase, input.destinations),
-      rateLadder: input.rateLadder,
-    },
-  }
+  return { success: true }
 }
 
 export async function deleteShippingZone(
   supabase: any,
   storeId: string,
   zoneId: string,
-): Promise<{ success: boolean; error?: string }> {
+): Promise<ShippingZoneMutationResult> {
   const result = await supabase
     .from(ECOMMERCE_TABLES.shippingZones)
     .delete()
@@ -224,7 +218,7 @@ export async function deleteShippingZone(
     .single()
 
   if (result.error || !result.data) {
-    return { success: false, error: DELETE_ZONE_ERROR_MESSAGE }
+    return { success: false }
   }
   return { success: true }
 }
@@ -383,21 +377,18 @@ async function fetchZoneName(supabase: any, zoneId: string): Promise<string> {
   return result.data?.name ?? "otra zona"
 }
 
-async function hydrateDestinationViews(
-  supabase: any,
-  destinations: ShippingZoneDestinationInput[],
-): Promise<ShippingZoneDestinationView[]> {
-  const rows = destinations.map((destination) => ({
-    department_code: destination.departmentCode,
-    municipality_code: destination.municipalityCode,
-  }))
-  const locationNames = await resolveLocationNames(supabase, rows)
-  return rows.map((row) => toDestinationView(row, locationNames))
-}
-
 type LocationNames = { departments: Map<string, string>; municipalities: Map<string, string> }
 type DestinationCodeRow = { department_code: string; municipality_code: string | null }
 
+// Two targeted queries, not one over-fetching one: querying co_locations by
+// department_code alone pulls every municipio of every matched department
+// (up to co_locations' full 1,122 rows) only to discard most of them here --
+// a store whose zones span enough departments crosses PostgREST's max_rows
+// cap (supabase/config.toml) and the excess rows are truncated before this
+// function ever sees them, degrading destination badges to raw DANE codes.
+// Department names come from co_departments (33 rows, can't truncate);
+// municipality names are looked up by the exact codes this function needs,
+// nothing broader.
 async function resolveLocationNames(supabase: any, destinationRows: DestinationCodeRow[]): Promise<LocationNames> {
   const departmentCodes = [...new Set(destinationRows.map((row) => row.department_code))]
   const municipalityCodes = [
@@ -410,16 +401,18 @@ async function resolveLocationNames(supabase: any, destinationRows: DestinationC
     return { departments, municipalities }
   }
 
-  const result = await supabase
-    .from(ECOMMERCE_TABLES.coLocations)
-    .select("department_code, department_name, municipality_code, municipality_name")
-    .in("department_code", departmentCodes)
+  const [departmentsResult, municipalitiesResult] = await Promise.all([
+    supabase.from(ECOMMERCE_VIEWS.coDepartments).select("department_code, department_name").in("department_code", departmentCodes),
+    municipalityCodes.length === 0
+      ? Promise.resolve({ data: [] })
+      : supabase.from(ECOMMERCE_TABLES.coLocations).select("municipality_code, municipality_name").in("municipality_code", municipalityCodes),
+  ])
 
-  for (const row of result.data ?? []) {
+  for (const row of departmentsResult.data ?? []) {
     departments.set(row.department_code, row.department_name)
-    if (municipalityCodes.includes(row.municipality_code)) {
-      municipalities.set(row.municipality_code, row.municipality_name)
-    }
+  }
+  for (const row of municipalitiesResult.data ?? []) {
+    municipalities.set(row.municipality_code, row.municipality_name)
   }
 
   return { departments, municipalities }
@@ -454,20 +447,34 @@ function ladderToRateRows(ladder: ShippingRateLadder): ShippingRateRow[] {
   }))
 }
 
-function rateRowsToLadder(rows: { basis: string; range_from: number | null; range_to: number | null; amount: number }[]): ShippingRateLadder {
-  const basis = (rows[0]?.basis ?? "flat") as ShippingRateBasis
+// basis comes back from the DB as a plain string, never pre-narrowed to
+// ShippingRateBasis -- the switch below is what actually checks it belongs
+// to the union (shipping_rates_basis_chk guarantees it in practice, but the
+// type system doesn't know that, so an unrecognized value fails loudly
+// instead of laundering into a plausible-looking ladder).
+type RawShippingRateRow = { basis: string; range_from: number | null; range_to: number | null; amount: number }
 
-  if (basis === "flat") {
-    return { basis: "flat", amount: String(rows[0]?.amount ?? 0) }
-  }
-
-  const ranges = [...rows]
+function rateRowsToRanges(rows: RawShippingRateRow[]) {
+  return [...rows]
     .sort((a, b) => (a.range_from ?? 0) - (b.range_from ?? 0))
     .map((row) => ({
       from: String(row.range_from ?? 0),
       to: row.range_to === null ? "" : String(row.range_to),
       amount: String(row.amount),
     }))
+}
 
-  return { basis, ranges } as ShippingRateLadder
+function rateRowsToLadder(rows: RawShippingRateRow[]): ShippingRateLadder {
+  const basis = rows[0]?.basis ?? "flat"
+
+  switch (basis) {
+    case "flat":
+      return { basis: "flat", amount: String(rows[0]?.amount ?? 0) }
+    case "order_value":
+      return { basis: "order_value", ranges: rateRowsToRanges(rows) }
+    case "weight":
+      return { basis: "weight", ranges: rateRowsToRanges(rows) }
+    default:
+      throw new Error(`Zona de envío con basis de tarifa desconocido: ${basis}`)
+  }
 }

@@ -1,5 +1,10 @@
-import { LANGUAGE_LOCALES } from "@/lib/cart/cart-summary";
 import type { Language } from "@/lib/i18n/translations";
+
+const LANGUAGE_LOCALES: Record<Language, string> = {
+  es: "es-CO",
+  en: "en-US",
+  pt: "pt-BR",
+};
 
 export function formatOrderDate(orderDate: string, language: Language): string {
   return new Intl.DateTimeFormat(LANGUAGE_LOCALES[language], {

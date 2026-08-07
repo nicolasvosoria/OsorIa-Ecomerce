@@ -1,5 +1,31 @@
 import { z } from "zod"
 
+import { translations } from "@/lib/i18n/translations"
+
+// D23/A3: how an order's shipping cost was arrived at, stored alongside the
+// amount so a $0 line never means two different things -- coordinate's "we
+// still have to agree on it" and a ladder's genuine free-shipping rung both
+// cost 0.
+export type ShippingResolutionStatus = "agreed" | "rate" | "free" | "out_of_zone"
+
+export type ShippingDestination = {
+  departmentCode: string
+  municipalityCode: string
+}
+
+// D24: the department/municipality pair of the five-field structured
+// destination the address book (lib/account/schemas.ts) and checkout
+// (lib/checkout/schemas.ts) both collect, via the same chained picker (D28)
+// -- one rule and one message each, sourced from the same
+// translations.es.checkout copy the picker itself renders, reused under
+// whatever key name each schema needs instead of each keeping its own
+// hardcoded repeat of that wording.
+const REQUIRED_DEPARTMENT_MESSAGE = translations.es.checkout.selectDepartment
+const REQUIRED_MUNICIPALITY_MESSAGE = translations.es.checkout.selectMunicipality
+
+export const requiredDepartmentField = z.string().trim().min(1, REQUIRED_DEPARTMENT_MESSAGE)
+export const requiredMunicipalityField = z.string().trim().min(1, REQUIRED_MUNICIPALITY_MESSAGE)
+
 // A3: stored values are frozen English identifiers -- Spanish only shows up in
 // the label the UI renders (lib/i18n/translations.ts).
 export const SHIPPING_MODES = ["coordinate", "own_rates", "auto_quote"] as const
@@ -45,8 +71,6 @@ export type UnmatchedDestinationAction = (typeof UNMATCHED_DESTINATION_ACTIONS)[
 export const unmatchedDestinationActionFormSchema = z.object({
   unmatchedDestinationAction: z.enum(UNMATCHED_DESTINATION_ACTIONS),
 })
-
-export type UnmatchedDestinationActionFormValues = z.infer<typeof unmatchedDestinationActionFormSchema>
 
 // D6: a zone's rate ladder basis. Chosen once per zone -- every row of its
 // ladder shares it (D5: "one rate ladder per zone").
@@ -98,6 +122,20 @@ const rateRangeRowSchema = z
   )
 
 export type ShippingRateRangeRowValues = z.infer<typeof rateRangeRowSchema>
+
+// Same bounds rateRangeRowSchema validates, without amount's own check:
+// parseShippingLadderRangeBounds (near findShippingLadderGaps below) is the
+// only caller, and it exists precisely so a still-blank Monto can't hide a
+// gap or overlap that's already visible from from/to alone.
+const rateRangeBoundsRowSchema = z
+  .object({
+    from: nonNegativeRangeBound,
+    to: z.string(),
+  })
+  .refine(
+    (row) => row.to.trim() === "" || (isNonNegativeNumber(row.to) && Number(row.to) > Number(row.from)),
+    { message: RANGE_TO_BEFORE_FROM_MESSAGE, path: ["to"] },
+  )
 
 const flatRateLadderSchema = z.object({
   basis: z.literal("flat"),
@@ -151,7 +189,10 @@ const destinationSchema = z.object({
 
 export type ShippingZoneDestinationInput = z.infer<typeof destinationSchema>
 
-function destinationKey(destination: ShippingZoneDestinationInput): string {
+// The one place a (departmentCode, municipalityCode) pair becomes a
+// comparison key -- the zone editor uses it to spot a destination already in
+// the list, this schema's own duplicate-destination refine below uses it too.
+export function destinationKey(destination: ShippingZoneDestinationInput): string {
   return `${destination.departmentCode}:${destination.municipalityCode ?? ""}`
 }
 
@@ -171,15 +212,22 @@ const looseRateLadderFieldSchema = z.object({
   ranges: z.array(z.object({ from: z.string(), to: z.string(), amount: z.string() })),
 })
 
+// Shared by both schemas below: the client form's own name/destinations
+// rules, factored out once instead of duplicated between the loose
+// (RHF-resolver) shape and the strict wire-payload shape.
+const zoneNameFieldSchema = z.string().trim().min(1, REQUIRED_ZONE_NAME_MESSAGE)
+
+const zoneDestinationsFieldSchema = z
+  .array(destinationSchema)
+  .min(1, MIN_ONE_DESTINATION_MESSAGE)
+  .refine(
+    (destinations) => new Set(destinations.map(destinationKey)).size === destinations.length,
+    DUPLICATE_DESTINATION_MESSAGE,
+  )
+
 export const shippingZoneFormSchema = z.object({
-  name: z.string().trim().min(1, REQUIRED_ZONE_NAME_MESSAGE),
-  destinations: z
-    .array(destinationSchema)
-    .min(1, MIN_ONE_DESTINATION_MESSAGE)
-    .refine(
-      (destinations) => new Set(destinations.map(destinationKey)).size === destinations.length,
-      DUPLICATE_DESTINATION_MESSAGE,
-    ),
+  name: zoneNameFieldSchema,
+  destinations: zoneDestinationsFieldSchema,
   rateLadder: looseRateLadderFieldSchema,
 })
 
@@ -188,6 +236,21 @@ export type ShippingZoneFormValues = z.infer<typeof shippingZoneFormSchema>
 // Alias used by the editor's components: same shape, names the whole-form
 // value rather than the schema it happens to come from.
 export type ZoneEditorFormValues = ShippingZoneFormValues
+
+// The wire payload saveShippingZoneAction actually receives: name and
+// destinations share the client form's own rules, but rateLadder is the
+// STRICT discriminated union (shippingRateLadderSchema) -- never the form's
+// loose, placeholder-carrying shape above. One schema for what crosses the
+// client -> server boundary, so the two sides can't silently disagree about
+// the same field the way a separate form-side schema and a separate,
+// hand-parsed action-side rateLadder once did (every save failed
+// rateLadder.ranges/amount "Required" and reported only the generic
+// INVALID_INPUT).
+export const shippingZoneActionSchema = z.object({
+  name: zoneNameFieldSchema,
+  destinations: zoneDestinationsFieldSchema,
+  rateLadder: shippingRateLadderSchema,
+})
 
 export type ShippingLadderGapIssue = {
   code: "not_starting_at_zero" | "gap" | "overlap" | "not_open_ended"
@@ -199,6 +262,17 @@ const LADDER_GAP_MESSAGE = "La escalera de tarifas tiene un vacío entre dos ran
 const LADDER_OVERLAP_MESSAGE = "La escalera de tarifas tiene rangos que se superponen"
 const LADDER_MUST_END_OPEN_MESSAGE = "El último rango de la escalera debe quedar sin límite superior"
 
+// Everything findShippingLadderGaps below actually reads: two bounds per
+// range, never the amount. ShippingRateLadder (amount included) satisfies
+// this structurally, so the strict save-path check keeps passing it as-is --
+// but this narrower shape is also what parseShippingLadderRangeBounds below
+// produces, so the live gap indicator (rate-ladder-field.tsx) can ask "are
+// the BOUNDS complete" without first having to answer "is the amount too",
+// which a still-blank Monto would otherwise fail.
+export type ShippingRateLadderBounds =
+  | { basis: "flat" }
+  | { basis: "order_value" | "weight"; ranges: { from: string; to: string }[] }
+
 // D6: "a zone's ladder MUST cover 0 to infinity with no gaps". This is a
 // cross-row invariant a CHECK constraint cannot express, so -- following
 // lib/home-discount-popup.ts's validateHomeDiscountPopupAdminStatus, the
@@ -206,7 +280,7 @@ const LADDER_MUST_END_OPEN_MESSAGE = "El último rango de la escalera debe queda
 // it's a plain function over the already-shape-validated ladder, called both
 // by the editor for a live indicator and by the save path to block an
 // incomplete ladder (D6), not merely warn about it.
-export function findShippingLadderGaps(ladder: ShippingRateLadder): ShippingLadderGapIssue[] {
+export function findShippingLadderGaps(ladder: ShippingRateLadderBounds): ShippingLadderGapIssue[] {
   if (ladder.basis === "flat") {
     return []
   }
@@ -244,4 +318,15 @@ export function findShippingLadderGaps(ladder: ShippingRateLadder): ShippingLadd
   }
 
   return issues
+}
+
+// The live indicator's own entry point: validates only what
+// findShippingLadderGaps needs (from/to), so a range row whose Monto is still
+// blank -- or not yet a valid number -- doesn't take the whole ladder's gap
+// check down with it while an owner is mid-edit.
+export function parseShippingLadderRangeBounds(
+  ranges: { from: string; to: string }[],
+): { from: string; to: string }[] | null {
+  const parsed = z.array(rateRangeBoundsRowSchema).min(1, MIN_ONE_RANGE_MESSAGE).safeParse(ranges)
+  return parsed.success ? parsed.data : null
 }

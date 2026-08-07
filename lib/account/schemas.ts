@@ -1,5 +1,7 @@
 import { z } from "zod"
 
+import { requiredDepartmentField, requiredMunicipalityField } from "@/lib/shipping/schemas"
+
 // Espeja el default de ecommerce.user_addresses.country: el formulario lo trae
 // escrito y el schema lo repone si la persona lo deja en blanco.
 export const DEFAULT_ADDRESS_COUNTRY = "Colombia"
@@ -18,11 +20,11 @@ const optionalText = z
 export const savedAddressDraftSchema = z.object({
   label: optionalText,
   addressLine1: z.string().trim().min(1, "La dirección es requerida"),
-  departmentCode: z.string().trim().min(1, "Selecciona un departamento"),
-  departmentName: z.string().trim().min(1, "Selecciona un departamento"),
-  city: z.string().trim().min(1, "Selecciona un municipio"),
-  municipalityCode: z.string().trim().min(1, "Selecciona un municipio"),
-  locationId: z.string().trim().min(1, "Selecciona un municipio"),
+  departmentCode: requiredDepartmentField,
+  departmentName: requiredDepartmentField,
+  city: requiredMunicipalityField,
+  municipalityCode: requiredMunicipalityField,
+  locationId: requiredMunicipalityField,
   postalCode: optionalText,
   country: z
     .string()

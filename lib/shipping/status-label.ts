@@ -1,11 +1,8 @@
-import type { ShippingResolutionStatus } from "@/lib/shipping/resolver"
+import type { ShippingResolutionStatus } from "@/lib/shipping/schemas"
 
 // D23/A15: the one place a stored shipping_status maps to a label -- split
 // by WHO is reading, so the audience is part of the call site instead of
-// something a caller could silently get wrong. Wave 4 shipped this as two
-// competing files (S10's own checkout-quote formatter, S11's own order/admin
-// mapping) that quietly disagreed on what "out_of_zone" means; this is the
-// single file both collapse into.
+// something a caller could silently get wrong.
 //
 // BUYER-facing surfaces -- the checkout quote, the success page, the order
 // detail, and (S12) the confirmation email -- read shippingStatusLabelKeyForBuyer.

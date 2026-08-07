@@ -131,6 +131,12 @@ export interface Translations {
     municipality: string
     selectMunicipality: string
     selectDepartmentFirst: string
+    // D28's picker: an honest, retryable state for either chained select's
+    // own fetch failing, instead of an empty control or a spinner stuck
+    // forever (both listDepartments and listMunicipalitiesByDepartment can
+    // reject -- a Supabase error, or lib/supabase/with-timeout.ts's timeout).
+    departmentsLoadError: string
+    municipalitiesLoadError: string
     postalCode: string
     country: string
     notes: string
@@ -147,6 +153,12 @@ export interface Translations {
     // quote can't drift from what a buyer sees on either of those.
     shippingBlocked: string
     shippingQuoteFailed: string
+    // D31: the order-write path's own destination re-validation
+    // (resolveAuthoritativeShippingDestination, lib/supabase/orders-api.ts)
+    // rejects a shipping_location_id that no longer resolves in co_locations --
+    // a server module with no request-scoped locale, so it throws sourced
+    // from translations.es (same posture as checkout.shippingBlocked above).
+    invalidShippingDestination: string
     shippingCalculating: string
     shippingSelectDestination: string
     totalPendingShipping: string
@@ -202,6 +214,7 @@ export interface Translations {
       basisWeight: string
       flatAmountLabel: string
       rangesLabel: string
+      rangesFreeShippingHint: string
       rangeFromLabel: string
       rangeToLabel: string
       rangeToPlaceholder: string
@@ -320,6 +333,7 @@ export interface Translations {
     clear: string
     apply: string
     reset: string
+    retry: string
   }
   // Contacto
   contact: {
@@ -590,6 +604,8 @@ export const translations: Record<Language, Translations> = {
       municipality: 'Municipio',
       selectMunicipality: 'Selecciona un municipio',
       selectDepartmentFirst: 'Primero selecciona un departamento',
+      departmentsLoadError: 'No pudimos cargar los departamentos.',
+      municipalitiesLoadError: 'No pudimos cargar los municipios.',
       postalCode: 'Código postal',
       country: 'País',
       notes: 'Notas',
@@ -600,6 +616,7 @@ export const translations: Record<Language, Translations> = {
       shippingCoordinationCta: 'Escribir por WhatsApp',
       shippingBlocked: 'Esta tienda todavía no envía a tu municipio. Contáctala para coordinar antes de continuar con la compra.',
       shippingQuoteFailed: 'No pudimos calcular el envío en este momento. Intenta de nuevo.',
+      invalidShippingDestination: 'El destino de envío seleccionado ya no es válido. Vuelve a elegir el departamento y el municipio.',
       shippingCalculating: 'Calculando el envío...',
       shippingSelectDestination: 'Elige tu destino para ver el costo de envío',
       totalPendingShipping: 'Se confirma al calcular el envío',
@@ -653,6 +670,7 @@ export const translations: Record<Language, Translations> = {
         basisWeight: 'Por peso',
         flatAmountLabel: 'Monto',
         rangesLabel: 'Rangos',
+        rangesFreeShippingHint: 'Un rango con Monto en 0 es envío gratis para ese tramo.',
         rangeFromLabel: 'Desde',
         rangeToLabel: 'Hasta',
         rangeToPlaceholder: 'Sin límite',
@@ -660,7 +678,7 @@ export const translations: Record<Language, Translations> = {
         addRangeButton: 'Agregar rango',
         removeRangeLabel: 'Quitar rango',
         codCommissionNote:
-          'El monto ya debe incluir cualquier comisión de recaudo contraentrega que quieras cobrar. Los agregadores en Colombia cobran entre 4% y 4.3% del valor recaudado, con un mínimo de COP 4.900 a 5.700.',
+          'El monto ya debe incluir cualquier comisión de recaudo contraentrega que quieras cobrar.',
         missingWeightTitle: 'Faltan productos con peso cargado',
         missingWeightDescription:
           'No puedes activar una tarifa por peso hasta que estos productos tengan peso:',
@@ -760,6 +778,7 @@ export const translations: Record<Language, Translations> = {
       clear: 'Limpiar',
       apply: 'Aplicar',
       reset: 'Restablecer',
+      retry: 'Reintentar',
     },
     contact: {
       title: 'Contáctanos',
@@ -1026,6 +1045,8 @@ export const translations: Record<Language, Translations> = {
       municipality: 'Municipality',
       selectMunicipality: 'Select a municipality',
       selectDepartmentFirst: 'Select a department first',
+      departmentsLoadError: "We couldn't load the departments.",
+      municipalitiesLoadError: "We couldn't load the municipalities.",
       postalCode: 'Postal code',
       country: 'Country',
       notes: 'Notes',
@@ -1036,6 +1057,7 @@ export const translations: Record<Language, Translations> = {
       shippingCoordinationCta: 'Message on WhatsApp',
       shippingBlocked: "This store doesn't ship to your municipality yet. Contact them to coordinate before continuing your purchase.",
       shippingQuoteFailed: "We couldn't calculate shipping right now. Please try again.",
+      invalidShippingDestination: "The selected shipping destination is no longer valid. Choose the department and municipality again.",
       shippingCalculating: 'Calculating shipping...',
       shippingSelectDestination: 'Choose your destination to see the shipping cost',
       totalPendingShipping: 'Confirmed once shipping is calculated',
@@ -1089,6 +1111,7 @@ export const translations: Record<Language, Translations> = {
         basisWeight: 'By weight',
         flatAmountLabel: 'Amount',
         rangesLabel: 'Ranges',
+        rangesFreeShippingHint: 'A range with an Amount of 0 is free shipping for that tier.',
         rangeFromLabel: 'From',
         rangeToLabel: 'To',
         rangeToPlaceholder: 'No limit',
@@ -1096,7 +1119,7 @@ export const translations: Record<Language, Translations> = {
         addRangeButton: 'Add range',
         removeRangeLabel: 'Remove range',
         codCommissionNote:
-          'The amount should already include any cash-on-delivery collection fee you want to charge. Colombian aggregators charge 4%-4.3% of the collected amount, with a minimum of COP 4,900-5,700.',
+          'The amount should already include any cash-on-delivery collection fee you want to charge.',
         missingWeightTitle: 'Products missing weight',
         missingWeightDescription: 'You cannot activate a weight-based rate until these products have a weight:',
         viewProductLink: 'Edit product',
@@ -1195,6 +1218,7 @@ export const translations: Record<Language, Translations> = {
       clear: 'Clear',
       apply: 'Apply',
       reset: 'Reset',
+      retry: 'Retry',
     },
     contact: {
       title: 'Contact us',
@@ -1461,6 +1485,8 @@ export const translations: Record<Language, Translations> = {
       municipality: 'Município',
       selectMunicipality: 'Selecione um município',
       selectDepartmentFirst: 'Selecione primeiro um departamento',
+      departmentsLoadError: 'Não conseguimos carregar os departamentos.',
+      municipalitiesLoadError: 'Não conseguimos carregar os municípios.',
       postalCode: 'CEP',
       country: 'País',
       notes: 'Observações',
@@ -1471,6 +1497,7 @@ export const translations: Record<Language, Translations> = {
       shippingCoordinationCta: 'Enviar mensagem no WhatsApp',
       shippingBlocked: 'Esta loja ainda não envia para o seu município. Fale com a loja para combinar antes de continuar a compra.',
       shippingQuoteFailed: 'Não conseguimos calcular o frete agora. Tente novamente.',
+      invalidShippingDestination: 'O destino de envio selecionado não é mais válido. Escolha novamente o departamento e o município.',
       shippingCalculating: 'Calculando o frete...',
       shippingSelectDestination: 'Escolha seu destino para ver o custo do frete',
       totalPendingShipping: 'Confirmado ao calcular o frete',
@@ -1524,6 +1551,7 @@ export const translations: Record<Language, Translations> = {
         basisWeight: 'Por peso',
         flatAmountLabel: 'Valor',
         rangesLabel: 'Faixas',
+        rangesFreeShippingHint: 'Uma faixa com Valor 0 é frete grátis para esse trecho.',
         rangeFromLabel: 'De',
         rangeToLabel: 'Até',
         rangeToPlaceholder: 'Sem limite',
@@ -1531,7 +1559,7 @@ export const translations: Record<Language, Translations> = {
         addRangeButton: 'Adicionar faixa',
         removeRangeLabel: 'Remover faixa',
         codCommissionNote:
-          'O valor já deve incluir qualquer comissão de coleta contra entrega que você queira cobrar. Os agregadores na Colômbia cobram entre 4% e 4,3% do valor coletado, com mínimo de COP 4.900 a 5.700.',
+          'O valor já deve incluir qualquer comissão de coleta contra entrega que você queira cobrar.',
         missingWeightTitle: 'Faltam produtos com peso cadastrado',
         missingWeightDescription: 'Você não pode ativar uma tarifa por peso até que estes produtos tenham peso:',
         viewProductLink: 'Editar produto',
@@ -1629,6 +1657,7 @@ export const translations: Record<Language, Translations> = {
       clear: 'Limpar',
       apply: 'Aplicar',
       reset: 'Redefinir',
+      retry: 'Tentar novamente',
     },
     contact: {
       title: 'Entre em contato',

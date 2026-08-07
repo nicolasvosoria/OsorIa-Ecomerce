@@ -1,5 +1,5 @@
 import { getSupabaseEcommerce } from "@/lib/supabase/client"
-import { ECOMMERCE_TABLES } from "@/lib/supabase/contract"
+import { ECOMMERCE_TABLES, ECOMMERCE_VIEWS } from "@/lib/supabase/contract"
 import { withTimeout } from "@/lib/supabase/with-timeout"
 
 export type Department = {
@@ -31,32 +31,32 @@ function coLocations(client: NonNullable<EcommerceClient>) {
   return client.from(ECOMMERCE_TABLES.coLocations)
 }
 
-// D1: co_locations is the only table (no separate departments table), so the
-// 33 departments are read off the same denormalized columns every municipio
-// row already carries, deduplicated here in memory.
+function coDepartments(client: NonNullable<EcommerceClient>) {
+  return client.from(ECOMMERCE_VIEWS.coDepartments)
+}
+
+// D1: co_departments is a view over the distinct departments of co_locations
+// (33 rows), not the 1,122-row municipio table itself -- PostgREST's own
+// max_rows cap (supabase/config.toml) truncates a response past 1,000 rows,
+// so deriving the 33 departments by pulling every municipio row and
+// deduplicating in memory silently lost departments once the catalog passed
+// that cap. The view can never collide with it.
 export async function listDepartments(
   client: EcommerceClient = getSupabaseEcommerce(),
 ): Promise<Department[]> {
   if (!client) return []
 
   const result = (await withTimeout(
-    coLocations(client).select("department_code, department_name").order("department_name"),
+    coDepartments(client).select("department_code, department_name").order("department_name"),
     LOCATIONS_TIMEOUT_MS,
     "listDepartments",
-  )) as { data: Pick<CoLocationRow, "department_code" | "department_name">[] | null; error: any }
+  )) as { data: { department_code: string; department_name: string }[] | null; error: any }
 
   if (result.error) {
     throw new Error(`No se pudieron leer los departamentos: ${result.error.message}`)
   }
 
-  const byCode = new Map<string, Department>()
-  for (const row of result.data ?? []) {
-    if (!byCode.has(row.department_code)) {
-      byCode.set(row.department_code, { code: row.department_code, name: row.department_name })
-    }
-  }
-
-  return [...byCode.values()]
+  return (result.data ?? []).map((row) => ({ code: row.department_code, name: row.department_name }))
 }
 
 // D28's second chained select: municipios filtered to one department. The

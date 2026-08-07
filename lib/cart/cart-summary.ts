@@ -1,12 +1,5 @@
 import type { CartItem as LocalCartItem } from '@/contexts/cart-context';
 import { formatPrice } from '@/lib/commerce/utils';
-import type { Language } from '@/lib/i18n/translations';
-
-export const LANGUAGE_LOCALES: Record<Language, string> = {
-  es: 'es-CO',
-  en: 'en-US',
-  pt: 'pt-BR',
-};
 
 export type CartSummaryLine = {
   id: string;
@@ -22,7 +15,7 @@ export type CartSummaryLine = {
 // passes `shippingAmount` and `total` keeps mirroring `subtotal` -- exactly
 // the "shipping is calculated at checkout" promise the drawer's own copy
 // makes. app/checkout/page.tsx is the one caller that resolves a real
-// shipping amount (lib/shipping/quote.ts) and passes it here once it has
+// shipping amount (getCheckoutShippingQuote) and passes it here once it has
 // one, which is the only thing that makes `total` genuinely diverge.
 export type CartSummary = {
   lines: CartSummaryLine[];
@@ -37,7 +30,6 @@ export function buildLocalCartSummary(args: {
   items: LocalCartItem[];
   getItemSubtotal: (item: LocalCartItem) => number;
   total: number;
-  language: Language;
   defaultCurrencyCode?: string;
   shippingAmount?: number;
 }): CartSummary {

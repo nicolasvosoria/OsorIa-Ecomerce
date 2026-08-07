@@ -33,6 +33,8 @@
 --
 -- Scope: ecommerce schema only.
 
+begin;
+
 alter table ecommerce.orders
   add column if not exists shipping_location_id bigint references ecommerce.co_locations(id) on delete restrict,
   add column if not exists shipping_department_code text,
@@ -254,3 +256,5 @@ $$;
 -- ever silently drifting.
 revoke all on function ecommerce.create_order_with_notifications(uuid, text, text, jsonb, jsonb, jsonb) from public;
 grant execute on function ecommerce.create_order_with_notifications(uuid, text, text, jsonb, jsonb, jsonb) to service_role;
+
+commit;

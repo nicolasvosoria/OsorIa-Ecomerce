@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 
+import { Button } from "@/components/ui/button"
 import { FormField } from "@/components/ui/form-field"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useLanguage } from "@/contexts/language-context"
@@ -28,7 +29,7 @@ export type ShippingLocationValue = {
   municipalityName: string
 }
 
-export const EMPTY_SHIPPING_LOCATION: ShippingLocationValue = {
+const EMPTY_SHIPPING_LOCATION: ShippingLocationValue = {
   departmentCode: "",
   departmentName: "",
   municipalityCode: "",
@@ -55,18 +56,33 @@ export function ShippingLocationPicker({
   // Qué departamento describe la lista de municipios que hay en estado ahora
   // mismo -- nunca se marca "cargando" con un setState síncrono al entrar al
   // efecto; se deriva comparando este valor contra value.departmentCode, y
-  // solo se actualiza dentro del callback async cuando la respuesta llega.
+  // solo se actualiza dentro del callback async cuando la respuesta llega
+  // (con éxito o con error: ambos casos cierran el intento).
   const [municipalitiesLoadedFor, setMunicipalitiesLoadedFor] = useState<string | null>(null)
+  // listDepartments y listMunicipalitiesByDepartment (lib/shipping/locations-api.ts)
+  // rechazan tanto en un error de Supabase como en el timeout de
+  // lib/supabase/with-timeout.ts -- ningún rechazo puede dejar el select de
+  // departamento vacío sin aviso, ni a isLoadingMunicipalities encendido para
+  // siempre. Los dos efectos de abajo convierten un rechazo en un estado
+  // honesto -- un mensaje y un botón para reintentar.
+  const [departmentsError, setDepartmentsError] = useState(false)
+  const [departmentsAttempt, setDepartmentsAttempt] = useState(0)
+  const [municipalitiesError, setMunicipalitiesError] = useState(false)
+  const [municipalitiesAttempt, setMunicipalitiesAttempt] = useState(0)
 
   useEffect(() => {
     let cancelled = false
-    listDepartments().then((result) => {
-      if (!cancelled) setDepartments(result)
-    })
+    listDepartments()
+      .then((result) => {
+        if (!cancelled) setDepartments(result)
+      })
+      .catch(() => {
+        if (!cancelled) setDepartmentsError(true)
+      })
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [departmentsAttempt])
 
   // D28's segundo select encadenado: se vuelve a pedir cada vez que cambia el
   // departamento, filtrado a ese departamento -- nunca los 1.122 municipios
@@ -79,25 +95,48 @@ export function ShippingLocationPicker({
     }
 
     let cancelled = false
-    listMunicipalitiesByDepartment(value.departmentCode).then((result) => {
-      if (cancelled) return
-      setMunicipalities(result)
-      setMunicipalitiesLoadedFor(value.departmentCode)
-    })
+    listMunicipalitiesByDepartment(value.departmentCode)
+      .then((result) => {
+        if (cancelled) return
+        setMunicipalities(result)
+      })
+      .catch(() => {
+        if (!cancelled) setMunicipalitiesError(true)
+      })
+      .finally(() => {
+        // Cierra el intento tanto en éxito como en error -- de lo contrario
+        // isLoadingMunicipalities, que solo compara este valor contra
+        // value.departmentCode, se queda en "cargando" para siempre.
+        if (!cancelled) setMunicipalitiesLoadedFor(value.departmentCode)
+      })
 
     return () => {
       cancelled = true
     }
-  }, [value.departmentCode])
+  }, [value.departmentCode, municipalitiesAttempt])
 
   const municipalityOptions = value.departmentCode ? municipalities : []
-  const isLoadingMunicipalities = Boolean(value.departmentCode) && municipalitiesLoadedFor !== value.departmentCode
+  const isLoadingMunicipalities =
+    Boolean(value.departmentCode) && municipalitiesLoadedFor !== value.departmentCode && !municipalitiesError
 
   const selectDepartment = (code: string) => {
     const department = departments.find((candidate) => candidate.code === code)
     // Cambiar de departamento vacía el municipio elegido: uno de otro
-    // departamento ya no es una opción válida.
+    // departamento ya no es una opción válida. También limpia un error de
+    // municipios que quedó del departamento anterior -- este es otro.
+    setMunicipalitiesError(false)
     onChange({ ...EMPTY_SHIPPING_LOCATION, departmentCode: code, departmentName: department?.name ?? "" })
+  }
+
+  const retryDepartments = () => {
+    setDepartmentsError(false)
+    setDepartmentsAttempt((count) => count + 1)
+  }
+
+  const retryMunicipalities = () => {
+    setMunicipalitiesError(false)
+    setMunicipalitiesLoadedFor(null)
+    setMunicipalitiesAttempt((count) => count + 1)
   }
 
   const selectMunicipality = (id: string) => {
@@ -121,9 +160,24 @@ export function ShippingLocationPicker({
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-      <FormField id="shipping-department" label={t.checkout.department} error={departmentError}>
+      <FormField
+        id="shipping-department"
+        label={t.checkout.department}
+        labelAdornment={
+          departmentsError ? (
+            <Button type="button" variant="link" size="sm" className="h-auto p-0" onClick={retryDepartments}>
+              {t.common.retry}
+            </Button>
+          ) : undefined
+        }
+        error={departmentsError ? t.checkout.departmentsLoadError : departmentError}
+      >
         {(fieldProps) => (
-          <Select value={value.departmentCode || undefined} onValueChange={selectDepartment} disabled={disabled}>
+          <Select
+            value={value.departmentCode || undefined}
+            onValueChange={selectDepartment}
+            disabled={disabled || departmentsError}
+          >
             <SelectTrigger {...fieldProps} className="w-full">
               <SelectValue placeholder={t.checkout.selectDepartment} />
             </SelectTrigger>
@@ -138,12 +192,23 @@ export function ShippingLocationPicker({
         )}
       </FormField>
 
-      <FormField id="shipping-municipality" label={t.checkout.municipality} error={municipalityError}>
+      <FormField
+        id="shipping-municipality"
+        label={t.checkout.municipality}
+        labelAdornment={
+          municipalitiesError ? (
+            <Button type="button" variant="link" size="sm" className="h-auto p-0" onClick={retryMunicipalities}>
+              {t.common.retry}
+            </Button>
+          ) : undefined
+        }
+        error={municipalitiesError ? t.checkout.municipalitiesLoadError : municipalityError}
+      >
         {(fieldProps) => (
           <Select
             value={value.municipalityId || undefined}
             onValueChange={selectMunicipality}
-            disabled={disabled || !value.departmentCode || isLoadingMunicipalities}
+            disabled={disabled || !value.departmentCode || isLoadingMunicipalities || municipalitiesError}
           >
             <SelectTrigger {...fieldProps} className="w-full">
               <SelectValue placeholder={municipalityPlaceholder} />

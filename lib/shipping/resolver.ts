@@ -1,21 +1,15 @@
+import { translations } from "@/lib/i18n/translations"
 import { resolveWeightGrams } from "@/lib/products/adapter"
 import { ECOMMERCE_TABLES } from "@/lib/supabase/contract"
 import { loadShippingSettings } from "@/lib/supabase/shipping-settings-api"
 import { withTimeout } from "@/lib/supabase/with-timeout"
-import type { ShippingMode, ShippingRateBasis, UnmatchedDestinationAction } from "@/lib/shipping/schemas"
-
-// D23/A3: how an order's shipping cost was arrived at, stored alongside the
-// amount so a $0 line never means two different things -- coordinate's "we
-// still have to agree on it" and a ladder's genuine free-shipping rung both
-// cost 0.
-export const SHIPPING_RESOLUTION_STATUSES = ["agreed", "rate", "free", "out_of_zone"] as const
-
-export type ShippingResolutionStatus = (typeof SHIPPING_RESOLUTION_STATUSES)[number]
-
-export type ShippingDestination = {
-  departmentCode: string
-  municipalityCode: string
-}
+import type {
+  ShippingDestination,
+  ShippingMode,
+  ShippingRateBasis,
+  ShippingResolutionStatus,
+  UnmatchedDestinationAction,
+} from "@/lib/shipping/schemas"
 
 export type ShippingResolutionItem = {
   productId: string | null
@@ -43,8 +37,14 @@ export type ShippingResolution = {
 
 const SHIPPING_RESOLUTION_TIMEOUT_MS = 15000
 
-const UNSERVED_DESTINATION_MESSAGE =
-  "Esta tienda todavía no realiza envíos a tu destino. Contáctala directamente para coordinar antes de continuar."
+// D31: sourced from translations.es.checkout.shippingBlocked -- the same key
+// app/checkout/page.tsx's renderShippingQuote already shows via the
+// "blocked" kind use-shipping-quote.ts derives from an instanceof check on
+// this error -- instead of an independent hardcoded copy of the same
+// meaning. This module has no request-scoped locale to thread through
+// (lib/shipping/schemas.ts's REQUIRED_DEPARTMENT_MESSAGE is the same
+// precedent), so "es" is the fixed default.
+const UNSERVED_DESTINATION_MESSAGE = translations.es.checkout.shippingBlocked
 
 // D7: a caller that needs to tell "the store blocked this destination" apart
 // from any other resolution failure (a live checkout quote, say, deciding
@@ -59,12 +59,14 @@ export class UnservedDestinationError extends Error {
 }
 
 // D19: the seam every strategy plugs into -- own_rates (below) is the first
-// and, until the aggregator lands, only real one. Both createOrder and
-// quoteShipping call exactly this function, never their own copy of "find
-// the zone, apply the ladder", so they structurally cannot disagree (the bug
-// this whole design exists to prevent). D7's block/allow decision is applied
-// here too, uniformly: a caller only ever sees "out_of_zone" when the
-// store's own setting allows the sale through anyway.
+// and, until the aggregator lands, only real one. Both createOrder
+// (lib/supabase/orders-api.ts) and the live checkout preview
+// (app/checkout/actions.ts's getCheckoutShippingQuote) call exactly this
+// function, never their own copy of "find the zone, apply the ladder", so
+// they structurally cannot disagree (the bug this whole design exists to
+// prevent). D7's block/allow decision is applied here too, uniformly: a
+// caller only ever sees "out_of_zone" when the store's own setting allows
+// the sale through anyway.
 export async function resolveShipping(
   supabase: any,
   input: ShippingResolutionInput,
@@ -185,17 +187,38 @@ type ShippingRateRow = {
   amount: number
 }
 
+// basis comes back from the DB as a plain string, never pre-narrowed to
+// ShippingRateBasis -- narrowed here the same way shipping-zones-api.ts's
+// rateRowsToLadder narrows it (shipping_rates_basis_chk guarantees it in
+// practice, but the type system doesn't know that). This one guards the
+// PRICING path itself: amountForZoneLadder below prices off input.subtotal
+// whenever basis isn't "weight", so an unrecognized value laundered past
+// this point would silently bill the buyer off the wrong number instead of
+// failing loudly.
+type RawShippingRateRow = { basis: string; range_from: number | null; range_to: number | null; amount: number }
+
+function toShippingRateRow(row: RawShippingRateRow): ShippingRateRow {
+  switch (row.basis) {
+    case "flat":
+    case "order_value":
+    case "weight":
+      return { ...row, basis: row.basis }
+    default:
+      throw new Error(`Tarifa de envío con basis desconocido: ${row.basis}`)
+  }
+}
+
 async function loadZoneLadder(supabase: any, zoneId: string): Promise<ShippingRateRow[]> {
   const result = (await withTimeout(
     supabase.from(ECOMMERCE_TABLES.shippingRates).select("basis, range_from, range_to, amount").eq("zone_id", zoneId),
     SHIPPING_RESOLUTION_TIMEOUT_MS,
     "loadZoneLadder",
-  )) as { data: ShippingRateRow[] | null; error: any }
+  )) as { data: RawShippingRateRow[] | null; error: any }
 
   if (result.error) {
     throw new Error("No se pudo leer la escalera de tarifas de la zona", { cause: result.error })
   }
-  return result.data ?? []
+  return (result.data ?? []).map(toShippingRateRow)
 }
 
 // D5/D6: S7 already blocks SAVING an incomplete ladder (findShippingLadderGaps

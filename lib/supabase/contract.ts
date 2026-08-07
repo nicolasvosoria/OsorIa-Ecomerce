@@ -55,6 +55,7 @@ export const ECOMMERCE_TABLES = {
 export const ECOMMERCE_VIEWS = {
   appFontPairingsLegacy: "app_font_pairings_legacy",
   appFontsLegacy: "app_fonts_legacy",
+  coDepartments: "co_departments",
   componentStylesLegacy: "component_styles_legacy",
   emailOutboxHealth: "email_outbox_health",
   itemOptionsLegacy: "item_options_legacy",

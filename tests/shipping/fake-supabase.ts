@@ -8,6 +8,12 @@
 // para que resolver.test.ts lo reuse en vez de duplicarlo.
 export type Row = Record<string, unknown>
 
+// co_departments es una vista real sobre co_locations (ver la migración
+// 20260807000700): un fixture nunca la siembra por separado, se deriva de
+// co_locations cada vez que se consulta, igual que en Postgres.
+const CO_LOCATIONS_TABLE = "co_locations"
+const CO_DEPARTMENTS_VIEW = "co_departments"
+
 export function createShippingSupabase(seed: Record<string, Row[]> = {}) {
   const tables = new Map<string, Row[]>(Object.entries(seed).map(([table, rows]) => [table, [...rows]]))
   let nextId = 1
@@ -17,8 +23,19 @@ export function createShippingSupabase(seed: Record<string, Row[]> = {}) {
     return tables.get(name)!
   }
 
+  function deriveCoDepartments(): Row[] {
+    const byCode = new Map<string, Row>()
+    for (const row of table(CO_LOCATIONS_TABLE)) {
+      const code = row.department_code as string
+      if (!byCode.has(code)) {
+        byCode.set(code, { department_code: code, department_name: row.department_name })
+      }
+    }
+    return [...byCode.values()]
+  }
+
   function from(name: string) {
-    const rows = table(name)
+    const rows = name === CO_DEPARTMENTS_VIEW ? deriveCoDepartments() : table(name)
     let operation: "select" | "insert" | "update" | "delete" = "select"
     let payload: Row | Row[] | null = null
     const filters: { type: "eq" | "neq" | "in" | "is"; column: string; value: unknown }[] = []

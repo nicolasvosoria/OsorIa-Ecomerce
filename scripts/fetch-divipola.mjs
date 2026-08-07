@@ -69,8 +69,14 @@ async function main() {
 
   const tuples = rows.map(toValuesTuple).join(",\n  ")
 
+  // do update, not do nothing: keeps a re-run idempotent AND lets a DANE
+  // name or classification correction propagate on the next re-run. The
+  // (department_code, municipality_code) match itself never needs
+  // re-setting; department_name/municipality_name/municipality_type are the
+  // columns DANE actually corrects over time (see the migration this seed
+  // is pasted into).
   console.log(
-    `insert into ecommerce.co_locations\n  (department_code, department_name, municipality_code, municipality_name, municipality_type, longitude, latitude)\nvalues\n  ${tuples}\non conflict (department_code, municipality_code) do nothing;`,
+    `insert into ecommerce.co_locations\n  (department_code, department_name, municipality_code, municipality_name, municipality_type, longitude, latitude)\nvalues\n  ${tuples}\non conflict (department_code, municipality_code) do update set\n  department_name = excluded.department_name,\n  municipality_name = excluded.municipality_name,\n  municipality_type = excluded.municipality_type,\n  updated_at = excluded.updated_at;`,
   )
 }
 

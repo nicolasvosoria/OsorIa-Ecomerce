@@ -11,7 +11,7 @@ export type ShippingSettings = {
   unmatchedDestinationAction: UnmatchedDestinationAction
 }
 
-export const DEFAULT_SHIPPING_SETTINGS: ShippingSettings = {
+const DEFAULT_SHIPPING_SETTINGS: ShippingSettings = {
   mode: "coordinate",
   unmatchedDestinationAction: "block",
 }
@@ -39,7 +39,7 @@ export async function saveShippingMode(supabase: any, storeId: string, mode: Shi
     .upsert({ store_id: storeId, mode }, { onConflict: "store_id" })
 
   if (error) {
-    throw new Error("No se pudo guardar el modo de envío", { cause: error })
+    throw new Error("No se pudo persistir el modo de envío en store_shipping_settings", { cause: error })
   }
 }
 
@@ -57,7 +57,7 @@ export async function saveUnmatchedDestinationAction(
     .upsert({ store_id: storeId, unmatched_destination_action: unmatchedDestinationAction }, { onConflict: "store_id" })
 
   if (error) {
-    throw new Error("No se pudo guardar la acción para destinos sin zona", { cause: error })
+    throw new Error("No se pudo persistir la acción para destinos sin zona en store_shipping_settings", { cause: error })
   }
 }
 

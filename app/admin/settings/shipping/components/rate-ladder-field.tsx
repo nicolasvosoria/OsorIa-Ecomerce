@@ -3,10 +3,11 @@
 import { useMemo } from "react"
 import Link from "next/link"
 import { Controller, useFieldArray, useWatch, type Control } from "react-hook-form"
-import { Info, Plus, Trash2 } from "lucide-react"
+import { AlertCircle, Info, Plus, Trash2 } from "lucide-react"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
+import { FieldError } from "@/components/ui/field-error"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -14,9 +15,8 @@ import { translations } from "@/lib/i18n/translations"
 import {
   SHIPPING_RATE_BASES,
   findShippingLadderGaps,
+  parseShippingLadderRangeBounds,
   shippingRateBasisLabelKey,
-  shippingRateLadderSchema,
-  toRateLadderPayload,
   type ShippingRateRangeRowValues,
   type ZoneEditorFormValues,
 } from "@/lib/shipping/schemas"
@@ -39,17 +39,21 @@ export function RateLadderField({
   missingWeightProducts: MissingWeightProduct[]
 }) {
   const basis = useWatch({ control, name: "rateLadder.basis" })
-  const amount = useWatch({ control, name: "rateLadder.amount" })
   // The `?? EMPTY_RANGES` fallback reuses one stable module-level reference
   // instead of a fresh `[]` literal every render, so gapIssues' useMemo below
   // doesn't see `ranges` as "changed" on every render it isn't.
   const ranges = useWatch({ control, name: "rateLadder.ranges" }) ?? EMPTY_RANGES
   const { fields, append, remove } = useFieldArray({ control, name: "rateLadder.ranges" })
 
+  // parseShippingLadderRangeBounds only requires from/to to be valid, never
+  // amount -- so a row whose Monto is still blank while an owner is mid-edit
+  // doesn't take the whole gap/overlap check down with it (unlike parsing
+  // through the strict, amount-included shippingRateLadderSchema).
   const gapIssues = useMemo(() => {
-    const parsed = shippingRateLadderSchema.safeParse(toRateLadderPayload({ basis, amount, ranges }))
-    return parsed.success ? findShippingLadderGaps(parsed.data) : []
-  }, [basis, amount, ranges])
+    if (basis === "flat") return []
+    const bounds = parseShippingLadderRangeBounds(ranges)
+    return bounds ? findShippingLadderGaps({ basis, ranges: bounds }) : []
+  }, [basis, ranges])
 
   return (
     <div className="space-y-4 rounded-md border p-4">
@@ -81,7 +85,18 @@ export function RateLadderField({
           <Controller
             control={control}
             name="rateLadder.amount"
-            render={({ field }) => <Input id="rate-ladder-amount" type="number" min="0" {...field} />}
+            render={({ field, fieldState }) => (
+              <>
+                <Input
+                  id="rate-ladder-amount"
+                  type="number"
+                  min="0"
+                  aria-invalid={fieldState.error ? true : undefined}
+                  {...field}
+                />
+                <FieldError message={fieldState.error?.message} />
+              </>
+            )}
           />
         </div>
       ) : (
@@ -98,9 +113,10 @@ export function RateLadderField({
               <Plus className="h-4 w-4" /> {copy.addRangeButton}
             </Button>
           </div>
+          <p className="text-xs text-muted-foreground">{copy.rangesFreeShippingHint}</p>
 
           {fields.map((field, index) => (
-            <div key={field.id} className="grid grid-cols-[1fr_1fr_1fr_auto] items-end gap-2">
+            <div key={field.id} className="grid grid-cols-2 items-end gap-2 sm:grid-cols-[1fr_1fr_1fr_auto]">
               <RangeBoundField control={control} index={index} name="from" label={copy.rangeFromLabel} />
               <RangeBoundField
                 control={control}
@@ -124,9 +140,13 @@ export function RateLadderField({
           ))}
 
           {gapIssues.length > 0 ? (
-            <Alert>
-              <Info className="h-4 w-4" />
-              <AlertDescription>{gapIssues[0].message}</AlertDescription>
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                {gapIssues.map((issue, index) => (
+                  <p key={index}>{issue.message}</p>
+                ))}
+              </AlertDescription>
             </Alert>
           ) : null}
         </div>
@@ -180,8 +200,18 @@ function RangeBoundField({
       <Controller
         control={control}
         name={fieldName}
-        render={({ field }) => (
-          <Input id={fieldName} type="number" min="0" placeholder={placeholder} {...field} />
+        render={({ field, fieldState }) => (
+          <>
+            <Input
+              id={fieldName}
+              type="number"
+              min="0"
+              placeholder={placeholder}
+              aria-invalid={fieldState.error ? true : undefined}
+              {...field}
+            />
+            <FieldError message={fieldState.error?.message} />
+          </>
         )}
       />
     </div>

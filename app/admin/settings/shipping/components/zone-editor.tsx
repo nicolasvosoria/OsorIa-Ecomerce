@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { useFieldArray, useForm, type Control } from "react-hook-form"
+import { useFieldArray, useForm, type Control, type FieldPath } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Check, ChevronsUpDown, Loader2, Pencil, Plus, Save, X } from "lucide-react"
 import { toast } from "sonner"
@@ -31,6 +31,7 @@ import { translations } from "@/lib/i18n/translations"
 import type { Department, Municipality } from "@/lib/shipping/locations-api"
 import {
   UNMATCHED_DESTINATION_ACTIONS,
+  destinationKey,
   findShippingLadderGaps,
   shippingRateBasisLabelKey,
   shippingRateLadderSchema,
@@ -52,6 +53,13 @@ import { EMPTY_RANGE_ROW, RateLadderField } from "./rate-ladder-field"
 
 const copy = translations.es.shipping.zones
 
+// Replaces a plain `string | "new" | null` state: "new" used to be absorbed
+// by `string`, so nothing enforced the distinction and every read site had
+// to re-derive it by hand (was editingZoneId "new", null, or a real id?).
+// A discriminated union makes each of the dialog's three states -- closed,
+// creating, editing a specific zone -- its own checked shape instead.
+type ZoneEditorState = { mode: "closed" } | { mode: "creating" } | { mode: "editing"; zoneId: string }
+
 export function ShippingZonesSection({
   zones,
   missingWeightProducts,
@@ -61,7 +69,7 @@ export function ShippingZonesSection({
   missingWeightProducts: MissingWeightProduct[]
   unmatchedDestinationAction: UnmatchedDestinationAction
 }) {
-  const [editingZoneId, setEditingZoneId] = useState<string | "new" | null>(null)
+  const [editorState, setEditorState] = useState<ZoneEditorState>({ mode: "closed" })
   const [departments, setDepartments] = useState<Department[]>([])
 
   useEffect(() => {
@@ -70,7 +78,12 @@ export function ShippingZonesSection({
       .catch((error) => console.error("[Shipping Zones] Error al cargar departamentos:", error))
   }, [])
 
-  const editingZone = editingZoneId && editingZoneId !== "new" ? zones.find((zone) => zone.id === editingZoneId) ?? null : null
+  const editingZoneId = editorState.mode === "editing" ? editorState.zoneId : null
+  // Looked up only to PRE-FILL the form -- a stale `zones` list (refreshed
+  // elsewhere while the dialog stayed open) can legitimately miss it, but
+  // that must never flip the save into a create: editingZoneId above, not
+  // this lookup, is what ZoneForm uses to decide create-vs-edit.
+  const editingZone = editingZoneId ? zones.find((zone) => zone.id === editingZoneId) ?? null : null
 
   return (
     <div className="space-y-6">
@@ -82,7 +95,7 @@ export function ShippingZonesSection({
             <CardTitle className="text-base">{copy.sectionTitle}</CardTitle>
             <CardDescription>{copy.sectionDescription}</CardDescription>
           </div>
-          <Button type="button" size="sm" className="shrink-0 gap-1.5" onClick={() => setEditingZoneId("new")}>
+          <Button type="button" size="sm" className="shrink-0 gap-1.5" onClick={() => setEditorState({ mode: "creating" })}>
             <Plus className="h-4 w-4" /> {copy.addButton}
           </Button>
         </CardHeader>
@@ -90,24 +103,28 @@ export function ShippingZonesSection({
           {zones.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">{copy.emptyDescription}</p>
           ) : (
-            <ZonesTable zones={zones} onEdit={setEditingZoneId} />
+            <ZonesTable zones={zones} onEdit={(zoneId) => setEditorState({ mode: "editing", zoneId })} />
           )}
         </CardContent>
       </Card>
 
-      <Dialog open={editingZoneId !== null} onOpenChange={(open) => !open && setEditingZoneId(null)}>
+      <Dialog
+        open={editorState.mode !== "closed"}
+        onOpenChange={(open) => !open && setEditorState({ mode: "closed" })}
+      >
         <DialogContent className="editor-chrome max-h-[85vh] max-w-2xl overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingZoneId === "new" ? copy.createTitle : copy.editTitle}</DialogTitle>
+            <DialogTitle>{editorState.mode === "creating" ? copy.createTitle : copy.editTitle}</DialogTitle>
             <DialogDescription>{copy.sectionDescription}</DialogDescription>
           </DialogHeader>
-          {editingZoneId !== null ? (
+          {editorState.mode !== "closed" ? (
             <ZoneForm
-              key={editingZoneId}
+              key={editingZoneId ?? "new"}
+              zoneId={editingZoneId}
               zone={editingZone}
               departments={departments}
               missingWeightProducts={missingWeightProducts}
-              onClose={() => setEditingZoneId(null)}
+              onClose={() => setEditorState({ mode: "closed" })}
             />
           ) : null}
         </DialogContent>
@@ -140,7 +157,7 @@ function ZonesTable({
             <TableCell className="whitespace-normal">
               <div className="flex flex-wrap gap-1">
                 {zone.destinations.map((destination) => (
-                  <Badge key={`${destination.departmentCode}:${destination.municipalityCode ?? ""}`} variant="outline">
+                  <Badge key={destinationKey(destination)} variant="outline">
                     {destination.municipalityCode
                       ? destination.municipalityName
                       : `${copy.wholeDepartmentPrefix} ${destination.departmentName}`}
@@ -267,11 +284,15 @@ function buildNameHints(zone: ShippingZoneRecord | null): Map<string, string> {
 }
 
 function ZoneForm({
+  zoneId,
   zone,
   departments,
   missingWeightProducts,
   onClose,
 }: {
+  // Decides create-vs-edit on submit -- sourced from editorState, never
+  // re-derived from `zone` (see the editingZoneId comment above the caller).
+  zoneId: string | null
   zone: ShippingZoneRecord | null
   departments: Department[]
   missingWeightProducts: MissingWeightProduct[]
@@ -284,29 +305,50 @@ function ZoneForm({
     control,
     register,
     handleSubmit,
-    getValues,
+    setError,
     formState: { errors, isSubmitting },
   } = useForm<ZoneEditorFormValues>({
     resolver: zodResolver(shippingZoneFormSchema),
     defaultValues: toDefaultValues(zone),
   })
 
-  async function onSubmit() {
-    const ladderPayload = toRateLadderPayload(getValues("rateLadder"))
+  // Takes handleSubmit's own validated payload instead of re-reading the
+  // form with getValues(): one reading of the form, not two that can quietly
+  // differ (the resolver trims `name`; a second, untrimmed read would have
+  // undone that).
+  async function onSubmit(values: ZoneEditorFormValues) {
+    const ladderPayload = toRateLadderPayload(values.rateLadder)
     const parsedLadder = shippingRateLadderSchema.safeParse(ladderPayload)
     if (!parsedLadder.success) {
-      toast.error(copy.saveErrorToast)
+      // looseRateLadderFieldSchema (the resolver's own schema) never fails on
+      // the ladder, so this is the only place a broken row/amount is ever
+      // caught -- surfaced on the exact field RateLadderField renders
+      // (rate-ladder-field.tsx's Controllers read fieldState off this SAME
+      // control), the same "inline error, no toast" treatment name/destinations
+      // already get from the resolver above.
+      for (const issue of parsedLadder.error.issues) {
+        setError(`rateLadder.${issue.path.join(".")}` as FieldPath<ZoneEditorFormValues>, {
+          type: "manual",
+          message: issue.message,
+        })
+      }
       return
     }
 
     const gapIssues = findShippingLadderGaps(parsedLadder.data)
     if (gapIssues.length > 0) {
-      toast.error(gapIssues[0].message)
+      // D6 is a cross-row invariant, not one field's fault -- one toast per
+      // issue (same "several problems, several toasts" shape processOrder
+      // already uses in app/checkout/page.tsx for stock errors) so fixing the
+      // first one doesn't just uncover a second the owner was never shown.
+      gapIssues.forEach((issue) => toast.error(issue.message))
       return
     }
 
-    const { name, destinations } = getValues()
-    const result = await saveShippingZoneAction({ name, destinations, rateLadder: parsedLadder.data }, zone?.id)
+    const result = await saveShippingZoneAction(
+      { name: values.name, destinations: values.destinations, rateLadder: parsedLadder.data },
+      zoneId ?? undefined,
+    )
 
     if (!result.success) {
       toast.error(result.error || copy.saveErrorToast)
@@ -402,17 +444,15 @@ function DestinationsField({
     )
   }
 
-  const existingKeys = new Set(
-    fields.map((field) => `${field.departmentCode}:${field.municipalityCode ?? ""}`),
-  )
+  const existingKeys = new Set(fields.map(destinationKey))
 
   function addWholeDepartment() {
-    if (!selectedDepartment || existingKeys.has(`${selectedDepartment}:`)) return
+    if (!selectedDepartment || existingKeys.has(destinationKey({ departmentCode: selectedDepartment, municipalityCode: null }))) return
     append({ departmentCode: selectedDepartment, municipalityCode: null })
   }
 
   function addMunicipality(municipality: Municipality) {
-    if (existingKeys.has(`${municipality.departmentCode}:${municipality.code}`)) return
+    if (existingKeys.has(destinationKey({ departmentCode: municipality.departmentCode, municipalityCode: municipality.code }))) return
 
     setNames((current) => {
       const next = new Map(current)
@@ -461,7 +501,9 @@ function DestinationsField({
                 <CommandEmpty>{loadingMunicipalities ? copy.loadingMunicipalities : copy.noMunicipalitiesFound}</CommandEmpty>
                 <CommandGroup>
                   {municipalities.map((municipality) => {
-                    const alreadyAdded = existingKeys.has(`${municipality.departmentCode}:${municipality.code}`)
+                    const alreadyAdded = existingKeys.has(
+                      destinationKey({ departmentCode: municipality.departmentCode, municipalityCode: municipality.code }),
+                    )
                     return (
                       <CommandItem
                         key={municipality.id}

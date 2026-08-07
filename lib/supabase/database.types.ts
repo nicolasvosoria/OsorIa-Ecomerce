@@ -2709,6 +2709,13 @@ export type Database = {
         }
         Relationships: []
       }
+      co_departments: {
+        Row: {
+          department_code: string | null
+          department_name: string | null
+        }
+        Relationships: []
+      }
       component_styles_legacy: {
         Row: {
           component_name: string | null

@@ -5,8 +5,7 @@ import { revalidatePath } from "next/cache"
 import type { AdminActionResult } from "@/lib/admin/action-result"
 import {
   shippingModeFormSchema,
-  shippingRateLadderSchema,
-  shippingZoneFormSchema,
+  shippingZoneActionSchema,
   unmatchedDestinationActionFormSchema,
 } from "@/lib/shipping/schemas"
 import { authorizeActiveStoreAdmin } from "@/lib/supabase/active-store"
@@ -17,10 +16,6 @@ import { deleteShippingZone, saveShippingZone } from "@/lib/supabase/shipping-zo
 const SHIPPING_SETTINGS_PATH = "/admin/settings/shipping"
 const SETTINGS_PATH = "/admin/settings"
 const INVALID_INPUT = "Los datos no son válidos. Revisa el formulario e intenta de nuevo."
-const SAVE_ERROR_MESSAGE = "No se pudo guardar el modo de envío"
-const SAVE_UNMATCHED_DESTINATION_ERROR_MESSAGE = "No se pudo guardar la acción para destinos sin zona"
-const SAVE_ZONE_ERROR_MESSAGE = "No se pudo guardar la zona de envío"
-const DELETE_ZONE_ERROR_MESSAGE = "No se pudo eliminar la zona de envío"
 
 // D13/D27: storeId always comes from the active-store gate, never from the
 // client -- the same authority shape every other settings action in this
@@ -42,7 +37,11 @@ export async function updateShippingModeAction(input: unknown): Promise<AdminAct
     await saveShippingMode(supabase, storeId, parsed.data.mode)
   } catch (error) {
     console.error("[Shipping Settings] Error al guardar el modo de envío:", error)
-    return { success: false, error: SAVE_ERROR_MESSAGE }
+    // D31: no server literal here -- shipping.saveErrorToast (lib/i18n/
+    // translations.ts) is the one declaration of this message; the console's
+    // own `result.error || copy.saveErrorToast` only renders it when
+    // result.error is falsy.
+    return { success: false }
   }
 
   revalidatePath(SHIPPING_SETTINGS_PATH)
@@ -70,7 +69,9 @@ export async function updateUnmatchedDestinationActionAction(input: unknown): Pr
     await saveUnmatchedDestinationAction(supabase, storeId, parsed.data.unmatchedDestinationAction)
   } catch (error) {
     console.error("[Shipping Settings] Error al guardar la acción para destinos sin zona:", error)
-    return { success: false, error: SAVE_UNMATCHED_DESTINATION_ERROR_MESSAGE }
+    // D31: see updateShippingModeAction above -- shipping.zones.
+    // unmatchedDestinationSaveErrorToast is the one declaration.
+    return { success: false }
   }
 
   revalidatePath(SHIPPING_SETTINGS_PATH)
@@ -86,9 +87,8 @@ export async function saveShippingZoneAction(
   input: unknown,
   zoneId?: string,
 ): Promise<AdminActionResult> {
-  const parsedZone = shippingZoneFormSchema.safeParse(input)
-  const parsedLadder = shippingRateLadderSchema.safeParse((input as { rateLadder?: unknown } | null)?.rateLadder)
-  if (!parsedZone.success || !parsedLadder.success) {
+  const parsed = shippingZoneActionSchema.safeParse(input)
+  if (!parsed.success) {
     return { success: false, error: INVALID_INPUT }
   }
 
@@ -100,22 +100,15 @@ export async function saveShippingZoneAction(
   const { supabase, storeId } = authorization
 
   try {
-    const result = await saveShippingZone(
-      supabase,
-      storeId,
-      {
-        name: parsedZone.data.name,
-        destinations: parsedZone.data.destinations,
-        rateLadder: parsedLadder.data,
-      },
-      zoneId,
-    )
+    const result = await saveShippingZone(supabase, storeId, parsed.data, zoneId)
     if (!result.success) {
       return { success: false, error: result.error }
     }
   } catch (error) {
     console.error("[Shipping Settings] Error al guardar la zona de envío:", error)
-    return { success: false, error: SAVE_ZONE_ERROR_MESSAGE }
+    // D31: see updateShippingModeAction above -- shipping.zones.saveErrorToast
+    // is the one declaration.
+    return { success: false }
   }
 
   revalidatePath(SHIPPING_SETTINGS_PATH)
@@ -133,11 +126,13 @@ export async function deleteShippingZoneAction(zoneId: string): Promise<AdminAct
   try {
     const result = await deleteShippingZone(supabase, storeId, zoneId)
     if (!result.success) {
-      return { success: false, error: result.error ?? DELETE_ZONE_ERROR_MESSAGE }
+      return { success: false, error: result.error }
     }
   } catch (error) {
     console.error("[Shipping Settings] Error al eliminar la zona de envío:", error)
-    return { success: false, error: DELETE_ZONE_ERROR_MESSAGE }
+    // D31: see updateShippingModeAction above -- shipping.zones.deleteErrorToast
+    // is the one declaration.
+    return { success: false }
   }
 
   revalidatePath(SHIPPING_SETTINGS_PATH)

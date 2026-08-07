@@ -68,8 +68,10 @@ export function getPublicProductMetadata(metadata: unknown): PublicProductMetada
 }
 
 // weight_grams is a real column now, not free text, so it never comes through
-// getPublicProductMetadata; it is spliced back in at the spot "Peso" held before it
-// was absorbed (right after Dimensiones), so the buyer keeps seeing it there.
+// getPublicProductMetadata; it is spliced back in right after Dimensiones,
+// the spot "Peso" held before it was absorbed -- but only when the product
+// actually carries a Dimensiones entry. Most products don't, so weight lands
+// at the end of the list instead (after whichever fields the product has).
 function withPublicWeight(
   entries: PublicProductMetadataEntry[],
   weightGrams: number | null | undefined,

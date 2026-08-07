@@ -21,7 +21,6 @@ import {
 import { GuestLoginBanner } from "@/components/checkout/guest-login-banner"
 import {
   getCheckoutPrefill,
-  getCheckoutShippingQuote,
   getCheckoutStoreContactPhone,
   placeCheckoutOrder,
   type CheckoutPrefill,
@@ -30,41 +29,22 @@ import { useStore } from "@/contexts/store-context"
 import { enabledPaymentMethodIds } from "@/lib/checkout/payment-methods"
 import type { CheckoutOrderInput } from "@/lib/checkout/schemas"
 import type { Translations } from "@/lib/i18n/translations"
-import type { ShippingDestination, ShippingResolutionItem, ShippingResolutionStatus } from "@/lib/shipping/resolver"
+import type { ShippingDestination } from "@/lib/shipping/schemas"
 import { shippingStatusLabelKeyForBuyer } from "@/lib/shipping/status-label"
 import { buildWhatsAppLink } from "@/lib/stores/whatsapp-contact"
-
-// D23: the live quote's own vocabulary of states -- "resolved" carries one of
-// the four SHIPPING_RESOLUTION_STATUSES (lib/shipping/resolver.ts), the rest
-// are this preview's own transitional/failure states, never a status the
-// resolver itself would return. "idle"/"loading" are never stored (see
-// `shippingQuote` below) -- only a settled ShippingQuoteOutcome is state, so
-// there is nothing to set synchronously inside the quoting effect.
-type ShippingQuoteOutcome =
-  | { kind: "resolved"; status: ShippingResolutionStatus; amount: number }
-  | { kind: "blocked" }
-  | { kind: "failed" }
-
-type ShippingQuoteState = { kind: "idle" } | { kind: "loading" } | ShippingQuoteOutcome
+import { useShippingQuote, type ShippingQuoteState } from "@/app/checkout/use-shipping-quote"
 
 export default function CheckoutPage() {
   const router = useRouter()
   const localCart = useLocalCart()
   const { user, isAuthenticated, isLoading: authLoading } = useAuth()
-  const { language, t } = useLanguage()
+  const { t } = useLanguage()
   const { store } = useStore()
   const [customerData, setCustomerData] = useState<GuestCustomerData | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [prefill, setPrefill] = useState<CheckoutPrefill>(null)
   const [contactPhone, setContactPhone] = useState<string | null>(null)
   const [destination, setDestination] = useState<ShippingDestination | null>(null)
-  // The settled outcome of the most recent quote request, tagged with the
-  // fingerprint of the request it answers -- `shippingQuote` below compares
-  // that fingerprint against the CURRENT one to derive "idle"/"loading"
-  // during render instead of setting them from the effect (the race guard:
-  // an in-flight request for an older destination can only ever produce a
-  // fingerprint that no longer matches, so it can't surface as the answer).
-  const [quoted, setQuoted] = useState<{ fingerprint: string; outcome: ShippingQuoteOutcome } | null>(null)
 
   // Identity stays stable across renders (empty deps): the two checkout
   // forms call this from an effect keyed on their own watched fields, and a
@@ -122,78 +102,17 @@ export default function CheckoutPage() {
 
   const hasLocalItems = localCart.items.length > 0
   const cartSubtotal = localCart.getTotal()
-  // A primitive fingerprint of what the resolver actually prices (D25: the
-  // idempotency key and this quote both key off destination-or-cart, never
-  // the cart array's own reference identity, which cart-context can hand
-  // back as a new object every render even when nothing in it changed).
-  const cartFingerprint = localCart.items
-    .map((item) => `${item.id}:${item.variantId ?? ""}:${item.comboId ?? ""}:${item.quantity}`)
-    .join("|")
-  const shippingQuoteItems = useMemo(
-    () => toShippingResolutionItems(localCart.items),
-    // cartFingerprint IS localCart.items' content identity -- keying off it
-    // instead of the array itself keeps this stable across renders where
-    // the cart didn't actually change.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [cartFingerprint],
-  )
-  const quoteRequestFingerprint = destination
-    ? buildShippingQuoteFingerprint(destination, cartFingerprint, cartSubtotal)
-    : null
-
-  // D25: re-quotes on the only two things that change the price -- the
-  // destination or the cart -- and on nothing else (typing a name, say,
-  // never fires this). The `cancelled` flag is the same stale-response guard
-  // getCheckoutPrefill/getCheckoutStoreContactPhone already use above: React
-  // runs this effect's cleanup before the next run when the destination
-  // changes again, so an older quote that resolves late finds `cancelled`
-  // true and its setQuoted call below is simply never made -- and even if it
-  // somehow raced past that, its OWN fingerprint stamped on the result could
-  // never match a newer `quoteRequestFingerprint` at render time either.
-  useEffect(() => {
-    if (!destination || !quoteRequestFingerprint) return
-    const requestFingerprint = quoteRequestFingerprint
-
-    let cancelled = false
-    getCheckoutShippingQuote({
-      destination,
-      subtotal: cartSubtotal,
-      items: shippingQuoteItems,
-    })
-      .then((result) => {
-        if (cancelled) return
-        setQuoted({
-          fingerprint: requestFingerprint,
-          outcome: result.ok
-            ? { kind: "resolved", status: result.resolution.status, amount: result.resolution.amount }
-            : { kind: result.blocked ? "blocked" : "failed" },
-        })
-      })
-      .catch(() => {
-        if (cancelled) return
-        setQuoted({ fingerprint: requestFingerprint, outcome: { kind: "failed" } })
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [destination, quoteRequestFingerprint, cartSubtotal, shippingQuoteItems])
-
-  // Derived, never stored: "idle" (no destination yet) and "loading" (a
-  // request is in flight for the CURRENT fingerprint) are both computed at
-  // render time from comparing fingerprints, not set from the effect above --
-  // see the `quoted` state's own comment for why that's also the race guard.
-  const shippingQuote: ShippingQuoteState = !destination
-    ? { kind: "idle" }
-    : quoted?.fingerprint === quoteRequestFingerprint
-      ? quoted.outcome
-      : { kind: "loading" }
+  const {
+    quote: shippingQuote,
+    fingerprint: quoteRequestFingerprint,
+    retry: retryShippingQuote,
+  } = useShippingQuote(destination, localCart.items, cartSubtotal)
+  const isShippingBlocked = shippingQuote.kind === "blocked"
 
   const localSummary = buildLocalCartSummary({
     items: localCart.items,
     getItemSubtotal: localCart.getItemSubtotal,
     total: cartSubtotal,
-    language,
     shippingAmount: shippingQuote.kind === "resolved" ? shippingQuote.amount : 0,
   })
   const whatsappHref = contactPhone ? buildWhatsAppLink(contactPhone) : null
@@ -443,6 +362,7 @@ export default function CheckoutPage() {
                 isLoading={isProcessing}
                 prefill={prefill}
                 onDestinationChange={handleDestinationChange}
+                shippingBlocked={isShippingBlocked}
               />
             ) : (
               <div className="space-y-6">
@@ -451,6 +371,7 @@ export default function CheckoutPage() {
                   onComplete={handleGuestCheckoutComplete}
                   isLoading={isProcessing}
                   onDestinationChange={handleDestinationChange}
+                  shippingBlocked={isShippingBlocked}
                 />
               </div>
             )
@@ -530,7 +451,7 @@ export default function CheckoutPage() {
                 <div className="flex justify-between gap-4 text-sm">
                   <span className="text-muted-foreground">{t.cart.shipping}</span>
                   <span className="text-right text-muted-foreground">
-                    {renderShippingQuote(shippingQuote, t, localSummary.currencyCode)}
+                    {renderShippingQuoteValue(shippingQuote, t, localSummary.currencyCode)}
                   </span>
                 </div>
                 <div className="flex justify-between text-lg font-bold pt-2 border-t">
@@ -539,6 +460,7 @@ export default function CheckoutPage() {
                     {shippingQuote.kind === "resolved" ? localSummary.formattedTotal : t.checkout.totalPendingShipping}
                   </span>
                 </div>
+                {renderShippingQuoteIssue(shippingQuote, t, retryShippingQuote)}
               </div>
 
               {needsShippingCoordinationNote(shippingQuote) && whatsappHref && store?.store_name && (
@@ -627,42 +549,19 @@ async function buildOrderItemsFromCart(
   )
 }
 
-// Same shape the resolver prices (lib/shipping/resolver.ts's ShippingResolutionItem):
-// a combo item carries no product/variant of its own, a catalog item carries
-// no combo -- mirrors buildOrderItemsFromCart's own product_id fallback above,
-// this is the preview's read of the same cart, not the order's.
-function toShippingResolutionItems(items: CartItem[]): ShippingResolutionItem[] {
-  return items.map((item) => ({
-    productId: item.itemKind === "combo" ? null : item.productId || (typeof item.id === "string" ? item.id : null),
-    variantId: item.itemKind === "combo" ? null : item.variantId ?? null,
-    comboId: item.itemKind === "combo" ? item.comboId ?? null : null,
-    productName: item.name,
-    quantity: item.quantity,
-  }))
-}
-
-// One string identifying "this destination against this cart" -- shared by
-// the quoting effect (is this response still the answer to the CURRENT
-// question?) and the idempotency key above (has anything price-affecting
-// changed since the last attempt?) so the two can't drift into checking two
-// different things.
-function buildShippingQuoteFingerprint(
-  destination: ShippingDestination,
-  cartFingerprint: string,
-  subtotal: number,
-): string {
-  return `${destination.departmentCode}:${destination.municipalityCode}:${cartFingerprint}:${subtotal}`
-}
-
 function needsShippingCoordinationNote(quote: ShippingQuoteState): boolean {
   if (quote.kind === "blocked") return true
-  return quote.kind === "resolved" && (quote.status === "agreed" || quote.status === "out_of_zone")
+  return quote.kind === "resolved" && shippingStatusLabelKeyForBuyer(quote.status) === "agreed"
 }
 
-function renderShippingQuote(quote: ShippingQuoteState, t: Translations, currencyCode: string) {
+// The price column: a blocked or failed quote is a hard stop, not a value,
+// so it renders the same "—" the rest of the app uses for an absent value
+// (see e.g. app/orders/[orderNumber]/order-detail-client.tsx) -- the actual
+// sentence explaining why lives in renderShippingQuoteIssue below, as its
+// own full-width block, not squeezed into this value slot.
+function renderShippingQuoteValue(quote: ShippingQuoteState, t: Translations, currencyCode: string) {
   if (quote.kind === "idle") return t.checkout.shippingSelectDestination
-  if (quote.kind === "blocked") return t.checkout.shippingBlocked
-  if (quote.kind === "failed") return t.checkout.shippingQuoteFailed
+  if (quote.kind === "blocked" || quote.kind === "failed") return "—"
   if (quote.kind === "loading") {
     return (
       <span className="inline-flex items-center gap-2">
@@ -672,9 +571,28 @@ function renderShippingQuote(quote: ShippingQuoteState, t: Translations, currenc
     )
   }
 
-  // D23/A15: BUYER-facing -- agreed and out_of_zone collapse onto the same
-  // phrase (lib/shipping/status-label.ts), the same one the success page and
-  // the order detail use, so this live quote can't drift from either.
+  // A15: buyer-facing audience-scoped mapping -- lib/shipping/status-label.ts.
   const labelKey = shippingStatusLabelKeyForBuyer(quote.status)
   return labelKey ? t.orders.shippingStatusLabels.buyer[labelKey] : formatPrice(quote.amount, currencyCode)
+}
+
+// The full-width sentence a blocked or failed quote earns below the totals:
+// blocked is destructive (a hard stop -- D7's "antes de continuar con la
+// compra"), failed stays normal foreground and carries its own retry, since
+// re-picking the SAME municipality can't re-fire the quote on its own
+// (handleDestinationChange's identity check above).
+function renderShippingQuoteIssue(quote: ShippingQuoteState, t: Translations, retry: () => void) {
+  if (quote.kind === "blocked") {
+    return <p className="text-sm text-destructive">{t.checkout.shippingBlocked}</p>
+  }
+  if (quote.kind !== "failed") return null
+
+  return (
+    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+      <p className="text-sm text-foreground">{t.checkout.shippingQuoteFailed}</p>
+      <Button type="button" variant="link" size="sm" className="h-auto p-0" onClick={retry}>
+        {t.common.retry}
+      </Button>
+    </div>
+  )
 }

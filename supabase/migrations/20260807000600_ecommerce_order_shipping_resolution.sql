@@ -26,7 +26,8 @@ begin;
 update ecommerce.orders
 set shipping_cost = coalesce(shipping_cost, 0),
     tax_amount = coalesce(tax_amount, 0),
-    discount_amount = coalesce(discount_amount, 0);
+    discount_amount = coalesce(discount_amount, 0)
+where shipping_cost is null or tax_amount is null or discount_amount is null;
 
 alter table ecommerce.orders
   alter column shipping_cost set default 0,
@@ -48,12 +49,29 @@ comment on column ecommerce.orders.shipping_status is
 -- these to >= 0 (Math.max/Math.min in lib/supabase/orders-api.ts's
 -- createOrder), so unlike the coherence check below there is no real
 -- historical risk of a live row already violating one of these.
-alter table ecommerce.orders
-  add constraint orders_subtotal_nonnegative_chk check (subtotal >= 0),
-  add constraint orders_shipping_cost_nonnegative_chk check (shipping_cost >= 0),
-  add constraint orders_tax_amount_nonnegative_chk check (tax_amount >= 0),
-  add constraint orders_discount_amount_nonnegative_chk check (discount_amount >= 0),
-  add constraint orders_total_amount_nonnegative_chk check (total_amount >= 0);
+--
+-- Postgres has no ADD CONSTRAINT IF NOT EXISTS, so each is guarded by name
+-- against pg_constraint first -- same shape 20260504000100's own "additive
+-- integrity" block already uses for this repo's other named CHECK
+-- constraints added outside a CREATE TABLE.
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'orders_subtotal_nonnegative_chk' and conrelid = 'ecommerce.orders'::regclass) then
+    alter table ecommerce.orders add constraint orders_subtotal_nonnegative_chk check (subtotal >= 0);
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'orders_shipping_cost_nonnegative_chk' and conrelid = 'ecommerce.orders'::regclass) then
+    alter table ecommerce.orders add constraint orders_shipping_cost_nonnegative_chk check (shipping_cost >= 0);
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'orders_tax_amount_nonnegative_chk' and conrelid = 'ecommerce.orders'::regclass) then
+    alter table ecommerce.orders add constraint orders_tax_amount_nonnegative_chk check (tax_amount >= 0);
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'orders_discount_amount_nonnegative_chk' and conrelid = 'ecommerce.orders'::regclass) then
+    alter table ecommerce.orders add constraint orders_discount_amount_nonnegative_chk check (discount_amount >= 0);
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'orders_total_amount_nonnegative_chk' and conrelid = 'ecommerce.orders'::regclass) then
+    alter table ecommerce.orders add constraint orders_total_amount_nonnegative_chk check (total_amount >= 0);
+  end if;
+end $$;
 
 -- D26/A13: the one constraint this whole slice exists for -- the database
 -- refusing to store a row whose total doesn't equal its own components, no
@@ -65,10 +83,18 @@ alter table ecommerce.orders
 -- not watching. NOT VALID instead enforces the formula on every NEW and
 -- UPDATEd row immediately (the guarantee D26 asks for going forward, with
 -- zero gap), while validating the rows that already exist is a separate,
--- catchable step right below.
-alter table ecommerce.orders
-  add constraint orders_total_amount_matches_components_chk
-    check (total_amount = subtotal + shipping_cost + tax_amount - discount_amount) not valid;
+-- catchable step right below. Guarded the same way as the non-negativity
+-- constraints above -- Postgres has no ADD CONSTRAINT IF NOT EXISTS.
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'orders_total_amount_matches_components_chk' and conrelid = 'ecommerce.orders'::regclass
+  ) then
+    alter table ecommerce.orders
+      add constraint orders_total_amount_matches_components_chk
+        check (total_amount = subtotal + shipping_cost + tax_amount - discount_amount) not valid;
+  end if;
+end $$;
 
 -- Validates the constraint against every existing row in this same
 -- migration, but from inside a block that can only WARN, never abort: on a

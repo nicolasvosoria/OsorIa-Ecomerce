@@ -136,13 +136,12 @@ export function Header() {
   const { user, isAuthenticated, login, register, logout, refreshUser } = useAuth()
   const { isAdmin } = useAdminPermissions()
   const { store } = useStore()
-  const { t, language } = useLanguage()
+  const { t } = useLanguage()
   const { loginRequestCount } = useCheckoutLoginIntent()
   const localCartSummary = buildLocalCartSummary({
     items,
     getItemSubtotal,
     total: getTotal(),
-    language,
   })
 
   const { styles: styleData } = useComponentStyle("header", HEADER_DEFAULTS)

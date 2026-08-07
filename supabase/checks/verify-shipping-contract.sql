@@ -179,6 +179,209 @@ begin
 end $$;
 
 -- -----------------------------------------------------------------------------
+-- Finding 1 (design audit, plan-envios-ecommerce): ecommerce.co_departments
+-- is a real departments source, not co_locations deduplicated in application
+-- memory -- PostgREST's own max_rows cap (supabase/config.toml) truncates a
+-- 1,122-row co_locations response before every department reaches the
+-- picker. 33 rows can never collide with a 1,000-row cap. D27: same
+-- public-read / closed-to-write posture as co_locations itself.
+-- -----------------------------------------------------------------------------
+do $$
+begin
+  if to_regclass('ecommerce.co_departments') is null then
+    raise exception 'Missing ecommerce.co_departments';
+  end if;
+end $$;
+
+do $$
+declare
+  v_violations text[];
+begin
+  select array_agg(msg) into v_violations
+  from (
+    select format('%s does not have SELECT on ecommerce.co_departments', role) as msg
+    from unnest(array['anon', 'authenticated']) role
+    where not has_table_privilege(role, 'ecommerce.co_departments', 'select')
+    union all
+    select format('%s has %s on ecommerce.co_departments', role, priv)
+    from unnest(array['anon', 'authenticated']) role
+    cross join unnest(array['insert', 'update', 'delete']) priv
+    where has_table_privilege(role, 'ecommerce.co_departments', priv)
+  ) v;
+
+  if v_violations is not null then
+    raise exception 'ecommerce.co_departments grant contract broken: %', array_to_string(v_violations, '; ');
+  end if;
+
+  if not has_table_privilege('service_role', 'ecommerce.co_departments', 'select') then
+    raise exception 'service_role must retain SELECT on ecommerce.co_departments';
+  end if;
+end $$;
+
+-- The view must actually return every department, not just exist -- this is
+-- the assertion that would have caught Finding 1 directly: a co_departments
+-- built as anything other than a real distinct projection (e.g. a
+-- reintroduced in-memory dedupe upstream) could still under-count here.
+do $$
+declare
+  v_department_count integer;
+begin
+  select count(*) into v_department_count from ecommerce.co_departments;
+
+  if v_department_count <> 33 then
+    raise exception 'Expected 33 departments in ecommerce.co_departments, found %', v_department_count;
+  end if;
+end $$;
+
+-- security_invoker so this view runs under the QUERYING role's own RLS, not
+-- the view owner's -- the same posture ecommerce.co_departments' own
+-- migration (20260807000700) claims for itself. pg_class.reloptions is what
+-- actually proves the WITH (security_invoker = true) clause landed; a view
+-- recreated without it would still pass every assertion above while running
+-- as owner.
+do $$
+begin
+  if not exists (
+    select 1 from pg_class c
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'ecommerce' and c.relname = 'co_departments'
+      and c.reloptions @> array['security_invoker=true']
+  ) then
+    raise exception 'ecommerce.co_departments must be security_invoker=true';
+  end if;
+end $$;
+
+-- -----------------------------------------------------------------------------
+-- D4/D7/D27 (slice S2, 20260807000200): store_shipping_settings -- the table
+-- itself is only proven to exist by verify-ecommerce-contract.sql's generic
+-- table sweep. Its RLS posture, its anon-closed grant contract (same D27
+-- posture as the zones/rates tables below) and the mode CHECK constraint are
+-- this file's to assert.
+-- -----------------------------------------------------------------------------
+do $$
+begin
+  if not exists (
+    select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'ecommerce' and c.relname = 'store_shipping_settings' and c.relrowsecurity is true
+  ) then
+    raise exception 'ecommerce.store_shipping_settings is missing enabled RLS';
+  end if;
+end $$;
+
+do $$
+declare
+  v_violations text[];
+begin
+  select array_agg(msg) into v_violations
+  from (
+    select format('anon has %s on ecommerce.store_shipping_settings', priv) as msg
+    from unnest(array['select', 'insert', 'update', 'delete']) priv
+    where has_table_privilege('anon', 'ecommerce.store_shipping_settings', priv)
+  ) v;
+
+  if v_violations is not null then
+    raise exception 'anon must have no access to ecommerce.store_shipping_settings: %', array_to_string(v_violations, '; ');
+  end if;
+
+  if exists (
+    select 1
+    from unnest(array['select', 'insert', 'update', 'delete']) priv
+    where not has_table_privilege('service_role', 'ecommerce.store_shipping_settings', priv)
+  ) then
+    raise exception 'service_role must retain full access to ecommerce.store_shipping_settings';
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint con
+    join pg_class c on c.oid = con.conrelid
+    join pg_namespace n on n.oid = c.relnamespace
+    join pg_attribute a on a.attrelid = c.oid and a.attnum = any(con.conkey)
+    where n.nspname = 'ecommerce' and c.relname = 'store_shipping_settings'
+      and con.contype = 'c' and a.attname = 'mode'
+  ) then
+    raise exception 'Missing CHECK constraint on ecommerce.store_shipping_settings.mode';
+  end if;
+end $$;
+
+-- -----------------------------------------------------------------------------
+-- D8/A14 (20260807000300): weight_grams's own non-negativity constraints,
+-- named "so a future contract check can assert them by name" per that
+-- migration's own comment -- this is that check.
+-- -----------------------------------------------------------------------------
+do $$
+declare
+  v_missing text[];
+begin
+  select array_agg(required_constraint order by required_constraint) into v_missing
+  from (values
+    ('store_items', 'store_items_weight_grams_nonnegative_chk'),
+    ('item_variants', 'item_variants_weight_grams_nonnegative_chk')
+  ) req(required_table, required_constraint)
+  where not exists (
+    select 1 from pg_constraint con
+    join pg_class c on c.oid = con.conrelid
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'ecommerce' and c.relname = req.required_table
+      and con.conname = req.required_constraint and con.contype = 'c'
+  );
+
+  if v_missing is not null then
+    raise exception 'Missing named CHECK constraints for weight_grams: %', array_to_string(v_missing, ', ');
+  end if;
+end $$;
+
+-- -----------------------------------------------------------------------------
+-- D2/D30 (20260807000400): ecommerce.orders.shipping_location_id, its ON
+-- DELETE RESTRICT foreign key to co_locations, and the frozen department
+-- columns a later shipping-zone lookup and every order-detail reader depend
+-- on existing without a join back to co_locations.
+-- -----------------------------------------------------------------------------
+do $$
+declare
+  v_missing text[];
+begin
+  select array_agg(required_column order by required_column) into v_missing
+  from (values
+    ('shipping_location_id'), ('shipping_department_code'),
+    ('shipping_department_name'), ('shipping_municipality_code')
+  ) req(required_column)
+  where not exists (
+    select 1 from pg_attribute a
+    join pg_class c on c.oid = a.attrelid
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'ecommerce' and c.relname = 'orders' and a.attname = req.required_column
+      and a.attnum > 0 and not a.attisdropped
+  );
+
+  if v_missing is not null then
+    raise exception 'Missing frozen shipping destination columns on ecommerce.orders: %', array_to_string(v_missing, ', ');
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint con
+    join pg_class c on c.oid = con.conrelid
+    join pg_namespace n on n.oid = c.relnamespace
+    join pg_class fc on fc.oid = con.confrelid
+    join pg_namespace fn on fn.oid = fc.relnamespace
+    join pg_attribute a on a.attrelid = c.oid and a.attnum = any(con.conkey)
+    where n.nspname = 'ecommerce' and c.relname = 'orders'
+      and con.contype = 'f'
+      and a.attname = 'shipping_location_id'
+      and fn.nspname = 'ecommerce' and fc.relname = 'co_locations'
+      and con.confdeltype = 'r'
+  ) then
+    raise exception 'Missing ON DELETE RESTRICT foreign key from ecommerce.orders.shipping_location_id to ecommerce.co_locations';
+  end if;
+end $$;
+
+-- -----------------------------------------------------------------------------
 -- D3/D5/D6/D27 (slice S7): shipping_zones, shipping_zone_destinations and
 -- shipping_rates exist and are RLS-enabled, closed to anon.
 -- -----------------------------------------------------------------------------
@@ -247,20 +450,35 @@ begin
     raise exception 'Missing ecommerce.shipping_zone_destinations_municipality_fk';
   end if;
 
+  -- pg_indexes proves the name exists but not what kind of index it is -- a
+  -- non-unique, non-partial index of the same name would pass a name-only
+  -- check. pg_index.indisunique/indpred (partial indexes carry a predicate,
+  -- a full index has none) are what actually prove "at most one zone per
+  -- store may claim this destination" is enforced, not just indexed.
   if not exists (
-    select 1 from pg_indexes
-    where schemaname = 'ecommerce' and tablename = 'shipping_zone_destinations'
-      and indexname = 'shipping_zone_destinations_department_key'
+    select 1
+    from pg_index i
+    join pg_class ic on ic.oid = i.indexrelid
+    join pg_class tc on tc.oid = i.indrelid
+    join pg_namespace n on n.oid = tc.relnamespace
+    where n.nspname = 'ecommerce' and tc.relname = 'shipping_zone_destinations'
+      and ic.relname = 'shipping_zone_destinations_department_key'
+      and i.indisunique and i.indpred is not null
   ) then
-    raise exception 'Missing unique index ecommerce.shipping_zone_destinations_department_key';
+    raise exception 'ecommerce.shipping_zone_destinations_department_key must be a UNIQUE partial index';
   end if;
 
   if not exists (
-    select 1 from pg_indexes
-    where schemaname = 'ecommerce' and tablename = 'shipping_zone_destinations'
-      and indexname = 'shipping_zone_destinations_municipality_key'
+    select 1
+    from pg_index i
+    join pg_class ic on ic.oid = i.indexrelid
+    join pg_class tc on tc.oid = i.indrelid
+    join pg_namespace n on n.oid = tc.relnamespace
+    where n.nspname = 'ecommerce' and tc.relname = 'shipping_zone_destinations'
+      and ic.relname = 'shipping_zone_destinations_municipality_key'
+      and i.indisunique and i.indpred is not null
   ) then
-    raise exception 'Missing unique index ecommerce.shipping_zone_destinations_municipality_key';
+    raise exception 'ecommerce.shipping_zone_destinations_municipality_key must be a UNIQUE partial index';
   end if;
 end $$;
 
@@ -531,3 +749,5 @@ begin
 end $$;
 
 rollback;
+
+select 'shipping contract ok' as status;

@@ -32,7 +32,7 @@ export function EmailTemplate({ input }: { input: EmailTemplateInput }) {
 // cost -- item lines, subtotal, shipping and total, read straight off
 // lib/email/types.ts's OrderReceiptDetails (never recomputed here). Plain
 // <table>s marked data-text-format="dataTable" instead of a flex/grid
-// layout: @react-email/render's own plainText conversion (lib/email/render.ts)
+// layout: @react-email/render's own plainText conversion (lib/email/render.tsx)
 // already recognizes that attribute and renders it as aligned label/amount
 // lines in the text body, so the HTML and text stay in lockstep from one
 // markup instead of two hand-kept copies.
@@ -42,14 +42,11 @@ function OrderReceiptBreakdown({
   data: Extract<EmailTemplateInput, { kind: "order-received" }>["data"];
 }) {
   const money = (amount: number) => formatCommercePrice(amount, data.currencyCode);
-  // D23/A15: BUYER-facing -- shippingStatusLabelKeyForBuyer collapses
-  // "agreed"/"out_of_zone" onto one phrase and keeps "free" apart; "rate"
-  // and a legacy null status (an order predating shipping_status) render the
-  // resolved amount instead of a phrase, so a legacy order never implies a
-  // free or to-be-agreed shipment it didn't have. The phrase text itself
-  // comes from lib/i18n/translations.ts, the same vocabulary the checkout
-  // success page and the order detail screen read (D31) -- not retyped here,
-  // so it can't drift into a second mapping (D23/A15).
+  // A15: buyer-facing audience-scoped mapping -- lib/shipping/status-label.ts.
+  // D31: the phrase itself reads translations.es.* directly (an email
+  // template renders with no LanguageProvider), the same vocabulary every
+  // other surface reads through useLanguage() -- not retyped here, so it
+  // can't drift into a second copy.
   const shippingLabelKey = shippingStatusLabelKeyForBuyer(data.shippingStatus);
   const shippingDisplay = shippingLabelKey
     ? translations.es.orders.shippingStatusLabels.buyer[shippingLabelKey]

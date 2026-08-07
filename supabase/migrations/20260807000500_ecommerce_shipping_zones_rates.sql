@@ -45,7 +45,7 @@
 
 begin;
 
-create table ecommerce.shipping_zones (
+create table if not exists ecommerce.shipping_zones (
   id uuid primary key default gen_random_uuid(),
   store_id uuid not null references ecommerce.stores(id) on delete cascade,
   name text not null,
@@ -58,9 +58,9 @@ comment on table ecommerce.shipping_zones is
 
 -- Backs the composite FK below: guarantees a destination's denormalized
 -- store_id can never drift from the store_id of the zone it belongs to.
-create unique index shipping_zones_id_store_id_key on ecommerce.shipping_zones(id, store_id);
+create unique index if not exists shipping_zones_id_store_id_key on ecommerce.shipping_zones(id, store_id);
 
-create table ecommerce.shipping_zone_destinations (
+create table if not exists ecommerce.shipping_zone_destinations (
   id uuid primary key default gen_random_uuid(),
   zone_id uuid not null references ecommerce.shipping_zones(id) on delete cascade,
   store_id uuid not null references ecommerce.stores(id) on delete cascade,
@@ -78,17 +78,17 @@ comment on table ecommerce.shipping_zone_destinations is
 comment on column ecommerce.shipping_zone_destinations.municipality_code is
   'Null means the whole department is the destination; a municipio code narrows it to a single municipio, which wins over any department-level destination covering it (D3).';
 
-create unique index shipping_zone_destinations_department_key
+create unique index if not exists shipping_zone_destinations_department_key
   on ecommerce.shipping_zone_destinations(store_id, department_code)
   where municipality_code is null;
 
-create unique index shipping_zone_destinations_municipality_key
+create unique index if not exists shipping_zone_destinations_municipality_key
   on ecommerce.shipping_zone_destinations(store_id, department_code, municipality_code)
   where municipality_code is not null;
 
-create index shipping_zone_destinations_zone_idx on ecommerce.shipping_zone_destinations(zone_id);
+create index if not exists shipping_zone_destinations_zone_idx on ecommerce.shipping_zone_destinations(zone_id);
 
-create table ecommerce.shipping_rates (
+create table if not exists ecommerce.shipping_rates (
   id uuid primary key default gen_random_uuid(),
   zone_id uuid not null references ecommerce.shipping_zones(id) on delete cascade,
   basis text not null
@@ -109,7 +109,7 @@ create table ecommerce.shipping_rates (
 comment on table ecommerce.shipping_rates is
   'D5/D6: a zone''s rate ladder, one row per range. basis is uniform across a zone''s rows (D5). flat carries a single boundless row; order_value/weight rows range from range_from up to range_to, or to infinity when range_to is null -- the last rung. Free shipping (D6) is an amount=0 row, not a distinct concept.';
 
-create index shipping_rates_zone_idx on ecommerce.shipping_rates(zone_id);
+create index if not exists shipping_rates_zone_idx on ecommerce.shipping_rates(zone_id);
 
 alter table ecommerce.shipping_zones enable row level security;
 alter table ecommerce.shipping_zone_destinations enable row level security;

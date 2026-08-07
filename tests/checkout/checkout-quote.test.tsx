@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import { createContext, createElement, useContext, type ReactNode } from "react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -229,26 +229,60 @@ describe("Checkout quote: the four resolution statuses each render their own tre
 })
 
 describe("Checkout quote: a blocked or failed quote is visible and honest (D7)", () => {
-  it("blocked: says why and what to do, and shows no total", async () => {
+  it("blocked: shows a dash instead of a price, the sentence as a destructive block below the totals, no total, and disables the submit button", async () => {
     getCheckoutShippingQuoteMock.mockResolvedValueOnce({ ok: false, blocked: true, message: "unused" })
 
     renderCheckoutPage()
     await selectDepartment()
     await selectMunicipality("Medellín")
 
-    expect(await screen.findByText(t.shippingBlocked)).toBeInTheDocument()
+    const message = await screen.findByText(t.shippingBlocked)
+    expect(message).toHaveClass("text-destructive")
     expect(screen.getByText(t.totalPendingShipping)).toBeInTheDocument()
+
+    const shippingRow = screen.getByText(translations.es.cart.shipping).closest("div") as HTMLElement
+    expect(within(shippingRow).getByText("—")).toBeInTheDocument()
+
+    expect(screen.getByRole("button", { name: "Realizar pedido" })).toBeDisabled()
   })
 
-  it("failed: a technical failure never shows a stale or wrong number", async () => {
+  it("failed: a technical failure never shows a stale or wrong number, shows a dash, and offers a retry", async () => {
     getCheckoutShippingQuoteMock.mockRejectedValueOnce(new Error("network blip"))
 
     renderCheckoutPage()
     await selectDepartment()
     await selectMunicipality("Medellín")
 
-    expect(await screen.findByText(t.shippingQuoteFailed)).toBeInTheDocument()
+    const message = await screen.findByText(t.shippingQuoteFailed)
+    expect(message).not.toHaveClass("text-destructive")
     expect(screen.getByText(t.totalPendingShipping)).toBeInTheDocument()
+
+    const shippingRow = screen.getByText(translations.es.cart.shipping).closest("div") as HTMLElement
+    expect(within(shippingRow).getByText("—")).toBeInTheDocument()
+
+    // The buyer can't obey "Intenta de nuevo" by re-picking the SAME
+    // municipality (handleDestinationChange's identity check bails that out)
+    // -- the retry link is the only way back in.
+    expect(screen.getByRole("button", { name: "Realizar pedido" })).not.toBeDisabled()
+  })
+
+  it("failed: the retry button re-fires the quote for the same destination and recovers", async () => {
+    getCheckoutShippingQuoteMock
+      .mockRejectedValueOnce(new Error("network blip"))
+      .mockResolvedValueOnce(resolvedQuote("rate", 15000))
+
+    renderCheckoutPage()
+    await selectDepartment()
+    await selectMunicipality("Medellín")
+
+    await screen.findByText(t.shippingQuoteFailed)
+    expect(getCheckoutShippingQuoteMock).toHaveBeenCalledTimes(1)
+
+    fireEvent.click(screen.getByRole("button", { name: "Reintentar" }))
+
+    await waitFor(() => expect(getCheckoutShippingQuoteMock).toHaveBeenCalledTimes(2))
+    expect(await screen.findByText(price(15000))).toBeInTheDocument()
+    expect(screen.queryByText(t.shippingQuoteFailed)).not.toBeInTheDocument()
   })
 })
 

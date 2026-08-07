@@ -7,7 +7,10 @@ const { authorizeActiveStoreAdmin, saveShippingMode, revalidatePath } = vi.hoist
 }))
 
 vi.mock("@/lib/supabase/active-store", () => ({ authorizeActiveStoreAdmin }))
-vi.mock("@/lib/supabase/shipping-settings-api", () => ({ saveShippingMode }))
+vi.mock("@/lib/supabase/shipping-settings-api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/supabase/shipping-settings-api")>()),
+  saveShippingMode,
+}))
 vi.mock("next/cache", () => ({ revalidatePath }))
 
 import { updateShippingModeAction } from "@/app/admin/settings/shipping/actions"
@@ -55,7 +58,7 @@ describe("updateShippingModeAction", () => {
 
     const result = await updateShippingModeAction({ mode: "coordinate" })
 
-    expect(result).toEqual({ success: false, error: "No se pudo guardar el modo de envío" })
+    expect(result).toEqual({ success: false })
     expect(revalidatePath).not.toHaveBeenCalled()
   })
 })

@@ -4,13 +4,13 @@ import type { SavedAddress } from "@/lib/account/saved-address"
 import { computeCheckoutPayloadFingerprint } from "@/lib/checkout/idempotency"
 import { CheckoutIdempotencyConflictError, StoreIdentityNotReadyError } from "@/lib/checkout/order-writer"
 import { checkoutOrderSchema } from "@/lib/checkout/schemas"
-import { quoteShipping } from "@/lib/shipping/quote"
 import {
   UnservedDestinationError,
-  type ShippingDestination,
+  resolveShipping,
   type ShippingResolution,
   type ShippingResolutionItem,
 } from "@/lib/shipping/resolver"
+import type { ShippingDestination } from "@/lib/shipping/schemas"
 import { getAccountProfile } from "@/lib/supabase/account-profile-api"
 import { buildComboOrderSnapshotById } from "@/lib/supabase/combos-api"
 import {
@@ -53,6 +53,10 @@ const IDENTITY_NOT_READY_MESSAGE =
   "Esta tienda todavía no completó su configuración y no puede recibir pedidos en este momento."
 const IDEMPOTENCY_CONFLICT_MESSAGE =
   "Tu carrito cambió desde el último intento. Actualiza la página e inténtalo de nuevo."
+// Shared by placeCheckoutOrder and getCheckoutShippingQuote below -- both
+// need a service-role client and both hit this same "not configured" outcome,
+// so it is one declaration rather than one hardcoded copy per action.
+const SERVICE_ROLE_NOT_CONFIGURED_MESSAGE = "Supabase service role no configurado"
 
 // D28: idempotencyKey is the client's per-checkout-attempt correlation token
 // (app/checkout/page.tsx generates one UUID per page load and resends the
@@ -96,7 +100,7 @@ export async function placeCheckoutOrder(
 
   const serviceClient = getServiceEcommerceClient()
   if (!serviceClient) {
-    return { success: false, error: "Supabase service role no configurado" }
+    return { success: false, error: SERVICE_ROLE_NOT_CONFIGURED_MESSAGE }
   }
 
   try {
@@ -136,36 +140,41 @@ export type CheckoutShippingQuoteInput = {
 
 export type CheckoutShippingQuoteResult =
   | { ok: true; resolution: ShippingResolution }
-  | { ok: false; blocked: boolean; message: string }
+  | { ok: false; blocked: boolean }
 
-const SHIPPING_QUOTE_NO_STORE_MESSAGE = "No se pudo identificar la tienda para calcular el envío."
-const SHIPPING_QUOTE_UNAVAILABLE_COMBO_MESSAGE =
-  "Uno de los combos del carrito ya no está disponible; el envío no se puede calcular todavía."
-const SHIPPING_QUOTE_GENERIC_ERROR_MESSAGE = "No se pudo calcular el costo de envío en este momento."
-
-// D27: the live checkout preview -- the rate tables stay closed to anon, so
-// this is the only door in: it resolves the store the same way the rest of
-// the public storefront does (getRuntimeStoreId, also loadPublicStoreContactPhone's
-// fallback) and hands off to quoteShipping, never recomputing a price itself.
+// D27: shipping_zones/shipping_rates (and store_shipping_settings) are closed
+// to anon and to authenticated shoppers -- only service_role can read them --
+// so this action is the only door into the live checkout preview, the same
+// way it resolves the store as the rest of the public storefront does
+// (getRuntimeStoreId, also loadPublicStoreContactPhone's fallback). It calls
+// resolveShipping directly with the service client -- the exact function
+// createOrder (lib/supabase/orders-api.ts) calls for the order write -- so
+// quoting and the order write cannot disagree, structurally rather than by
+// convention.
 // D7: resolveShipping throws UnservedDestinationError specifically when the
 // store's own setting blocks this destination -- distinguished here so the
 // preview can say exactly that instead of a generic failure; any other
-// throw (a network blip, a misconfigured zone) is honestly "we don't know
-// yet", not "you can't buy this".
+// throw (a network blip, a misconfigured zone, no service client configured)
+// is honestly "we don't know yet", not "you can't buy this".
 export async function getCheckoutShippingQuote(
   input: CheckoutShippingQuoteInput,
 ): Promise<CheckoutShippingQuoteResult> {
   const storeId = await getRuntimeStoreId()
   if (!storeId) {
-    return { ok: false, blocked: false, message: SHIPPING_QUOTE_NO_STORE_MESSAGE }
+    return { ok: false, blocked: false }
   }
 
   if (!(await comboItemsAreAvailable(input.items))) {
-    return { ok: false, blocked: false, message: SHIPPING_QUOTE_UNAVAILABLE_COMBO_MESSAGE }
+    return { ok: false, blocked: false }
   }
 
   try {
-    const resolution = await quoteShipping({
+    const supabase = getServiceEcommerceClient()
+    if (!supabase) {
+      throw new Error(SERVICE_ROLE_NOT_CONFIGURED_MESSAGE)
+    }
+
+    const resolution = await resolveShipping(supabase, {
       storeId,
       destination: input.destination,
       subtotal: input.subtotal,
@@ -173,10 +182,7 @@ export async function getCheckoutShippingQuote(
     })
     return { ok: true, resolution }
   } catch (error: any) {
-    if (error instanceof UnservedDestinationError) {
-      return { ok: false, blocked: true, message: error.message }
-    }
-    return { ok: false, blocked: false, message: error?.message || SHIPPING_QUOTE_GENERIC_ERROR_MESSAGE }
+    return { ok: false, blocked: error instanceof UnservedDestinationError }
   }
 }
 

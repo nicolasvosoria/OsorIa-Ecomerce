@@ -20,7 +20,6 @@ describe('cart summary formatting', () => {
       items: [combo],
       getItemSubtotal: item => item.unitPriceAmount! * item.quantity,
       total: 1350000,
-      language: 'es',
     });
 
     expect(summary.lines).toHaveLength(1);
