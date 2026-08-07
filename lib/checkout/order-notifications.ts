@@ -1,6 +1,6 @@
 import { renderEmail } from "@/lib/email/render"
 import { resolveEmailSender } from "@/lib/email/sender"
-import type { TenantEmailBranding } from "@/lib/email/types"
+import type { EmailTemplateInput, OrderReceiptDetails, TenantEmailBranding } from "@/lib/email/types"
 import { isStoreIdentityReadinessEnforced } from "@/lib/checkout/identity-readiness-gate"
 import { toTenantEmailBranding, type StoreIdentityView } from "@/lib/supabase/store-identity-api"
 
@@ -42,6 +42,10 @@ export type OrderNotificationContext = {
   orderNumber: string
   customerName: string
   customerEmail: string
+  // D12: the resolved breakdown for the customer receipt alone -- the
+  // merchant notification stays the plain "you have a new order" ping,
+  // unchanged.
+  receipt: OrderReceiptDetails
 }
 
 // D12: builds the customer receipt and merchant notification from the SAME
@@ -60,7 +64,7 @@ export async function buildOrderOutboxNotifications(
     branding,
     verifiedReplyTo,
     recipientEmail: context.customerEmail,
-    data: { customerName: context.customerName, orderNumber: context.orderNumber },
+    data: { customerName: context.customerName, orderNumber: context.orderNumber, ...context.receipt },
     idempotencyKey: `checkout:${context.storeId}:${context.checkoutIdempotencyKey}:order-received`,
   })
 
@@ -156,16 +160,21 @@ function logMissingMerchantRecipient(context: OrderNotificationContext): void {
   )
 }
 
-async function renderNotification(input: {
-  templateKind: OrderOutboxNotification["templateKind"]
+// Generic over K so the receipt's richer data shape (order-received) and the
+// plain {customerName, orderNumber, ...} shape every other kind uses can
+// share this one render path without either widening the other's type --
+// EmailTemplateInput (lib/email/types.ts) stays the single source of truth
+// for what each kind's data must carry.
+async function renderNotification<K extends OrderOutboxNotification["templateKind"]>(input: {
+  templateKind: K
   branding: TenantEmailBranding
   verifiedReplyTo: string | null
   recipientEmail: string
-  data: { customerName: string; orderNumber: string; trackingCode?: string; returnReason?: string }
+  data: Extract<EmailTemplateInput, { kind: K }>["data"]
   idempotencyKey: string
 }): Promise<OrderOutboxNotification> {
   const sender = resolveEmailSender(input.templateKind, input.branding.displayName, input.verifiedReplyTo)
-  const rendered = await renderEmail({ kind: input.templateKind, branding: input.branding, data: input.data })
+  const rendered = await renderEmail({ kind: input.templateKind, branding: input.branding, data: input.data } as EmailTemplateInput)
 
   return {
     templateKind: input.templateKind,
