@@ -141,6 +141,18 @@ export interface Translations {
     // D14/D11: coordination copy naming the store and its real WhatsApp contact
     shippingCoordinationContact: string
     shippingCoordinationCta: string
+    // D23: the live shipping quote's vocabulary -- one word per resolution
+    // status/transitional state, never a back-computed number standing in
+    // for a word. shippingFree/shippingOutOfZone plug into
+    // lib/shipping/status-display.ts, the shared mapping a later order
+    // detail screen reuses so the two surfaces can't drift.
+    shippingFree: string
+    shippingOutOfZone: string
+    shippingBlocked: string
+    shippingQuoteFailed: string
+    shippingCalculating: string
+    shippingSelectDestination: string
+    totalPendingShipping: string
   }
   // Envío: configuración del modo de envío de la tienda (D31)
   shipping: {
@@ -566,6 +578,13 @@ export const translations: Record<Language, Translations> = {
       unitPrice: 'Precio unitario',
       shippingCoordinationContact: 'Coordinas la entrega directamente con {storeName} por WhatsApp.',
       shippingCoordinationCta: 'Escribir por WhatsApp',
+      shippingFree: 'Gratis',
+      shippingOutOfZone: 'Tu municipio no tiene una tarifa de envío configurada. Coordina la entrega directamente con la tienda.',
+      shippingBlocked: 'Esta tienda todavía no envía a tu municipio. Contáctala para coordinar antes de continuar con la compra.',
+      shippingQuoteFailed: 'No pudimos calcular el envío en este momento. Intenta de nuevo.',
+      shippingCalculating: 'Calculando el envío...',
+      shippingSelectDestination: 'Elige tu destino para ver el costo de envío',
+      totalPendingShipping: 'Se confirma al calcular el envío',
     },
     shipping: {
       settingsTitle: 'Envío',
@@ -986,6 +1005,13 @@ export const translations: Record<Language, Translations> = {
       unitPrice: 'Unit price',
       shippingCoordinationContact: 'You coordinate delivery directly with {storeName} on WhatsApp.',
       shippingCoordinationCta: 'Message on WhatsApp',
+      shippingFree: 'Free',
+      shippingOutOfZone: "Your municipality doesn't have a shipping rate configured yet. Coordinate delivery directly with the store.",
+      shippingBlocked: "This store doesn't ship to your municipality yet. Contact them to coordinate before continuing your purchase.",
+      shippingQuoteFailed: "We couldn't calculate shipping right now. Please try again.",
+      shippingCalculating: 'Calculating shipping...',
+      shippingSelectDestination: 'Choose your destination to see the shipping cost',
+      totalPendingShipping: 'Confirmed once shipping is calculated',
     },
     shipping: {
       settingsTitle: 'Shipping',
@@ -1405,6 +1431,13 @@ export const translations: Record<Language, Translations> = {
       unitPrice: 'Preço unitário',
       shippingCoordinationContact: 'Você combina a entrega diretamente com {storeName} pelo WhatsApp.',
       shippingCoordinationCta: 'Enviar mensagem no WhatsApp',
+      shippingFree: 'Grátis',
+      shippingOutOfZone: 'Seu município ainda não tem uma tarifa de frete configurada. Combine a entrega diretamente com a loja.',
+      shippingBlocked: 'Esta loja ainda não envia para o seu município. Fale com a loja para combinar antes de continuar a compra.',
+      shippingQuoteFailed: 'Não conseguimos calcular o frete agora. Tente novamente.',
+      shippingCalculating: 'Calculando o frete...',
+      shippingSelectDestination: 'Escolha seu destino para ver o custo do frete',
+      totalPendingShipping: 'Confirmado ao calcular o frete',
     },
     shipping: {
       settingsTitle: 'Envio',

@@ -18,11 +18,12 @@ export type CartSummaryLine = {
   itemKind?: LocalCartItem['itemKind'];
 };
 
-// `total` stays alongside `subtotal` even though shipping is still hardcoded to
-// zero: app/checkout/page.tsx (untouched this slice) and the standing money-formatter
-// contract in tests/quality/cart-summary-usage.test.ts both read `formattedTotal`
-// today. A later slice adds the real shipping amount here, which is when `total`
-// will start to genuinely differ from `subtotal` instead of mirroring it.
+// D29: the cart drawer (header.tsx) never knows a destination, so it never
+// passes `shippingAmount` and `total` keeps mirroring `subtotal` -- exactly
+// the "shipping is calculated at checkout" promise the drawer's own copy
+// makes. app/checkout/page.tsx is the one caller that resolves a real
+// shipping amount (lib/shipping/quote.ts) and passes it here once it has
+// one, which is the only thing that makes `total` genuinely diverge.
 export type CartSummary = {
   lines: CartSummaryLine[];
   subtotal: number;
@@ -38,6 +39,7 @@ export function buildLocalCartSummary(args: {
   total: number;
   language: Language;
   defaultCurrencyCode?: string;
+  shippingAmount?: number;
 }): CartSummary {
   const currencyCode = args.items.find(item => item.currencyCode)?.currencyCode || args.defaultCurrencyCode || 'COP';
   const lines = args.items.map(item => {
@@ -55,12 +57,15 @@ export function buildLocalCartSummary(args: {
     };
   });
 
+  const subtotal = args.total;
+  const total = subtotal + (args.shippingAmount ?? 0);
+
   return {
     lines,
-    subtotal: args.total,
-    total: args.total,
+    subtotal,
+    total,
     currencyCode,
-    formattedSubtotal: formatPrice(args.total, currencyCode),
-    formattedTotal: formatPrice(args.total, currencyCode),
+    formattedSubtotal: formatPrice(subtotal, currencyCode),
+    formattedTotal: formatPrice(total, currencyCode),
   };
 }

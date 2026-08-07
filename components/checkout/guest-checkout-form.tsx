@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect } from "react"
 import { useForm, useWatch, type UseFormReturn } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { toast } from "sonner"
@@ -12,6 +13,7 @@ import { FormField } from "@/components/ui/form-field"
 import { Input } from "@/components/ui/input"
 import { enabledPaymentMethodIds } from "@/lib/checkout/payment-methods"
 import { guestCheckoutFormSchema, type GuestCheckoutFormValues } from "@/lib/checkout/schemas"
+import type { ShippingDestination } from "@/lib/shipping/resolver"
 
 // Contrato externo del formulario: lo consumen también la página de checkout y
 // el fallback de la página de éxito, así que se mantiene en camelCase aunque
@@ -39,6 +41,11 @@ export interface GuestCustomerData {
 interface GuestCheckoutFormProps {
   onComplete: (customerData: GuestCustomerData) => void
   isLoading?: boolean
+  // The checkout page's shipping quote lives outside this form (the order
+  // summary card), so it needs the destination the instant the two chained
+  // selects resolve one -- long before this form's own onComplete fires at
+  // submit.
+  onDestinationChange?: (destination: ShippingDestination | null) => void
 }
 
 const DEFAULT_VALUES: GuestCheckoutFormValues = {
@@ -57,7 +64,7 @@ const DEFAULT_VALUES: GuestCheckoutFormValues = {
   payment_method: enabledPaymentMethodIds()[0],
 }
 
-export function GuestCheckoutForm({ onComplete, isLoading = false }: GuestCheckoutFormProps) {
+export function GuestCheckoutForm({ onComplete, isLoading = false, onDestinationChange }: GuestCheckoutFormProps) {
   const form = useForm<GuestCheckoutFormValues>({
     resolver: zodResolver(guestCheckoutFormSchema),
     defaultValues: DEFAULT_VALUES,
@@ -91,7 +98,7 @@ export function GuestCheckoutForm({ onComplete, isLoading = false }: GuestChecko
       className="space-y-6"
     >
       <ContactInfoCard form={form} isLoading={isLoading} />
-      <ShippingAddressCard form={form} isLoading={isLoading} />
+      <ShippingAddressCard form={form} isLoading={isLoading} onDestinationChange={onDestinationChange} />
       <PaymentMethodSection
         register={form.register}
         name="payment_method"
@@ -190,9 +197,11 @@ function ContactInfoCard({
 function ShippingAddressCard({
   form,
   isLoading,
+  onDestinationChange,
 }: {
   form: UseFormReturn<GuestCheckoutFormValues>
   isLoading: boolean
+  onDestinationChange?: (destination: ShippingDestination | null) => void
 }) {
   const { register, formState, setValue, control } = form
   const [departmentCode, departmentName, municipalityCode, locationId, city] = useWatch({
@@ -205,6 +214,14 @@ function ShippingAddressCard({
       "shipping_city",
     ],
   })
+
+  // Fires on every source of a destination change, picked manually or
+  // applied from a prefill -- both land here through the same watched
+  // fields, so there is exactly one place that reports "the destination is
+  // now this" upward.
+  useEffect(() => {
+    onDestinationChange?.(departmentCode && municipalityCode ? { departmentCode, municipalityCode } : null)
+  }, [departmentCode, municipalityCode, onDestinationChange])
 
   const applyLocation = (next: ShippingLocationValue) => {
     setValue("shipping_department_code", next.departmentCode, { shouldValidate: true })
