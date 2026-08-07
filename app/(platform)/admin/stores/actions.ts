@@ -27,7 +27,7 @@ export async function createTenantAction(
     return { success: false, error: authorization.error }
   }
 
-  const result = await createTenant(input, authorization.supabase)
+  const result = await createTenant(input, authorization.userId, authorization.supabase)
   if (result.success) {
     revalidatePath(STORES_PATH)
   }

@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
+import { isInvitedPendingPasswordMetadata } from "@/lib/auth/invited-session-gate";
 import { isSuperAdminRole } from "@/lib/memberships/roles";
 import { ECOMMERCE_TABLES } from "./contract";
 
@@ -29,6 +30,10 @@ type AdminAuthDiagnostics = {
 
 type AuthenticatedUser = {
   id: string;
+  // D22: carried alongside id so authorizeAnyCandidate can disqualify an
+  // invited-pending candidate off this SAME getUser() result, with no
+  // second call. See lib/auth/invited-session-gate.ts.
+  appMetadata: Record<string, unknown> | null | undefined;
 };
 
 type AuthResolution = {
@@ -148,7 +153,7 @@ async function getAuthenticatedUsers(
   for (const result of authResults) {
     const user = result.data?.user;
     if (user?.id) {
-      users.set(user.id, { id: user.id });
+      users.set(user.id, { id: user.id, appMetadata: user.app_metadata });
     }
   }
 
@@ -174,6 +179,15 @@ function deniedResult(
 // Runs a per-user authorization against every authenticated identity of the
 // request (cookie session and preview bearer) and grants on the first one that
 // passes, so a preview token keeps working alongside a signed-in session.
+//
+// D22: this is the ONE place every authenticated Route Handler resolves
+// identity through (authorizeStoreAdmin and requireSuperAdmin both call this),
+// and proxy.ts's global invited-session gate never runs for `/api/*` (its
+// matcher excludes the whole tree) -- so a candidate still mid invite-setup
+// is disqualified right here, off the SAME getUser() result
+// getAuthenticatedUsers already resolved, before it ever reaches
+// authorizeCandidate. See lib/auth/invited-session-gate.ts for the shared
+// predicate and the full rationale.
 export async function authorizeAnyCandidate<TGrant>(
   request: NextRequest,
   authorizeCandidate: (userId: string) => Promise<CandidateAuthorization<TGrant>>,
@@ -190,6 +204,10 @@ export async function authorizeAnyCandidate<TGrant>(
   }
 
   for (const user of authResolution.users) {
+    if (isInvitedPendingPasswordMetadata(user.appMetadata)) {
+      continue;
+    }
+
     const result = await authorizeCandidate(user.id);
 
     if ("error" in result) {

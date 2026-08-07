@@ -2,6 +2,7 @@
 
 import { useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
+import { finalizeCustomerSignup } from "@/lib/auth/finalize-signup-action"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { currentUserMustChangePassword, isCurrentUserAdminOrUnverified } from "@/lib/supabase/permissions-api"
 import { FORCE_PASSWORD_CHANGE_PATH, getAuthReturnPath, resolvePostAuthDestination } from "@/lib/auth-return-intent"
@@ -59,6 +60,21 @@ function AuthCallbackContent() {
           }
 
           if (data.session) {
+            // D23: finaliza el perfil del cliente de forma idempotente contra
+            // la tienda que quedó ligada al intent server-side (nunca contra
+            // este host) -- un no-op seguro si `intent` falta (una sesión
+            // existente que solo pasó por aquí, no un signup fresco).
+            //
+            // El resultado se descarta a propósito: la sesión ya quedó
+            // establecida, así que no hay nada que este usuario pueda
+            // corregir si falla (un intent ya consumido o expirado, un
+            // permiso de base de datos). finalizeCustomerSignup ya deja un
+            // log estructurado del lado del servidor ante cualquier fallo
+            // (D36) -- interrumpir aquí el login que sí funcionó no ayuda a
+            // nadie, y quien puede actuar sobre el log es el operador, no
+            // este cliente.
+            await finalizeCustomerSignup(searchParams.get("intent"))
+
             // Sesión creada (p. ej. tras confirmar correo), redirigir a página de éxito
             // salvo que exista un destino admin seguro permitido para el usuario.
             await pushPostAuthDestination()

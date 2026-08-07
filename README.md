@@ -50,8 +50,10 @@ Common optional variables by feature:
 - Chat API enrichment (`app/api/chat/route.ts`):
   - `SUPABASE_SERVICE_ROLE_KEY`
   - `DEEPSEEK_API_KEY`
-- Email confirmation route (`app/api/orders/send-confirmation-email/route.ts`):
-  - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`
+- Transactional email (`supabase/functions/email-worker`, delivered via the
+  Resend HTTP API — see `docs/supabase/email-outbox-runbook.md`):
+  - `RESEND_API_KEY` — a Supabase Edge secret (`supabase secrets set`), never
+    a Vercel/Next.js env var; not part of `.env.local`.
   - `NEXT_PUBLIC_APP_URL` (recommended in production)
   - `NEXT_PUBLIC_FACEBOOK_URL`, `NEXT_PUBLIC_INSTAGRAM_URL` (optional)
 - Optional storefront/domain:
@@ -97,15 +99,16 @@ Gate policy:
 
 - `pnpm-lock.yaml` is the single lockfile source of truth.
 - `lint`, `typecheck`, `test`, and `build` must fail loudly on real errors (no warning-only pass-through).
-- Current H2 `lint`/`typecheck`/`test` scripts are **focused quality gates** for hardening surfaces (`app/api/store`, `app/api/orders/send-confirmation-email`, `lib/security`, `tests/security`, `tests/quality`).
+- Current H2 `lint`/`typecheck`/`test` scripts are **focused quality gates** for hardening surfaces (`app/api/store`, `app/api/email-preview`, `lib/security`, `tests/security`, `tests/quality`).
 - Full-repository visibility remains available via `pnpm lint:full`, `pnpm typecheck:full`, and `pnpm test:full` so hidden issues are explicit instead of ignored.
 - If any command fails, stop the lane and fix the issue before continuing.
+- The design detector is pinned to `impeccable@3.5.0`, run as `NPM_CONFIG_CACHE=/tmp/impeccable-npm-cache npx --yes impeccable@3.5.0 detect <touched front surfaces>` — the default npm cache is read-only under the sandbox.
 
 ## 📚 Tech Stack
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 
-If using chat/catalog AI or order confirmation emails in production, also configure the optional feature variables listed above.
+If using chat/catalog AI in production, also configure the optional feature variables listed above. Transactional email delivery is configured separately, as a Supabase Edge secret (see above).
 
 After deployment, update Supabase Auth URL settings:
 

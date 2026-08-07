@@ -128,7 +128,7 @@ function ManagementSection({ tenant, owners }: { tenant: TenantSummary; owners: 
 
 // D7: support without membership — the reset only ever targets the store's
 // single owner, resolved server-side. Zero or several owners: the card says so
-// and offers nothing (no owner picker in this slice).
+// and offers nothing (no owner picker today).
 function OwnerCredentialCard({ storeId, owners }: { storeId: string; owners: StoreMember[] }) {
   return (
     <Card>

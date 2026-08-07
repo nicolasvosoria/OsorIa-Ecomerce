@@ -4,6 +4,8 @@ import { AdminPageContainer } from "@/components/admin/page-container"
 import { AdminPageHeader } from "@/components/admin/page-header"
 import { authorizeActiveStoreAdmin } from "@/lib/supabase/active-store"
 import { ECOMMERCE_TABLES } from "@/lib/supabase/contract"
+import { loadStoreIdentity } from "@/lib/supabase/store-identity-api"
+import { StoreIdentityPanel } from "./components/store-identity-panel"
 import { StorePublicationPanel } from "./components/store-publication-panel"
 
 export default async function StoreSettingsPage() {
@@ -24,12 +26,15 @@ export default async function StoreSettingsPage() {
     redirect("/admin")
   }
 
+  const identity = await loadStoreIdentity(supabase, storeId)
+
   return (
     <AdminPageContainer maxWidth="4xl">
       <AdminPageHeader
         title="Configuración"
         subtitle={`Ajustes generales de ${store.store_name}`}
       />
+      <StoreIdentityPanel initial={identity} />
       <StorePublicationPanel initialIsPublic={store.is_public ?? false} />
     </AdminPageContainer>
   )

@@ -172,15 +172,19 @@ describe("proxy store publication gate", () => {
   });
 
   // Anonymous traffic to an unpublished store — visitors, crawlers, scanners —
-  // must not pay for the theme preview: no session read, no RPC round-trip.
-  it("does no authorization work for a storefront request without the preview marker", async () => {
+  // must not pay for the theme preview specifically: no RPC round-trip, and
+  // no SECOND session read beyond D22's own global gate (proxy.ts's
+  // isInvitedPendingPassword, which now reads the session once for every
+  // non-public request, admin or not — see tests/proxy/invited-session-gate
+  // .test.ts for that gate's own coverage).
+  it("does no theme-preview authorization work for a storefront request without the preview marker", async () => {
     const fetchMock = mockStoreFetch(unpublishedStore);
     vi.stubGlobal("fetch", fetchMock);
     const { proxy } = await import("@/proxy");
 
     await proxy(makeRequest("/"));
 
-    expect(getUserMock).not.toHaveBeenCalled();
+    expect(getUserMock).toHaveBeenCalledTimes(1);
     expect(manageStoreRpcCalls(fetchMock)).toHaveLength(0);
   });
 

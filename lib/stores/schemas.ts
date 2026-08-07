@@ -57,3 +57,23 @@ export const updateTenantSettingsSchema = createStoreSchema.pick({
 })
 
 export type UpdateTenantSettingsValues = z.infer<typeof updateTenantSettingsSchema>
+
+// D4's fields that already have a column but never had an editor: legal name
+// (stores.legal_name) and the two store_contact fields settable directly
+// (reply_to/order_mailbox go through requestMailboxVerificationSchema below
+// instead, since setting them always starts a verification, never a plain
+// write).
+export const updateStoreIdentitySchema = z.object({
+  legalName: z.string().trim().min(1, "La razón social es requerida"),
+  phone: z.string().trim().min(1, "El teléfono es requerido"),
+  commercialAddress: z.string().trim().min(1, "La dirección es requerida"),
+})
+
+const MAILBOX_FIELDS = ["reply_to", "order_mailbox"] as const
+
+export const requestMailboxVerificationSchema = z.object({
+  field: z.enum(MAILBOX_FIELDS),
+  email: z.string().trim().min(1, INVALID_EMAIL_MESSAGE).email(INVALID_EMAIL_MESSAGE),
+})
+
+export type MailboxVerificationField = (typeof MAILBOX_FIELDS)[number]

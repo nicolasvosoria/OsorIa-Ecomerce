@@ -1,8 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { toast } from "sonner"
 
+import { TurnstileWidget, type TurnstileWidgetHandle } from "@/components/auth/turnstile-widget"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -14,6 +15,7 @@ import {
 import { FormField } from "@/components/ui/form-field"
 import { Input } from "@/components/ui/input"
 import { useLanguage } from "@/contexts/language-context"
+import { useFocusOnViewChange } from "@/lib/hooks/use-focus-on-view-change"
 import { resetPassword } from "@/lib/supabase/auth-api"
 
 interface PasswordRecoveryDialogProps {
@@ -62,6 +64,14 @@ function RecoveryLinkRequest({ onCancel, onBackToSignIn }: RecoveryLinkRequestPr
   // El toast se va solo y aparece lejos del campo: el mismo mensaje se queda en
   // el correo, que es lo que anuncian aria-invalid y aria-describedby.
   const [emailError, setEmailError] = useState<string | undefined>(undefined)
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
+  const turnstileRef = useRef<TurnstileWidgetHandle>(null)
+  // Keyed on `sentTo` itself: the ref only ever attaches to a DOM node once
+  // the confirmation view mounts, so the effect must re-fire exactly on that
+  // transition. It also runs once on the dialog's initial open, but the ref
+  // is unattached (null) then -- a harmless no-op that doesn't fight Radix's
+  // own focus into the email field.
+  const confirmationHeadingRef = useFocusOnViewChange<HTMLHeadingElement>(sentTo)
 
   const requestRecoveryLink = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -76,8 +86,9 @@ function RecoveryLinkRequest({ onCancel, onBackToSignIn }: RecoveryLinkRequestPr
     }
 
     setEmailError(undefined)
-    const result = await resetPassword(email)
+    const result = await resetPassword(email, turnstileToken)
     if (!result.success) {
+      turnstileRef.current?.reset()
       const detail = result.error || t.header.recoveryLinkErrorHint
       setEmailError(detail)
       toast.error(t.header.recoveryLinkError, {
@@ -96,9 +107,11 @@ function RecoveryLinkRequest({ onCancel, onBackToSignIn }: RecoveryLinkRequestPr
 
   if (sentTo) {
     return (
-      <>
+      <div role="status" aria-live="polite">
         <DialogHeader>
-          <DialogTitle className="text-xl">{t.header.emailSent}</DialogTitle>
+          <DialogTitle ref={confirmationHeadingRef} tabIndex={-1} className="text-xl outline-none">
+            {t.header.emailSent}
+          </DialogTitle>
           <DialogDescription>{t.header.forgotPasswordDescription2}</DialogDescription>
         </DialogHeader>
 
@@ -126,7 +139,7 @@ function RecoveryLinkRequest({ onCancel, onBackToSignIn }: RecoveryLinkRequestPr
             </Button>
           </div>
         </div>
-      </>
+      </div>
     )
   }
 
@@ -145,12 +158,15 @@ function RecoveryLinkRequest({ onCancel, onBackToSignIn }: RecoveryLinkRequestPr
               type="email"
               required
               placeholder={t.header.emailPlaceholder}
-              className="placeholder:opacity-50"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
             />
           )}
         </FormField>
+
+        {/* D26: no-op (renders nothing) until NEXT_PUBLIC_TURNSTILE_SITE_KEY
+            is set -- see components/auth/turnstile-widget.tsx. */}
+        <TurnstileWidget ref={turnstileRef} onToken={setTurnstileToken} />
 
         <div className="flex flex-col gap-2 pt-4">
           <Button type="submit" className="w-full">

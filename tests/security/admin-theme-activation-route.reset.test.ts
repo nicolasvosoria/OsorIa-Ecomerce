@@ -193,7 +193,7 @@ describe("theme activation route: reset + backup (D3)", () => {
 
     // The backup snapshot is nested under `variables.backup_component_styles`
     // in the same `app_theme_versions` write, and never as its own top-level
-    // column (so the Slice-4 definition parser safely ignores it).
+    // column (so resolveThemeDefinition safely ignores it).
     expect(themeVersionsTable.insert).toHaveBeenCalledWith(
       expect.objectContaining({
         is_current: true,

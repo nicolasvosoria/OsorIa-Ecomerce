@@ -1,6 +1,13 @@
 import { getSupabaseServiceClient } from "./admin-store";
 import { ECOMMERCE_FUNCTIONS, ECOMMERCE_TABLES } from "./contract";
-import { ensurePlatformUserByEmail } from "./memberships-api";
+import { assignSingleRole, ensureStoreUser, insertInvitedProfile, resolveStoreRoleId } from "./memberships-api";
+import { loadStoreIdentity, toTenantEmailBranding } from "./store-identity-api";
+import {
+  inviteNewIdentity,
+  mintPendingMembershipInvite,
+  provisionOrCompensate,
+  resolveAuthIdentityByEmail,
+} from "@/lib/auth/platform-identity-invites";
 import type { CreateStoreFormValues } from "@/lib/stores/schemas";
 
 export type TenantSummary = {
@@ -30,7 +37,7 @@ export const EMPTY_TENANT_METRICS: TenantMetrics = {
 };
 
 export type CreateTenantResult =
-  | { success: true; storeId: string; tempPassword?: string }
+  | { success: true; storeId: string }
   | { success: false; error: string };
 
 // D6's exact enumerations, kept local to the platform console instead of
@@ -79,14 +86,23 @@ const UNIQUE_VIOLATION_CODE = "23505";
 const SUBDOMAIN_TAKEN_ERROR = "Ese subdominio ya está en uso. Elige otro.";
 const PROVISION_FAILED_ERROR = "No se pudo crear la tienda";
 
-// Provisions a brand-new tenant from the platform console. The owner's platform
-// identity is resolved FIRST because provision_store writes store_users.user_id,
-// whose FK to user_profiles(id) demands that identity already exist — inverting
-// the order would fail the FK. Only then does the atomic provision_store create
-// the store (born private), its 'owner' role, and the membership in one call.
-// A freshly-minted owner carries the temporary password back for the operator.
+// Provisions a brand-new tenant from the platform console (D20/D21). The store
+// itself is created FIRST, ownerless (ecommerce.provision_store with a null
+// owner): the owner's invite email is rendered from an auth_intents row bound
+// to a real store_id (D15's Auth Hook), and that row can't exist before the
+// store does. Ownership is granted afterward, on one of two paths depending on
+// whether the owner email already exists anywhere in this shared-pool project
+// (resolveAuthIdentityByEmail, never ecommerce.user_profiles alone):
+//   - unknown anywhere -> D20's native invite, immediate ownership once
+//     provisioning succeeds, compensated (identity deleted) if it doesn't
+//   - exists elsewhere in the org -> D21's pending acceptance; the store sits
+//     ownerless until the intended user explicitly accepts
+// Either way, a failure that leaves the store itself ownerless with nothing
+// else to show for it is cleaned up too (deleteStoreShell) -- never a
+// permanently orphaned, unreachable tenant burning a subdomain.
 export async function createTenant(
   input: CreateStoreFormValues,
+  actorUserId: string,
   supabaseOverride?: any,
 ): Promise<CreateTenantResult> {
   const service = supabaseOverride ?? getSupabaseServiceClient();
@@ -94,20 +110,10 @@ export async function createTenant(
     return { success: false, error: "Supabase no configurado" };
   }
 
-  let owner;
-  try {
-    owner = await ensurePlatformUserByEmail(input.ownerEmail, service, {
-      firstName: input.ownerFirstName,
-      lastName: input.ownerLastName,
-    });
-  } catch (error) {
-    return { success: false, error: toCreateTenantError(error) };
-  }
-
   const { data, error } = await service.rpc(ECOMMERCE_FUNCTIONS.provisionStore, {
     p_subdomain: input.subdomain,
     p_store_name: input.storeName,
-    p_owner_user_id: owner.userId,
+    p_owner_user_id: null,
     p_currency_code: input.currencyCode,
   });
 
@@ -116,21 +122,113 @@ export async function createTenant(
   }
 
   const storeId = data as string;
-  if (owner.created) {
-    await recordSignupStore(service, owner.userId, storeId);
+  const result = await provisionOwner(service, storeId, actorUserId, input);
+  if (!result.success) {
+    await deleteStoreShell(service, storeId);
   }
 
-  return owner.created
-    ? { success: true, storeId, tempPassword: owner.tempPassword }
-    : { success: true, storeId };
+  return result;
+}
+
+async function provisionOwner(
+  service: any,
+  storeId: string,
+  actorUserId: string,
+  input: CreateStoreFormValues,
+): Promise<CreateTenantResult> {
+  let identity;
+  try {
+    identity = await resolveAuthIdentityByEmail(service, input.ownerEmail);
+  } catch (error) {
+    return { success: false, error: toCreateTenantError(error) };
+  }
+
+  if (identity.exists) {
+    const branding = toTenantEmailBranding(await loadStoreIdentity(service, storeId));
+    const invite = await mintPendingMembershipInvite(service, {
+      actorUserId,
+      storeId,
+      intendedUserId: identity.userId,
+      email: input.ownerEmail,
+      roleName: "owner",
+      branding,
+    });
+
+    if (invite.outcome !== "invited") {
+      return { success: false, error: PENDING_OWNER_INVITE_ERRORS[invite.outcome] ?? PROVISION_FAILED_ERROR };
+    }
+    return { success: true, storeId };
+  }
+
+  const invited = await inviteNewIdentity(service, {
+    storeId,
+    subdomain: input.subdomain,
+    email: input.ownerEmail,
+    purpose: "owner_invite",
+    names: { firstName: input.ownerFirstName, lastName: input.ownerLastName },
+  });
+
+  if (invited.outcome !== "invited") {
+    return { success: false, error: NEW_OWNER_INVITE_ERRORS[invited.outcome] ?? PROVISION_FAILED_ERROR };
+  }
+
+  try {
+    await provisionOrCompensate(invited.userId, async () => {
+      await insertInvitedProfile(service, invited.userId, input.ownerEmail, {
+        firstName: input.ownerFirstName,
+        lastName: input.ownerLastName,
+      });
+      const storeUserId = await ensureStoreUser(service, storeId, invited.userId);
+      const roleId = await resolveStoreRoleId(service, storeId, "owner");
+      await assignSingleRole(service, storeUserId, roleId);
+    });
+  } catch (error) {
+    return { success: false, error: toCreateTenantError(error) };
+  }
+
+  await recordSignupStore(service, invited.userId, storeId);
+  return { success: true, storeId };
+}
+
+const RATE_LIMITED_INVITE_ERROR =
+  "Ya enviamos una invitación hace poco. Espera un momento antes de volver a intentarlo.";
+
+const NEW_OWNER_INVITE_ERRORS: Partial<Record<string, string>> = {
+  rate_limited: RATE_LIMITED_INVITE_ERROR,
+  // D24: a real limiter-check failure reads identically to a genuine rate
+  // limit -- see InviteNewIdentityResult's rate_limit_check_failed comment.
+  rate_limit_check_failed: RATE_LIMITED_INVITE_ERROR,
+  email_exists: "Ese correo acaba de registrarse en la plataforma. Intenta de nuevo.",
+};
+
+const PENDING_OWNER_INVITE_ERRORS: Partial<Record<string, string>> = {
+  rate_limited: RATE_LIMITED_INVITE_ERROR,
+  // D24: same shape as NEW_OWNER_INVITE_ERRORS' own rate_limit_check_failed --
+  // a real limiter-check failure inside request_membership_invite must read
+  // identically to a genuine rate limit, never fall through to the generic
+  // PROVISION_FAILED_ERROR below.
+  rate_limit_check_failed: RATE_LIMITED_INVITE_ERROR,
+  not_authorized: "No tienes permiso para invitar a esta persona",
+  invalid_role: PROVISION_FAILED_ERROR,
+};
+
+// Only ever called on a store THIS request just created and failed to hand
+// off to an owner (native invite or pending acceptance) -- zero members,
+// zero products, nothing else can depend on it yet, so a hard delete is
+// safe (unlike softDeleteTenant, which soft-deletes an established store).
+async function deleteStoreShell(service: any, storeId: string): Promise<void> {
+  const { error } = await service.from(ECOMMERCE_TABLES.stores).delete().eq("id", storeId);
+  if (error) {
+    console.error(`[Stores] No se pudo revertir la tienda ${storeId} tras un aprovisionamiento fallido: ${error.message}`);
+  }
 }
 
 // The owner's platform identity was minted specifically to found this store
 // (D8), so its signup_store_id records that as the truest origin. Only runs
-// for a freshly-minted owner: an existing identity added as owner keeps
-// whatever origin it already carries. provision_store already committed the
-// store, role and membership by this point, so a failure here must not undo
-// a successful provisioning — it only logs.
+// for a freshly-invited owner (D20): an existing identity accepting D21's
+// pending invite keeps whatever origin it already carries. Ownership is
+// already committed by this point, so a failure here must not undo a
+// successful provisioning — it only logs.
 async function recordSignupStore(service: any, userId: string, storeId: string): Promise<void> {
   const { error } = await service
     .from(ECOMMERCE_TABLES.userProfiles)

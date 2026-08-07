@@ -127,10 +127,19 @@ describe("RouteAwareChrome", () => {
     },
   )
 
-  // El login pertenece al viaje de autenticación, no a la tienda: entra sin su
-  // fachada. Y solo él (D3) — el resto de /auth son pantallas de cara al cliente.
-  it("renders /auth/login without any storefront chrome around it", () => {
-    renderChrome("/auth/login")
+  // B3: the auth journey (provisioning/access to the panel) is not the shop,
+  // so the whole /auth subtree enters without storefront chrome -- not just
+  // login, which used to be the only path-by-path exemption.
+  it.each([
+    "/auth/login",
+    "/auth/accept-invite",
+    "/auth/accept-membership",
+    "/auth/mailbox-verification",
+    "/auth/reset-password",
+    "/auth/force-password-change",
+    "/auth/callback",
+  ])("renders %s without any storefront chrome around it", (pathname) => {
+    renderChrome(pathname)
 
     expect(screen.getByTestId("route-children")).toBeInTheDocument()
     expect(screen.queryByTestId("editable-wrapper-header")).not.toBeInTheDocument()
@@ -140,8 +149,8 @@ describe("RouteAwareChrome", () => {
     expect(screen.queryByTestId("floating-contact-button")).not.toBeInTheDocument()
   })
 
-  it.each(["/auth/cuenta-confirmada", "/", "/shop"])(
-    "keeps the storefront chrome on %s, so the login is not a blanket /auth exemption",
+  it.each(["/auth/cuenta", "/auth/cuenta-confirmada", "/", "/shop"])(
+    "keeps the storefront chrome on %s, so /auth is not a blanket exemption either",
     (pathname) => {
       renderChrome(pathname)
 

@@ -144,8 +144,8 @@ export async function POST(request: NextRequest) {
 
     // Persist the resolved (preset path) or edited (custom path) two-axis
     // bundle alongside the `is_current` flip so `getActiveTheme` can read it
-    // back verbatim next time (Slice 4 storage). `theme.colors` is the same
-    // jsonb the route already selected above.
+    // back verbatim next time. `theme.colors` is the same jsonb the route
+    // already selected above.
     const definition =
       customDefinition ??
       resolveThemeDefinition(themeName, theme.colors as ThemeColors);

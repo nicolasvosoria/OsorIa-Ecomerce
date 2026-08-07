@@ -33,8 +33,9 @@ export function OrderPageNotice({ title, description, action }: OrderPageNoticeP
 }
 
 // El guest jamás llega a estas pantallas vía una lectura de pedidos (D5): el
-// único CTA disponible es el puente de login de checkout (slice 4), reusado
-// tal cual para esta señal genérica de "inicia sesión".
+// único CTA disponible es el puente de login del checkout
+// (checkout-login-intent-context), reusado tal cual para esta señal genérica
+// de "inicia sesión".
 export function SignInToSeeOrdersNotice() {
   const { t } = useLanguage();
   const { requestLogin } = useCheckoutLoginIntent();

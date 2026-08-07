@@ -216,7 +216,11 @@ enable_signup = true
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
 # If enabled, users need to confirm their email address before signing in.
-enable_confirmations = false
+# D11's signup-confirmation catalog kind only ever gets sent (and the Send
+# Email Hook below only ever fires with email_action_type=signup) when this
+# is true. Enabling the matching setting on the real project is a manual
+# production step.
+enable_confirmations = true
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
 secure_password_change = false
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
@@ -241,11 +245,13 @@ otp_expiry = 3600
 # subject = "You have been invited"
 # content_path = "./supabase/templates/invite.html"
 
-# Uncomment to customize notification email template
-# [auth.email.notification.password_changed]
-# enabled = true
-# subject = "Your password has been changed"
-# content_path = "./templates/password_changed_notification.html"
+# D11's password-changed catalog kind is GoTrue's own built-in notification
+# (GOTRUE_MAILER_NOTIFICATIONS_PASSWORD_CHANGED_ENABLED, off by default) --
+# turned on so it reaches the Send Email Hook below like every other Auth
+# catalog kind, instead of silently never firing. Enabling the matching
+# setting on the real project is a manual production step.
+[auth.email.notification.password_changed]
+enabled = true
 
 [auth.sms]
 # Allow/disallow new user signups via SMS to your project.
@@ -377,6 +383,64 @@ deno_version = 2
 
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
+
+# The caller is the pg_cron schedule (see 20260805000400_ecommerce_email_
+# worker_provisioning.sql), never a Supabase Auth session, so there is no user
+# JWT to verify. Authorization is the function's own check of a Vault-backed
+# shared secret (D19).
+#
+# import_map points at this function's OWN deno.json (not a shared
+# supabase/functions/deno.json): this CLI (v2.95.3+) only auto-discovers a
+# deno.json that sits in the SAME DIRECTORY as the entrypoint
+# (ShouldUseDenoJsonDiscovery in the CLI's bundler); a shared root-level one
+# is silently NOT picked up and the deploy falls back to a default config
+# with no jsx/jsxImportSource, which is what broke auth-email-hook in
+# staging (see the runbook's deno.json section) -- this function has no JSX
+# of its own, but gets its own deno.json anyway per Supabase's own
+# recommended structure ("each function should maintain its own
+# configuration"), so it never falls into that same fallback path either.
+# No react/react-dom pin needed here (unlike auth-email-hook, below): this
+# function's only external dependency is npm:@supabase/supabase-js -- it
+# never touches lib/email/render.tsx or anything react-based.
+[functions."email-worker"]
+enabled = true
+verify_jwt = false
+import_map = "./functions/email-worker/deno.json"
+
+# D15: the Send Email Hook. The caller is GoTrue over HTTP, not a Supabase
+# session, so there is no user JWT to verify either -- authorization is the
+# Standard Webhooks signature the function itself checks against
+# AUTH_EMAIL_HOOK_SECRET. import_map points at this function's OWN deno.json
+# (see the comment on [functions."email-worker"] above for why NOT a shared
+# root-level one) -- it maps the bare `@react-email/*`/`react` specifiers
+# lib/email/render.tsx and its siblings use (Next's bundler resolves those
+# from node_modules; Deno needs the explicit npm: mapping) and sets
+# compilerOptions.jsx/jsxImportSource so that mapping's JSX actually compiles
+# to the automatic runtime instead of the classic one (which needs a bare
+# `React` global neither this function nor lib/email/ ever provides).
+# NOT registered under [auth.hook.send_email] here: this repo only AUTHORS
+# and locally verifies the function (its own tests, and invoking it directly
+# with a hand-signed payload) -- wiring GoTrue itself to call it, locally or
+# on the real project, is a manual step (see the runbook), so today's local
+# stack's existing Auth email behavior is unaffected by this function merely
+# existing.
+#
+# This function directory also carries its own package.json (`overrides`)
+# and a matching deno.lock: the invariant is that Deno must resolve the
+# EXACT SAME react/react-dom pair the Node side already pins in the root
+# package.json (19.2.1/19.2.1) -- lib/email/ is one shared module set and
+# must behave identically under both runtimes. Do not remove that
+# package.json or loosen its pin without re-reading the investigation in
+# docs/supabase/email-outbox-runbook.md first (see the "react/react-dom no
+# coincidían bajo Deno" section) for what breaks and why: without the
+# committed deno.lock, react-dom's peer resolution can drift to a
+# different patch than react on a future cold start as npm publishes new
+# versions -- not run-to-run randomness at a given moment -- and
+# react-dom's own version check crashes every render when that happens.
+[functions."auth-email-hook"]
+enabled = true
+verify_jwt = false
+import_map = "./functions/auth-email-hook/deno.json"
 
 [analytics]
 enabled = true

@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 const { resetPassword, toastError, toastSuccess } = vi.hoisted(() => ({
   resetPassword: vi.fn(),
@@ -65,10 +65,24 @@ describe("PasswordRecoveryDialog", () => {
     await user.type(emailField(), "duena@tienda.test")
     await user.click(sendButton())
 
-    await waitFor(() => expect(resetPassword).toHaveBeenCalledWith("duena@tienda.test"))
+    await waitFor(() => expect(resetPassword).toHaveBeenCalledWith("duena@tienda.test", null))
     expect(await screen.findByRole("heading", { name: t.header.emailSent })).toBeInTheDocument()
     expect(screen.getByText("duena@tienda.test")).toBeInTheDocument()
     expect(toastSuccess).toHaveBeenCalled()
+  })
+
+  // B8: the form view is destroyed wholesale when the confirmation view
+  // mounts in its place -- without a live region and a focus move, a
+  // screen-reader user hears nothing change.
+  it("announces the confirmation view as a live region and moves focus to its heading", async () => {
+    const user = openRecoveryDialog()
+
+    await user.type(emailField(), "duena@tienda.test")
+    await user.click(sendButton())
+
+    const heading = await screen.findByRole("heading", { name: t.header.emailSent })
+    expect(heading.closest('[role="status"]')).toBeTruthy()
+    await waitFor(() => expect(heading).toHaveFocus())
   })
 
   // El dueño que pierde la clave temporal no puede quedarse creyendo que el link
@@ -169,5 +183,63 @@ describe("PasswordRecoveryDialog", () => {
     await user.click(screen.getByRole("button", { name: t.common.cancel }))
 
     expect(onOpenChange).toHaveBeenCalledWith(false)
+  })
+})
+
+describe("PasswordRecoveryDialog Turnstile token reuse", () => {
+  const originalSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY = "test-site-key"
+  })
+
+  afterEach(() => {
+    if (originalSiteKey === undefined) {
+      delete process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
+    } else {
+      process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY = originalSiteKey
+    }
+    delete window.turnstile
+    document.querySelectorAll("script").forEach((script) => script.remove())
+  })
+
+  // A solved Turnstile token is single-use: Cloudflare's siteverify answers
+  // timeout-or-duplicate on replay. A failed submit must reset the widget so
+  // the resubmit can't resend the token the first attempt already consumed.
+  it("does not resend the token a failed attempt already consumed", async () => {
+    const reset = vi.fn()
+    const render_ = vi.fn(
+      (_container: HTMLElement, options: { callback: (token: string) => void }) => {
+        options.callback("consumed-token")
+        return "widget-1"
+      },
+    )
+
+    document.head.appendChild = new Proxy(document.head.appendChild.bind(document.head), {
+      apply(target, thisArg, args) {
+        const script = args[0] as HTMLScriptElement
+        window.turnstile = { render: render_, remove: vi.fn(), reset }
+        queueMicrotask(() => script.onload?.(new Event("load")))
+        return target.apply(thisArg, args as [Node])
+      },
+    })
+
+    resetPassword.mockResolvedValueOnce({ success: false, error: "Supabase no configurado" })
+    const user = openRecoveryDialog()
+
+    await waitFor(() => expect(render_).toHaveBeenCalled())
+    await user.type(emailField(), "duena@tienda.test")
+    await user.click(sendButton())
+
+    await waitFor(() =>
+      expect(resetPassword).toHaveBeenNthCalledWith(1, "duena@tienda.test", "consumed-token"),
+    )
+    expect(reset).toHaveBeenCalledWith("widget-1")
+
+    await user.click(sendButton())
+
+    await waitFor(() => expect(resetPassword).toHaveBeenCalledTimes(2))
+    expect(resetPassword).toHaveBeenNthCalledWith(2, "duena@tienda.test", null)
   })
 })

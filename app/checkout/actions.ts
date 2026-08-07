@@ -1,22 +1,15 @@
 "use server"
 
-import { headers } from "next/headers"
-import { after } from "next/server"
-
 import { formatSavedAddressLine, type SavedAddress } from "@/lib/account/saved-address"
+import { computeCheckoutPayloadFingerprint } from "@/lib/checkout/idempotency"
+import { CheckoutIdempotencyConflictError, StoreIdentityNotReadyError } from "@/lib/checkout/order-writer"
 import { checkoutOrderSchema } from "@/lib/checkout/schemas"
-import {
-  generateInvoiceEmailHTML,
-  sendEmail,
-} from "@/lib/orders/order-confirmation-email"
-import { resolveEmailBaseUrl } from "@/lib/security/email-runtime-guards"
 import { getAccountProfile } from "@/lib/supabase/account-profile-api"
 import {
   createOrder,
   getMostRecentOrderByUserId,
   type CreateOrderData,
   type InventoryValidationResult,
-  type OrderWithItems,
 } from "@/lib/supabase/orders-api"
 import {
   ecommerceForSession,
@@ -32,8 +25,21 @@ export type PlaceCheckoutOrderResult =
 
 export type CheckoutPrefill = { phone: string; address: string } | null
 
+const IDENTITY_NOT_READY_MESSAGE =
+  "Esta tienda todavía no completó su configuración y no puede recibir pedidos en este momento."
+const IDEMPOTENCY_CONFLICT_MESSAGE =
+  "Tu carrito cambió desde el último intento. Actualiza la página e inténtalo de nuevo."
+
+// D28: idempotencyKey is the client's per-checkout-attempt correlation token
+// (app/checkout/page.tsx generates one UUID per page load and resends the
+// SAME value on every retry within it). Deliberately not part of
+// checkoutOrderSchema: it isn't user-entered data, and folding it in would
+// make guestCheckoutFormSchema/authenticatedCheckoutFormSchema (both derived
+// from checkoutOrderSchema via pick/omit) demand a field their forms never
+// collect.
 export async function placeCheckoutOrder(
   input: unknown,
+  idempotencyKey: string,
 ): Promise<PlaceCheckoutOrderResult> {
   const parsed = checkoutOrderSchema.safeParse(input)
   if (!parsed.success) {
@@ -43,12 +49,18 @@ export async function placeCheckoutOrder(
     }
   }
 
+  if (!idempotencyKey) {
+    return { success: false, error: "No se pudo identificar el intento de pedido. Recarga la página e inténtalo de nuevo." }
+  }
+
   const authenticatedUserId = await resolveAuthenticatedUserId()
   // customer_type/user_id salen de la sesión y el pago nace pendiente, diga lo
   // que diga el cliente: la action escribe con el service client (bypasea RLS)
   // y los totales los recalcula createOrder contra la base de datos.
   const orderData: CreateOrderData = {
     ...parsed.data,
+    idempotency_key: idempotencyKey,
+    payload_fingerprint: computeCheckoutPayloadFingerprint(parsed.data),
     customer_type: authenticatedUserId ? "user" : "guest",
     user_id: authenticatedUserId,
     payment_status: "pending",
@@ -69,11 +81,19 @@ export async function placeCheckoutOrder(
       return { success: false, error: "No se pudo crear el pedido" }
     }
 
-    const requestOrigin = await resolveRequestOrigin()
-    after(() => sendOrderConfirmationEmail(order, requestOrigin))
-
+    // D12/D27: el recibo del cliente y la notificación del comercio ya
+    // quedaron en el outbox DENTRO de la misma transacción atómica que creó
+    // el pedido (ecommerce.create_order_with_notifications) -- no hay un
+    // envío diferido que disparar aquí, el worker del outbox se encarga.
     return { success: true, orderNumber: order.order_number, orderId: order.id }
   } catch (error: any) {
+    if (error instanceof StoreIdentityNotReadyError) {
+      return { success: false, error: IDENTITY_NOT_READY_MESSAGE }
+    }
+    if (error instanceof CheckoutIdempotencyConflictError) {
+      return { success: false, error: IDEMPOTENCY_CONFLICT_MESSAGE }
+    }
+
     return {
       success: false,
       error: error?.message || "Error inesperado al crear pedido",
@@ -158,45 +178,4 @@ async function prefillFromMostRecentOrder(
 async function resolveAuthenticatedUserId(): Promise<string | null> {
   const session = await resolveServerAuthSession()
   return session?.userId ?? null
-}
-
-async function resolveRequestOrigin(): Promise<string> {
-  const requestHeaders = await headers()
-  const host =
-    requestHeaders.get("x-forwarded-host") || requestHeaders.get("host")
-  const protocol = requestHeaders.get("x-forwarded-proto") || "https"
-  return host ? `${protocol}://${host}` : ""
-}
-
-// Corre tras responder (after()) y es best-effort: un fallo del correo jamás
-// tumba el pedido ya creado.
-async function sendOrderConfirmationEmail(
-  order: OrderWithItems,
-  requestOrigin: string,
-) {
-  try {
-    const baseUrlForEmail = resolveEmailBaseUrl({
-      requestOrigin,
-      appUrl: process.env.NEXT_PUBLIC_APP_URL,
-      vercelUrl: process.env.VERCEL_URL,
-    })
-
-    const customerName =
-      [order.customer_first_name, order.customer_last_name]
-        .filter(Boolean)
-        .join(" ") || undefined
-    const emailHtml = generateInvoiceEmailHTML(order, customerName, baseUrlForEmail)
-
-    const emailSent = await sendEmail({
-      to: order.customer_email,
-      subject: `Confirmación de Pedido #${order.order_number}`,
-      html: emailHtml,
-    })
-
-    if (!emailSent.success) {
-      console.error("Error al enviar correo de confirmación:", emailSent.error)
-    }
-  } catch (error) {
-    console.error("Error al enviar correo de confirmación:", error)
-  }
 }

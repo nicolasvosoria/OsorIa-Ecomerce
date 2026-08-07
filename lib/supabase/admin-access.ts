@@ -22,7 +22,10 @@ export function normalizeSafeAdminPath(candidate: string | null | undefined) {
   return normalizeAuthReturnPath(candidate);
 }
 
-function createRequestAuthClient(request: NextRequest) {
+// Exported for lib/auth/invited-session-gate.ts (D22): the same read-only,
+// cookie-scoped client this file already builds to resolve `/admin` access,
+// reused instead of a second copy for the global invited-session check.
+export function createRequestAuthClient(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 

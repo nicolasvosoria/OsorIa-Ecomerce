@@ -31,7 +31,7 @@ describe("H2 quality gates contract", () => {
     const scripts = packageJson.scripts ?? {};
 
     expect(scripts.lint).toBe(
-      "eslint app/api/store app/api/orders/send-confirmation-email lib/security tests/security tests/quality --max-warnings=0",
+      "eslint app/api/store app/api/email-preview lib/security tests/security tests/quality --max-warnings=0",
     );
     expect(scripts.typecheck).toBe("tsc --noEmit -p tsconfig.quality.json");
     expect(scripts.test).toBe("node scripts/run-vitest.mjs");

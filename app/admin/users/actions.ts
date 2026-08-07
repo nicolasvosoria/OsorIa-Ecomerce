@@ -42,7 +42,7 @@ export async function addStoreMemberAction(
     return { success: false, error: "No se pudo verificar el correo del miembro" }
   }
 
-  const result = await addStoreMember(storeId, email, roleName, supabase)
+  const result = await addStoreMember(storeId, userId, email, roleName, supabase)
   if (result.success) {
     revalidatePath(USERS_PATH)
   }

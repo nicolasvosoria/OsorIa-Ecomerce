@@ -78,11 +78,16 @@ function makeRecordingClient() {
     return builder;
   }
 
+  const rpcCalls: Array<{ fn: string; params: any }> = [];
   const client = {
     from: vi.fn((table: string) => makeBuilder(table)),
+    rpc: vi.fn((fn: string, params: any) => {
+      rpcCalls.push({ fn, params });
+      return Promise.resolve({ data: { ok: true, order: ORDER_ROW }, error: null });
+    }),
   };
 
-  return { client, eqCalls };
+  return { client, eqCalls, rpcCalls };
 }
 
 function storeFilterFor(
@@ -182,14 +187,30 @@ describe("orders-api store scoping", () => {
     ]);
   });
 
-  it("filters updateOrderStatus by store_id when a storeId is provided", async () => {
-    const { client, eqCalls } = makeRecordingClient();
+  // D30: updateOrderStatus now goes through ecommerce.transition_order_status
+  // (lib/orders/order-status-writer.ts), which does its own store scoping and
+  // authorization INSIDE the locked function -- this proves the TS wiring
+  // hands it the right store_id/user_id. "confirmed" is deliberately a
+  // non-lifecycle target (D11): it never enqueues a notification, so this
+  // stays a pure RPC-wiring test. Real graph/authorization/tenant enforcement
+  // is proven against real Postgres in verify-email-platform-contract.sql.
+  it("passes store_id and user_id to ecommerce.transition_order_status", async () => {
+    const { client, rpcCalls } = makeRecordingClient();
 
-    const ok = await updateOrderStatus("order-1", "shipped", "store-1", client);
+    const ok = await updateOrderStatus("order-1", "confirmed", "store-1", "user-1", client);
 
     expect(ok).toBe(true);
-    expect(storeFilterFor(eqCalls)).toEqual([
-      { table: "orders", column: "store_id", value: "store-1" },
+    expect(rpcCalls).toEqual([
+      {
+        fn: "transition_order_status",
+        params: {
+          p_order_id: "order-1",
+          p_store_id: "store-1",
+          p_user_id: "user-1",
+          p_next_status: "confirmed",
+          p_notification: null,
+        },
+      },
     ]);
   });
 

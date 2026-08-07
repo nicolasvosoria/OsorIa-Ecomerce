@@ -6,7 +6,7 @@
   },
   "include": [
     "app/api/store/**/*.ts",
-    "app/api/orders/send-confirmation-email/**/*.ts",
+    "app/api/email-preview/**/*.ts",
     "lib/security/**/*.ts",
     "tests/security/**/*.ts",
     "tests/quality/**/*.ts"

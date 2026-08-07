@@ -15,7 +15,13 @@ interface AuthContextType {
   isAuthenticated: boolean
   isLoading: boolean
   login: (email: string, password: string) => Promise<AuthResult>
-  register: (email: string, password: string, firstName?: string, lastName?: string) => Promise<AuthResult>
+  register: (
+    email: string,
+    password: string,
+    firstName?: string,
+    lastName?: string,
+    turnstileToken?: string | null,
+  ) => Promise<AuthResult>
   logout: () => Promise<void>
   refreshUser: () => Promise<void>
 }
@@ -114,9 +120,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     email: string,
     password: string,
     firstName?: string,
-    lastName?: string
+    lastName?: string,
+    turnstileToken?: string | null
   ): Promise<AuthResult> => {
-    const result = await signUp(email, password, firstName, lastName)
+    const result = await signUp(email, password, firstName, lastName, turnstileToken)
     // No actualizar el estado aquí, el listener de onAuthStateChange lo hará
     return result
   }, [])

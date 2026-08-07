@@ -1,0 +1,64 @@
+-- Closes the closing security review's finding on plan-correos-ecommerce:
+-- unauthenticated read of merchant operational mailboxes.
+--
+-- 20260805000100 added six columns to ecommerce.store_contact and narrowed
+-- only the UPDATE/INSERT column lists (its own comment says so: "the
+-- baseline blanket grant ... already covers every column of this
+-- pre-existing table, including the six just added, so it has to be
+-- narrowed"). SELECT was never mentioned. The baseline's `grant select on
+-- all tables in schema ecommerce to anon, authenticated` (20260425000100) is
+-- a RELATION-level grant, and a relation-level SELECT covers every column of
+-- the table INCLUDING ones added afterwards -- column ACLs are only
+-- consulted when the relation-level privilege is absent. So the six mailbox
+-- columns stayed fully readable by anon and authenticated.
+--
+-- RLS did not save it: store_contact_public_read (20260426000100) is `using
+-- (ecommerce.is_public_store(store_id) or ecommerce.can_manage_store(store_id))`,
+-- and is_public_store has no actor check -- any anonymous caller passes it
+-- for any active, public store. Every store on the platform is public by
+-- default, so this was cross-tenant enumeration of every merchant's
+-- operational inbox address, not a single-store leak.
+--
+-- The column list, decided per-column against actual usage (see the slice
+-- report for the full trace):
+--   - contact_email/contact_phone/address stay readable: genuinely public,
+--     rendered in the footer of every customer-facing email
+--     (lib/supabase/store-identity-api.ts's toTenantEmailBranding) and meant
+--     to be found by anyone.
+--   - order_mailbox_email/order_mailbox_pending_email/order_mailbox_verified_at
+--     are revoked: the merchant-side order recipient, never rendered into
+--     anything a customer sees (lib/checkout/order-notifications.ts only
+--     ever uses it as an RPC parameter, never as page or email content).
+--   - reply_to_email/reply_to_verified_at are revoked too. reply_to_email
+--     does reach a customer, but only in the Reply-To header of an email
+--     from ITS OWN store -- reachable only by someone who actually orders or
+--     signs up there. Granting it at the relation level instead lets ANY
+--     anonymous caller enumerate it across every store on the platform, the
+--     same widened-audience problem this whole migration exists to close.
+--     There is no legitimate anon/authenticated reader of this column: every
+--     app-side reader of store_contact (lib/supabase/store-identity-api.ts's
+--     loadStoreIdentity and supabase/functions/auth-email-hook/index.ts's own
+--     direct read) runs under the service-role client, which this grant
+--     narrowing does not touch.
+--   - reply_to_pending_email/order_mailbox_pending_email were already the
+--     sharpest part of the finding: store_mailbox_verifications.email (the
+--     SAME address, mid-verification) is locked down hard by
+--     20260805000300 (`revoke all ... from public, anon, authenticated`,
+--     plus a `using (false)` policy) -- the identical value sitting
+--     readable on store_contact was the same secret exposed through the
+--     back door. A pending_email set with verified_at null tells a reader
+--     exactly which merchant just requested a mailbox change and at which
+--     address.
+--
+-- Same shape as 20260729000100 (user_profiles) and 20260805000100/
+-- 20260805000900 (store_contact UPDATE / orders UPDATE): the table-level
+-- privilege has to go first, then the columns that ARE meant for anon/
+-- authenticated come back one by one. Re-running is safe in this order for
+-- the same reason noted there: a table-level revoke also clears the column
+-- grants the next statement restores.
+--
+-- Scope: ecommerce schema only.
+
+revoke select on ecommerce.store_contact from anon, authenticated;
+grant select (store_id, contact_email, contact_phone, address, updated_at)
+  on ecommerce.store_contact to anon, authenticated;
