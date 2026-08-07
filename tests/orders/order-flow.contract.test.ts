@@ -58,12 +58,30 @@ type ScriptedResponse = { data?: any; error?: any; count?: number };
 // fallback in a couple of them) working unchanged: that fallback's entry is
 // always consumed first, and this default only ever answers the LATER,
 // identity-load call once the test's own queue is exhausted.
+//
+// A10: createOrder also now resolves the frozen destination from
+// co_locations by shipping_location_id (resolveAuthoritativeShippingDestination),
+// on every order, unconditionally -- this default matches baseOrderData/
+// baseCheckoutInput's own shipping_location_id ("1") and destination fields
+// exactly, so every pre-existing test that never overrides the destination
+// keeps asserting the same values it always did. Tests that DO override the
+// destination (proving the catalog wins over a disagreeing client payload)
+// script their own "co_locations:select" entry instead.
 const DEFAULT_IDENTITY_QUEUE_RESPONSES: Record<string, ScriptedResponse> = {
   "stores:select": {
     data: { store_name: "Tienda de prueba", subdomain: "tienda-de-prueba", legal_name: null },
     error: null,
   },
   "store_branding:select": { data: null, error: null },
+  "co_locations:select": {
+    data: {
+      department_code: "11",
+      department_name: "Bogotá, D.C.",
+      municipality_code: "11001",
+      municipality_name: "Bogotá",
+    },
+    error: null,
+  },
   "store_contact:select": {
     data: {
       contact_email: "tienda@example.com",
@@ -280,6 +298,10 @@ class MockSupabaseState {
   }
 }
 
+// D2/D30: shipping_location_id/shipping_department_code/shipping_department_name/
+// shipping_municipality_code are the checkout's destination picker (D28) output --
+// required on every order now, so every fixture below carries them once here and
+// every call site that spreads ...baseOrderData/...baseCheckoutInput inherits them.
 const baseOrderData: CreateOrderData = {
   idempotency_key: "test-idempotency-key",
   payload_fingerprint: "test-payload-fingerprint",
@@ -288,7 +310,11 @@ const baseOrderData: CreateOrderData = {
   customer_first_name: "Ada",
   customer_last_name: "Lovelace",
   shipping_address: "Calle 123",
+  shipping_department_code: "11",
+  shipping_department_name: "Bogotá, D.C.",
   shipping_city: "Bogotá",
+  shipping_municipality_code: "11001",
+  shipping_location_id: "1",
   shipping_postal_code: "110111",
   total_amount: 100000,
   subtotal: 100000,
@@ -310,7 +336,11 @@ const baseCheckoutInput: CheckoutOrderInput = {
   customer_first_name: "Ada",
   customer_last_name: "Lovelace",
   shipping_address: "Calle 123",
+  shipping_department_code: "11",
+  shipping_department_name: "Bogotá, D.C.",
   shipping_city: "Bogotá",
+  shipping_municipality_code: "11001",
+  shipping_location_id: "1",
   shipping_postal_code: "110111",
   payment_method: "cash_on_delivery",
   items: [
@@ -2126,6 +2156,150 @@ describe("orders-api live order contract", () => {
       customer_type: "user",
       user_id: "session-user-1",
     });
+  });
+
+  // D2/D30: before this slice, app/checkout/page.tsx hardcoded city: "" for
+  // every authenticated order and checkoutOrderSchema had no destination
+  // fields at all -- an authenticated purchase stored an empty city and no
+  // department. This proves the authenticated write path now freezes
+  // shipping_location_id AND the department alongside it, not just the city.
+  //
+  // A10: the frozen department/municipality text is never trusted from the
+  // client -- the write path resolves it from ecommerce.co_locations by
+  // shipping_location_id, the same way applyAuthoritativePricing already
+  // ignores the client's price. The client payload below deliberately claims
+  // Bogotá for a location id whose real catalog row is Antioquia/Medellín,
+  // proving the stored row carries the CATALOG's destination, not the
+  // client's disagreeing one.
+  it("stores the catalog's frozen destination text for shipping_location_id, not the client's disagreeing one, for an authenticated order", async () => {
+    getUserMock.mockResolvedValue({
+      data: { user: { id: "session-user-destination-1" } },
+      error: null,
+    });
+
+    const state = new MockSupabaseState({
+      "store_items:select": [
+        {
+          data: [
+            { id: "store-item-1", base_price: 100000, currency_code: "COP" },
+          ],
+          error: null,
+        },
+        {
+          data: {
+            track_inventory: false,
+            inventory_quantity: 10,
+            is_available_for_sale: true,
+            is_active: true,
+          },
+          error: null,
+        },
+        {
+          data: {
+            store_id: "store-uuid-destination-1",
+            track_inventory: false,
+            inventory_quantity: 10,
+          },
+          error: null,
+        },
+        {
+          data: {
+            track_inventory: false,
+            inventory_quantity: 10,
+            is_available_for_sale: true,
+            is_active: true,
+          },
+          error: null,
+        },
+      ],
+      "co_locations:select": [
+        {
+          data: {
+            department_code: "05",
+            department_name: "ANTIOQUIA",
+            municipality_code: "05001",
+            municipality_name: "MEDELLÍN",
+          },
+          error: null,
+        },
+      ],
+      "orders:insert": [
+        {
+          data: {
+            id: "order-destination-1",
+            order_number: "A-DESTINATION-1",
+            payment_method: "cash_on_delivery",
+            payment_status: "pending",
+            payment_reference: null,
+            created_at: "2026-01-01T00:00:00.000Z",
+            updated_at: "2026-01-01T00:00:00.000Z",
+            ...baseOrderData,
+          },
+          error: null,
+        },
+      ],
+      "order_items:insert": [{ data: [{ id: "item-destination-1" }], error: null }],
+      "order_addresses:insert": [
+        { data: [{ id: "addr-destination-1" }], error: null },
+      ],
+    });
+
+    getServiceEcommerceClientMock.mockReturnValue({ from: state.from, rpc: state.rpc });
+
+    const result = await placeCheckoutOrder({
+      ...baseCheckoutInput,
+      // El id apunta a Antioquia/Medellín (scripteado arriba); el texto que
+      // manda el cliente miente y dice Bogotá para ese mismo id.
+      shipping_location_id: "42",
+      shipping_department_code: "11",
+      shipping_department_name: "Bogotá, D.C.",
+      shipping_city: "Bogotá",
+      shipping_municipality_code: "11001",
+    }, "idem-destination-1");
+
+    expect(result).toMatchObject({ success: true, orderNumber: "A-DESTINATION-1" });
+    expect(state.inserts.orders?.[0]).toMatchObject({
+      shipping_location_id: "42",
+      shipping_department_code: "05",
+      shipping_department_name: "ANTIOQUIA",
+      shipping_city: "MEDELLÍN",
+      shipping_municipality_code: "05001",
+    });
+  });
+
+  // A10: if the id the client submits does not resolve to a real
+  // co_locations row (stale picker state, a tampered id), the order is never
+  // written at all -- there is no partial or best-guess destination to fall
+  // back to.
+  it("does not create the order when shipping_location_id does not resolve in co_locations", async () => {
+    getUserMock.mockResolvedValue({
+      data: { user: { id: "session-user-destination-2" } },
+      error: null,
+    });
+
+    const state = new MockSupabaseState({
+      "store_items:select": [
+        {
+          data: [
+            { id: "store-item-1", base_price: 100000, currency_code: "COP" },
+          ],
+          error: null,
+        },
+      ],
+      "co_locations:select": [
+        { data: null, error: { message: "no rows found" } },
+      ],
+    });
+
+    getServiceEcommerceClientMock.mockReturnValue({ from: state.from, rpc: state.rpc });
+
+    const result = await placeCheckoutOrder({
+      ...baseCheckoutInput,
+      shipping_location_id: "999999",
+    }, "idem-destination-invalid-1");
+
+    expect(result).toMatchObject({ success: false });
+    expect(state.inserts.orders).toBeUndefined();
   });
 
   it("returns the 409-style validationResult in the action result when inventory runs short", async () => {

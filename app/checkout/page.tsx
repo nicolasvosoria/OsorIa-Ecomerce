@@ -12,7 +12,10 @@ import { useLanguage } from "@/contexts/language-context"
 import { toast } from "sonner"
 import Link from "next/link"
 import { useAuth } from "@/contexts/auth-context"
-import { AuthenticatedCheckoutForm } from "@/components/checkout/authenticated-checkout-form"
+import {
+  AuthenticatedCheckoutForm,
+  type AuthenticatedCheckoutData,
+} from "@/components/checkout/authenticated-checkout-form"
 import { GuestLoginBanner } from "@/components/checkout/guest-login-banner"
 import {
   getCheckoutPrefill,
@@ -102,29 +105,29 @@ export default function CheckoutPage() {
   // Para usuarios invitados, mostrar formulario completo
 
   // Función para procesar checkout de usuario autenticado
-  const handleAuthenticatedCheckoutComplete = async (data: {
-    firstName: string
-    lastName: string
-    phone: string
-    address: string
-    paymentMethod: string
-  }) => {
+  const handleAuthenticatedCheckoutComplete = async (data: AuthenticatedCheckoutData) => {
     if (!user || !hasLocalItems) return
 
     setIsProcessing(true)
 
     try {
       // El nombre lo captura el formulario (el perfil puede no traerlo); el
-      // correo sigue viniendo de la cuenta porque es de solo lectura.
+      // correo sigue viniendo de la cuenta porque es de solo lectura. D24: el
+      // destino (departamento/municipio) lo captura el mismo picker que usa
+      // el invitado -- ya no se fuerza a vacío.
       const customerDataForOrder: GuestCustomerData = {
         firstName: data.firstName,
         lastName: data.lastName,
         email: user.email || "",
         phone: data.phone,
         address: data.address,
-        city: "",
-        postalCode: "",
-        country: "Colombia",
+        departmentCode: data.departmentCode,
+        departmentName: data.departmentName,
+        city: data.city,
+        municipalityCode: data.municipalityCode,
+        locationId: data.locationId,
+        postalCode: data.postalCode,
+        country: data.country,
         notes: "",
         paymentMethod: data.paymentMethod,
       }
@@ -163,7 +166,11 @@ export default function CheckoutPage() {
         customer_last_name: data.lastName,
         customer_phone: data.phone || undefined,
         shipping_address: data.address,
+        shipping_department_code: data.departmentCode || "",
+        shipping_department_name: data.departmentName || "",
         shipping_city: data.city || "",
+        shipping_municipality_code: data.municipalityCode || "",
+        shipping_location_id: data.locationId || "",
         shipping_postal_code: data.postalCode || "",
         shipping_country: data.country,
         shipping_notes: data.notes || undefined,

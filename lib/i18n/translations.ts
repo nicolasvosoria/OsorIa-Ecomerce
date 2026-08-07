@@ -123,6 +123,13 @@ export interface Translations {
     processing: string
     address: string
     city: string
+    // D28: los dos selects encadenados del picker de destino (departamento,
+    // luego municipio filtrado a ese departamento).
+    department: string
+    selectDepartment: string
+    municipality: string
+    selectMunicipality: string
+    selectDepartmentFirst: string
     postalCode: string
     country: string
     notes: string
@@ -487,6 +494,11 @@ export const translations: Record<Language, Translations> = {
       processing: 'Procesando...',
       address: 'Dirección',
       city: 'Ciudad',
+      department: 'Departamento',
+      selectDepartment: 'Selecciona un departamento',
+      municipality: 'Municipio',
+      selectMunicipality: 'Selecciona un municipio',
+      selectDepartmentFirst: 'Primero selecciona un departamento',
       postalCode: 'Código postal',
       country: 'País',
       notes: 'Notas',
@@ -843,6 +855,11 @@ export const translations: Record<Language, Translations> = {
       processing: 'Processing...',
       address: 'Address',
       city: 'City',
+      department: 'Department',
+      selectDepartment: 'Select a department',
+      municipality: 'Municipality',
+      selectMunicipality: 'Select a municipality',
+      selectDepartmentFirst: 'Select a department first',
       postalCode: 'Postal code',
       country: 'Country',
       notes: 'Notes',
@@ -1199,6 +1216,11 @@ export const translations: Record<Language, Translations> = {
       processing: 'Processando...',
       address: 'Endereço',
       city: 'Cidade',
+      department: 'Departamento',
+      selectDepartment: 'Selecione um departamento',
+      municipality: 'Município',
+      selectMunicipality: 'Selecione um município',
+      selectDepartmentFirst: 'Selecione primeiro um departamento',
       postalCode: 'CEP',
       country: 'País',
       notes: 'Observações',

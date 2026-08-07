@@ -19,7 +19,11 @@ function addressRow(overrides: Partial<AddressRow> & Pick<AddressRow, "id">): Ad
     user_id: OWNER,
     label: null,
     address_line_1: "Cra 1 # 2-3",
+    department_code: null,
+    department_name: null,
     city: null,
+    municipality_code: null,
+    location_id: null,
     postal_code: null,
     country: "Colombia",
     is_default: false,
@@ -32,7 +36,11 @@ function addressRow(overrides: Partial<AddressRow> & Pick<AddressRow, "id">): Ad
 const DRAFT: SavedAddressDraft = {
   label: "Casa",
   addressLine1: "Calle 10 # 4-5",
-  city: "Bogotá",
+  departmentCode: "05",
+  departmentName: "Antioquia",
+  city: "Medellín",
+  municipalityCode: "05001",
+  locationId: "1",
   postalCode: "110111",
   country: "Colombia",
 }
@@ -112,7 +120,7 @@ describe("updateUserAddress", () => {
 
     const office = table.rows().find((row) => row.id === "office")
     expect(office?.label).toBe("Oficina")
-    expect(office?.city).toBe("Bogotá")
+    expect(office?.city).toBe("Medellín")
     expect(defaultsOf(table.rows())).toEqual(["home"])
   })
 
@@ -246,7 +254,16 @@ describe("deleteUserAddress", () => {
 describe("findDefaultUserAddress", () => {
   it("reads the owner's default and never someone else's", async () => {
     const table = createUserAddressesTable([
-      addressRow({ id: "home", label: "Casa", is_default: true, city: "Bogotá" }),
+      addressRow({
+        id: "home",
+        label: "Casa",
+        is_default: true,
+        department_code: "05",
+        department_name: "Antioquia",
+        city: "Medellín",
+        municipality_code: "05001",
+        location_id: 1,
+      }),
       addressRow({ id: "foreign", user_id: SOMEONE_ELSE, is_default: true }),
     ])
 
@@ -254,7 +271,11 @@ describe("findDefaultUserAddress", () => {
       id: "home",
       label: "Casa",
       addressLine1: "Cra 1 # 2-3",
-      city: "Bogotá",
+      departmentCode: "05",
+      departmentName: "Antioquia",
+      city: "Medellín",
+      municipalityCode: "05001",
+      locationId: "1",
       postalCode: null,
       country: "Colombia",
       isDefault: true,
