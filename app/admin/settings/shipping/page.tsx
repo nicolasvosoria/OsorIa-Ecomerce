@@ -8,12 +8,14 @@ import { getStoreIdentityReadiness } from "@/lib/stores/identity-readiness"
 import { buildWhatsAppLink } from "@/lib/stores/whatsapp-contact"
 import { authorizeActiveStoreAdmin } from "@/lib/supabase/active-store"
 import { loadShippingSettings } from "@/lib/supabase/shipping-settings-api"
+import { findMissingWeightProducts, listShippingZones } from "@/lib/supabase/shipping-zones-api"
 import { loadStoreIdentity } from "@/lib/supabase/store-identity-api"
 import {
   ShippingContactPendingNotice,
   type ShippingContactPendingReason,
 } from "./components/shipping-contact-pending-notice"
 import { ShippingModeForm } from "./components/shipping-mode-form"
+import { ShippingZonesSection } from "./components/zone-editor"
 
 const copy = translations.es.shipping
 
@@ -28,9 +30,11 @@ export default async function ShippingSettingsPage() {
   }
 
   const { supabase, storeId } = authorization
-  const [settings, identity] = await Promise.all([
+  const [settings, identity, zones, missingWeightProducts] = await Promise.all([
     loadShippingSettings(supabase, storeId),
     loadStoreIdentity(supabase, storeId),
+    listShippingZones(supabase, storeId),
+    findMissingWeightProducts(supabase, storeId),
   ])
   const readiness = getStoreIdentityReadiness(identity)
   const phoneMissing = readiness.missingFields.includes("phone")
@@ -49,6 +53,11 @@ export default async function ShippingSettingsPage() {
       <AdminPageHeader title={copy.settingsTitle} subtitle={copy.settingsSubtitle} />
       {contactPendingReason && <ShippingContactPendingNotice reason={contactPendingReason} />}
       <ShippingModeForm defaultValues={{ mode: toSelectableShippingMode(settings.mode) }} />
+      <ShippingZonesSection
+        zones={zones}
+        missingWeightProducts={missingWeightProducts}
+        unmatchedDestinationAction={settings.unmatchedDestinationAction ?? "block"}
+      />
     </AdminPageContainer>
   )
 }

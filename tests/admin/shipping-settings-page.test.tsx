@@ -10,15 +10,25 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import { ShippingContactPendingNotice } from "@/app/admin/settings/shipping/components/shipping-contact-pending-notice"
 import { ShippingModeForm } from "@/app/admin/settings/shipping/components/shipping-mode-form"
 
-const { authorizeActiveStoreAdmin, loadShippingSettings, loadStoreIdentity, redirect } = vi.hoisted(() => ({
+const {
+  authorizeActiveStoreAdmin,
+  loadShippingSettings,
+  loadStoreIdentity,
+  listShippingZones,
+  findMissingWeightProducts,
+  redirect,
+} = vi.hoisted(() => ({
   authorizeActiveStoreAdmin: vi.fn(),
   loadShippingSettings: vi.fn(),
   loadStoreIdentity: vi.fn(),
+  listShippingZones: vi.fn(),
+  findMissingWeightProducts: vi.fn(),
   redirect: vi.fn(),
 }))
 
 vi.mock("@/lib/supabase/active-store", () => ({ authorizeActiveStoreAdmin }))
 vi.mock("@/lib/supabase/shipping-settings-api", () => ({ loadShippingSettings }))
+vi.mock("@/lib/supabase/shipping-zones-api", () => ({ listShippingZones, findMissingWeightProducts }))
 vi.mock("@/lib/supabase/store-identity-api", () => ({ loadStoreIdentity }))
 vi.mock("next/navigation", () => ({ redirect }))
 
@@ -55,6 +65,8 @@ describe("ShippingSettingsPage", () => {
     vi.clearAllMocks()
     authorizeActiveStoreAdmin.mockResolvedValue(GRANT)
     loadStoreIdentity.mockResolvedValue(COMPLETE_IDENTITY)
+    listShippingZones.mockResolvedValue([])
+    findMissingWeightProducts.mockResolvedValue([])
   })
 
   it("reads the ACTIVE store's saved mode back and hands it to the form as its default", async () => {
@@ -98,6 +110,8 @@ describe("ShippingSettingsPage phone-pending notice (D14/F10/A9)", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     authorizeActiveStoreAdmin.mockResolvedValue(GRANT)
+    listShippingZones.mockResolvedValue([])
+    findMissingWeightProducts.mockResolvedValue([])
   })
 
   function findNotice(page: ReactNode) {

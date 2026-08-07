@@ -177,3 +177,169 @@ begin
     raise exception 'Expected 33 distinct departments in ecommerce.co_locations, found %', v_department_count;
   end if;
 end $$;
+
+-- -----------------------------------------------------------------------------
+-- D3/D5/D6/D27 (slice S7): shipping_zones, shipping_zone_destinations and
+-- shipping_rates exist and are RLS-enabled, closed to anon.
+-- -----------------------------------------------------------------------------
+do $$
+begin
+  if to_regclass('ecommerce.shipping_zones') is null then
+    raise exception 'Missing ecommerce.shipping_zones';
+  end if;
+  if to_regclass('ecommerce.shipping_zone_destinations') is null then
+    raise exception 'Missing ecommerce.shipping_zone_destinations';
+  end if;
+  if to_regclass('ecommerce.shipping_rates') is null then
+    raise exception 'Missing ecommerce.shipping_rates';
+  end if;
+end $$;
+
+do $$
+declare
+  v_missing text[];
+begin
+  select array_agg(required_column order by required_column) into v_missing
+  from (values
+    ('shipping_zones', 'store_id'), ('shipping_zones', 'name'),
+    ('shipping_zone_destinations', 'zone_id'), ('shipping_zone_destinations', 'store_id'),
+    ('shipping_zone_destinations', 'department_code'),
+    ('shipping_rates', 'zone_id'), ('shipping_rates', 'basis'), ('shipping_rates', 'amount')
+  ) req(required_table, required_column)
+  where not exists (
+    select 1 from pg_attribute a
+    join pg_class c on c.oid = a.attrelid
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'ecommerce' and c.relname = req.required_table
+      and a.attname = req.required_column
+      and a.attnum > 0
+      and not a.attisdropped
+      and a.attnotnull
+  );
+
+  if v_missing is not null then
+    raise exception 'Missing NOT NULL columns on shipping zones/rates tables: %', array_to_string(v_missing, ', ');
+  end if;
+end $$;
+
+-- D3: at most one zone per store may claim a given destination -- the
+-- department-only and municipio partial unique indexes, plus the composite
+-- FK that keeps a destination's store_id honest against its owning zone.
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint con
+    join pg_class c on c.oid = con.conrelid
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'ecommerce' and c.relname = 'shipping_zone_destinations'
+      and con.conname = 'shipping_zone_destinations_zone_store_fk' and con.contype = 'f'
+  ) then
+    raise exception 'Missing ecommerce.shipping_zone_destinations_zone_store_fk';
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint con
+    join pg_class c on c.oid = con.conrelid
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'ecommerce' and c.relname = 'shipping_zone_destinations'
+      and con.conname = 'shipping_zone_destinations_municipality_fk' and con.contype = 'f'
+  ) then
+    raise exception 'Missing ecommerce.shipping_zone_destinations_municipality_fk';
+  end if;
+
+  if not exists (
+    select 1 from pg_indexes
+    where schemaname = 'ecommerce' and tablename = 'shipping_zone_destinations'
+      and indexname = 'shipping_zone_destinations_department_key'
+  ) then
+    raise exception 'Missing unique index ecommerce.shipping_zone_destinations_department_key';
+  end if;
+
+  if not exists (
+    select 1 from pg_indexes
+    where schemaname = 'ecommerce' and tablename = 'shipping_zone_destinations'
+      and indexname = 'shipping_zone_destinations_municipality_key'
+  ) then
+    raise exception 'Missing unique index ecommerce.shipping_zone_destinations_municipality_key';
+  end if;
+end $$;
+
+-- D6: basis is constrained to the three known values, and a row's bounds
+-- must match its basis (flat carries none, ranged rows require range_from).
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint con
+    join pg_class c on c.oid = con.conrelid
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'ecommerce' and c.relname = 'shipping_rates'
+      and con.conname = 'shipping_rates_basis_chk' and con.contype = 'c'
+  ) then
+    raise exception 'Missing ecommerce.shipping_rates_basis_chk';
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint con
+    join pg_class c on c.oid = con.conrelid
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'ecommerce' and c.relname = 'shipping_rates'
+      and con.conname = 'shipping_rates_bounds_match_basis_chk' and con.contype = 'c'
+  ) then
+    raise exception 'Missing ecommerce.shipping_rates_bounds_match_basis_chk';
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint con
+    join pg_class c on c.oid = con.conrelid
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'ecommerce' and c.relname = 'shipping_rates'
+      and con.conname = 'shipping_rates_amount_nonnegative_chk' and con.contype = 'c'
+  ) then
+    raise exception 'Missing ecommerce.shipping_rates_amount_nonnegative_chk';
+  end if;
+end $$;
+
+-- D27: RLS enabled on all three, and closed to anon entirely -- the checkout
+-- quote (a later slice) reads through service_role, never anon/authenticated
+-- directly, same posture as store_shipping_settings.
+do $$
+declare
+  v_missing_rls text[];
+begin
+  select array_agg(t order by t) into v_missing_rls
+  from unnest(array['shipping_zones', 'shipping_zone_destinations', 'shipping_rates']) t
+  where not exists (
+    select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'ecommerce' and c.relname = t and c.relrowsecurity is true
+  );
+
+  if v_missing_rls is not null then
+    raise exception 'Missing enabled RLS on: %', array_to_string(v_missing_rls, ', ');
+  end if;
+end $$;
+
+do $$
+declare
+  v_violations text[];
+begin
+  select array_agg(msg) into v_violations
+  from (
+    select format('anon has %s on ecommerce.%s', priv, tbl) as msg
+    from unnest(array['shipping_zones', 'shipping_zone_destinations', 'shipping_rates']) tbl
+    cross join unnest(array['select', 'insert', 'update', 'delete']) priv
+    where has_table_privilege('anon', format('ecommerce.%s', tbl), priv)
+  ) v;
+
+  if v_violations is not null then
+    raise exception 'anon must have no access to shipping zones/rates tables: %', array_to_string(v_violations, '; ');
+  end if;
+
+  if exists (
+    select 1
+    from unnest(array['shipping_zones', 'shipping_zone_destinations', 'shipping_rates']) tbl
+    cross join unnest(array['select', 'insert', 'update', 'delete']) priv
+    where not has_table_privilege('service_role', format('ecommerce.%s', tbl), priv)
+  ) then
+    raise exception 'service_role must retain full access to shipping zones/rates tables';
+  end if;
+end $$;
