@@ -336,6 +336,45 @@ export type Database = {
           },
         ]
       }
+      co_locations: {
+        Row: {
+          created_at: string
+          department_code: string
+          department_name: string
+          id: number
+          latitude: number | null
+          longitude: number | null
+          municipality_code: string
+          municipality_name: string
+          municipality_type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          department_code: string
+          department_name: string
+          id?: number
+          latitude?: number | null
+          longitude?: number | null
+          municipality_code: string
+          municipality_name: string
+          municipality_type: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          department_code?: string
+          department_name?: string
+          id?: number
+          latitude?: number | null
+          longitude?: number | null
+          municipality_code?: string
+          municipality_name?: string
+          municipality_type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       component_styles: {
         Row: {
           component_name: string

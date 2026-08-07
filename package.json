@@ -18,6 +18,7 @@
     "supabase:reset": "supabase db reset",
     "supabase:verify": "psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -v ON_ERROR_STOP=1 -f supabase/checks/verify-ecommerce-contract.sql",
     "supabase:verify:email": "psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -v ON_ERROR_STOP=1 -f supabase/checks/verify-email-platform-contract.sql",
+    "supabase:verify:shipping": "psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -v ON_ERROR_STOP=1 -f supabase/checks/verify-shipping-contract.sql",
     "supabase:verify:functions-boot": "node scripts/check-edge-functions-boot.mjs",
     "supabase:verify:functions-render": "node scripts/check-edge-functions-render.mjs",
     "supabase:types": "supabase gen types typescript --local --schema ecommerce > lib/supabase/database.types.ts",
