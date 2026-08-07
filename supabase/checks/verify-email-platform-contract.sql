@@ -335,6 +335,45 @@ begin
   end if;
 end $$;
 
+-- Closing-security-review finding on plan-correos-ecommerce: SELECT was the
+-- one verb 20260805000100's own column lockdown never covered, so the six
+-- mailbox columns stayed readable by anon/authenticated through the
+-- baseline's relation-level `grant select on all tables`. 20260806000600
+-- closes it; this is that fix's contract, covering the verb the block above
+-- (UPDATE) does not. contact_email/contact_phone/address stay readable --
+-- genuinely public, rendered in the footer of every customer-facing email.
+do $$
+declare
+  v_violations text[];
+begin
+  select array_agg(msg) into v_violations
+  from (
+    select format('%s can SELECT ecommerce.store_contact.%s', role, col) as msg
+    from unnest(array['anon', 'authenticated']) role
+    cross join unnest(array[
+      'reply_to_email', 'reply_to_pending_email', 'reply_to_verified_at',
+      'order_mailbox_email', 'order_mailbox_pending_email', 'order_mailbox_verified_at'
+    ]) col
+    where has_column_privilege(role, 'ecommerce.store_contact', col, 'select')
+    union all
+    select format('%s cannot SELECT ecommerce.store_contact.%s', role, col)
+    from unnest(array['anon', 'authenticated']) role
+    cross join unnest(array['contact_email', 'contact_phone', 'address']) col
+    where not has_column_privilege(role, 'ecommerce.store_contact', col, 'select')
+  ) v;
+
+  if v_violations is not null then
+    raise exception 'store_contact SELECT column grant contract broken: %', array_to_string(v_violations, '; ');
+  end if;
+
+  if not (
+    has_column_privilege('service_role', 'ecommerce.store_contact', 'order_mailbox_email', 'select')
+    and has_column_privilege('service_role', 'ecommerce.store_contact', 'reply_to_pending_email', 'select')
+  ) then
+    raise exception 'service_role must retain full SELECT access to ecommerce.store_contact';
+  end if;
+end $$;
+
 -- D29 + D30: status and the four lifecycle timestamps are NOT reachable by a
 -- direct authenticated UPDATE -- only ecommerce.transition_order_status can
 -- move them. Without this, a store admin's own PATCH could jump the frozen
@@ -620,6 +659,73 @@ begin
   if (v_result ->> 'ok')::boolean is not true then
     raise exception 'service_role must be able to finalize a customer profile through the app''s own call path, got %', v_result;
   end if;
+end $$;
+
+-- -----------------------------------------------------------------------------
+-- Live-role reproduction of the store_contact SELECT contract above (same
+-- reason the finalize-profile-requires-service-role block exists):
+-- has_column_privilege proves the catalog is right, but only an actual query
+-- under SET LOCAL ROLE proves what PostgREST's own anon role would really do
+-- with it. Without 20260806000600, the very first `perform` below succeeds
+-- instead of raising insufficient_privilege, because the six mailbox columns
+-- are still reachable through the baseline's relation-level SELECT grant --
+-- this is the exact query shape an unauthenticated PostgREST request could
+-- run before that fix.
+-- -----------------------------------------------------------------------------
+do $$
+declare
+  v_owner_id uuid := gen_random_uuid();
+  v_store_id uuid;
+  v_contact_email text;
+begin
+  insert into auth.users (id, email, encrypted_password, email_confirmed_at, created_at, updated_at, raw_app_meta_data, raw_user_meta_data, aud, role)
+  values (v_owner_id, 'select-lockdown-check-owner@example.com', 'x', now(), now(), now(), '{}', '{}', 'authenticated', 'authenticated');
+  insert into ecommerce.user_profiles (id, email, role) values (v_owner_id, 'select-lockdown-check-owner@example.com', 'user');
+  v_store_id := ecommerce.provision_store('select-lockdown-check-store', 'Select Lockdown Check Store', v_owner_id, 'COP');
+  update ecommerce.stores set is_public = true where id = v_store_id;
+
+  insert into ecommerce.store_contact (
+    store_id, contact_email, contact_phone, address,
+    reply_to_email, reply_to_pending_email,
+    order_mailbox_email, order_mailbox_pending_email
+  ) values (
+    v_store_id, 'contacto@example.com', '+57 300 0000000', 'Calle Falsa 123',
+    'responde@example.com', 'nueva-respuesta@example.com',
+    'pedidos@example.com', 'nuevo-pedido@example.com'
+  );
+
+  set local role anon;
+
+  begin
+    perform order_mailbox_email from ecommerce.store_contact where store_id = v_store_id;
+    raise exception 'store-contact-select-lockdown reopened: anon could SELECT order_mailbox_email';
+  exception when insufficient_privilege then null;
+  end;
+
+  begin
+    perform order_mailbox_pending_email from ecommerce.store_contact where store_id = v_store_id;
+    raise exception 'store-contact-select-lockdown reopened: anon could SELECT order_mailbox_pending_email';
+  exception when insufficient_privilege then null;
+  end;
+
+  begin
+    perform reply_to_email from ecommerce.store_contact where store_id = v_store_id;
+    raise exception 'store-contact-select-lockdown reopened: anon could SELECT reply_to_email';
+  exception when insufficient_privilege then null;
+  end;
+
+  begin
+    perform reply_to_pending_email from ecommerce.store_contact where store_id = v_store_id;
+    raise exception 'store-contact-select-lockdown reopened: anon could SELECT reply_to_pending_email';
+  exception when insufficient_privilege then null;
+  end;
+
+  select contact_email into v_contact_email from ecommerce.store_contact where store_id = v_store_id;
+  if v_contact_email <> 'contacto@example.com' then
+    raise exception 'anon must still be able to read the genuinely public storefront columns, got %', v_contact_email;
+  end if;
+
+  reset role;
 end $$;
 
 -- Outbox: idempotency, claim/lease concurrency, and the D16 retry schedule.
