@@ -22,6 +22,7 @@ const validInput = {
   display_order: "0",
   images: [] as string[],
   inventory_quantity: "5",
+  weight_grams: "500",
 }
 
 function firstMessage(result: ReturnType<typeof productSchema.safeParse>): string | undefined {

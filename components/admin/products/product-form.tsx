@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { translations } from "@/lib/i18n/translations"
 import {
   MAX_PRODUCT_IMAGE_SIZE_MB,
   MAX_PRODUCT_IMAGES,
@@ -34,6 +35,11 @@ import type { ItemCategory } from "@/lib/types/products"
 
 const PRODUCTS_PATH = "/admin/products"
 const SUBMIT_ACTION_FIELD = "productSubmitAction"
+// The admin console has no runtime language switch (D31 still applies to new copy,
+// but no /admin/* screen consumes useLanguage()): a static read, like sibling slice
+// S2's ShippingModeForm, avoids requiring every ProductForm consumer to wrap in a
+// LanguageProvider it never otherwise needs.
+const copy = translations.es.products
 
 type ProductFormHandle = {
   resetToDefaults: () => void
@@ -99,6 +105,7 @@ export function ProductForm({ categories, defaultValues, submitActions }: Produc
       <BasicInfoCard form={form} categories={categories} />
       <ImagesCard form={form} resetToken={imageResetToken} />
       <PricingCard form={form} compareAtPriceNotice={compareAtPriceNotice} />
+      <ShippingCard form={form} />
       <InventoryCard form={form} />
       <StatusCard form={form} />
       <ProductSeoCard form={form} />
@@ -283,6 +290,37 @@ function PricingCard({
             )}
           </FormField>
         </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function ShippingCard({ form }: { form: UseFormReturn<ProductFormValues> }) {
+  const { register, formState } = form
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{copy.weightSectionTitle}</CardTitle>
+        <CardDescription>{copy.weightSectionDescription}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <FormField
+          id="weight_grams"
+          label={copy.weightLabel}
+          error={formState.errors.weight_grams?.message}
+        >
+          {(fieldProps) => (
+            <Input
+              {...fieldProps}
+              type="number"
+              step="1"
+              min="0"
+              placeholder="0"
+              {...register("weight_grams")}
+            />
+          )}
+        </FormField>
       </CardContent>
     </Card>
   )

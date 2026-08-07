@@ -88,6 +88,11 @@ export interface Translations {
       newest: string
       oldest: string
     }
+    weightSectionTitle: string
+    weightSectionDescription: string
+    weightLabel: string
+    weightRequiredError: string
+    weightPublicLabel: string
   }
   // Carrito
   cart: {
@@ -419,6 +424,11 @@ export const translations: Record<Language, Translations> = {
         newest: 'Más recientes',
         oldest: 'Más antiguos',
       },
+      weightSectionTitle: 'Envío',
+      weightSectionDescription: 'El peso se usa para calcular el costo de envío.',
+      weightLabel: 'Peso (gramos) *',
+      weightRequiredError: 'El peso es requerido',
+      weightPublicLabel: 'Peso',
     },
     wishlist: {
       title: 'Lista de deseos',
@@ -760,6 +770,11 @@ export const translations: Record<Language, Translations> = {
         newest: 'Newest',
         oldest: 'Oldest',
       },
+      weightSectionTitle: 'Shipping',
+      weightSectionDescription: 'Weight is used to calculate the shipping cost.',
+      weightLabel: 'Weight (grams) *',
+      weightRequiredError: 'Weight is required',
+      weightPublicLabel: 'Weight',
     },
     wishlist: {
       title: 'Wishlist',
@@ -1101,6 +1116,11 @@ export const translations: Record<Language, Translations> = {
         newest: 'Mais recentes',
         oldest: 'Mais antigos',
       },
+      weightSectionTitle: 'Envio',
+      weightSectionDescription: 'O peso é usado para calcular o custo de envio.',
+      weightLabel: 'Peso (gramas) *',
+      weightRequiredError: 'O peso é obrigatório',
+      weightPublicLabel: 'Peso',
     },
     wishlist: {
       title: 'Lista de desejos',

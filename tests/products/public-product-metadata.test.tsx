@@ -36,6 +36,45 @@ describe('PublicProductMetadata', () => {
     expect(html).not.toContain('unknown_public_claim')
   })
 
+  it('renders the resolved weight_grams column where the free-text "Peso" used to sit (D22, Finding 3)', () => {
+    const html = renderToStaticMarkup(
+      <PublicProductMetadata
+        metadata={{ material: 'Aluminio', dimensions: '15x10x5 cm', warranty: '12 meses' }}
+        weightGrams={500}
+      />,
+    )
+
+    expect(html).toContain('Peso')
+    expect(html).toContain('500 g')
+    // Position: right after Dimensiones, before Garantía.
+    expect(html.indexOf('Dimensiones')).toBeLessThan(html.indexOf('Peso'))
+    expect(html.indexOf('Peso')).toBeLessThan(html.indexOf('Garantía'))
+  })
+
+  it('formats a weight of a kilogram or more in kilograms', () => {
+    const html = renderToStaticMarkup(
+      <PublicProductMetadata metadata={{}} weightGrams={1500} />,
+    )
+
+    expect(html).toContain('1.5 kg')
+  })
+
+  it('shows a weight of exactly zero grams instead of hiding it', () => {
+    const html = renderToStaticMarkup(<PublicProductMetadata metadata={{}} weightGrams={0} />)
+
+    expect(html).toContain('Peso')
+    expect(html).toContain('0 g')
+  })
+
+  it('adds nothing when the product has no resolved weight', () => {
+    const html = renderToStaticMarkup(
+      <PublicProductMetadata metadata={{ material: 'Aluminio' }} weightGrams={null} />,
+    )
+
+    expect(html).not.toContain('Peso')
+    expect(html).toContain('Aluminio')
+  })
+
   it('renders nothing when metadata only contains private or unknown fields', () => {
     const html = renderToStaticMarkup(
       <PublicProductMetadata

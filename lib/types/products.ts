@@ -26,6 +26,10 @@ export interface StoreItem {
   category_id?: string
   base_price: number
   compare_at_price?: number
+  // Base weight in grams; item_variants.weight_grams overrides it the same way
+  // a variant's price overrides base_price. Nullable: 27 pre-existing products
+  // have no weight yet.
+  weight_grams?: number | null
   currency_code: string
   is_active: boolean
   is_featured: boolean
@@ -52,6 +56,8 @@ export interface ItemVariant {
   variant_code?: string
   price?: number
   compare_at_price?: number
+  // Overrides the product's base weight_grams when set, mirroring price's override of base_price.
+  weight_grams?: number | null
   variant_options?: Record<string, any>
   track_inventory: boolean
   inventory_quantity: number

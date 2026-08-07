@@ -172,6 +172,7 @@ describe("products-api contract", () => {
       {
         item_name: "Café Especial",
         base_price: 12000,
+        weight_grams: 500,
         seo_title: "Comprar Café Especial",
         seo_description: "Café molido premium",
         tags: [" café ", "premium"],
@@ -255,6 +256,7 @@ describe("products-api contract", () => {
       {
         item_name: "Galería Cinco",
         base_price: 12000,
+        weight_grams: 500,
         primary_image_url: "https://example.com/1.webp",
         primary_image_alt: "Galería Cinco",
       },
@@ -284,6 +286,7 @@ describe("products-api contract", () => {
       {
         item_name: "Demasiadas imágenes",
         base_price: 12000,
+        weight_grams: 500,
         primary_image_url: "https://example.com/1.webp",
       },
       [

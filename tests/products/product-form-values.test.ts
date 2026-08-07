@@ -9,6 +9,7 @@ function productWith(overrides: Partial<StoreItemWithDetails> = {}): StoreItemWi
     id: "item-1",
     item_name: "Café Especial",
     base_price: 12000,
+    weight_grams: 500,
     currency_code: "COP",
     is_active: true,
     is_featured: false,
@@ -35,11 +36,12 @@ function galleryImage(imageUrl: string, displayOrder: number): ItemImage {
 }
 
 describe("defaultProductFormValues", () => {
-  it("is a payload the form schema accepts once a name and a price are typed in", () => {
+  it("is a payload the form schema accepts once a name, a price and a weight are typed in", () => {
     const typed = {
       ...defaultProductFormValues,
       item_name: "Café",
       base_price: "1000",
+      weight_grams: "500",
     }
     expect(productSchema.safeParse(typed).success).toBe(true)
   })
