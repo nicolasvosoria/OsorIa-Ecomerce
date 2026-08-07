@@ -16,6 +16,7 @@ import {
   authenticatedCheckoutFormSchema,
   type AuthenticatedCheckoutFormValues,
 } from "@/lib/checkout/schemas"
+import type { ShippingDestination } from "@/lib/shipping/resolver"
 import type { UserProfile } from "@/lib/types/user"
 import type { CheckoutPrefill } from "@/app/checkout/actions"
 
@@ -44,6 +45,11 @@ interface AuthenticatedCheckoutFormProps {
   // Llega de forma asíncrona (D4): el formulario nunca espera por esto para
   // renderizarse, solo aplica los valores cuando lleguen.
   prefill?: CheckoutPrefill
+  // The checkout page's shipping quote lives outside this form (the order
+  // summary card), so it needs the destination the instant the two chained
+  // selects resolve one -- long before this form's own onComplete fires at
+  // submit.
+  onDestinationChange?: (destination: ShippingDestination | null) => void
 }
 
 function buildDefaultValues(user: UserProfile): AuthenticatedCheckoutFormValues {
@@ -68,6 +74,7 @@ export function AuthenticatedCheckoutForm({
   onComplete,
   isLoading = false,
   prefill,
+  onDestinationChange,
 }: AuthenticatedCheckoutFormProps) {
   const { register, handleSubmit, formState, setValue, control } = useForm<AuthenticatedCheckoutFormValues>({
     resolver: zodResolver(authenticatedCheckoutFormSchema),
@@ -124,6 +131,14 @@ export function AuthenticatedCheckoutForm({
     dirtyFields.shipping_location_id,
     setValue,
   ])
+
+  // Fires on every source of a destination change, picked manually or
+  // applied from the prefill above -- both land here through the same
+  // watched fields, so there is exactly one place that reports "the
+  // destination is now this" upward.
+  useEffect(() => {
+    onDestinationChange?.(departmentCode && municipalityCode ? { departmentCode, municipalityCode } : null)
+  }, [departmentCode, municipalityCode, onDestinationChange])
 
   const applyLocation = (next: ShippingLocationValue) => {
     setValue("shipping_department_code", next.departmentCode, { shouldValidate: true })

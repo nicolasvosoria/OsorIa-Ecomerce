@@ -46,6 +46,18 @@ const SHIPPING_RESOLUTION_TIMEOUT_MS = 15000
 const UNSERVED_DESTINATION_MESSAGE =
   "Esta tienda todavía no realiza envíos a tu destino. Contáctala directamente para coordinar antes de continuar."
 
+// D7: a caller that needs to tell "the store blocked this destination" apart
+// from any other resolution failure (a live checkout quote, say, deciding
+// whether to show the honest block copy or a generic retry message) can't
+// re-derive that from a plain Error without re-implementing the zone lookup
+// D19 already forbids duplicating -- this is the one thing to instanceof.
+export class UnservedDestinationError extends Error {
+  constructor() {
+    super(UNSERVED_DESTINATION_MESSAGE)
+    this.name = "UnservedDestinationError"
+  }
+}
+
 // D19: the seam every strategy plugs into -- own_rates (below) is the first
 // and, until the aggregator lands, only real one. Both createOrder and
 // quoteShipping call exactly this function, never their own copy of "find
@@ -92,7 +104,7 @@ function enforceUnmatchedDestinationPolicy(
 ): ShippingResolution {
   if (resolution.status !== "out_of_zone") return resolution
   if (unmatchedDestinationAction === "block") {
-    throw new Error(UNSERVED_DESTINATION_MESSAGE)
+    throw new UnservedDestinationError()
   }
   return resolution
 }
