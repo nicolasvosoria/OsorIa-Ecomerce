@@ -1,5 +1,13 @@
 import type { ReactNode } from 'react'
 
+import { translations } from '@/lib/i18n/translations'
+
+// Storefront components have no runtime language switch here and this one renders
+// from a server component, so useLanguage()'s provider is not reachable; a static
+// read (matching how the admin's ShippingCard reads translations.es.products) keeps
+// the new "Peso" label going through translations.ts without a hook dependency.
+const copy = translations.es.products
+
 type PublicMetadataField = {
   key: string
   label: string
@@ -16,7 +24,7 @@ const PUBLIC_PRODUCT_METADATA_FIELDS: PublicMetadataField[] = [
   { key: 'materials', label: 'Materiales' },
   { key: 'color', label: 'Color' },
   { key: 'dimensions', label: 'Dimensiones' },
-  { key: 'weight', label: 'Peso' },
+  // weight was absorbed by the real weight_grams column; see withPublicWeight below.
   { key: 'warranty', label: 'Garantía' },
   { key: 'compatibility', label: 'Compatibilidad' },
   { key: 'power', label: 'Potencia' },
@@ -59,16 +67,52 @@ export function getPublicProductMetadata(metadata: unknown): PublicProductMetada
   })
 }
 
-export function PublicProductMetadata({ metadata }: { metadata: unknown }): ReactNode {
-  const publicMetadata = getPublicProductMetadata(metadata)
+// weight_grams is a real column now, not free text, so it never comes through
+// getPublicProductMetadata; it is spliced back in at the spot "Peso" held before it
+// was absorbed (right after Dimensiones), so the buyer keeps seeing it there.
+function withPublicWeight(
+  entries: PublicProductMetadataEntry[],
+  weightGrams: number | null | undefined,
+): PublicProductMetadataEntry[] {
+  if (weightGrams == null) return entries
 
-  if (publicMetadata.length === 0) return null
+  const weightEntry: PublicProductMetadataEntry = {
+    key: 'weight',
+    label: copy.weightPublicLabel,
+    value: formatPublicWeightGrams(weightGrams),
+  }
+  const dimensionsIndex = entries.findIndex((entry) => entry.key === 'dimensions')
+  const insertAt = dimensionsIndex === -1 ? entries.length : dimensionsIndex + 1
+
+  return [...entries.slice(0, insertAt), weightEntry, ...entries.slice(insertAt)]
+}
+
+// Grams read best under 1kg; kilograms (two decimals, trimmed) read best at or above
+// it. Presentation only -- the stored value stays integer grams (Amendment A4).
+function formatPublicWeightGrams(grams: number): string {
+  if (grams >= 1000) {
+    const kilograms = Math.round((grams / 1000) * 100) / 100
+    return `${kilograms} kg`
+  }
+  return `${grams} g`
+}
+
+export function PublicProductMetadata({
+  metadata,
+  weightGrams,
+}: {
+  metadata: unknown
+  weightGrams?: number | null
+}): ReactNode {
+  const entries = withPublicWeight(getPublicProductMetadata(metadata), weightGrams)
+
+  if (entries.length === 0) return null
 
   return (
     <div>
       <h4 className="text-sm font-semibold mb-2">Especificaciones</h4>
       <dl className="space-y-2">
-        {publicMetadata.map((entry) => (
+        {entries.map((entry) => (
           <div key={entry.key} className="flex justify-between">
             <dt className="text-sm text-muted-foreground">{entry.label}:</dt>
             <dd className="text-sm font-medium">{entry.value}</dd>

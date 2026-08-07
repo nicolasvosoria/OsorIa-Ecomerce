@@ -127,6 +127,9 @@ async function fillRequiredProductFields() {
   fireEvent.change(screen.getByLabelText(/precio base/i), {
     target: { value: "12000" },
   });
+  fireEvent.change(screen.getByLabelText(/peso/i), {
+    target: { value: "500" },
+  });
   fireEvent.change(screen.getByLabelText(/descripción$/i), {
     target: { value: "Café molido premium" },
   });
@@ -162,6 +165,7 @@ describe("admin product create form reset", () => {
     );
     expect(screen.getByLabelText(/nombre del producto/i)).toHaveValue("");
     expect(screen.getByLabelText(/precio base/i)).toHaveValue(null);
+    expect(screen.getByLabelText(/peso/i)).toHaveValue(null);
     expect(screen.getByLabelText(/descripción$/i)).toHaveValue("");
     expect(screen.getByTestId("selected-images")).toHaveTextContent("");
 
@@ -213,6 +217,7 @@ describe("admin product create form reset", () => {
 
     expect(screen.getByLabelText(/nombre del producto/i)).toHaveValue("");
     expect(screen.getByLabelText(/precio base/i)).toHaveValue(null);
+    expect(screen.getByLabelText(/peso/i)).toHaveValue(null);
     expect(screen.getByTestId("selected-images")).toHaveTextContent("");
   });
 

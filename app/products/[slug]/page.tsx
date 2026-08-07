@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Check, AlertCircle, PackageCheck } from 'lucide-react';
 import { AddToCart } from '@/components/cart/add-to-cart';
 import { WishlistButton } from '@/components/wishlist/wishlist-button';
-import { adaptSupabaseProduct } from '@/lib/products/adapter';
+import { adaptSupabaseProduct, resolveWeightGrams } from '@/lib/products/adapter';
 import { VariantSelectorSlots } from '@/components/products/variant-selector-slots';
 import { ProductImageGallery } from './components/product-image-gallery';
 import { RelatedProductsCarousel } from './components/related-products-carousel';
@@ -331,7 +331,10 @@ async function ProductContent({ slug }: { slug: string }) {
                 </div>
               )}
 
-              <PublicProductMetadata metadata={product.metadata} />
+              <PublicProductMetadata
+                metadata={product.metadata}
+                weightGrams={resolveWeightGrams(product)}
+              />
             </div>
           </div>
         </div>

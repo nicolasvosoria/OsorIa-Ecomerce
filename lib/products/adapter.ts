@@ -10,6 +10,7 @@ import type {
   StoreItemWithDetails,
   ItemCategory,
   ItemOption,
+  ItemVariant,
 } from '@/lib/types/products';
 import type { Product, Collection, ProductVariant, ProductOption, Money, Image } from '@/lib/commerce/types';
 import { resolveCommercePrice } from '@/lib/products/pricing';
@@ -32,6 +33,17 @@ function normalizeCommercePrice(
     currencyCode,
     compareAtAmount,
   });
+}
+
+// Same base/override shape as price (variant.price || item.base_price), same place
+// in the code. Uses ?? instead of ||: unlike a $0 variant price, 0 grams is a
+// legitimate explicit weight the column's own non-negativity constraint admits, and
+// || would wrongly read it as unset and fall through to the base.
+export function resolveWeightGrams(
+  item: Pick<StoreItemWithDetails, 'weight_grams'>,
+  variant?: Pick<ItemVariant, 'weight_grams'> | null,
+): number | null {
+  return variant?.weight_grams ?? item.weight_grams ?? null;
 }
 
 function getCommerceImageUrl(item: StoreItemWithDetails): string {

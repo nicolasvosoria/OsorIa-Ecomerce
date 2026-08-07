@@ -567,6 +567,7 @@ export interface CreateItemData {
   category_id?: string
   base_price: number
   compare_at_price?: number
+  weight_grams: number
   currency_code?: string
   is_active?: boolean
   is_featured?: boolean
@@ -767,6 +768,7 @@ export async function createItem(
       category_id: data.category_id || null,
       base_price: data.base_price,
       compare_at_price: data.compare_at_price || null,
+      weight_grams: data.weight_grams,
       currency_code: data.currency_code || 'COP',
       is_active: data.is_active !== undefined ? data.is_active : true,
       is_featured: data.is_featured !== undefined ? data.is_featured : false,
@@ -838,6 +840,7 @@ export interface UpdateItemData {
   category_id?: string
   base_price?: number
   compare_at_price?: number
+  weight_grams?: number
   currency_code?: string
   is_active?: boolean
   is_featured?: boolean
@@ -974,6 +977,7 @@ export async function updateItem(
     if (data.category_id !== undefined) updateData.category_id = data.category_id || null
     if (data.base_price !== undefined) updateData.base_price = data.base_price
     if (data.compare_at_price !== undefined) updateData.compare_at_price = data.compare_at_price || null
+    if (data.weight_grams !== undefined) updateData.weight_grams = data.weight_grams
     if (data.currency_code !== undefined) updateData.currency_code = data.currency_code
     if (data.is_active !== undefined) updateData.is_active = data.is_active
     if (data.is_featured !== undefined) updateData.is_featured = data.is_featured

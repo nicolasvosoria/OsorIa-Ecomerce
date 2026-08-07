@@ -944,6 +944,7 @@ export type Database = {
           updated_at: string | null
           variant_code: string | null
           variant_options: Json | null
+          weight_grams: number | null
         }
         Insert: {
           compare_at_price?: number | null
@@ -959,6 +960,7 @@ export type Database = {
           updated_at?: string | null
           variant_code?: string | null
           variant_options?: Json | null
+          weight_grams?: number | null
         }
         Update: {
           compare_at_price?: number | null
@@ -974,6 +976,7 @@ export type Database = {
           updated_at?: string | null
           variant_code?: string | null
           variant_options?: Json | null
+          weight_grams?: number | null
         }
         Relationships: [
           {
@@ -1979,6 +1982,7 @@ export type Database = {
           tags: string[] | null
           track_inventory: boolean | null
           updated_at: string | null
+          weight_grams: number | null
         }
         Insert: {
           base_price?: number
@@ -2008,6 +2012,7 @@ export type Database = {
           tags?: string[] | null
           track_inventory?: boolean | null
           updated_at?: string | null
+          weight_grams?: number | null
         }
         Update: {
           base_price?: number
@@ -2037,6 +2042,7 @@ export type Database = {
           tags?: string[] | null
           track_inventory?: boolean | null
           updated_at?: string | null
+          weight_grams?: number | null
         }
         Relationships: [
           {
@@ -2598,6 +2604,7 @@ export type Database = {
           track_inventory: boolean | null
           updated_at: string | null
           view_count: number | null
+          weight_grams: number | null
         }
         Relationships: [
           {
