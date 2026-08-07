@@ -1,4 +1,5 @@
 import type { CartItem as LocalCartItem } from '@/contexts/cart-context';
+import { formatPrice } from '@/lib/commerce/utils';
 import type { Language } from '@/lib/i18n/translations';
 
 export const LANGUAGE_LOCALES: Record<Language, string> = {
@@ -26,20 +27,6 @@ export type CartSummary = {
   formattedTotal: string;
 };
 
-export function formatCartMoney(amount: string | number, currencyCode: string | undefined, language: Language): string {
-  const currency = currencyCode || 'COP';
-  const numericAmount = typeof amount === 'number' ? amount : Number(amount);
-  const safeAmount = Number.isFinite(numericAmount) ? numericAmount : 0;
-
-  return new Intl.NumberFormat(LANGUAGE_LOCALES[language], {
-    style: 'currency',
-    currency,
-    currencyDisplay: currency === 'COP' ? 'code' : 'narrowSymbol',
-    maximumFractionDigits: currency === 'COP' ? 0 : 2,
-    minimumFractionDigits: currency === 'COP' ? 0 : 2,
-  }).format(safeAmount);
-}
-
 export function buildLocalCartSummary(args: {
   items: LocalCartItem[];
   getItemSubtotal: (item: LocalCartItem) => number;
@@ -58,7 +45,7 @@ export function buildLocalCartSummary(args: {
       quantity: item.quantity,
       currencyCode: lineCurrency,
       amount,
-      formattedLineTotal: formatCartMoney(amount, lineCurrency, args.language),
+      formattedLineTotal: formatPrice(amount, lineCurrency),
       itemKind: item.itemKind,
     };
   });
@@ -68,7 +55,7 @@ export function buildLocalCartSummary(args: {
     subtotal: args.total,
     total: args.total,
     currencyCode,
-    formattedSubtotal: formatCartMoney(args.total, currencyCode, args.language),
-    formattedTotal: formatCartMoney(args.total, currencyCode, args.language),
+    formattedSubtotal: formatPrice(args.total, currencyCode),
+    formattedTotal: formatPrice(args.total, currencyCode),
   };
 }

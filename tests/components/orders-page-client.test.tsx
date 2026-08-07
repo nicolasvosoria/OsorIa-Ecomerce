@@ -98,7 +98,7 @@ describe("OrdersPageClient order list", () => {
     expect(screen.getByText("2 artículos", { exact: false })).toBeInTheDocument()
     expect(screen.getByText("Confirmado")).toBeInTheDocument()
     expect(screen.getByText("Pago: Pagado")).toBeInTheDocument()
-    expect(screen.getByText("COP 50.000")).toBeInTheDocument()
+    expect(screen.getByText("$ 50.000")).toBeInTheDocument()
   })
 
   // D20: el detalle tiene URL propia, y el nombre accesible del enlace nombra el

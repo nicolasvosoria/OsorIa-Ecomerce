@@ -43,10 +43,10 @@ describe("CheckoutSuccessClient order summary", () => {
 
     expect(screen.getByText("Resumen del pedido")).toBeInTheDocument()
     expect(screen.getByText("2 × Campera")).toBeInTheDocument()
-    expect(screen.getByText("Precio unitario: COP 25.000")).toBeInTheDocument()
+    expect(screen.getByText("Precio unitario: $ 25.000")).toBeInTheDocument()
     // La línea del ítem y el total del pedido coinciden en monto (una sola
     // unidad de línea), así que aparecen dos veces en pantalla.
-    expect(screen.getAllByText("COP 50.000")).toHaveLength(2)
+    expect(screen.getAllByText("$ 50.000")).toHaveLength(2)
     expect(screen.getByText("Total")).toBeInTheDocument()
     expect(screen.getByText("Método de pago")).toBeInTheDocument()
     expect(screen.getByText("Pago contra entrega")).toBeInTheDocument()
