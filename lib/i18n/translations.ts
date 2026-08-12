@@ -187,6 +187,9 @@ export interface Translations {
     contactPhoneInvalidCta: string
     // D3/D5/D6/D8/D10: zonas de envío, sus destinos y su escalera de tarifas (S7).
     zones: {
+      coordinateModeTitle: string
+      coordinateModeDescription: string
+      coordinateModeCta: string
       sectionTitle: string
       sectionDescription: string
       addButton: string
@@ -211,6 +214,7 @@ export interface Translations {
       noMunicipalitiesFound: string
       wholeDepartmentPrefix: string
       destinationsColumn: string
+      moreDestinationsLabel: string
       basisColumn: string
       actionsColumn: string
       basisLabel: string
@@ -652,6 +656,10 @@ export const translations: Record<Language, Translations> = {
         'Guardaste un teléfono, pero no arma un enlace válido de WhatsApp. Revisa el número en Configuración.',
       contactPhoneInvalidCta: 'Corregir en Configuración',
       zones: {
+        coordinateModeTitle: 'Esta tienda coordina el envío por WhatsApp',
+        coordinateModeDescription:
+          'No necesitas zonas ni tarifas: cada envío se acuerda directo con el cliente. Si quieres cobrar envío automático por zona, cambia el modo de envío.',
+        coordinateModeCta: 'Ir al modo de envío',
         sectionTitle: 'Zonas de envío',
         sectionDescription: 'Define las zonas de entrega, sus destinos y su escalera de tarifas.',
         addButton: 'Agregar zona',
@@ -676,6 +684,7 @@ export const translations: Record<Language, Translations> = {
         noMunicipalitiesFound: 'Sin resultados',
         wholeDepartmentPrefix: 'Todo:',
         destinationsColumn: 'Destinos',
+        moreDestinationsLabel: '+{count} más',
         basisColumn: 'Tarifa',
         actionsColumn: 'Acciones',
         basisLabel: 'Tipo de tarifa',
@@ -1102,6 +1111,10 @@ export const translations: Record<Language, Translations> = {
         'You saved a phone, but it does not build a valid WhatsApp link. Check the number in Settings.',
       contactPhoneInvalidCta: 'Fix it in Settings',
       zones: {
+        coordinateModeTitle: 'This store coordinates shipping over WhatsApp',
+        coordinateModeDescription:
+          "You don't need zones or rates: every shipment is arranged directly with the customer. If you want to charge automatic shipping by zone, change the shipping mode.",
+        coordinateModeCta: 'Go to shipping mode',
         sectionTitle: 'Shipping zones',
         sectionDescription: 'Define your delivery zones, their destinations and their rate ladder.',
         addButton: 'Add zone',
@@ -1126,6 +1139,7 @@ export const translations: Record<Language, Translations> = {
         noMunicipalitiesFound: 'No results',
         wholeDepartmentPrefix: 'Whole:',
         destinationsColumn: 'Destinations',
+        moreDestinationsLabel: '+{count} more',
         basisColumn: 'Rate',
         actionsColumn: 'Actions',
         basisLabel: 'Rate type',
@@ -1551,6 +1565,10 @@ export const translations: Record<Language, Translations> = {
         'Você salvou um telefone, mas ele não gera um link válido do WhatsApp. Revise o número em Configurações.',
       contactPhoneInvalidCta: 'Corrigir em Configurações',
       zones: {
+        coordinateModeTitle: 'Esta loja combina o frete pelo WhatsApp',
+        coordinateModeDescription:
+          'Você não precisa de zonas nem tarifas: cada frete é combinado direto com o cliente. Se quiser cobrar frete automático por zona, mude o modo de frete.',
+        coordinateModeCta: 'Ir para o modo de frete',
         sectionTitle: 'Zonas de frete',
         sectionDescription: 'Defina as zonas de entrega, seus destinos e sua escada de tarifas.',
         addButton: 'Adicionar zona',
@@ -1575,6 +1593,7 @@ export const translations: Record<Language, Translations> = {
         noMunicipalitiesFound: 'Sem resultados',
         wholeDepartmentPrefix: 'Todo:',
         destinationsColumn: 'Destinos',
+        moreDestinationsLabel: '+{count} mais',
         basisColumn: 'Tarifa',
         actionsColumn: 'Ações',
         basisLabel: 'Tipo de tarifa',

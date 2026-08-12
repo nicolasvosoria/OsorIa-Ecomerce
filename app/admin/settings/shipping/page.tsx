@@ -43,7 +43,11 @@ export default async function ShippingSettingsPage() {
       <AdminPageHeader title={copy.settingsTitle} subtitle={copy.settingsSubtitle} />
       {contactPendingReason && <ShippingContactPendingNotice reason={contactPendingReason} />}
       <ShippingModeForm defaultValues={{ mode: toSelectableShippingMode(settings.mode) }} />
-      <ShippingZonesSection zones={zones} unmatchedDestinationAction={settings.unmatchedDestinationAction} />
+      <ShippingZonesSection
+        mode={settings.mode}
+        zones={zones}
+        unmatchedDestinationAction={settings.unmatchedDestinationAction}
+      />
     </AdminPageContainer>
   )
 }

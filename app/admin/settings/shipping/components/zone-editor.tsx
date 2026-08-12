@@ -3,10 +3,11 @@
 import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Pencil, Plus, X } from "lucide-react"
+import { Info, Pencil, Plus, X } from "lucide-react"
 import { toast } from "sonner"
 
 import { ConfirmActionButton } from "@/components/admin/confirm-action-button"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -17,20 +18,29 @@ import {
   UNMATCHED_DESTINATION_ACTIONS,
   destinationKey,
   shippingRateBasisLabelKey,
+  type ShippingMode,
   type UnmatchedDestinationAction,
 } from "@/lib/shipping/schemas"
-import type { ShippingZoneRecord } from "@/lib/supabase/shipping-zones-api"
+import type { ShippingZoneDestinationView, ShippingZoneRecord } from "@/lib/supabase/shipping-zones-api"
 import { deleteShippingZoneAction, updateUnmatchedDestinationActionAction } from "../actions"
 
 const copy = translations.es.shipping.zones
 
+const VISIBLE_DESTINATION_BADGES = 3
+
 export function ShippingZonesSection({
+  mode,
   zones,
   unmatchedDestinationAction,
 }: {
+  mode: ShippingMode
   zones: ShippingZoneRecord[]
   unmatchedDestinationAction: UnmatchedDestinationAction
 }) {
+  if (mode === "coordinate") {
+    return <CoordinateModeNotice />
+  }
+
   return (
     <div className="space-y-6">
       <UnmatchedDestinationCard defaultValue={unmatchedDestinationAction} />
@@ -49,13 +59,33 @@ export function ShippingZonesSection({
         </CardHeader>
         <CardContent>
           {zones.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">{copy.emptyDescription}</p>
+            <div className="flex flex-col items-center gap-1 py-8 text-center">
+              <p className="font-medium">{copy.emptyTitle}</p>
+              <p className="text-sm text-muted-foreground">{copy.emptyDescription}</p>
+            </div>
           ) : (
             <ZonesTable zones={zones} />
           )}
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+function CoordinateModeNotice() {
+  return (
+    <Alert>
+      <Info aria-hidden />
+      <AlertTitle>{copy.coordinateModeTitle}</AlertTitle>
+      <AlertDescription>
+        <p>
+          {copy.coordinateModeDescription}{" "}
+          <Link href="#shipping-mode" className="font-medium underline underline-offset-4">
+            {copy.coordinateModeCta}
+          </Link>
+        </p>
+      </AlertDescription>
+    </Alert>
   )
 }
 
@@ -75,15 +105,7 @@ function ZonesTable({ zones }: { zones: ShippingZoneRecord[] }) {
           <TableRow key={zone.id}>
             <TableCell className="font-medium">{zone.name}</TableCell>
             <TableCell className="whitespace-normal">
-              <div className="flex flex-wrap gap-1">
-                {zone.destinations.map((destination) => (
-                  <Badge key={destinationKey(destination)} variant="outline">
-                    {destination.municipalityCode
-                      ? destination.municipalityName
-                      : `${copy.wholeDepartmentPrefix} ${destination.departmentName}`}
-                  </Badge>
-                ))}
-              </div>
+              <DestinationBadges destinations={zone.destinations} />
             </TableCell>
             <TableCell>
               <Badge variant="secondary">{copy[shippingRateBasisLabelKey(zone.rateLadder.basis)]}</Badge>
@@ -102,6 +124,26 @@ function ZonesTable({ zones }: { zones: ShippingZoneRecord[] }) {
         ))}
       </TableBody>
     </Table>
+  )
+}
+
+function DestinationBadges({ destinations }: { destinations: ShippingZoneDestinationView[] }) {
+  const visibleDestinations = destinations.slice(0, VISIBLE_DESTINATION_BADGES)
+  const hiddenDestinationsCount = destinations.length - visibleDestinations.length
+
+  return (
+    <div className="flex flex-wrap gap-1">
+      {visibleDestinations.map((destination) => (
+        <Badge key={destinationKey(destination)} variant="outline">
+          {destination.municipalityCode
+            ? destination.municipalityName
+            : `${copy.wholeDepartmentPrefix} ${destination.departmentName}`}
+        </Badge>
+      ))}
+      {hiddenDestinationsCount > 0 && (
+        <Badge variant="secondary">{copy.moreDestinationsLabel.replace("{count}", String(hiddenDestinationsCount))}</Badge>
+      )}
+    </div>
   )
 }
 
