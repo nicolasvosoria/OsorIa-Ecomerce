@@ -15,6 +15,7 @@ const ORDER_ID = "0c9f9a1e-1c4c-4f0a-9d1f-6a1b2c3d4e5f"
 const PRODUCT_ID = "7b8c9d0e-1f2a-3b4c-5d6e-7f8a9b0c1d2e"
 const COMBO_ID = "11111111-1111-4111-8111-111111111111"
 const CATEGORY_ID = "22222222-2222-4222-8222-222222222222"
+const ZONE_ID = "33333333-3333-4333-8333-333333333333"
 
 function labelsOf(pathname: string, entityLabel?: string): string[] {
   return adminBreadcrumbTrail(pathname, entityLabel).map((step) => step.label)
@@ -84,6 +85,24 @@ describe("adminBreadcrumbTrail", () => {
       "Admin",
       "Productos",
       "Categorías",
+      "Editar",
+    ])
+  })
+
+  it("nests the shipping zone create screen under shipping settings", () => {
+    expect(labelsOf("/admin/settings/shipping/zones/new")).toEqual([
+      "Admin",
+      "Configuración",
+      "Envío",
+      "Crear",
+    ])
+  })
+
+  it("nests the shipping zone edit screen under shipping settings, skipping the zone id", () => {
+    expect(labelsOf(`/admin/settings/shipping/zones/${ZONE_ID}/edit`)).toEqual([
+      "Admin",
+      "Configuración",
+      "Envío",
       "Editar",
     ])
   })

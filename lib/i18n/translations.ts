@@ -192,6 +192,8 @@ export interface Translations {
       addButton: string
       createTitle: string
       editTitle: string
+      formTitle: string
+      formDescription: string
       emptyTitle: string
       emptyDescription: string
       nameLabel: string
@@ -652,6 +654,8 @@ export const translations: Record<Language, Translations> = {
         addButton: 'Agregar zona',
         createTitle: 'Nueva zona de envío',
         editTitle: 'Editar zona de envío',
+        formTitle: 'Datos de la zona',
+        formDescription: 'Nombre, destinos y escalera de tarifas de la zona.',
         emptyTitle: 'Todavía no hay zonas de envío',
         emptyDescription: 'Agrega una zona para empezar a cobrar envío según el destino.',
         nameLabel: 'Nombre de la zona',
@@ -1097,6 +1101,8 @@ export const translations: Record<Language, Translations> = {
         addButton: 'Add zone',
         createTitle: 'New shipping zone',
         editTitle: 'Edit shipping zone',
+        formTitle: 'Zone details',
+        formDescription: 'Name, destinations and rate ladder for the zone.',
         emptyTitle: 'No shipping zones yet',
         emptyDescription: 'Add a zone to start charging shipping by destination.',
         nameLabel: 'Zone name',
@@ -1541,6 +1547,8 @@ export const translations: Record<Language, Translations> = {
         addButton: 'Adicionar zona',
         createTitle: 'Nova zona de frete',
         editTitle: 'Editar zona de frete',
+        formTitle: 'Dados da zona',
+        formDescription: 'Nome, destinos e escada de tarifas da zona.',
         emptyTitle: 'Ainda não há zonas de frete',
         emptyDescription: 'Adicione uma zona para começar a cobrar frete por destino.',
         nameLabel: 'Nome da zona',

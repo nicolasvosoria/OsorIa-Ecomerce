@@ -30,6 +30,8 @@ const ADMIN_ROUTES: Record<string, AdminRoute> = {
   "/admin/home-discount-popup": { kind: "static", label: "Popup" },
   "/admin/settings": { kind: "static", label: "Configuración" },
   "/admin/settings/shipping": { kind: "static", label: "Envío" },
+  "/admin/settings/shipping/zones/new": { kind: "static", label: "Crear" },
+  [`/admin/settings/shipping/zones/${DYNAMIC_SEGMENT}/edit`]: { kind: "static", label: "Editar" },
 }
 
 const DYNAMIC_ROUTE_PATTERNS = Object.keys(ADMIN_ROUTES).filter((pattern) =>

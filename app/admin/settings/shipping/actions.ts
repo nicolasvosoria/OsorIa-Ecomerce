@@ -9,7 +9,7 @@ import {
   unmatchedDestinationActionFormSchema,
 } from "@/lib/shipping/schemas"
 import { authorizeActiveStoreAdmin } from "@/lib/supabase/active-store"
-import { listDepartments, listMunicipalitiesByDepartment, type Department, type Municipality } from "@/lib/shipping/locations-api"
+import { listMunicipalitiesByDepartment, type Municipality } from "@/lib/shipping/locations-api"
 import { saveShippingMode, saveUnmatchedDestinationAction } from "@/lib/supabase/shipping-settings-api"
 import { deleteShippingZone, saveShippingZone } from "@/lib/supabase/shipping-zones-api"
 
@@ -137,16 +137,6 @@ export async function deleteShippingZoneAction(zoneId: string): Promise<AdminAct
 
   revalidatePath(SHIPPING_SETTINGS_PATH)
   return { success: true }
-}
-
-// D28's chained picker (department, then municipio filtered to it), reused
-// here for the zone destination picker -- both server actions require the
-// same active-store admin grant every other picker action in this console
-// does (app/admin/actions/catalog-pickers.ts), even though co_locations is
-// public data, so the zones screen has a single authority path throughout.
-export async function listShippingDepartmentsAction(): Promise<Department[]> {
-  const { supabase } = await requireActiveStoreGrant()
-  return listDepartments(supabase)
 }
 
 export async function listShippingMunicipalitiesAction(departmentCode: string): Promise<Municipality[]> {

@@ -126,6 +126,13 @@ describe("AdminSidebar Configuración submenu", () => {
     expect(screen.getByRole("link", { name: "Configuración" })).toHaveAttribute("aria-expanded", "true")
   })
 
+  it("keeps Envío highlighted on the zone create screen, its child route with no nav entry", () => {
+    mockedPathname = "/admin/settings/shipping/zones/new"
+    renderSidebar()
+
+    expect(activeNavLabel()).toBe("Envío")
+  })
+
   it("expands on /admin/settings and marks General as the current page", () => {
     mockedPathname = "/admin/settings"
     renderSidebar()
