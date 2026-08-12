@@ -116,6 +116,56 @@ describe("AdminSidebar highlight", () => {
   })
 })
 
+describe("AdminSidebar Configuración submenu", () => {
+  it("expands on /admin/settings/shipping and marks Envío as the current page", () => {
+    mockedPathname = "/admin/settings/shipping"
+    renderSidebar()
+
+    expect(activeNavLabel()).toBe("Envío")
+    expect(screen.getByRole("link", { name: "Configuración" })).not.toHaveAttribute("aria-current")
+    expect(screen.getByRole("link", { name: "Configuración" })).toHaveAttribute("aria-expanded", "true")
+  })
+
+  it("expands on /admin/settings and marks General as the current page", () => {
+    mockedPathname = "/admin/settings"
+    renderSidebar()
+
+    expect(activeNavLabel()).toBe("General")
+    expect(screen.getByRole("link", { name: "Configuración" })).not.toHaveAttribute("aria-current")
+  })
+
+  it("leaves the group collapsed on an unrelated route", () => {
+    mockedPathname = "/admin/products"
+    renderSidebar()
+
+    expect(screen.getByRole("link", { name: "Configuración" })).toHaveAttribute("aria-expanded", "false")
+    expect(screen.queryByRole("link", { name: "Envío" })).not.toBeInTheDocument()
+    expect(screen.queryByRole("link", { name: "General" })).not.toBeInTheDocument()
+  })
+
+  it("re-collapses on an already-mounted sidebar navigating to an unrelated route", () => {
+    mockedPathname = "/admin/settings/shipping"
+    const { rerender } = render(
+      <SidebarProvider defaultPinned>
+        <AdminSidebar />
+      </SidebarProvider>,
+    )
+
+    expect(screen.getByRole("link", { name: "Configuración" })).toHaveAttribute("aria-expanded", "true")
+
+    mockedPathname = "/admin/products"
+    rerender(
+      <SidebarProvider defaultPinned>
+        <AdminSidebar />
+      </SidebarProvider>,
+    )
+
+    expect(screen.getByRole("link", { name: "Configuración" })).toHaveAttribute("aria-expanded", "false")
+    expect(screen.queryByRole("link", { name: "Envío" })).not.toBeInTheDocument()
+    expect(screen.queryByRole("link", { name: "General" })).not.toBeInTheDocument()
+  })
+})
+
 describe("AdminSidebar pinned vs peeking", () => {
   beforeEach(() => {
     vi.useFakeTimers()

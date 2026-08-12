@@ -354,6 +354,10 @@ export interface Translations {
     administration: string
     changeTheme: string
     changeFont: string
+    settingsNav: {
+      general: string
+      shipping: string
+    }
   }
   // Página no encontrada (404)
   notFound: {
@@ -797,6 +801,10 @@ export const translations: Record<Language, Translations> = {
       administration: 'Administración',
       changeTheme: 'Cambiar tema',
       changeFont: 'Cambiar fuente',
+      settingsNav: {
+        general: 'General',
+        shipping: 'Envío',
+      },
     },
     notFound: {
       heading: 'Página no encontrada',
@@ -1237,6 +1245,10 @@ export const translations: Record<Language, Translations> = {
       administration: 'Administration',
       changeTheme: 'Change theme',
       changeFont: 'Change font',
+      settingsNav: {
+        general: 'General',
+        shipping: 'Shipping',
+      },
     },
     notFound: {
       heading: 'Page Not Found',
@@ -1676,6 +1688,10 @@ export const translations: Record<Language, Translations> = {
       administration: 'Administração',
       changeTheme: 'Mudar tema',
       changeFont: 'Mudar fonte',
+      settingsNav: {
+        general: 'Geral',
+        shipping: 'Envio',
+      },
     },
     notFound: {
       heading: 'Página não encontrada',
