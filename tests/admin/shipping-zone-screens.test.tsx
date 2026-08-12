@@ -1,10 +1,4 @@
-import {
-  Children,
-  isValidElement,
-  type ComponentProps,
-  type ReactElement,
-  type ReactNode,
-} from "react"
+import type { ComponentProps, ReactElement, ReactNode } from "react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const {
@@ -42,31 +36,11 @@ vi.mock("@/app/admin/settings/shipping/actions", () => ({
 import CreateShippingZonePage from "@/app/admin/settings/shipping/zones/new/page"
 import EditShippingZonePage from "@/app/admin/settings/shipping/zones/[zoneId]/edit/page"
 import { ZoneForm } from "@/app/admin/settings/shipping/components/zone-form"
-import type { ShippingZoneRecord } from "@/lib/supabase/shipping-zones-api"
+import { findElementOfType } from "./_helpers/find-element-of-type"
+import { ZONE } from "./_helpers/shipping-zone-fixture"
 
 const SERVICE = { marker: "service-client" }
 const GRANT = { supabase: SERVICE, storeId: "store-1", userId: "user-1" }
-
-const ZONE: ShippingZoneRecord = {
-  id: "zone-1",
-  name: "Eje Cafetero",
-  destinations: [
-    { departmentCode: "05", departmentName: "ANTIOQUIA", municipalityCode: "05001", municipalityName: "MEDELLÍN" },
-  ],
-  rateLadder: { basis: "flat", amount: "5000" },
-}
-
-function findElementOfType(node: ReactNode, type: unknown): ReactElement | null {
-  if (!isValidElement(node)) return null
-  if (node.type === type) return node
-
-  const children = (node.props as { children?: ReactNode }).children
-  for (const child of Children.toArray(children)) {
-    const found = findElementOfType(child, type)
-    if (found) return found
-  }
-  return null
-}
 
 function zoneFormOf(page: ReactNode) {
   return findElementOfType(page, ZoneForm) as ReactElement<ComponentProps<typeof ZoneForm>> | null

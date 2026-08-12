@@ -203,7 +203,12 @@ export interface Translations {
       namePlaceholder: string
       destinationsLabel: string
       selectAllDepartmentsButton: string
+      selectedAllDestinationsToast: string
       clearDestinationsButton: string
+      clearDestinationsConfirmTitle: string
+      clearDestinationsConfirmDescription: string
+      clearDestinationsConfirmButton: string
+      clearedDestinationsToast: string
       selectedDestinationsCountLabel: string
       selectedMunicipalitiesCountLabel: string
       showMunicipalitiesButton: string
@@ -212,6 +217,7 @@ export interface Translations {
       municipalitySearchPlaceholder: string
       loadingMunicipalities: string
       noMunicipalitiesFound: string
+      municipalitiesLoadError: string
       wholeDepartmentPrefix: string
       destinationsColumn: string
       moreDestinationsLabel: string
@@ -673,7 +679,12 @@ export const translations: Record<Language, Translations> = {
         namePlaceholder: 'Ej. Eje Cafetero',
         destinationsLabel: 'Destinos',
         selectAllDepartmentsButton: 'Seleccionar todos',
+        selectedAllDestinationsToast: 'Se seleccionaron los {count} destinos disponibles, reemplazando cualquier selección anterior.',
         clearDestinationsButton: 'Limpiar',
+        clearDestinationsConfirmTitle: '¿Vaciar los destinos seleccionados?',
+        clearDestinationsConfirmDescription: 'Se perderán los {count} destinos que elegiste. Esta acción no se puede deshacer.',
+        clearDestinationsConfirmButton: 'Vaciar',
+        clearedDestinationsToast: 'Se vació la selección de destinos',
         selectedDestinationsCountLabel: 'destinos seleccionados',
         selectedMunicipalitiesCountLabel: 'municipios seleccionados',
         showMunicipalitiesButton: 'Ver municipios',
@@ -682,6 +693,7 @@ export const translations: Record<Language, Translations> = {
         municipalitySearchPlaceholder: 'Buscar municipio…',
         loadingMunicipalities: 'Cargando municipios…',
         noMunicipalitiesFound: 'Sin resultados',
+        municipalitiesLoadError: 'No pudimos cargar los municipios.',
         wholeDepartmentPrefix: 'Todo:',
         destinationsColumn: 'Destinos',
         moreDestinationsLabel: '+{count} más',
@@ -1128,7 +1140,12 @@ export const translations: Record<Language, Translations> = {
         namePlaceholder: 'E.g. Coffee Region',
         destinationsLabel: 'Destinations',
         selectAllDepartmentsButton: 'Select all',
+        selectedAllDestinationsToast: 'Selected all {count} available destinations, replacing any previous selection.',
         clearDestinationsButton: 'Clear',
+        clearDestinationsConfirmTitle: 'Clear the selected destinations?',
+        clearDestinationsConfirmDescription: "You'll lose the {count} destinations you picked. This action cannot be undone.",
+        clearDestinationsConfirmButton: 'Clear',
+        clearedDestinationsToast: 'Destinations selection cleared',
         selectedDestinationsCountLabel: 'destinations selected',
         selectedMunicipalitiesCountLabel: 'municipalities selected',
         showMunicipalitiesButton: 'Show municipalities',
@@ -1137,6 +1154,7 @@ export const translations: Record<Language, Translations> = {
         municipalitySearchPlaceholder: 'Search municipality…',
         loadingMunicipalities: 'Loading municipalities…',
         noMunicipalitiesFound: 'No results',
+        municipalitiesLoadError: "We couldn't load the municipalities.",
         wholeDepartmentPrefix: 'Whole:',
         destinationsColumn: 'Destinations',
         moreDestinationsLabel: '+{count} more',
@@ -1582,7 +1600,12 @@ export const translations: Record<Language, Translations> = {
         namePlaceholder: 'Ex. Eixo Cafeeiro',
         destinationsLabel: 'Destinos',
         selectAllDepartmentsButton: 'Selecionar todos',
+        selectedAllDestinationsToast: 'Foram selecionados os {count} destinos disponíveis, substituindo qualquer seleção anterior.',
         clearDestinationsButton: 'Limpar',
+        clearDestinationsConfirmTitle: 'Esvaziar os destinos selecionados?',
+        clearDestinationsConfirmDescription: 'Você vai perder os {count} destinos que escolheu. Esta ação não pode ser desfeita.',
+        clearDestinationsConfirmButton: 'Esvaziar',
+        clearedDestinationsToast: 'Seleção de destinos esvaziada',
         selectedDestinationsCountLabel: 'destinos selecionados',
         selectedMunicipalitiesCountLabel: 'municípios selecionados',
         showMunicipalitiesButton: 'Ver municípios',
@@ -1591,6 +1614,7 @@ export const translations: Record<Language, Translations> = {
         municipalitySearchPlaceholder: 'Buscar município…',
         loadingMunicipalities: 'Carregando municípios…',
         noMunicipalitiesFound: 'Sem resultados',
+        municipalitiesLoadError: 'Não conseguimos carregar os municípios.',
         wholeDepartmentPrefix: 'Todo:',
         destinationsColumn: 'Destinos',
         moreDestinationsLabel: '+{count} mais',

@@ -138,38 +138,30 @@ function AdminNavGroupItem({
   onNavigate: () => void
 }) {
   const activeChildHref = longestMatchingHref(pathname, item.children)
-  const open = activeChildHref !== null
 
   return (
     <SidebarMenuItem>
-      <SidebarMenuButton
-        asChild
-        isActive={open}
-        tooltip={item.label}
-        aria-expanded={open}
-      >
+      <SidebarMenuButton asChild isActive={activeChildHref !== null} tooltip={item.label}>
         <Link href={item.href} onClick={onNavigate}>
           <item.icon aria-hidden="true" />
           <span className="truncate">{item.label}</span>
         </Link>
       </SidebarMenuButton>
-      {open ? (
-        <SidebarMenuSub>
-          {item.children.map((child) => (
-            <SidebarMenuSubItem key={child.href}>
-              <SidebarMenuSubButton asChild isActive={child.href === activeChildHref}>
-                <Link
-                  href={child.href}
-                  onClick={onNavigate}
-                  aria-current={child.href === activeChildHref ? "page" : undefined}
-                >
-                  <span>{child.label}</span>
-                </Link>
-              </SidebarMenuSubButton>
-            </SidebarMenuSubItem>
-          ))}
-        </SidebarMenuSub>
-      ) : null}
+      <SidebarMenuSub>
+        {item.children.map((child) => (
+          <SidebarMenuSubItem key={child.href}>
+            <SidebarMenuSubButton asChild isActive={child.href === activeChildHref}>
+              <Link
+                href={child.href}
+                onClick={onNavigate}
+                aria-current={child.href === activeChildHref ? "page" : undefined}
+              >
+                <span>{child.label}</span>
+              </Link>
+            </SidebarMenuSubButton>
+          </SidebarMenuSubItem>
+        ))}
+      </SidebarMenuSub>
     </SidebarMenuItem>
   )
 }

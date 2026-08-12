@@ -1,10 +1,4 @@
-import {
-  Children,
-  isValidElement,
-  type ComponentProps,
-  type ReactElement,
-  type ReactNode,
-} from "react"
+import { type ComponentProps, type ReactElement } from "react"
 import { render, screen } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -30,6 +24,7 @@ vi.mock("next/navigation", () => ({
 }))
 
 import AdminOrderDetailPage from "@/app/admin/orders/[id]/page"
+import { findElementOfType } from "./_helpers/find-element-of-type"
 
 const ORDER: OrderWithItems = {
   id: "0c9f9a1e-1c4c-4f0a-9d1f-6a1b2c3d4e5f",
@@ -54,18 +49,6 @@ const ORDER: OrderWithItems = {
   created_at: "2026-07-10T12:00:00.000Z",
   updated_at: "2026-07-10T12:00:00.000Z",
   items: [],
-}
-
-function findElementOfType(node: ReactNode, type: unknown): ReactElement | null {
-  if (!isValidElement(node)) return null
-  if (node.type === type) return node
-
-  const children = (node.props as { children?: ReactNode }).children
-  for (const child of Children.toArray(children)) {
-    const found = findElementOfType(child, type)
-    if (found) return found
-  }
-  return null
 }
 
 describe("AdminOrderDetailPage", () => {

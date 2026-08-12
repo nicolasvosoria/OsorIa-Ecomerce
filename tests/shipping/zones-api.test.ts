@@ -251,4 +251,34 @@ describe("findClaimedDestinations", () => {
 
     expect(claimed).toEqual([])
   })
+
+  it("throws when the zone-name lookup fails, instead of labelling every destination as an unknown zone", async () => {
+    const supabase = {
+      from: (table: string) => {
+        if (table === "shipping_zone_destinations") {
+          return {
+            select: () => ({
+              eq: () =>
+                Promise.resolve({
+                  data: [{ zone_id: "zone-north", department_code: "05", municipality_code: null }],
+                  error: null,
+                }),
+            }),
+          }
+        }
+        if (table === "shipping_zones") {
+          return {
+            select: () => ({
+              in: () => Promise.resolve({ data: null, error: { message: "statement timeout" } }),
+            }),
+          }
+        }
+        throw new Error(`unexpected table ${table}`)
+      },
+    }
+
+    await expect(findClaimedDestinations(supabase as any, STORE_ID)).rejects.toThrow(
+      "No se pudieron leer los nombres de las zonas",
+    )
+  })
 })

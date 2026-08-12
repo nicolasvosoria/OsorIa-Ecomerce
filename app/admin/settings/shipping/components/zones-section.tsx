@@ -48,7 +48,9 @@ export function ShippingZonesSection({
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-3">
           <div>
-            <CardTitle className="text-base">{copy.sectionTitle}</CardTitle>
+            <CardTitle asChild className="text-base">
+              <h2>{copy.sectionTitle}</h2>
+            </CardTitle>
             <CardDescription>{copy.sectionDescription}</CardDescription>
           </div>
           <Button size="sm" className="shrink-0 gap-1.5" asChild>
@@ -185,7 +187,9 @@ function UnmatchedDestinationCard({ defaultValue }: { defaultValue: UnmatchedDes
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">{copy.unmatchedDestinationTitle}</CardTitle>
+        <CardTitle asChild className="text-base">
+          <h2>{copy.unmatchedDestinationTitle}</h2>
+        </CardTitle>
         <CardDescription>{copy.unmatchedDestinationDescription}</CardDescription>
       </CardHeader>
       <CardContent>

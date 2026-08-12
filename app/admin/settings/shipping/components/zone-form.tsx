@@ -8,6 +8,17 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { Check, ChevronDown, ChevronRight, ChevronsUpDown, Loader2, Save } from "lucide-react"
 import { toast } from "sonner"
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -51,6 +62,9 @@ import { EMPTY_RANGE_ROW, RateLadderField } from "./rate-ladder-field"
 const copy = translations.es.shipping.zones
 
 const SHIPPING_ZONES_LIST_PATH = "/admin/settings/shipping"
+
+const DESTINATIONS_LABEL_ID = "zone-destinations-label"
+const DESTINATIONS_ERROR_ID = "zone-destinations-error"
 
 type DestinationValue = ZoneEditorFormValues["destinations"][number]
 
@@ -156,7 +170,9 @@ export function ZoneForm({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">{copy.formTitle}</CardTitle>
+        <CardTitle asChild className="text-base">
+          <h2>{copy.formTitle}</h2>
+        </CardTitle>
         <CardDescription>{copy.formDescription}</CardDescription>
       </CardHeader>
       <CardContent>
@@ -165,8 +181,12 @@ export function ZoneForm({
             {(field) => <Input {...field} placeholder={copy.namePlaceholder} {...register("name")} />}
           </FormField>
 
-          <DestinationsField control={control} departments={departments} claimedDestinations={claimedDestinations} />
-          <FieldError message={errors.destinations?.message} />
+          <DestinationsField
+            control={control}
+            departments={departments}
+            claimedDestinations={claimedDestinations}
+            errorMessage={errors.destinations?.message}
+          />
 
           <RateLadderField control={control} missingWeightProducts={missingWeightProducts} />
 
@@ -225,31 +245,54 @@ function claimedDestinationsByKey(claimedDestinations: ClaimedDestination[]): Ma
   )
 }
 
+function existingDestinationKeys(destinations: DestinationValue[]): Set<string> {
+  return new Set(destinations.map(destinationKey))
+}
+
+function wholeDepartmentCodesOf(destinations: DestinationValue[]): Set<string> {
+  return new Set(
+    destinations.filter((destination) => destination.municipalityCode === null).map((destination) => destination.departmentCode),
+  )
+}
+
+function groupMunicipalityCodesByDepartment(destinations: DestinationValue[]): Map<string, Set<string>> {
+  const codesByDepartment = new Map<string, Set<string>>()
+  for (const destination of destinations) {
+    if (destination.municipalityCode === null) continue
+    const codes = codesByDepartment.get(destination.departmentCode) ?? new Set<string>()
+    codes.add(destination.municipalityCode)
+    codesByDepartment.set(destination.departmentCode, codes)
+  }
+  return codesByDepartment
+}
+
+function ClaimedByBadge({ id, zoneName }: { id?: string; zoneName: string }) {
+  return (
+    <Badge id={id} variant="outline" className="normal-case">
+      {`${copy.claimedByPrefix} "${zoneName}"`}
+    </Badge>
+  )
+}
+
 const EMPTY_MUNICIPALITY_CODES = new Set<string>()
 
 function DestinationsField({
   control,
   departments,
   claimedDestinations,
+  errorMessage,
 }: {
   control: Control<ZoneEditorFormValues>
   departments: Department[]
   claimedDestinations: ClaimedDestination[]
+  errorMessage?: string
 }) {
   const { fields, replace } = useFieldArray({ control, name: "destinations" })
   const claimedByKey = useMemo(() => claimedDestinationsByKey(claimedDestinations), [claimedDestinations])
 
-  const existingKeys = new Set(fields.map(destinationKey))
-  const wholeDepartmentCodes = new Set(
-    fields.filter((field) => field.municipalityCode === null).map((field) => field.departmentCode),
-  )
-  const municipalityCodesByDepartment = new Map<string, Set<string>>()
-  for (const field of fields) {
-    if (field.municipalityCode === null) continue
-    const codes = municipalityCodesByDepartment.get(field.departmentCode) ?? new Set<string>()
-    codes.add(field.municipalityCode)
-    municipalityCodesByDepartment.set(field.departmentCode, codes)
-  }
+  const existingKeys = existingDestinationKeys(fields)
+  const wholeDepartmentCodes = wholeDepartmentCodesOf(fields)
+  const municipalityCodesByDepartment = groupMunicipalityCodesByDepartment(fields)
 
   function toggleDepartmentWhole(departmentCode: string, checked: boolean) {
     replace(nextDestinationsForWholeDepartment(fields, departmentCode, checked))
@@ -259,9 +302,20 @@ function DestinationsField({
     replace(nextDestinationsForMunicipality(fields, municipality, checked))
   }
 
+  function selectAllDepartments() {
+    const nextDestinations = selectableWholeDepartments(departments, claimedByKey)
+    replace(nextDestinations)
+    toast.success(copy.selectedAllDestinationsToast.replace("{count}", String(nextDestinations.length)))
+  }
+
   return (
-    <div className="space-y-3">
-      <Label>{copy.destinationsLabel}</Label>
+    <div
+      role="group"
+      aria-labelledby={DESTINATIONS_LABEL_ID}
+      aria-describedby={errorMessage ? DESTINATIONS_ERROR_ID : undefined}
+      className="space-y-3"
+    >
+      <Label id={DESTINATIONS_LABEL_ID}>{copy.destinationsLabel}</Label>
 
       <MunicipalitySearchField
         wholeDepartmentCodes={wholeDepartmentCodes}
@@ -271,18 +325,11 @@ function DestinationsField({
       />
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => replace(selectableWholeDepartments(departments, claimedByKey))}
-          >
+        <div className="flex gap-3">
+          <Button type="button" variant="outline" size="sm" onClick={selectAllDepartments}>
             {copy.selectAllDepartmentsButton}
           </Button>
-          <Button type="button" variant="outline" size="sm" onClick={() => replace([])}>
-            {copy.clearDestinationsButton}
-          </Button>
+          <ClearDestinationsButton count={fields.length} onConfirm={() => replace([])} />
         </div>
         <p className="text-sm text-muted-foreground">
           {fields.length} {copy.selectedDestinationsCountLabel}
@@ -302,7 +349,56 @@ function DestinationsField({
           />
         ))}
       </div>
+
+      <FieldError id={DESTINATIONS_ERROR_ID} message={errorMessage} />
     </div>
+  )
+}
+
+function ClearDestinationsButton({ count, onConfirm }: { count: number; onConfirm: () => void }) {
+  const [open, setOpen] = useState(false)
+
+  function handleConfirm() {
+    onConfirm()
+    setOpen(false)
+    toast.success(copy.clearedDestinationsToast)
+  }
+
+  if (count === 0) {
+    return (
+      <Button type="button" variant="ghost" size="sm" onClick={onConfirm}>
+        {copy.clearDestinationsButton}
+      </Button>
+    )
+  }
+
+  return (
+    <AlertDialog open={open} onOpenChange={setOpen}>
+      <AlertDialogTrigger asChild>
+        <Button type="button" variant="ghost" size="sm">
+          {copy.clearDestinationsButton}
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent className="editor-chrome">
+        <AlertDialogHeader>
+          <AlertDialogTitle>{copy.clearDestinationsConfirmTitle}</AlertDialogTitle>
+          <AlertDialogDescription>
+            {copy.clearDestinationsConfirmDescription.replace("{count}", String(count))}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>{copy.cancelButton}</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={(event) => {
+              event.preventDefault()
+              handleConfirm()
+            }}
+          >
+            {copy.clearDestinationsConfirmButton}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   )
 }
 
@@ -324,6 +420,7 @@ function DepartmentRow({
   const [expanded, setExpanded] = useState(false)
   const [municipalities, setMunicipalities] = useState<Municipality[]>([])
   const [loadingMunicipalities, setLoadingMunicipalities] = useState(false)
+  const [municipalitiesError, setMunicipalitiesError] = useState(false)
 
   useEffect(() => {
     if (!expanded) return
@@ -333,7 +430,10 @@ function DepartmentRow({
       .then((result) => {
         if (active) setMunicipalities(result)
       })
-      .catch((error) => console.error("[Shipping Zones] Error al cargar municipios:", error))
+      .catch((error) => {
+        console.error("[Shipping Zones] Error al cargar municipios:", error)
+        if (active) setMunicipalitiesError(true)
+      })
       .finally(() => {
         if (active) setLoadingMunicipalities(false)
       })
@@ -344,12 +444,16 @@ function DepartmentRow({
   }, [expanded, department.code])
 
   function toggleExpanded() {
-    if (!expanded) setLoadingMunicipalities(true)
+    if (!expanded) {
+      setLoadingMunicipalities(true)
+      setMunicipalitiesError(false)
+    }
     setExpanded((current) => !current)
   }
 
   const claimedWholeBy = claimedByKey.get(destinationKey({ departmentCode: department.code, municipalityCode: null }))
   const checkboxId = `department-${department.code}`
+  const claimedDescriptionId = claimedWholeBy ? `${checkboxId}-claimed` : undefined
 
   return (
     <div className="p-3">
@@ -357,14 +461,22 @@ function DepartmentRow({
         <Checkbox
           id={checkboxId}
           checked={wholeSelected}
-          disabled={Boolean(claimedWholeBy)}
-          onCheckedChange={(checked) => onToggleWhole(checked === true)}
+          aria-disabled={claimedWholeBy ? true : undefined}
+          aria-describedby={claimedDescriptionId}
+          className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+          onCheckedChange={(checked) => {
+            if (claimedWholeBy) return
+            onToggleWhole(checked === true)
+          }}
         />
-        <Label htmlFor={checkboxId} className="min-w-0 flex-1 cursor-pointer">
+        <Label
+          htmlFor={checkboxId}
+          className="min-w-0 flex-1 cursor-pointer max-md:flex max-md:min-h-11 max-md:items-center peer-aria-disabled:cursor-not-allowed peer-aria-disabled:opacity-70"
+        >
           {department.name}
         </Label>
         {claimedWholeBy ? (
-          <Badge variant="outline" className="normal-case">{`${copy.claimedByPrefix} "${claimedWholeBy}"`}</Badge>
+          <ClaimedByBadge id={claimedDescriptionId} zoneName={claimedWholeBy} />
         ) : selectedMunicipalityCodes.size > 0 ? (
           <span className="text-xs text-muted-foreground">
             {selectedMunicipalityCodes.size} {copy.selectedMunicipalitiesCountLabel}
@@ -386,6 +498,7 @@ function DepartmentRow({
       {expanded ? (
         <MunicipalityChecklist
           loading={loadingMunicipalities}
+          error={municipalitiesError}
           municipalities={municipalities}
           claimedByKey={claimedByKey}
           wholeSelected={wholeSelected}
@@ -399,6 +512,7 @@ function DepartmentRow({
 
 function MunicipalityChecklist({
   loading,
+  error,
   municipalities,
   claimedByKey,
   wholeSelected,
@@ -406,6 +520,7 @@ function MunicipalityChecklist({
   onToggleMunicipality,
 }: {
   loading: boolean
+  error: boolean
   municipalities: Municipality[]
   claimedByKey: Map<string, string>
   wholeSelected: boolean
@@ -414,6 +529,10 @@ function MunicipalityChecklist({
 }) {
   if (loading) {
     return <p className="mt-2 pl-6 text-sm text-muted-foreground">{copy.loadingMunicipalities}</p>
+  }
+
+  if (error) {
+    return <p className="mt-2 pl-6 text-sm text-destructive">{copy.municipalitiesLoadError}</p>
   }
 
   if (municipalities.length === 0) {
@@ -428,21 +547,29 @@ function MunicipalityChecklist({
         )
         const checked = wholeSelected || selectedMunicipalityCodes.has(municipality.code)
         const checkboxId = `municipality-${municipality.code}`
+        const isLocked = wholeSelected || Boolean(claimedBy)
+        const claimedDescriptionId = claimedBy ? `${checkboxId}-claimed` : undefined
 
         return (
           <div key={municipality.id} className="flex items-center gap-2">
             <Checkbox
               id={checkboxId}
               checked={checked}
-              disabled={wholeSelected || Boolean(claimedBy)}
-              onCheckedChange={(value) => onToggleMunicipality(municipality, value === true)}
+              aria-disabled={isLocked ? true : undefined}
+              aria-describedby={claimedDescriptionId}
+              className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+              onCheckedChange={(value) => {
+                if (isLocked) return
+                onToggleMunicipality(municipality, value === true)
+              }}
             />
-            <Label htmlFor={checkboxId} className="min-w-0 flex-1 cursor-pointer text-sm">
+            <Label
+              htmlFor={checkboxId}
+              className="min-w-0 flex-1 cursor-pointer text-sm max-md:flex max-md:min-h-11 max-md:items-center peer-aria-disabled:cursor-not-allowed peer-aria-disabled:opacity-70"
+            >
               {municipality.name}
             </Label>
-            {claimedBy ? (
-              <Badge variant="outline" className="normal-case">{`${copy.claimedByPrefix} "${claimedBy}"`}</Badge>
-            ) : null}
+            {claimedBy ? <ClaimedByBadge id={claimedDescriptionId} zoneName={claimedBy} /> : null}
           </div>
         )
       })}
@@ -467,6 +594,7 @@ function MunicipalitySearchField({
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<Municipality[]>([])
   const [searching, setSearching] = useState(false)
+  const [searchError, setSearchError] = useState(false)
 
   const trimmedQuery = query.trim()
   const queryTooShort = trimmedQuery.length < MUNICIPALITY_SEARCH_MIN_LENGTH
@@ -478,9 +606,16 @@ function MunicipalitySearchField({
     const timeoutId = setTimeout(() => {
       searchShippingMunicipalitiesAction(trimmedQuery)
         .then((municipalities) => {
-          if (active) setResults(municipalities)
+          if (!active) return
+          setResults(municipalities)
+          setSearchError(false)
         })
-        .catch((error) => console.error("[Shipping Zones] Error al buscar municipios:", error))
+        .catch((error) => {
+          console.error("[Shipping Zones] Error al buscar municipios:", error)
+          if (!active) return
+          setResults([])
+          setSearchError(true)
+        })
         .finally(() => {
           if (active) setSearching(false)
         })
@@ -516,7 +651,13 @@ function MunicipalitySearchField({
           <CommandList>
             {queryTooShort ? null : (
               <>
-                <CommandEmpty>{searching ? copy.loadingMunicipalities : copy.noMunicipalitiesFound}</CommandEmpty>
+                <CommandEmpty>
+                  {searching
+                    ? copy.loadingMunicipalities
+                    : searchError
+                      ? copy.municipalitiesLoadError
+                      : copy.noMunicipalitiesFound}
+                </CommandEmpty>
                 <CommandGroup>
                   {results.map((municipality) => {
                     const key = destinationKey({
@@ -525,12 +666,14 @@ function MunicipalitySearchField({
                     })
                     const claimedBy = claimedByKey.get(key)
                     const alreadySelected = wholeDepartmentCodes.has(municipality.departmentCode) || existingKeys.has(key)
+                    const claimedDescriptionId = claimedBy ? `search-${municipality.code}-claimed` : undefined
 
                     return (
                       <CommandItem
                         key={municipality.id}
                         value={municipality.code}
                         disabled={alreadySelected || Boolean(claimedBy)}
+                        aria-describedby={claimedDescriptionId}
                         onSelect={() => {
                           onSelect(municipality)
                           setOpen(false)
@@ -539,9 +682,7 @@ function MunicipalitySearchField({
                       >
                         <Check className={alreadySelected ? "h-4 w-4 opacity-100" : "h-4 w-4 opacity-0"} />
                         <span className="flex-1">{`${municipality.name} (${municipality.departmentName})`}</span>
-                        {claimedBy ? (
-                          <Badge variant="outline" className="normal-case">{`${copy.claimedByPrefix} "${claimedBy}"`}</Badge>
-                        ) : null}
+                        {claimedBy ? <ClaimedByBadge id={claimedDescriptionId} zoneName={claimedBy} /> : null}
                       </CommandItem>
                     )
                   })}

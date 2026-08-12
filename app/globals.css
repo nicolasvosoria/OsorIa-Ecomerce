@@ -319,4 +319,9 @@
     min-height: 36px;
     min-width: 36px;
   }
+
+  [data-slot="checkbox"] {
+    min-height: unset;
+    min-width: unset;
+  }
 }

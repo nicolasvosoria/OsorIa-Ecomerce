@@ -16,7 +16,6 @@ import { deleteShippingZone, saveShippingZone } from "@/lib/supabase/shipping-zo
 const SHIPPING_SETTINGS_PATH = "/admin/settings/shipping"
 const SETTINGS_PATH = "/admin/settings"
 const INVALID_INPUT = "Los datos no son válidos. Revisa el formulario e intenta de nuevo."
-const MUNICIPALITY_SEARCH_LIMIT = 50
 
 // D13/D27: storeId always comes from the active-store gate, never from the
 // client -- the same authority shape every other settings action in this
@@ -144,6 +143,8 @@ export async function listShippingMunicipalitiesAction(departmentCode: string): 
   const { supabase } = await requireActiveStoreGrant()
   return listMunicipalitiesByDepartment(departmentCode, supabase)
 }
+
+const MUNICIPALITY_SEARCH_LIMIT = 50
 
 export async function searchShippingMunicipalitiesAction(query: string): Promise<Municipality[]> {
   const { supabase } = await requireActiveStoreGrant()

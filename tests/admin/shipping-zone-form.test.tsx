@@ -31,24 +31,11 @@ beforeAll(() => {
 
 import { ZoneForm } from "@/app/admin/settings/shipping/components/zone-form"
 import { RateLadderField } from "@/app/admin/settings/shipping/components/rate-ladder-field"
+import { translations } from "@/lib/i18n/translations"
 import type { Department } from "@/lib/shipping/locations-api"
 import type { ZoneEditorFormValues } from "@/lib/shipping/schemas"
-import type { ClaimedDestination, MissingWeightProduct, ShippingZoneRecord } from "@/lib/supabase/shipping-zones-api"
-
-const ZONE: ShippingZoneRecord = {
-  id: "zone-1",
-  name: "Eje Cafetero",
-  destinations: [
-    { departmentCode: "05", departmentName: "ANTIOQUIA", municipalityCode: "05001", municipalityName: "MEDELLÍN" },
-  ],
-  rateLadder: {
-    basis: "order_value",
-    ranges: [
-      { from: "0", to: "50000", amount: "5000" },
-      { from: "50000", to: "", amount: "0" },
-    ],
-  },
-}
+import type { ClaimedDestination, MissingWeightProduct } from "@/lib/supabase/shipping-zones-api"
+import { ZONE } from "./_helpers/shipping-zone-fixture"
 
 const DEPARTMENTS: Department[] = [
   { code: "05", name: "ANTIOQUIA" },
@@ -105,11 +92,50 @@ describe("ZoneForm destinations picker", () => {
     )
 
     expect(screen.getByText('Ya asignado a la zona "Costa Caribe"')).toBeInTheDocument()
-    expect(screen.getByRole("checkbox", { name: "ANTIOQUIA" })).toBeDisabled()
-    expect(screen.getByRole("checkbox", { name: "VALLE DEL CAUCA" })).toBeEnabled()
+    expect(screen.getByRole("checkbox", { name: "ANTIOQUIA" })).toHaveAttribute("aria-disabled", "true")
+    expect(screen.getByRole("checkbox", { name: "VALLE DEL CAUCA" })).not.toHaveAttribute("aria-disabled")
   })
 
-  it("selects every department at once with 'Seleccionar todos', and clears everything with 'Limpiar'", () => {
+  it("connects a claimed checkbox to its reason through aria-describedby, and keeps the row reachable instead of using native disabled", () => {
+    const claimedDestinations: ClaimedDestination[] = [
+      { departmentCode: "05", municipalityCode: null, zoneName: "Costa Caribe" },
+    ]
+    render(
+      <ZoneForm
+        zoneId={null}
+        zone={null}
+        departments={DEPARTMENTS}
+        missingWeightProducts={[]}
+        claimedDestinations={claimedDestinations}
+      />,
+    )
+
+    const checkbox = screen.getByRole("checkbox", { name: "ANTIOQUIA" })
+    expect(checkbox).not.toBeDisabled()
+
+    const describedById = checkbox.getAttribute("aria-describedby")
+    expect(describedById).toBeTruthy()
+    expect(document.getElementById(describedById as string)).toHaveTextContent(
+      'Ya asignado a la zona "Costa Caribe"',
+    )
+
+    fireEvent.click(checkbox)
+    expect(checkbox).not.toBeChecked()
+  })
+
+  it("names the destinations group for assistive technology and wires its validation error to it", async () => {
+    render(<ZoneForm zoneId={null} zone={null} departments={DEPARTMENTS} missingWeightProducts={[]} />)
+
+    const group = screen.getByRole("group", { name: "Destinos" })
+    expect(group).not.toHaveAttribute("aria-describedby")
+
+    fireEvent.click(screen.getByRole("button", { name: "Guardar zona" }))
+
+    const errorMessage = await screen.findByText("Agrega al menos un destino a la zona")
+    expect(group.getAttribute("aria-describedby")).toBe(errorMessage.id)
+  })
+
+  it("selects every department at once with 'Seleccionar todos', and clears everything with 'Limpiar' once confirmed", async () => {
     render(<ZoneForm zoneId={null} zone={null} departments={DEPARTMENTS} missingWeightProducts={[]} />)
 
     fireEvent.click(screen.getByRole("button", { name: "Seleccionar todos" }))
@@ -119,10 +145,26 @@ describe("ZoneForm destinations picker", () => {
     expect(screen.getByText("2 destinos seleccionados")).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole("button", { name: "Limpiar" }))
+    fireEvent.click(await screen.findByRole("button", { name: "Vaciar" }))
 
     expect(screen.getByRole("checkbox", { name: "ANTIOQUIA" })).not.toBeChecked()
     expect(screen.getByRole("checkbox", { name: "VALLE DEL CAUCA" })).not.toBeChecked()
     expect(screen.getByText("0 destinos seleccionados")).toBeInTheDocument()
+  })
+
+  it("requires confirmation before 'Limpiar' wipes a non-empty destinations selection, and does nothing on cancel", async () => {
+    render(<ZoneForm zoneId={null} zone={null} departments={DEPARTMENTS} missingWeightProducts={[]} />)
+
+    fireEvent.click(screen.getByRole("button", { name: "Seleccionar todos" }))
+    fireEvent.click(screen.getByRole("button", { name: "Limpiar" }))
+
+    expect(await screen.findByRole("alertdialog")).toBeInTheDocument()
+    expect(screen.getByRole("checkbox", { name: "ANTIOQUIA", hidden: true })).toBeChecked()
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }))
+
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument()
+    expect(screen.getByRole("checkbox", { name: "ANTIOQUIA" })).toBeChecked()
   })
 
   it("skips a department already claimed whole by another zone when 'Seleccionar todos' runs", () => {
@@ -162,9 +204,9 @@ describe("ZoneForm destinations picker", () => {
 
     expect(screen.getByRole("checkbox", { name: "ANTIOQUIA" })).toBeChecked()
     expect(screen.getByRole("checkbox", { name: "MEDELLÍN" })).toBeChecked()
-    expect(screen.getByRole("checkbox", { name: "MEDELLÍN" })).toBeDisabled()
+    expect(screen.getByRole("checkbox", { name: "MEDELLÍN" })).toHaveAttribute("aria-disabled", "true")
     expect(screen.getByRole("checkbox", { name: "ABEJORRAL" })).toBeChecked()
-    expect(screen.getByRole("checkbox", { name: "ABEJORRAL" })).toBeDisabled()
+    expect(screen.getByRole("checkbox", { name: "ABEJORRAL" })).toHaveAttribute("aria-disabled", "true")
 
     fireEvent.change(screen.getByLabelText("Nombre de la zona"), { target: { value: "Zona Test" } })
     fireEvent.click(screen.getByRole("button", { name: "Guardar zona" }))
@@ -187,6 +229,66 @@ describe("ZoneForm destinations picker", () => {
     fireEvent.click(result)
 
     expect(screen.getByText("1 destinos seleccionados")).toBeInTheDocument()
+  })
+
+  it("clears the previous query's results and shows the load-error state instead of 'Sin resultados' when a search rejects", async () => {
+    searchShippingMunicipalitiesAction.mockResolvedValueOnce([
+      { id: 1, code: "05001", name: "MEDELLÍN", departmentCode: "05", departmentName: "ANTIOQUIA" },
+    ])
+    render(<ZoneForm zoneId={null} zone={null} departments={DEPARTMENTS} missingWeightProducts={[]} />)
+
+    fireEvent.click(screen.getByText("Buscar municipio…"))
+    fireEvent.change(screen.getByPlaceholderText("Buscar municipio…"), { target: { value: "med" } })
+    await screen.findByText("MEDELLÍN (ANTIOQUIA)")
+
+    searchShippingMunicipalitiesAction.mockRejectedValueOnce(new Error("timeout"))
+    fireEvent.change(screen.getByPlaceholderText("Buscar municipio…"), { target: { value: "sopo" } })
+
+    await waitFor(() => expect(searchShippingMunicipalitiesAction).toHaveBeenCalledWith("sopo"), { timeout: 2000 })
+    expect(await screen.findByText(translations.es.shipping.zones.municipalitiesLoadError)).toBeInTheDocument()
+    expect(screen.queryByText("MEDELLÍN (ANTIOQUIA)")).not.toBeInTheDocument()
+    expect(screen.queryByText(translations.es.shipping.zones.noMunicipalitiesFound)).not.toBeInTheDocument()
+  })
+
+  it("connects a claimed search result to its reason for assistive technology", async () => {
+    searchShippingMunicipalitiesAction.mockResolvedValue([
+      { id: 3, code: "76001", name: "CALI", departmentCode: "76", departmentName: "VALLE DEL CAUCA" },
+    ])
+    const claimedDestinations: ClaimedDestination[] = [
+      { departmentCode: "76", municipalityCode: "76001", zoneName: "Costa Caribe" },
+    ]
+    render(
+      <ZoneForm
+        zoneId={null}
+        zone={null}
+        departments={DEPARTMENTS}
+        missingWeightProducts={[]}
+        claimedDestinations={claimedDestinations}
+      />,
+    )
+
+    fireEvent.click(screen.getByText("Buscar municipio…"))
+    fireEvent.change(screen.getByPlaceholderText("Buscar municipio…"), { target: { value: "cali" } })
+
+    await waitFor(() => expect(searchShippingMunicipalitiesAction).toHaveBeenCalledWith("cali"), { timeout: 2000 })
+    const option = await screen.findByRole("option", { name: /CALI/ })
+
+    expect(option).toHaveAttribute("aria-disabled", "true")
+    const describedById = option.getAttribute("aria-describedby")
+    expect(describedById).toBeTruthy()
+    expect(document.getElementById(describedById as string)).toHaveTextContent(
+      'Ya asignado a la zona "Costa Caribe"',
+    )
+  })
+})
+
+describe("ZoneForm heading structure", () => {
+  it("renders the card title as a real, level-2 heading", () => {
+    render(<ZoneForm zoneId={null} zone={null} departments={[]} missingWeightProducts={[]} />)
+
+    expect(
+      screen.getByRole("heading", { level: 2, name: translations.es.shipping.zones.formTitle }),
+    ).toBeInTheDocument()
   })
 })
 

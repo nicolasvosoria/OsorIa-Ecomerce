@@ -391,19 +391,24 @@ export async function findClaimedDestinations(
   excludeZoneId?: string,
 ): Promise<ClaimedDestination[]> {
   const existingDestinations = await fetchStoreDestinations(supabase, storeId, excludeZoneId)
-  const zoneNameByZoneId = await mapZoneNames(supabase, existingDestinations.map((destination) => destination.zoneId))
+  const uniqueZoneIds = [...new Set(existingDestinations.map((destination) => destination.zoneId))]
+  const zoneNamesResult =
+    uniqueZoneIds.length === 0
+      ? { data: [], error: null }
+      : await supabase.from(ECOMMERCE_TABLES.shippingZones).select("id, name").in("id", uniqueZoneIds)
+  if (zoneNamesResult.error) {
+    throw new Error("No se pudieron leer los nombres de las zonas", { cause: zoneNamesResult.error })
+  }
+
+  const zoneNameByZoneId = new Map<string, string>(
+    (zoneNamesResult.data ?? []).map((zone: { id: string; name: string }) => [zone.id, zone.name]),
+  )
 
   return existingDestinations.map((destination) => ({
     departmentCode: destination.departmentCode,
     municipalityCode: destination.municipalityCode,
     zoneName: zoneNameByZoneId.get(destination.zoneId) ?? UNKNOWN_ZONE_NAME,
   }))
-}
-
-async function mapZoneNames(supabase: any, zoneIds: string[]): Promise<Map<string, string>> {
-  const uniqueZoneIds = [...new Set(zoneIds)]
-  const names = await Promise.all(uniqueZoneIds.map((zoneId) => fetchZoneName(supabase, zoneId)))
-  return new Map(uniqueZoneIds.map((zoneId, index) => [zoneId, names[index]]))
 }
 
 type LocationNames = { departments: Map<string, string>; municipalities: Map<string, string> }

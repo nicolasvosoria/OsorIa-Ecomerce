@@ -123,7 +123,6 @@ describe("AdminSidebar Configuración submenu", () => {
 
     expect(activeNavLabel()).toBe("Envío")
     expect(screen.getByRole("link", { name: "Configuración" })).not.toHaveAttribute("aria-current")
-    expect(screen.getByRole("link", { name: "Configuración" })).toHaveAttribute("aria-expanded", "true")
   })
 
   it("keeps Envío highlighted on the zone create screen, its child route with no nav entry", () => {
@@ -141,16 +140,18 @@ describe("AdminSidebar Configuración submenu", () => {
     expect(screen.getByRole("link", { name: "Configuración" })).not.toHaveAttribute("aria-current")
   })
 
-  it("leaves the group collapsed on an unrelated route", () => {
+  it("always renders Envío and General under Configuración, with no aria-expanded state to announce", () => {
     mockedPathname = "/admin/products"
     renderSidebar()
 
-    expect(screen.getByRole("link", { name: "Configuración" })).toHaveAttribute("aria-expanded", "false")
-    expect(screen.queryByRole("link", { name: "Envío" })).not.toBeInTheDocument()
-    expect(screen.queryByRole("link", { name: "General" })).not.toBeInTheDocument()
+    expect(screen.getByRole("link", { name: "Configuración" })).not.toHaveAttribute("aria-expanded")
+    expect(screen.getByRole("link", { name: "Envío" })).toBeInTheDocument()
+    expect(screen.getByRole("link", { name: "General" })).toBeInTheDocument()
+    expect(screen.getByRole("link", { name: "Envío" })).not.toHaveAttribute("aria-current")
+    expect(screen.getByRole("link", { name: "General" })).not.toHaveAttribute("aria-current")
   })
 
-  it("re-collapses on an already-mounted sidebar navigating to an unrelated route", () => {
+  it("keeps the submenu mounted on an already-mounted sidebar navigating to an unrelated route", () => {
     mockedPathname = "/admin/settings/shipping"
     const { rerender } = render(
       <SidebarProvider defaultPinned>
@@ -158,7 +159,7 @@ describe("AdminSidebar Configuración submenu", () => {
       </SidebarProvider>,
     )
 
-    expect(screen.getByRole("link", { name: "Configuración" })).toHaveAttribute("aria-expanded", "true")
+    expect(screen.getByRole("link", { name: "Envío" })).toBeInTheDocument()
 
     mockedPathname = "/admin/products"
     rerender(
@@ -167,9 +168,9 @@ describe("AdminSidebar Configuración submenu", () => {
       </SidebarProvider>,
     )
 
-    expect(screen.getByRole("link", { name: "Configuración" })).toHaveAttribute("aria-expanded", "false")
-    expect(screen.queryByRole("link", { name: "Envío" })).not.toBeInTheDocument()
-    expect(screen.queryByRole("link", { name: "General" })).not.toBeInTheDocument()
+    expect(screen.getByRole("link", { name: "Envío" })).toBeInTheDocument()
+    expect(screen.getByRole("link", { name: "General" })).toBeInTheDocument()
+    expect(screen.getByRole("link", { name: "Envío" })).not.toHaveAttribute("aria-current")
   })
 })
 

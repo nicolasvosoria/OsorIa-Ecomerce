@@ -15,7 +15,7 @@ import {
   type ShippingContactPendingReason,
 } from "./components/shipping-contact-pending-notice"
 import { ShippingModeForm } from "./components/shipping-mode-form"
-import { ShippingZonesSection } from "./components/zone-editor"
+import { ShippingZonesSection } from "./components/zones-section"
 
 const copy = translations.es.shipping
 

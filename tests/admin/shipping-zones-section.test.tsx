@@ -25,24 +25,10 @@ beforeAll(() => {
   global.ResizeObserver = ResizeObserverStub
 })
 
-import { ShippingZonesSection } from "@/app/admin/settings/shipping/components/zone-editor"
+import { ShippingZonesSection } from "@/app/admin/settings/shipping/components/zones-section"
 import { translations } from "@/lib/i18n/translations"
 import type { ShippingZoneDestinationView, ShippingZoneRecord } from "@/lib/supabase/shipping-zones-api"
-
-const ZONE: ShippingZoneRecord = {
-  id: "zone-1",
-  name: "Eje Cafetero",
-  destinations: [
-    { departmentCode: "05", departmentName: "ANTIOQUIA", municipalityCode: "05001", municipalityName: "MEDELLÍN" },
-  ],
-  rateLadder: {
-    basis: "order_value",
-    ranges: [
-      { from: "0", to: "50000", amount: "5000" },
-      { from: "50000", to: "", amount: "0" },
-    ],
-  },
-}
+import { ZONE } from "./_helpers/shipping-zone-fixture"
 
 function destinationsInDepartment(departmentName: string, count: number): ShippingZoneDestinationView[] {
   return Array.from({ length: count }, (_, index) => ({
@@ -133,5 +119,16 @@ describe("ShippingZonesSection", () => {
     expect(screen.getByText(translations.es.shipping.zones.sectionTitle)).toBeInTheDocument()
     expect(screen.getByText(translations.es.shipping.zones.unmatchedDestinationTitle)).toBeInTheDocument()
     expect(screen.queryByText(translations.es.shipping.zones.coordinateModeTitle)).not.toBeInTheDocument()
+  })
+
+  it("renders both section titles as real, level-2 headings", () => {
+    render(<ShippingZonesSection mode="own_rates" zones={[ZONE]} unmatchedDestinationAction="block" />)
+
+    expect(
+      screen.getByRole("heading", { level: 2, name: translations.es.shipping.zones.sectionTitle }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole("heading", { level: 2, name: translations.es.shipping.zones.unmatchedDestinationTitle }),
+    ).toBeInTheDocument()
   })
 })
