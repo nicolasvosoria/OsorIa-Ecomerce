@@ -212,6 +212,41 @@ describe("WhyUs design options", () => {
   })
 })
 
+describe("WhyUs default shipping copy (D29)", () => {
+  it("no longer promises free shipping in the default items", () => {
+    const shippingItem = WHYUS_DEFAULTS.items.find((item) => item.icon === "shipping")
+    expect(shippingItem?.title.toLowerCase()).not.toContain("gratis")
+  })
+
+  it("renders the corrected default when the store never customized its items", () => {
+    mockUseAdmin.mockReturnValue({ componentEdits: new Map() })
+    mockUseComponentStyle.mockImplementation((_name: string, defaults: Record<string, unknown>) => ({
+      styles: defaults,
+    }))
+
+    const { container } = render(<WhyUs />)
+    expect(container.textContent).not.toContain("Envío Gratis")
+  })
+
+  it("preserves a store's own edited shipping copy even though the default changed", () => {
+    mockUseAdmin.mockReturnValue({ componentEdits: new Map() })
+    mockUseComponentStyle.mockImplementation((_name: string, defaults: Record<string, unknown>) => ({
+      styles: {
+        ...defaults,
+        items: [
+          WHYUS_DEFAULTS.items[0],
+          { icon: "shipping", title: "Envío Gratis a Bogotá", description: "Entrega en 2 Días", link: "" },
+          WHYUS_DEFAULTS.items[2],
+          WHYUS_DEFAULTS.items[3],
+        ],
+      },
+    }))
+
+    const { container } = render(<WhyUs />)
+    expect(container.textContent).toContain("Envío Gratis a Bogotá")
+  })
+})
+
 describe("WhyUs item link", () => {
   it("renders a card item without a link as a plain div (no regression)", () => {
     mockUseAdmin.mockReturnValue({ componentEdits: new Map() })

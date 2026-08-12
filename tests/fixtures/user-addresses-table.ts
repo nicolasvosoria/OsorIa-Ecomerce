@@ -5,7 +5,11 @@ export type AddressRow = {
   user_id: string
   label: string | null
   address_line_1: string
+  department_code: string | null
+  department_name: string | null
   city: string | null
+  municipality_code: string | null
+  location_id: number | null
   postal_code: string | null
   country: string
   is_default: boolean

@@ -1,5 +1,6 @@
 import { buildOrderOutboxNotifications } from "@/lib/checkout/order-notifications"
 import { isStoreIdentityReadinessEnforced } from "@/lib/checkout/identity-readiness-gate"
+import type { OrderReceiptDetails } from "@/lib/email/types"
 import { getStoreIdentityReadiness, type StoreIdentityField } from "@/lib/stores/identity-readiness"
 import { ECOMMERCE_FUNCTIONS } from "@/lib/supabase/contract"
 import { loadStoreIdentity, type StoreIdentityView } from "@/lib/supabase/store-identity-api"
@@ -55,6 +56,7 @@ export async function writeOrderAtomically(input: WriteOrderAtomicallyInput): Pr
     orderNumber,
     customerName: `${input.header.customer_first_name} ${input.header.customer_last_name}`.trim(),
     customerEmail: input.header.customer_email,
+    receipt: buildOrderReceiptDetails(input.header),
   })
 
   const { data, error } = await input.supabase.rpc(ECOMMERCE_FUNCTIONS.createOrderWithNotifications, {
@@ -99,6 +101,29 @@ async function reserveOrderNumber(supabase: any, storeId: string): Promise<strin
     throw new Error(`No se pudo generar el número de pedido: ${error?.message ?? "sin dato"}`)
   }
   return data as string
+}
+
+// D12/D26: the confirmation email's breakdown, read straight off the header
+// createOrder already resolved (recalculated subtotal, S9's shipping
+// resolution, the total the DB's own reconciliation check will also see) --
+// never recomputed here, so the receipt can't drift from the order it
+// describes. currency_code is optional on CreateOrderData; app/checkout's
+// own action already derives it from the first item's price (the same
+// fallback orders-api.ts uses elsewhere), repeated here as the last resort.
+function buildOrderReceiptDetails(header: CreateOrderData): OrderReceiptDetails {
+  return {
+    currencyCode: header.currency_code ?? header.items[0]?.currency_code ?? "COP",
+    lines: header.items.map((item) => ({
+      productName: item.product_name,
+      variantTitle: item.variant_title,
+      quantity: item.quantity,
+      totalPrice: item.total_price,
+    })),
+    subtotal: header.subtotal,
+    shippingCost: header.shipping_cost ?? 0,
+    shippingStatus: header.shipping_status ?? null,
+    totalAmount: header.total_amount,
+  }
 }
 
 // idempotency_key/payload_fingerprint travel as their own top-level RPC

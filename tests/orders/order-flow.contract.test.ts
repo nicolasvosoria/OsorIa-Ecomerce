@@ -58,12 +58,39 @@ type ScriptedResponse = { data?: any; error?: any; count?: number };
 // fallback in a couple of them) working unchanged: that fallback's entry is
 // always consumed first, and this default only ever answers the LATER,
 // identity-load call once the test's own queue is exhausted.
+//
+// A10: createOrder also now resolves the frozen destination from
+// co_locations by shipping_location_id (resolveAuthoritativeShippingDestination),
+// on every order, unconditionally -- this default matches baseOrderData/
+// baseCheckoutInput's own shipping_location_id ("1") and destination fields
+// exactly, so every pre-existing test that never overrides the destination
+// keeps asserting the same values it always did. Tests that DO override the
+// destination (proving the catalog wins over a disagreeing client payload)
+// script their own "co_locations:select" entry instead.
+// S9: createOrder now also resolves shipping (lib/shipping/resolver.ts),
+// unconditionally, on every order -- loadShippingSettings reads this table
+// first. A missing row (this default) is the "never customized" shape D11/
+// D17 already gave store_shipping_settings, so every pre-existing test that
+// never scripts its own settings resolves the born default: mode=coordinate,
+// unmatched_destination_action=block -- status "agreed", amount 0, no zone
+// tables ever queried. Tests exercising own_rates/out_of_zone script their
+// own "store_shipping_settings:select" entry instead.
 const DEFAULT_IDENTITY_QUEUE_RESPONSES: Record<string, ScriptedResponse> = {
   "stores:select": {
     data: { store_name: "Tienda de prueba", subdomain: "tienda-de-prueba", legal_name: null },
     error: null,
   },
   "store_branding:select": { data: null, error: null },
+  "store_shipping_settings:select": { data: null, error: null },
+  "co_locations:select": {
+    data: {
+      department_code: "11",
+      department_name: "Bogotá, D.C.",
+      municipality_code: "11001",
+      municipality_name: "Bogotá",
+    },
+    error: null,
+  },
   "store_contact:select": {
     data: {
       contact_email: "tienda@example.com",
@@ -280,6 +307,10 @@ class MockSupabaseState {
   }
 }
 
+// D2/D30: shipping_location_id/shipping_department_code/shipping_department_name/
+// shipping_municipality_code are the checkout's destination picker (D28) output --
+// required on every order now, so every fixture below carries them once here and
+// every call site that spreads ...baseOrderData/...baseCheckoutInput inherits them.
 const baseOrderData: CreateOrderData = {
   idempotency_key: "test-idempotency-key",
   payload_fingerprint: "test-payload-fingerprint",
@@ -288,7 +319,11 @@ const baseOrderData: CreateOrderData = {
   customer_first_name: "Ada",
   customer_last_name: "Lovelace",
   shipping_address: "Calle 123",
+  shipping_department_code: "11",
+  shipping_department_name: "Bogotá, D.C.",
   shipping_city: "Bogotá",
+  shipping_municipality_code: "11001",
+  shipping_location_id: "1",
   shipping_postal_code: "110111",
   total_amount: 100000,
   subtotal: 100000,
@@ -310,7 +345,11 @@ const baseCheckoutInput: CheckoutOrderInput = {
   customer_first_name: "Ada",
   customer_last_name: "Lovelace",
   shipping_address: "Calle 123",
+  shipping_department_code: "11",
+  shipping_department_name: "Bogotá, D.C.",
   shipping_city: "Bogotá",
+  shipping_municipality_code: "11001",
+  shipping_location_id: "1",
   shipping_postal_code: "110111",
   payment_method: "cash_on_delivery",
   items: [
@@ -1343,7 +1382,13 @@ describe("orders-api live order contract", () => {
     );
   });
 
-  it("recalculates authoritative totals from the database and ignores client-sent price/discount tampering", async () => {
+  // D21/D23: shipping_cost/shipping_status are recomputed the same way price
+  // already is -- never trusted from the client, no matter what it claims
+  // the resolution was. This store is the born default (coordinate, D11/D17,
+  // see DEFAULT_IDENTITY_QUEUE_RESPONSES above), so the server-recomputed
+  // pair is amount 0 / status "agreed" regardless of the tampered shipping_cost
+  // and shipping_status the client sends below.
+  it("recalculates authoritative totals and shipping resolution from the database, ignoring client-sent price/discount/shipping tampering", async () => {
     const state = new MockSupabaseState({
       "store_items:select": [
         {
@@ -1403,6 +1448,7 @@ describe("orders-api live order contract", () => {
       subtotal: 999999,
       total_amount: 999999,
       shipping_cost: 30000,
+      shipping_status: "rate",
       tax_amount: 20000,
       discount_amount: -50000,
       items: [
@@ -1419,6 +1465,7 @@ describe("orders-api live order contract", () => {
     expect(state.inserts.orders?.[0]).toMatchObject({
       subtotal: 80000,
       shipping_cost: 0,
+      shipping_status: "agreed",
       tax_amount: 0,
       discount_amount: 0,
       total_amount: 80000,
@@ -1430,6 +1477,73 @@ describe("orders-api live order contract", () => {
     expect(insertedItems[0].unit_price).toBe(40000);
     expect(insertedItems[0].total_price).toBe(80000);
     expect(created?.items[0].total_price).toBe(80000);
+  });
+
+  // D17: the one live public store is born mode=coordinate -- after this
+  // slice deploys, its checkout must behave EXACTLY as before: shipping
+  // stays 0 and the resolution recorded is "agreed", the deployment-safety
+  // property the whole shipping plan rests on. No tampering, no own_rates
+  // settings scripted -- this is the plain born-default path.
+  it("keeps a coordinate-mode store's order at shipping_cost 0 and shipping_status agreed (D17 deployment safety)", async () => {
+    const state = new MockSupabaseState({
+      "store_items:select": [
+        { data: [{ id: "store-item-deploy-safety", base_price: 20000, currency_code: "COP" }], error: null },
+        { data: { track_inventory: false, inventory_quantity: 10 }, error: null },
+        { data: { store_id: "store-uuid-deploy-safety", track_inventory: false, inventory_quantity: 10 }, error: null },
+      ],
+      "orders:insert": [
+        {
+          data: {
+            id: "order-deploy-safety-1",
+            order_number: "A-DEPLOY-SAFETY",
+            created_at: "2026-01-01T00:00:00.000Z",
+            updated_at: "2026-01-01T00:00:00.000Z",
+          },
+          error: null,
+        },
+      ],
+      "order_items:insert": [
+        {
+          data: [
+            {
+              id: "item-deploy-safety-1",
+              order_id: "order-deploy-safety-1",
+              product_id: "store-item-deploy-safety",
+              product_name: "Campera",
+              quantity: 1,
+              unit_price: 20000,
+              total_price: 20000,
+              currency_code: "COP",
+            },
+          ],
+          error: null,
+        },
+      ],
+      "order_addresses:insert": [{ data: [{ id: "addr-deploy-safety-1" }], error: null }],
+    });
+
+    getSupabaseEcommerceMock.mockReturnValue({ from: state.from, rpc: state.rpc });
+
+    await createOrder({
+      ...baseOrderData,
+      subtotal: 20000,
+      total_amount: 20000,
+      items: [
+        {
+          product_id: "store-item-deploy-safety",
+          product_name: "Campera",
+          unit_price: 20000,
+          quantity: 1,
+          total_price: 20000,
+        },
+      ],
+    });
+
+    expect(state.inserts.orders?.[0]).toMatchObject({
+      shipping_cost: 0,
+      shipping_status: "agreed",
+      total_amount: 20000,
+    });
   });
 
   it("placeCheckoutOrder forces payment_status=pending and a whitelisted payment_method even when the client sends inflated totals and payment_status=paid", async () => {
@@ -2128,6 +2242,150 @@ describe("orders-api live order contract", () => {
     });
   });
 
+  // D2/D30: before this slice, app/checkout/page.tsx hardcoded city: "" for
+  // every authenticated order and checkoutOrderSchema had no destination
+  // fields at all -- an authenticated purchase stored an empty city and no
+  // department. This proves the authenticated write path now freezes
+  // shipping_location_id AND the department alongside it, not just the city.
+  //
+  // A10: the frozen department/municipality text is never trusted from the
+  // client -- the write path resolves it from ecommerce.co_locations by
+  // shipping_location_id, the same way applyAuthoritativePricing already
+  // ignores the client's price. The client payload below deliberately claims
+  // Bogotá for a location id whose real catalog row is Antioquia/Medellín,
+  // proving the stored row carries the CATALOG's destination, not the
+  // client's disagreeing one.
+  it("stores the catalog's frozen destination text for shipping_location_id, not the client's disagreeing one, for an authenticated order", async () => {
+    getUserMock.mockResolvedValue({
+      data: { user: { id: "session-user-destination-1" } },
+      error: null,
+    });
+
+    const state = new MockSupabaseState({
+      "store_items:select": [
+        {
+          data: [
+            { id: "store-item-1", base_price: 100000, currency_code: "COP" },
+          ],
+          error: null,
+        },
+        {
+          data: {
+            track_inventory: false,
+            inventory_quantity: 10,
+            is_available_for_sale: true,
+            is_active: true,
+          },
+          error: null,
+        },
+        {
+          data: {
+            store_id: "store-uuid-destination-1",
+            track_inventory: false,
+            inventory_quantity: 10,
+          },
+          error: null,
+        },
+        {
+          data: {
+            track_inventory: false,
+            inventory_quantity: 10,
+            is_available_for_sale: true,
+            is_active: true,
+          },
+          error: null,
+        },
+      ],
+      "co_locations:select": [
+        {
+          data: {
+            department_code: "05",
+            department_name: "ANTIOQUIA",
+            municipality_code: "05001",
+            municipality_name: "MEDELLÍN",
+          },
+          error: null,
+        },
+      ],
+      "orders:insert": [
+        {
+          data: {
+            id: "order-destination-1",
+            order_number: "A-DESTINATION-1",
+            payment_method: "cash_on_delivery",
+            payment_status: "pending",
+            payment_reference: null,
+            created_at: "2026-01-01T00:00:00.000Z",
+            updated_at: "2026-01-01T00:00:00.000Z",
+            ...baseOrderData,
+          },
+          error: null,
+        },
+      ],
+      "order_items:insert": [{ data: [{ id: "item-destination-1" }], error: null }],
+      "order_addresses:insert": [
+        { data: [{ id: "addr-destination-1" }], error: null },
+      ],
+    });
+
+    getServiceEcommerceClientMock.mockReturnValue({ from: state.from, rpc: state.rpc });
+
+    const result = await placeCheckoutOrder({
+      ...baseCheckoutInput,
+      // El id apunta a Antioquia/Medellín (scripteado arriba); el texto que
+      // manda el cliente miente y dice Bogotá para ese mismo id.
+      shipping_location_id: "42",
+      shipping_department_code: "11",
+      shipping_department_name: "Bogotá, D.C.",
+      shipping_city: "Bogotá",
+      shipping_municipality_code: "11001",
+    }, "idem-destination-1");
+
+    expect(result).toMatchObject({ success: true, orderNumber: "A-DESTINATION-1" });
+    expect(state.inserts.orders?.[0]).toMatchObject({
+      shipping_location_id: "42",
+      shipping_department_code: "05",
+      shipping_department_name: "ANTIOQUIA",
+      shipping_city: "MEDELLÍN",
+      shipping_municipality_code: "05001",
+    });
+  });
+
+  // A10: if the id the client submits does not resolve to a real
+  // co_locations row (stale picker state, a tampered id), the order is never
+  // written at all -- there is no partial or best-guess destination to fall
+  // back to.
+  it("does not create the order when shipping_location_id does not resolve in co_locations", async () => {
+    getUserMock.mockResolvedValue({
+      data: { user: { id: "session-user-destination-2" } },
+      error: null,
+    });
+
+    const state = new MockSupabaseState({
+      "store_items:select": [
+        {
+          data: [
+            { id: "store-item-1", base_price: 100000, currency_code: "COP" },
+          ],
+          error: null,
+        },
+      ],
+      "co_locations:select": [
+        { data: null, error: { message: "no rows found" } },
+      ],
+    });
+
+    getServiceEcommerceClientMock.mockReturnValue({ from: state.from, rpc: state.rpc });
+
+    const result = await placeCheckoutOrder({
+      ...baseCheckoutInput,
+      shipping_location_id: "999999",
+    }, "idem-destination-invalid-1");
+
+    expect(result).toMatchObject({ success: false });
+    expect(state.inserts.orders).toBeUndefined();
+  });
+
   it("returns the 409-style validationResult in the action result when inventory runs short", async () => {
     const state = new MockSupabaseState({
       "store_items:select": [
@@ -2568,6 +2826,11 @@ describe("orders-api live order contract", () => {
           currencyCode: "COP",
         },
       ],
+      // D23: orderRow predates shipping_status (nullable since S9) -- the
+      // mapper falls back to null rather than crashing on the missing column.
+      subtotal: 50000,
+      shippingCost: 0,
+      shippingStatus: null,
       totalAmount: 50000,
       currencyCode: "COP",
       paymentMethod: "cash_on_delivery",

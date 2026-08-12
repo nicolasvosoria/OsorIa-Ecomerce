@@ -88,6 +88,11 @@ export interface Translations {
       newest: string
       oldest: string
     }
+    weightSectionTitle: string
+    weightSectionDescription: string
+    weightLabel: string
+    weightRequiredError: string
+    weightPublicLabel: string
   }
   // Carrito
   cart: {
@@ -96,6 +101,7 @@ export interface Translations {
     emptyDescription: string
     subtotal: string
     shipping: string
+    shippingCalculatedAtCheckout: string
     discount: string
     total: string
     checkout: string
@@ -118,13 +124,124 @@ export interface Translations {
     processing: string
     address: string
     city: string
+    // D28: los dos selects encadenados del picker de destino (departamento,
+    // luego municipio filtrado a ese departamento).
+    department: string
+    selectDepartment: string
+    municipality: string
+    selectMunicipality: string
+    selectDepartmentFirst: string
+    // D28's picker: an honest, retryable state for either chained select's
+    // own fetch failing, instead of an empty control or a spinner stuck
+    // forever (both listDepartments and listMunicipalitiesByDepartment can
+    // reject -- a Supabase error, or lib/supabase/with-timeout.ts's timeout).
+    departmentsLoadError: string
+    municipalitiesLoadError: string
     postalCode: string
     country: string
     notes: string
     paymentMethod: string
-    shippingConfirmedByStore: string
     guestLoginCta: string
     unitPrice: string
+    // D14/D11: coordination copy naming the store and its real WhatsApp contact
+    shippingCoordinationContact: string
+    shippingCoordinationCta: string
+    // D23/A15: this screen's OWN transitional/failure states -- a resolved
+    // status instead reads orders.shippingStatusLabels.buyer (through
+    // shippingStatusLabelKeyForBuyer, lib/shipping/status-label.ts), the same
+    // vocabulary the success page and the order detail use, so this live
+    // quote can't drift from what a buyer sees on either of those.
+    shippingBlocked: string
+    shippingQuoteFailed: string
+    // D31: the order-write path's own destination re-validation
+    // (resolveAuthoritativeShippingDestination, lib/supabase/orders-api.ts)
+    // rejects a shipping_location_id that no longer resolves in co_locations --
+    // a server module with no request-scoped locale, so it throws sourced
+    // from translations.es (same posture as checkout.shippingBlocked above).
+    invalidShippingDestination: string
+    shippingCalculating: string
+    shippingSelectDestination: string
+    totalPendingShipping: string
+  }
+  // Envío: configuración del modo de envío de la tienda (D31)
+  shipping: {
+    settingsTitle: string
+    settingsSubtitle: string
+    modeLabel: string
+    modeCoordinate: string
+    modeOwnRates: string
+    saveButton: string
+    saving: string
+    savedToast: string
+    saveErrorToast: string
+    summaryTitle: string
+    summaryModeLabel: string
+    summaryConfigureLink: string
+    // D14/F10: the coordinate mode's WhatsApp phone prerequisite, marked pending
+    contactPhonePendingTitle: string
+    contactPhonePendingDescription: string
+    contactPhonePendingCta: string
+    // A9: a saved phone that can't build a valid WhatsApp link (wrong digit count, etc.)
+    contactPhoneInvalidTitle: string
+    contactPhoneInvalidDescription: string
+    contactPhoneInvalidCta: string
+    // D3/D5/D6/D8/D10: zonas de envío, sus destinos y su escalera de tarifas (S7).
+    zones: {
+      sectionTitle: string
+      sectionDescription: string
+      addButton: string
+      createTitle: string
+      editTitle: string
+      emptyTitle: string
+      emptyDescription: string
+      nameLabel: string
+      namePlaceholder: string
+      destinationsLabel: string
+      departmentPlaceholder: string
+      addWholeDepartmentButton: string
+      addMunicipalityButton: string
+      municipalitySearchPlaceholder: string
+      loadingMunicipalities: string
+      noMunicipalitiesFound: string
+      wholeDepartmentPrefix: string
+      removeDestinationLabel: string
+      destinationsColumn: string
+      basisColumn: string
+      actionsColumn: string
+      basisLabel: string
+      basisFlat: string
+      basisOrderValue: string
+      basisWeight: string
+      flatAmountLabel: string
+      rangesLabel: string
+      rangesFreeShippingHint: string
+      rangeFromLabel: string
+      rangeToLabel: string
+      rangeToPlaceholder: string
+      rangeAmountLabel: string
+      addRangeButton: string
+      removeRangeLabel: string
+      codCommissionNote: string
+      missingWeightTitle: string
+      missingWeightDescription: string
+      viewProductLink: string
+      saveButton: string
+      saving: string
+      cancelButton: string
+      savedToast: string
+      saveErrorToast: string
+      deleteTitle: string
+      deleteDescription: string
+      deleteConfirmButton: string
+      deletedToast: string
+      deleteErrorToast: string
+      unmatchedDestinationTitle: string
+      unmatchedDestinationDescription: string
+      unmatchedDestinationBlock: string
+      unmatchedDestinationAllow: string
+      unmatchedDestinationSavedToast: string
+      unmatchedDestinationSaveErrorToast: string
+    }
   }
   // Pedidos
   orders: {
@@ -166,6 +283,30 @@ export interface Translations {
       failed: string
       refunded: string
     }
+    // D23/A15: lib/shipping/status-label.ts is the one file mapping a stored
+    // shipping_status to a key here, split by audience. BUYER-facing screens
+    // (the checkout quote, the success page, the order detail) read `.buyer`
+    // through shippingStatusLabelKeyForBuyer -- "agreed" and "out_of_zone"
+    // collapse onto the same phrase, since to a buyer both just mean "settle
+    // it with the store". STORE-facing screens (the admin order detail, the
+    // orders export) read `.store` through shippingStatusLabelKeyForStore
+    // instead: "out_of_zone" keeps its own phrase there, because to the
+    // owner it's a coverage gap in their own zones, not their
+    // coordinate-shipping policy working as intended. "free" matches on
+    // both; "rate" and a legacy null render the formatted amount instead
+    // (or, in the export's own text column, nothing), never a phrase here.
+    shippingStatusColumnLabel: string
+    shippingStatusLabels: {
+      buyer: {
+        agreed: string
+        free: string
+      }
+      store: {
+        agreed: string
+        outOfZone: string
+        free: string
+      }
+    }
   }
   // General
   common: {
@@ -192,6 +333,7 @@ export interface Translations {
     clear: string
     apply: string
     reset: string
+    retry: string
   }
   // Contacto
   contact: {
@@ -404,6 +546,11 @@ export const translations: Record<Language, Translations> = {
         newest: 'Más recientes',
         oldest: 'Más antiguos',
       },
+      weightSectionTitle: 'Envío',
+      weightSectionDescription: 'El peso se usa para calcular el costo de envío.',
+      weightLabel: 'Peso (gramos) *',
+      weightRequiredError: 'El peso es requerido',
+      weightPublicLabel: 'Peso',
     },
     wishlist: {
       title: 'Lista de deseos',
@@ -430,6 +577,7 @@ export const translations: Record<Language, Translations> = {
       emptyDescription: 'Agrega productos a tu carrito para comenzar',
       subtotal: 'Subtotal',
       shipping: 'Envío',
+      shippingCalculatedAtCheckout: 'El envío se calcula en el checkout',
       discount: 'Descuento',
       total: 'Total',
       checkout: 'Finalizar compra',
@@ -451,13 +599,108 @@ export const translations: Record<Language, Translations> = {
       processing: 'Procesando...',
       address: 'Dirección',
       city: 'Ciudad',
+      department: 'Departamento',
+      selectDepartment: 'Selecciona un departamento',
+      municipality: 'Municipio',
+      selectMunicipality: 'Selecciona un municipio',
+      selectDepartmentFirst: 'Primero selecciona un departamento',
+      departmentsLoadError: 'No pudimos cargar los departamentos.',
+      municipalitiesLoadError: 'No pudimos cargar los municipios.',
       postalCode: 'Código postal',
       country: 'País',
       notes: 'Notas',
       paymentMethod: 'Método de pago',
-      shippingConfirmedByStore: 'El costo de envío lo confirma la tienda al coordinar la entrega',
       guestLoginCta: 'Inicia sesión',
       unitPrice: 'Precio unitario',
+      shippingCoordinationContact: 'Coordinas la entrega directamente con {storeName} por WhatsApp.',
+      shippingCoordinationCta: 'Escribir por WhatsApp',
+      shippingBlocked: 'Esta tienda todavía no envía a tu municipio. Contáctala para coordinar antes de continuar con la compra.',
+      shippingQuoteFailed: 'No pudimos calcular el envío en este momento. Intenta de nuevo.',
+      invalidShippingDestination: 'El destino de envío seleccionado ya no es válido. Vuelve a elegir el departamento y el municipio.',
+      shippingCalculating: 'Calculando el envío...',
+      shippingSelectDestination: 'Elige tu destino para ver el costo de envío',
+      totalPendingShipping: 'Se confirma al calcular el envío',
+    },
+    shipping: {
+      settingsTitle: 'Envío',
+      settingsSubtitle: 'Define cómo se calcula el envío en tu tienda.',
+      modeLabel: 'Modo de envío',
+      modeCoordinate: 'Coordinar con el cliente',
+      modeOwnRates: 'Tarifas propias',
+      saveButton: 'Guardar',
+      saving: 'Guardando...',
+      savedToast: 'Modo de envío actualizado',
+      saveErrorToast: 'No se pudo guardar el modo de envío',
+      summaryTitle: 'Envío',
+      summaryModeLabel: 'Modo actual',
+      summaryConfigureLink: 'Configurar envío',
+      contactPhonePendingTitle: 'Falta tu teléfono de contacto',
+      contactPhonePendingDescription:
+        'Coordinas el envío con tus clientes por WhatsApp, pero todavía no configuraste un teléfono.',
+      contactPhonePendingCta: 'Completar en Configuración',
+      contactPhoneInvalidTitle: 'Tu teléfono no sirve para WhatsApp',
+      contactPhoneInvalidDescription:
+        'Guardaste un teléfono, pero no arma un enlace válido de WhatsApp. Revisa el número en Configuración.',
+      contactPhoneInvalidCta: 'Corregir en Configuración',
+      zones: {
+        sectionTitle: 'Zonas de envío',
+        sectionDescription: 'Define las zonas de entrega, sus destinos y su escalera de tarifas.',
+        addButton: 'Agregar zona',
+        createTitle: 'Nueva zona de envío',
+        editTitle: 'Editar zona de envío',
+        emptyTitle: 'Todavía no hay zonas de envío',
+        emptyDescription: 'Agrega una zona para empezar a cobrar envío según el destino.',
+        nameLabel: 'Nombre de la zona',
+        namePlaceholder: 'Ej. Eje Cafetero',
+        destinationsLabel: 'Destinos',
+        departmentPlaceholder: 'Selecciona un departamento',
+        addWholeDepartmentButton: 'Agregar departamento completo',
+        addMunicipalityButton: 'Agregar municipio…',
+        municipalitySearchPlaceholder: 'Buscar municipio…',
+        loadingMunicipalities: 'Cargando municipios…',
+        noMunicipalitiesFound: 'Sin resultados',
+        wholeDepartmentPrefix: 'Todo:',
+        removeDestinationLabel: 'Quitar destino',
+        destinationsColumn: 'Destinos',
+        basisColumn: 'Tarifa',
+        actionsColumn: 'Acciones',
+        basisLabel: 'Tipo de tarifa',
+        basisFlat: 'Tarifa fija',
+        basisOrderValue: 'Por valor del pedido',
+        basisWeight: 'Por peso',
+        flatAmountLabel: 'Monto',
+        rangesLabel: 'Rangos',
+        rangesFreeShippingHint: 'Un rango con Monto en 0 es envío gratis para ese tramo.',
+        rangeFromLabel: 'Desde',
+        rangeToLabel: 'Hasta',
+        rangeToPlaceholder: 'Sin límite',
+        rangeAmountLabel: 'Monto',
+        addRangeButton: 'Agregar rango',
+        removeRangeLabel: 'Quitar rango',
+        codCommissionNote:
+          'El monto ya debe incluir cualquier comisión de recaudo contraentrega que quieras cobrar.',
+        missingWeightTitle: 'Faltan productos con peso cargado',
+        missingWeightDescription:
+          'No puedes activar una tarifa por peso hasta que estos productos tengan peso:',
+        viewProductLink: 'Editar producto',
+        saveButton: 'Guardar zona',
+        saving: 'Guardando...',
+        cancelButton: 'Cancelar',
+        savedToast: 'Zona de envío guardada',
+        saveErrorToast: 'No se pudo guardar la zona de envío',
+        deleteTitle: '¿Eliminar esta zona?',
+        deleteDescription: 'Sus destinos y su escalera de tarifas se eliminarán junto con ella. Esta acción no se puede deshacer.',
+        deleteConfirmButton: 'Eliminar',
+        deletedToast: 'Zona de envío eliminada',
+        deleteErrorToast: 'No se pudo eliminar la zona de envío',
+        unmatchedDestinationTitle: 'Destino sin zona configurada',
+        unmatchedDestinationDescription:
+          'Qué pasa en el checkout cuando el destino del cliente no coincide con ninguna zona.',
+        unmatchedDestinationBlock: 'Bloquear la compra',
+        unmatchedDestinationAllow: 'Permitirla y coordinar el envío después',
+        unmatchedDestinationSavedToast: 'Acción para destinos sin zona actualizada',
+        unmatchedDestinationSaveErrorToast: 'No se pudo guardar la acción para destinos sin zona',
+      },
     },
     orders: {
       title: 'Pedidos',
@@ -498,6 +741,18 @@ export const translations: Record<Language, Translations> = {
         failed: 'Fallido',
         refunded: 'Reembolsado',
       },
+      shippingStatusColumnLabel: 'Estado de Envío',
+      shippingStatusLabels: {
+        buyer: {
+          agreed: 'A convenir con la tienda',
+          free: 'Gratis',
+        },
+        store: {
+          agreed: 'A convenir con la tienda',
+          outOfZone: 'Fuera de zona configurada',
+          free: 'Gratis',
+        },
+      },
     },
     common: {
       loading: 'Cargando...',
@@ -523,6 +778,7 @@ export const translations: Record<Language, Translations> = {
       clear: 'Limpiar',
       apply: 'Aplicar',
       reset: 'Restablecer',
+      retry: 'Reintentar',
     },
     contact: {
       title: 'Contáctanos',
@@ -731,6 +987,11 @@ export const translations: Record<Language, Translations> = {
         newest: 'Newest',
         oldest: 'Oldest',
       },
+      weightSectionTitle: 'Shipping',
+      weightSectionDescription: 'Weight is used to calculate the shipping cost.',
+      weightLabel: 'Weight (grams) *',
+      weightRequiredError: 'Weight is required',
+      weightPublicLabel: 'Weight',
     },
     wishlist: {
       title: 'Wishlist',
@@ -757,6 +1018,7 @@ export const translations: Record<Language, Translations> = {
       emptyDescription: 'Add products to your cart to get started',
       subtotal: 'Subtotal',
       shipping: 'Shipping',
+      shippingCalculatedAtCheckout: 'Shipping is calculated at checkout',
       discount: 'Discount',
       total: 'Total',
       checkout: 'Checkout',
@@ -778,13 +1040,107 @@ export const translations: Record<Language, Translations> = {
       processing: 'Processing...',
       address: 'Address',
       city: 'City',
+      department: 'Department',
+      selectDepartment: 'Select a department',
+      municipality: 'Municipality',
+      selectMunicipality: 'Select a municipality',
+      selectDepartmentFirst: 'Select a department first',
+      departmentsLoadError: "We couldn't load the departments.",
+      municipalitiesLoadError: "We couldn't load the municipalities.",
       postalCode: 'Postal code',
       country: 'Country',
       notes: 'Notes',
       paymentMethod: 'Payment method',
-      shippingConfirmedByStore: 'The store confirms the shipping cost when coordinating delivery',
       guestLoginCta: 'Log in',
       unitPrice: 'Unit price',
+      shippingCoordinationContact: 'You coordinate delivery directly with {storeName} on WhatsApp.',
+      shippingCoordinationCta: 'Message on WhatsApp',
+      shippingBlocked: "This store doesn't ship to your municipality yet. Contact them to coordinate before continuing your purchase.",
+      shippingQuoteFailed: "We couldn't calculate shipping right now. Please try again.",
+      invalidShippingDestination: "The selected shipping destination is no longer valid. Choose the department and municipality again.",
+      shippingCalculating: 'Calculating shipping...',
+      shippingSelectDestination: 'Choose your destination to see the shipping cost',
+      totalPendingShipping: 'Confirmed once shipping is calculated',
+    },
+    shipping: {
+      settingsTitle: 'Shipping',
+      settingsSubtitle: 'Define how shipping is calculated for your store.',
+      modeLabel: 'Shipping mode',
+      modeCoordinate: 'Coordinate with the customer',
+      modeOwnRates: 'My own rates',
+      saveButton: 'Save',
+      saving: 'Saving...',
+      savedToast: 'Shipping mode updated',
+      saveErrorToast: 'Could not save the shipping mode',
+      summaryTitle: 'Shipping',
+      summaryModeLabel: 'Current mode',
+      summaryConfigureLink: 'Configure shipping',
+      contactPhonePendingTitle: 'Your contact phone is missing',
+      contactPhonePendingDescription:
+        'You coordinate shipping with your customers on WhatsApp, but you have not set a phone yet.',
+      contactPhonePendingCta: 'Complete it in Settings',
+      contactPhoneInvalidTitle: "Your phone doesn't work for WhatsApp",
+      contactPhoneInvalidDescription:
+        'You saved a phone, but it does not build a valid WhatsApp link. Check the number in Settings.',
+      contactPhoneInvalidCta: 'Fix it in Settings',
+      zones: {
+        sectionTitle: 'Shipping zones',
+        sectionDescription: 'Define your delivery zones, their destinations and their rate ladder.',
+        addButton: 'Add zone',
+        createTitle: 'New shipping zone',
+        editTitle: 'Edit shipping zone',
+        emptyTitle: 'No shipping zones yet',
+        emptyDescription: 'Add a zone to start charging shipping by destination.',
+        nameLabel: 'Zone name',
+        namePlaceholder: 'E.g. Coffee Region',
+        destinationsLabel: 'Destinations',
+        departmentPlaceholder: 'Select a department',
+        addWholeDepartmentButton: 'Add the whole department',
+        addMunicipalityButton: 'Add municipality…',
+        municipalitySearchPlaceholder: 'Search municipality…',
+        loadingMunicipalities: 'Loading municipalities…',
+        noMunicipalitiesFound: 'No results',
+        wholeDepartmentPrefix: 'Whole:',
+        removeDestinationLabel: 'Remove destination',
+        destinationsColumn: 'Destinations',
+        basisColumn: 'Rate',
+        actionsColumn: 'Actions',
+        basisLabel: 'Rate type',
+        basisFlat: 'Flat rate',
+        basisOrderValue: 'By order value',
+        basisWeight: 'By weight',
+        flatAmountLabel: 'Amount',
+        rangesLabel: 'Ranges',
+        rangesFreeShippingHint: 'A range with an Amount of 0 is free shipping for that tier.',
+        rangeFromLabel: 'From',
+        rangeToLabel: 'To',
+        rangeToPlaceholder: 'No limit',
+        rangeAmountLabel: 'Amount',
+        addRangeButton: 'Add range',
+        removeRangeLabel: 'Remove range',
+        codCommissionNote:
+          'The amount should already include any cash-on-delivery collection fee you want to charge.',
+        missingWeightTitle: 'Products missing weight',
+        missingWeightDescription: 'You cannot activate a weight-based rate until these products have a weight:',
+        viewProductLink: 'Edit product',
+        saveButton: 'Save zone',
+        saving: 'Saving...',
+        cancelButton: 'Cancel',
+        savedToast: 'Shipping zone saved',
+        saveErrorToast: 'Could not save the shipping zone',
+        deleteTitle: 'Delete this zone?',
+        deleteDescription: 'Its destinations and rate ladder will be deleted along with it. This action cannot be undone.',
+        deleteConfirmButton: 'Delete',
+        deletedToast: 'Shipping zone deleted',
+        deleteErrorToast: 'Could not delete the shipping zone',
+        unmatchedDestinationTitle: 'Destination with no configured zone',
+        unmatchedDestinationDescription:
+          'What happens at checkout when the customer\'s destination matches no zone.',
+        unmatchedDestinationBlock: 'Block the purchase',
+        unmatchedDestinationAllow: 'Allow it and coordinate shipping afterward',
+        unmatchedDestinationSavedToast: 'Unmatched destination action updated',
+        unmatchedDestinationSaveErrorToast: 'Could not save the unmatched destination action',
+      },
     },
     orders: {
       title: 'Orders',
@@ -825,6 +1181,18 @@ export const translations: Record<Language, Translations> = {
         failed: 'Failed',
         refunded: 'Refunded',
       },
+      shippingStatusColumnLabel: 'Shipping status',
+      shippingStatusLabels: {
+        buyer: {
+          agreed: 'Arranged with the store',
+          free: 'Free',
+        },
+        store: {
+          agreed: 'Arranged with the store',
+          outOfZone: 'Outside a configured zone',
+          free: 'Free',
+        },
+      },
     },
     common: {
       loading: 'Loading...',
@@ -850,6 +1218,7 @@ export const translations: Record<Language, Translations> = {
       clear: 'Clear',
       apply: 'Apply',
       reset: 'Reset',
+      retry: 'Retry',
     },
     contact: {
       title: 'Contact us',
@@ -1058,6 +1427,11 @@ export const translations: Record<Language, Translations> = {
         newest: 'Mais recentes',
         oldest: 'Mais antigos',
       },
+      weightSectionTitle: 'Envio',
+      weightSectionDescription: 'O peso é usado para calcular o custo de envio.',
+      weightLabel: 'Peso (gramas) *',
+      weightRequiredError: 'O peso é obrigatório',
+      weightPublicLabel: 'Peso',
     },
     wishlist: {
       title: 'Lista de desejos',
@@ -1084,6 +1458,7 @@ export const translations: Record<Language, Translations> = {
       emptyDescription: 'Adicione produtos ao seu carrinho para começar',
       subtotal: 'Subtotal',
       shipping: 'Frete',
+      shippingCalculatedAtCheckout: 'O frete é calculado no checkout',
       discount: 'Desconto',
       total: 'Total',
       checkout: 'Finalizar compra',
@@ -1105,13 +1480,106 @@ export const translations: Record<Language, Translations> = {
       processing: 'Processando...',
       address: 'Endereço',
       city: 'Cidade',
+      department: 'Departamento',
+      selectDepartment: 'Selecione um departamento',
+      municipality: 'Município',
+      selectMunicipality: 'Selecione um município',
+      selectDepartmentFirst: 'Selecione primeiro um departamento',
+      departmentsLoadError: 'Não conseguimos carregar os departamentos.',
+      municipalitiesLoadError: 'Não conseguimos carregar os municípios.',
       postalCode: 'CEP',
       country: 'País',
       notes: 'Observações',
       paymentMethod: 'Método de pagamento',
-      shippingConfirmedByStore: 'A loja confirma o custo de frete ao combinar a entrega',
       guestLoginCta: 'Entrar',
       unitPrice: 'Preço unitário',
+      shippingCoordinationContact: 'Você combina a entrega diretamente com {storeName} pelo WhatsApp.',
+      shippingCoordinationCta: 'Enviar mensagem no WhatsApp',
+      shippingBlocked: 'Esta loja ainda não envia para o seu município. Fale com a loja para combinar antes de continuar a compra.',
+      shippingQuoteFailed: 'Não conseguimos calcular o frete agora. Tente novamente.',
+      invalidShippingDestination: 'O destino de envio selecionado não é mais válido. Escolha novamente o departamento e o município.',
+      shippingCalculating: 'Calculando o frete...',
+      shippingSelectDestination: 'Escolha seu destino para ver o custo do frete',
+      totalPendingShipping: 'Confirmado ao calcular o frete',
+    },
+    shipping: {
+      settingsTitle: 'Envio',
+      settingsSubtitle: 'Defina como o frete é calculado na sua loja.',
+      modeLabel: 'Modo de envio',
+      modeCoordinate: 'Combinar com o cliente',
+      modeOwnRates: 'Minhas próprias tarifas',
+      saveButton: 'Salvar',
+      saving: 'Salvando...',
+      savedToast: 'Modo de envio atualizado',
+      saveErrorToast: 'Não foi possível salvar o modo de envio',
+      summaryTitle: 'Envio',
+      summaryModeLabel: 'Modo atual',
+      summaryConfigureLink: 'Configurar envio',
+      contactPhonePendingTitle: 'Falta o seu telefone de contato',
+      contactPhonePendingDescription:
+        'Você combina o envio com seus clientes pelo WhatsApp, mas ainda não configurou um telefone.',
+      contactPhonePendingCta: 'Completar em Configurações',
+      contactPhoneInvalidTitle: 'Seu telefone não funciona no WhatsApp',
+      contactPhoneInvalidDescription:
+        'Você salvou um telefone, mas ele não gera um link válido do WhatsApp. Revise o número em Configurações.',
+      contactPhoneInvalidCta: 'Corrigir em Configurações',
+      zones: {
+        sectionTitle: 'Zonas de frete',
+        sectionDescription: 'Defina as zonas de entrega, seus destinos e sua escada de tarifas.',
+        addButton: 'Adicionar zona',
+        createTitle: 'Nova zona de frete',
+        editTitle: 'Editar zona de frete',
+        emptyTitle: 'Ainda não há zonas de frete',
+        emptyDescription: 'Adicione uma zona para começar a cobrar frete por destino.',
+        nameLabel: 'Nome da zona',
+        namePlaceholder: 'Ex. Eixo Cafeeiro',
+        destinationsLabel: 'Destinos',
+        departmentPlaceholder: 'Selecione um departamento',
+        addWholeDepartmentButton: 'Adicionar departamento completo',
+        addMunicipalityButton: 'Adicionar município…',
+        municipalitySearchPlaceholder: 'Buscar município…',
+        loadingMunicipalities: 'Carregando municípios…',
+        noMunicipalitiesFound: 'Sem resultados',
+        wholeDepartmentPrefix: 'Todo:',
+        removeDestinationLabel: 'Remover destino',
+        destinationsColumn: 'Destinos',
+        basisColumn: 'Tarifa',
+        actionsColumn: 'Ações',
+        basisLabel: 'Tipo de tarifa',
+        basisFlat: 'Tarifa fixa',
+        basisOrderValue: 'Por valor do pedido',
+        basisWeight: 'Por peso',
+        flatAmountLabel: 'Valor',
+        rangesLabel: 'Faixas',
+        rangesFreeShippingHint: 'Uma faixa com Valor 0 é frete grátis para esse trecho.',
+        rangeFromLabel: 'De',
+        rangeToLabel: 'Até',
+        rangeToPlaceholder: 'Sem limite',
+        rangeAmountLabel: 'Valor',
+        addRangeButton: 'Adicionar faixa',
+        removeRangeLabel: 'Remover faixa',
+        codCommissionNote:
+          'O valor já deve incluir qualquer comissão de coleta contra entrega que você queira cobrar.',
+        missingWeightTitle: 'Faltam produtos com peso cadastrado',
+        missingWeightDescription: 'Você não pode ativar uma tarifa por peso até que estes produtos tenham peso:',
+        viewProductLink: 'Editar produto',
+        saveButton: 'Salvar zona',
+        saving: 'Salvando...',
+        cancelButton: 'Cancelar',
+        savedToast: 'Zona de frete salva',
+        saveErrorToast: 'Não foi possível salvar a zona de frete',
+        deleteTitle: 'Excluir esta zona?',
+        deleteDescription: 'Seus destinos e sua escada de tarifas serão excluídos junto com ela. Esta ação não pode ser desfeita.',
+        deleteConfirmButton: 'Excluir',
+        deletedToast: 'Zona de frete excluída',
+        deleteErrorToast: 'Não foi possível excluir a zona de frete',
+        unmatchedDestinationTitle: 'Destino sem zona configurada',
+        unmatchedDestinationDescription: 'O que acontece no checkout quando o destino do cliente não corresponde a nenhuma zona.',
+        unmatchedDestinationBlock: 'Bloquear a compra',
+        unmatchedDestinationAllow: 'Permitir e combinar o frete depois',
+        unmatchedDestinationSavedToast: 'Ação para destinos sem zona atualizada',
+        unmatchedDestinationSaveErrorToast: 'Não foi possível salvar a ação para destinos sem zona',
+      },
     },
     orders: {
       title: 'Pedidos',
@@ -1152,6 +1620,18 @@ export const translations: Record<Language, Translations> = {
         failed: 'Falhou',
         refunded: 'Reembolsado',
       },
+      shippingStatusColumnLabel: 'Status do frete',
+      shippingStatusLabels: {
+        buyer: {
+          agreed: 'A combinar com a loja',
+          free: 'Grátis',
+        },
+        store: {
+          agreed: 'A combinar com a loja',
+          outOfZone: 'Fora de uma zona configurada',
+          free: 'Grátis',
+        },
+      },
     },
     common: {
       loading: 'Carregando...',
@@ -1177,6 +1657,7 @@ export const translations: Record<Language, Translations> = {
       clear: 'Limpar',
       apply: 'Aplicar',
       reset: 'Redefinir',
+      retry: 'Tentar novamente',
     },
     contact: {
       title: 'Entre em contato',

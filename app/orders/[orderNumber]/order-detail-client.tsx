@@ -12,10 +12,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useLanguage } from "@/contexts/language-context";
-import { formatCartMoney } from "@/lib/cart/cart-summary";
+import { formatPrice } from "@/lib/commerce/utils";
 import { PAYMENT_METHODS } from "@/lib/checkout/payment-methods";
-import type { Language } from "@/lib/i18n/translations";
 import { formatOrderDate } from "@/lib/orders/format-order-date";
+import { shippingStatusLabelKeyForBuyer } from "@/lib/shipping/status-label";
 import type { OrderDetail, OrderDetailView } from "./load-order-detail-view";
 
 const ORDERS_HISTORY_PATH = "/orders";
@@ -78,7 +78,7 @@ function OrderDetailPage({ order }: { order: OrderDetail }) {
         </div>
 
         <div className="space-y-6">
-          <OrderLinesCard order={order} language={language} />
+          <OrderLinesCard order={order} />
           <OrderShippingCard order={order} />
         </div>
       </div>
@@ -102,9 +102,14 @@ function OrderDetailHeading({ orderNumber }: { orderNumber: string }) {
   );
 }
 
-function OrderLinesCard({ order, language }: { order: OrderDetail; language: Language }) {
+function OrderLinesCard({ order }: { order: OrderDetail }) {
   const { t } = useLanguage();
-  const money = (amount: number) => formatCartMoney(amount, order.currencyCode, language);
+  const money = (amount: number) => formatPrice(amount, order.currencyCode);
+  // A15: buyer-facing audience-scoped mapping -- lib/shipping/status-label.ts.
+  const shippingLabelKey = shippingStatusLabelKeyForBuyer(order.shippingStatus);
+  const shippingDisplay = shippingLabelKey
+    ? t.orders.shippingStatusLabels.buyer[shippingLabelKey]
+    : money(order.shippingCost);
 
   return (
     // `CardTitle` pinta un <div>: sin rol de encabezado, las dos secciones del
@@ -145,7 +150,7 @@ function OrderLinesCard({ order, language }: { order: OrderDetail; language: Lan
           </div>
           <div className="flex justify-between">
             <dt className="text-muted-foreground">{t.cart.shipping}</dt>
-            <dd>{money(order.shippingCost)}</dd>
+            <dd>{shippingDisplay}</dd>
           </div>
           <div className="flex justify-between text-base font-bold">
             <dt>{t.cart.total}</dt>

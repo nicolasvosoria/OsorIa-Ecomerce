@@ -24,6 +24,7 @@ import type { StoreItemWithDetails } from "@/lib/types/products"
 const STOCK_LABEL = "Cantidad en Stock"
 const THRESHOLD_LABEL = "Umbral de Stock Bajo"
 const TRACK_INVENTORY_LABEL = "Rastrear inventario"
+const WEIGHT_LABEL = "Peso (gramos) *"
 
 const CREATE_ACTION = {
   label: "Crear Producto",
@@ -42,6 +43,7 @@ function trackedProduct(): StoreItemWithDetails {
     id: "item-1",
     item_name: "Café Especial",
     base_price: 12000,
+    weight_grams: 500,
     currency_code: "COP",
     is_active: true,
     is_featured: false,
@@ -123,6 +125,26 @@ describe("ProductForm field accessibility", () => {
 
     expect(seoTitle).not.toHaveAttribute("aria-invalid")
     expect(seoTitle).not.toHaveAttribute("aria-describedby")
+  })
+})
+
+describe("ProductForm weight (D9)", () => {
+  it("rejects creating a product with no weight", async () => {
+    renderProductForm()
+
+    fireEvent.click(screen.getByRole("button", { name: "Crear Producto" }))
+
+    const weight = screen.getByLabelText(WEIGHT_LABEL)
+    await waitFor(() => expect(weight).toHaveAttribute("aria-invalid", "true"))
+
+    const errorId = weight.getAttribute("aria-describedby")
+    expect(document.getElementById(errorId as string)).toHaveTextContent("El peso es requerido")
+  })
+
+  it("shows the stored base weight of an existing product", () => {
+    renderProductForm(toProductFormValues(trackedProduct()))
+
+    expect(screen.getByLabelText(WEIGHT_LABEL)).toHaveValue(500)
   })
 })
 

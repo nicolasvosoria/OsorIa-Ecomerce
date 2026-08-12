@@ -12,6 +12,15 @@
 // falls back to the store name / a default colour). The gate is now exactly:
 // display name, legal name, phone, commercial address, verified Reply-To,
 // verified operational order mailbox.
+//
+// D14/F10 (plan-envios-ecommerce): phone was already unconditional here, and
+// F10 leans on that instead of forking a second, mode-conditional check --
+// every store is born in the `coordinate` shipping mode (D11/D17), and that
+// mode's WhatsApp coordination (components/ui/floating-contact-button.tsx,
+// the checkout copy in app/checkout/page.tsx) is exactly what phone was
+// always guarding checkout on. The shipping settings screen
+// (app/admin/settings/shipping/page.tsx) reads this SAME missingFields list
+// to mark the phone pending, instead of keeping its own copy of the check.
 
 export type StoreIdentityField =
   | "displayName"

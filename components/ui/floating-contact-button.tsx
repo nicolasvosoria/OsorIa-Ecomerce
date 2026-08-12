@@ -7,6 +7,7 @@ import Link from "next/link"
 import { Chatbot } from "@/components/chatbot/chatbot"
 import { useAdmin } from "@/contexts/admin-context"
 import { useLanguage } from "@/contexts/language-context"
+import { buildWhatsAppLink } from "@/lib/stores/whatsapp-contact"
 
 // Icono oficial de WhatsApp
 const WhatsAppIcon = ({ className }: { className?: string }) => (
@@ -20,7 +21,15 @@ const WhatsAppIcon = ({ className }: { className?: string }) => (
   </svg>
 )
 
-export function FloatingContactButton() {
+interface FloatingContactButtonProps {
+  // D14: the caller (route-aware-chrome.tsx, fed by the server-side loader in
+  // TenantScopedShell) resolves this once per page; a store with no phone on
+  // file gets `null` and the WhatsApp option below simply never renders --
+  // no fallback number, no disabled state.
+  phone: string | null
+}
+
+export function FloatingContactButton({ phone }: FloatingContactButtonProps) {
   // Llamar todos los hooks primero, antes de cualquier lógica condicional
   const [isOpen, setIsOpen] = useState(false)
   const [chatbotOpen, setChatbotOpen] = useState(false)
@@ -76,6 +85,11 @@ export function FloatingContactButton() {
   // En móviles, el panel es overlay completo, así que no necesitamos ajustar la posición
   const rightOffset = !isMobile && isEditMode && selectedComponent ? "28rem" : "1.5rem" // 28rem = 448px (384px + 64px de margen)
 
+  const whatsappHref = phone ? buildWhatsAppLink(phone) : null
+  // Con la opción de WhatsApp ausente, el chatbot ocupa el lugar que dejaba
+  // libre en el arco en vez de flotar con un hueco debajo.
+  const chatbotBottomOffset = whatsappHref ? "70px" : "10px"
+
   return (
     <div 
       ref={menuRef} 
@@ -85,34 +99,36 @@ export function FloatingContactButton() {
       {/* Opciones del menú en arco */}
       <div className="absolute bottom-14 right-0">
         {/* Opción WhatsApp - posición superior derecha */}
-        <Link
-          href="https://wa.me/1234567890"
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={handleOptionClick}
-          className={`absolute flex items-center gap-3 rounded-full px-4 py-3 shadow-lg hover:shadow-xl transition-all duration-300 ${
-            isOpen ? "opacity-100 scale-100 translate-x-0 translate-y-0 pointer-events-auto" : "opacity-0 scale-0 translate-x-4 translate-y-4 pointer-events-none"
-          }`}
-          style={{
-            backgroundColor: "var(--card)",
-            color: "var(--card-foreground)",
-            border: "1px solid var(--border)",
-            right: "0px",
-            bottom: "10px",
-            transitionDelay: isOpen ? "0.1s" : "0s",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = "scale(1.1)"
-            e.currentTarget.style.backgroundColor = "var(--muted)"
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = "scale(1)"
-            e.currentTarget.style.backgroundColor = "var(--card)"
-          }}
-        >
-          <WhatsAppIcon className="h-5 w-5 text-[#25D366]" />
-          <span className="font-semibold text-sm whitespace-nowrap">{t.contact.whatsapp}</span>
-        </Link>
+        {whatsappHref && (
+          <Link
+            href={whatsappHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={handleOptionClick}
+            className={`absolute flex items-center gap-3 rounded-full px-4 py-3 shadow-lg hover:shadow-xl transition-all duration-300 ${
+              isOpen ? "opacity-100 scale-100 translate-x-0 translate-y-0 pointer-events-auto" : "opacity-0 scale-0 translate-x-4 translate-y-4 pointer-events-none"
+            }`}
+            style={{
+              backgroundColor: "var(--card)",
+              color: "var(--card-foreground)",
+              border: "1px solid var(--border)",
+              right: "0px",
+              bottom: "10px",
+              transitionDelay: isOpen ? "0.1s" : "0s",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = "scale(1.1)"
+              e.currentTarget.style.backgroundColor = "var(--muted)"
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "scale(1)"
+              e.currentTarget.style.backgroundColor = "var(--card)"
+            }}
+          >
+            <WhatsAppIcon className="h-5 w-5 text-[#25D366]" />
+            <span className="font-semibold text-sm whitespace-nowrap">{t.contact.whatsapp}</span>
+          </Link>
+        )}
 
         {/* Opción Chatbot - posición superior izquierda */}
         <button
@@ -128,7 +144,7 @@ export function FloatingContactButton() {
             color: "var(--card-foreground)",
             border: "1px solid var(--border)",
             right: "0px",
-            bottom: "70px",
+            bottom: chatbotBottomOffset,
             transitionDelay: isOpen ? "0.05s" : "0s",
           }}
           onMouseEnter={(e) => {

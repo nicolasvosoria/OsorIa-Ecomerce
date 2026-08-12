@@ -4,7 +4,9 @@ import { AdminPageContainer } from "@/components/admin/page-container"
 import { AdminPageHeader } from "@/components/admin/page-header"
 import { authorizeActiveStoreAdmin } from "@/lib/supabase/active-store"
 import { ECOMMERCE_TABLES } from "@/lib/supabase/contract"
+import { loadShippingSettings } from "@/lib/supabase/shipping-settings-api"
 import { loadStoreIdentity } from "@/lib/supabase/store-identity-api"
+import { ShippingSummaryPanel } from "./components/shipping-summary-panel"
 import { StoreIdentityPanel } from "./components/store-identity-panel"
 import { StorePublicationPanel } from "./components/store-publication-panel"
 
@@ -26,7 +28,10 @@ export default async function StoreSettingsPage() {
     redirect("/admin")
   }
 
-  const identity = await loadStoreIdentity(supabase, storeId)
+  const [identity, shipping] = await Promise.all([
+    loadStoreIdentity(supabase, storeId),
+    loadShippingSettings(supabase, storeId),
+  ])
 
   return (
     <AdminPageContainer maxWidth="4xl">
@@ -36,6 +41,7 @@ export default async function StoreSettingsPage() {
       />
       <StoreIdentityPanel initial={identity} />
       <StorePublicationPanel initialIsPublic={store.is_public ?? false} />
+      <ShippingSummaryPanel mode={shipping.mode} />
     </AdminPageContainer>
   )
 }

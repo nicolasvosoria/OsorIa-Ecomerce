@@ -1,3 +1,5 @@
+import type { ShippingResolutionStatus } from "@/lib/shipping/schemas";
+
 export const EMAIL_TEMPLATE_KINDS = [
   "signup-confirmation",
   "owner-invite",
@@ -65,6 +67,34 @@ type OrderStatusEmailInput = OrderEmailInput & {
   returnReason?: string;
 };
 
+// D12: one line per order item on the confirmation receipt -- product name
+// (+ variant, when the item carries one), quantity and the line's own
+// resolved total. lib/checkout/order-writer.ts reads this straight off the
+// same order items the RPC is about to persist, nothing recomputed here.
+type OrderReceiptLine = {
+  productName: string;
+  variantTitle?: string;
+  quantity: number;
+  totalPrice: number;
+};
+
+// D12/D26: the resolved breakdown the confirmation email renders. Threaded
+// through from what lib/checkout/order-writer.ts already resolved before
+// the order write (S9's shipping resolution, the same subtotal/total the
+// DB's own total_amount = subtotal + shipping_cost + tax_amount -
+// discount_amount check will see) -- never recomputed here, or the receipt
+// risks disagreeing with the order it describes.
+export type OrderReceiptDetails = {
+  currencyCode: string;
+  lines: OrderReceiptLine[];
+  subtotal: number;
+  shippingCost: number;
+  shippingStatus: ShippingResolutionStatus | null;
+  totalAmount: number;
+};
+
+type OrderReceiptEmailInput = OrderEmailInput & OrderReceiptDetails;
+
 type EmailEnvelope<K extends EmailTemplateKind, D> = {
   kind: K;
   branding: TenantEmailBranding;
@@ -78,7 +108,7 @@ export type EmailTemplateInput =
   | EmailEnvelope<"password-recovery", AuthEmailInput>
   | EmailEnvelope<"password-changed", { recipientName: string }>
   | EmailEnvelope<"store-mailbox-verification", MailboxVerificationEmailInput>
-  | EmailEnvelope<"order-received", OrderEmailInput>
+  | EmailEnvelope<"order-received", OrderReceiptEmailInput>
   | EmailEnvelope<"merchant-new-order", MerchantOrderEmailInput>
   | EmailEnvelope<"membership-acceptance", MembershipEmailInput>
   | EmailEnvelope<"order-shipped", OrderStatusEmailInput>

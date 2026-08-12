@@ -6,7 +6,7 @@ vi.mock("next/navigation", () => ({
 }))
 
 import { OrderDetailClient } from "@/app/orders/[orderNumber]/order-detail-client"
-import type { OrderDetailView } from "@/app/orders/[orderNumber]/load-order-detail-view"
+import type { OrderDetail, OrderDetailView } from "@/app/orders/[orderNumber]/load-order-detail-view"
 import { CheckoutLoginIntentProvider } from "@/contexts/checkout-login-intent-context"
 import { LanguageProvider } from "@/contexts/language-context"
 
@@ -20,36 +20,39 @@ function renderOrderDetail(view: OrderDetailView) {
   )
 }
 
+const OWNED_ORDER_DETAIL: OrderDetail = {
+  orderNumber: "A-9001",
+  orderDate: "2026-07-01T00:00:00Z",
+  status: "confirmed",
+  paymentStatus: "paid",
+  paymentMethod: "cash_on_delivery",
+  currencyCode: "COP",
+  subtotal: 48000,
+  shippingCost: 2000,
+  shippingStatus: "rate",
+  totalAmount: 50000,
+  lines: [
+    {
+      id: "item-1",
+      productName: "Campera",
+      variantTitle: "Talla M",
+      quantity: 2,
+      unitPrice: 24000,
+      totalPrice: 48000,
+    },
+  ],
+  shipping: {
+    address: "Cra 1 # 2-3",
+    city: "Bogotá",
+    postalCode: "110111",
+    country: "Colombia",
+    notes: "Dejar en portería",
+  },
+}
+
 const OWNED_ORDER: OrderDetailView = {
   status: "detail",
-  order: {
-    orderNumber: "A-9001",
-    orderDate: "2026-07-01T00:00:00Z",
-    status: "confirmed",
-    paymentStatus: "paid",
-    paymentMethod: "cash_on_delivery",
-    currencyCode: "COP",
-    subtotal: 48000,
-    shippingCost: 2000,
-    totalAmount: 50000,
-    lines: [
-      {
-        id: "item-1",
-        productName: "Campera",
-        variantTitle: "Talla M",
-        quantity: 2,
-        unitPrice: 24000,
-        totalPrice: 48000,
-      },
-    ],
-    shipping: {
-      address: "Cra 1 # 2-3",
-      city: "Bogotá",
-      postalCode: "110111",
-      country: "Colombia",
-      notes: "Dejar en portería",
-    },
-  },
+  order: OWNED_ORDER_DETAIL,
 }
 
 describe("OrderDetailClient owned order", () => {
@@ -69,7 +72,7 @@ describe("OrderDetailClient owned order", () => {
     expect(screen.getByText(/2 ×/)).toBeInTheDocument()
     expect(screen.getByText("Confirmado")).toBeInTheDocument()
     expect(screen.getByText("Pago: Pagado")).toBeInTheDocument()
-    expect(screen.getByText("COP 50.000")).toBeInTheDocument()
+    expect(screen.getByText("$ 50.000")).toBeInTheDocument()
     expect(screen.getByText("Cra 1 # 2-3")).toBeInTheDocument()
     expect(screen.getByText(/Pago contra entrega/)).toBeInTheDocument()
   })
@@ -92,6 +95,53 @@ describe("OrderDetailClient owned order", () => {
       "href",
       "/orders",
     )
+  })
+})
+
+// D23: a $0 shipping_cost means something different depending on how it was
+// resolved, so the detail page must render the status, not a bare amount --
+// and a legacy order with no shipping_status (nullable since S9) has to
+// keep rendering the way it always did instead of crashing.
+describe("OrderDetailClient shipping status rendering (D23)", () => {
+  function orderDetailWithShipping(
+    shippingStatus: OrderDetail["shippingStatus"],
+    shippingCost: number,
+  ): OrderDetailView {
+    return {
+      status: "detail",
+      order: { ...OWNED_ORDER_DETAIL, shippingStatus, shippingCost },
+    }
+  }
+
+  it("shows the resolved amount for a real zone rate", () => {
+    renderOrderDetail(orderDetailWithShipping("rate", 2000))
+
+    expect(screen.getByText("$ 2.000")).toBeInTheDocument()
+  })
+
+  it("shows the coordinate phrase for a coordinate-mode order, never a bare zero", () => {
+    renderOrderDetail(orderDetailWithShipping("agreed", 0))
+
+    expect(screen.getByText("A convenir con la tienda")).toBeInTheDocument()
+  })
+
+  it("shows the same coordinate phrase for a destination outside every zone", () => {
+    renderOrderDetail(orderDetailWithShipping("out_of_zone", 0))
+
+    expect(screen.getByText("A convenir con la tienda")).toBeInTheDocument()
+  })
+
+  it("shows Gratis for a ladder's free rung, distinct from the coordinate phrase", () => {
+    renderOrderDetail(orderDetailWithShipping("free", 0))
+
+    expect(screen.getByText("Gratis")).toBeInTheDocument()
+    expect(screen.queryByText("A convenir con la tienda")).not.toBeInTheDocument()
+  })
+
+  it("falls back to the amount for a legacy order with no shipping_status", () => {
+    renderOrderDetail(orderDetailWithShipping(null, 2000))
+
+    expect(screen.getByText("$ 2.000")).toBeInTheDocument()
   })
 })
 

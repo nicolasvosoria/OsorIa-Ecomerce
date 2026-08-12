@@ -57,7 +57,11 @@ function signedInAs(user: { id: string; email?: string } | null) {
 const ADDRESS_FORM = {
   label: "  Casa  ",
   addressLine1: "  Calle 10 # 4-5 ",
+  departmentCode: "11",
+  departmentName: "Bogotá, D.C.",
   city: "Bogotá",
+  municipalityCode: "11001",
+  locationId: "1",
   postalCode: "",
   country: "",
 }
@@ -148,7 +152,11 @@ describe("saved address actions", () => {
         draft: {
           label: "Casa",
           addressLine1: "Calle 10 # 4-5",
+          departmentCode: "11",
+          departmentName: "Bogotá, D.C.",
           city: "Bogotá",
+          municipalityCode: "11001",
+          locationId: "1",
           postalCode: null,
           country: "Colombia",
         },

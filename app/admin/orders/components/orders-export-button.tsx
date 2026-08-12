@@ -10,6 +10,8 @@ import {
   PAYMENT_STATUS_LABELS,
 } from "@/lib/orders/order-status";
 import { formatOrderDateTime } from "@/lib/orders/order-format";
+import { shippingStatusLabelKeyForStore } from "@/lib/shipping/status-label";
+import { translations } from "@/lib/i18n/translations";
 
 const EXCEL_EXPORT_FETCH_LIMIT = 10000;
 
@@ -27,6 +29,17 @@ async function fetchAllOrders(): Promise<OrderWithItems[]> {
   }
   const result = (await response.json()) as { orders: OrderWithItems[] };
   return result.orders;
+}
+
+// A15: store-facing audience-scoped mapping -- lib/shipping/status-label.ts.
+// A translated phrase in a numeric column is a landmine for anyone summing
+// "Envío" in a spreadsheet, so the amount stays a plain number and this
+// dedicated text column carries the status instead -- blank for "rate" and
+// a legacy null, since the "Envío" number already says everything there is
+// to say about them.
+function shippingStatusColumnValue(order: OrderWithItems): string {
+  const key = shippingStatusLabelKeyForStore(order.shipping_status ?? null);
+  return key ? translations.es.orders.shippingStatusLabels.store[key] : "";
 }
 
 function buildOrdersSheet(orders: OrderWithItems[]) {
@@ -48,6 +61,7 @@ function buildOrdersSheet(orders: OrderWithItems[]) {
     "Referencia de Pago": order.payment_reference || "",
     Subtotal: order.subtotal,
     Envío: order.shipping_cost,
+    [translations.es.orders.shippingStatusColumnLabel]: shippingStatusColumnValue(order),
     Impuestos: order.tax_amount,
     Descuento: order.discount_amount,
     Total: order.total_amount,
@@ -77,6 +91,7 @@ function buildOrdersSheet(orders: OrderWithItems[]) {
     { wch: 20 },
     { wch: 12 },
     { wch: 12 },
+    { wch: 20 },
     { wch: 12 },
     { wch: 12 },
     { wch: 12 },

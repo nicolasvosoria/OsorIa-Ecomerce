@@ -107,6 +107,7 @@ function buildSharedItemFields(
     category_id: input.category_id || undefined,
     base_price: Number.parseFloat(input.base_price),
     compare_at_price: getValidCompareAtPrice(input.base_price, input.compare_at_price),
+    weight_grams: Number.parseInt(input.weight_grams, 10),
     currency_code: input.currency_code,
     is_active: input.is_active,
     is_featured: input.is_featured,

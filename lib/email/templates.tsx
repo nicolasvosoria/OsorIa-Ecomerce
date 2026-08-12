@@ -2,6 +2,10 @@ import type { CSSProperties } from "react";
 
 import { Heading, Text } from "@react-email/components";
 
+import { translations } from "@/lib/i18n/translations";
+import { formatCommercePrice } from "@/lib/products/pricing";
+import { shippingStatusLabelKeyForBuyer } from "@/lib/shipping/status-label";
+
 import { EmailAction, EmailLayout } from "./components.tsx";
 import { EMAIL_COPY } from "./copy.ts";
 import { getAdminUrl, getTenantUrl } from "./urls.ts";
@@ -16,10 +20,70 @@ export function EmailTemplate({ input }: { input: EmailTemplateInput }) {
     <EmailLayout branding={input.branding}>
       <Heading as="h1" style={headingStyle}>{copy.heading}</Heading>
       <Text style={bodyTextStyle}>{text}</Text>
+      {input.kind === "order-received" ? <OrderReceiptBreakdown data={input.data} /> : null}
       {action ? (
         <EmailAction href={action.href} label={copy.actionLabel ?? "Continuar"} primaryColor={input.branding.primaryColor} />
       ) : null}
     </EmailLayout>
+  );
+}
+
+// D12: the buyer's only durable record of what they bought and what it
+// cost -- item lines, subtotal, shipping and total, read straight off
+// lib/email/types.ts's OrderReceiptDetails (never recomputed here). Plain
+// <table>s marked data-text-format="dataTable" instead of a flex/grid
+// layout: @react-email/render's own plainText conversion (lib/email/render.tsx)
+// already recognizes that attribute and renders it as aligned label/amount
+// lines in the text body, so the HTML and text stay in lockstep from one
+// markup instead of two hand-kept copies.
+function OrderReceiptBreakdown({
+  data,
+}: {
+  data: Extract<EmailTemplateInput, { kind: "order-received" }>["data"];
+}) {
+  const money = (amount: number) => formatCommercePrice(amount, data.currencyCode);
+  // A15: buyer-facing audience-scoped mapping -- lib/shipping/status-label.ts.
+  // D31: the phrase itself reads translations.es.* directly (an email
+  // template renders with no LanguageProvider), the same vocabulary every
+  // other surface reads through useLanguage() -- not retyped here, so it
+  // can't drift into a second copy.
+  const shippingLabelKey = shippingStatusLabelKeyForBuyer(data.shippingStatus);
+  const shippingDisplay = shippingLabelKey
+    ? translations.es.orders.shippingStatusLabels.buyer[shippingLabelKey]
+    : money(data.shippingCost);
+
+  return (
+    <>
+      <table role="presentation" width="100%" align="center" border={0} cellPadding={0} cellSpacing={0} style={itemsTableStyle} data-text-format="dataTable">
+        <tbody>
+          {data.lines.map((line, index) => (
+            <tr key={index}>
+              <td style={itemLabelCellStyle}>
+                {line.quantity} × {line.productName}
+                {line.variantTitle ? ` (${line.variantTitle})` : ""}
+              </td>
+              <td style={itemAmountCellStyle}>{money(line.totalPrice)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <table role="presentation" width="100%" align="center" border={0} cellPadding={0} cellSpacing={0} style={totalsTableStyle} data-text-format="dataTable">
+        <tbody>
+          <tr>
+            <td style={totalsLabelCellStyle}>{translations.es.cart.subtotal}</td>
+            <td style={totalsAmountCellStyle}>{money(data.subtotal)}</td>
+          </tr>
+          <tr>
+            <td style={totalsLabelCellStyle}>{translations.es.cart.shipping}</td>
+            <td style={totalsAmountCellStyle}>{shippingDisplay}</td>
+          </tr>
+          <tr>
+            <td style={totalRowLabelCellStyle}>{translations.es.cart.total}</td>
+            <td style={totalRowAmountCellStyle}>{money(data.totalAmount)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </>
   );
 }
 
@@ -72,3 +136,38 @@ const headingStyle: CSSProperties = {
 };
 // body (400, 16px, 1.5) — DESIGN.md typography ramp
 const bodyTextStyle: CSSProperties = { fontSize: "16px", fontWeight: 400, lineHeight: 1.5, margin: "0 0 16px" };
+
+// label (500, 14px, 1.25) — DESIGN.md typography ramp, same ramp
+// components.tsx's footerTextStyle already uses.
+const itemsTableStyle: CSSProperties = { borderCollapse: "collapse", margin: "0 0 12px", width: "100%" };
+const itemLabelCellStyle: CSSProperties = {
+  color: "#1a1a1a", // tinta
+  fontSize: "14px",
+  fontWeight: 500,
+  lineHeight: 1.25,
+  padding: "4px 0",
+  textAlign: "left",
+};
+const itemAmountCellStyle: CSSProperties = { ...itemLabelCellStyle, textAlign: "right", whiteSpace: "nowrap" };
+
+const totalsTableStyle: CSSProperties = { borderCollapse: "collapse", margin: "0 0 16px", width: "100%" };
+const totalsLabelCellStyle: CSSProperties = {
+  color: "#718096", // tinta-tenue
+  fontSize: "14px",
+  fontWeight: 500,
+  lineHeight: 1.25,
+  padding: "4px 0",
+  textAlign: "left",
+};
+const totalsAmountCellStyle: CSSProperties = { ...totalsLabelCellStyle, color: "#1a1a1a", textAlign: "right" };
+// title-adjacent emphasis for the total row -- filete (#e2e8f0, DESIGN.md)
+// as the divider that separates it from subtotal/shipping above.
+const totalRowLabelCellStyle: CSSProperties = {
+  ...totalsLabelCellStyle,
+  borderTop: "1px solid #e2e8f0",
+  color: "#1a1a1a",
+  fontSize: "16px",
+  fontWeight: 600,
+  paddingTop: "8px",
+};
+const totalRowAmountCellStyle: CSSProperties = { ...totalRowLabelCellStyle, textAlign: "right" };

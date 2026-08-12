@@ -1,11 +1,5 @@
 import type { CartItem as LocalCartItem } from '@/contexts/cart-context';
-import type { Language } from '@/lib/i18n/translations';
-
-export const LANGUAGE_LOCALES: Record<Language, string> = {
-  es: 'es-CO',
-  en: 'en-US',
-  pt: 'pt-BR',
-};
+import { formatPrice } from '@/lib/commerce/utils';
 
 export type CartSummaryLine = {
   id: string;
@@ -17,6 +11,12 @@ export type CartSummaryLine = {
   itemKind?: LocalCartItem['itemKind'];
 };
 
+// D29: the cart drawer (header.tsx) never knows a destination, so it never
+// passes `shippingAmount` and `total` keeps mirroring `subtotal` -- exactly
+// the "shipping is calculated at checkout" promise the drawer's own copy
+// makes. app/checkout/page.tsx is the one caller that resolves a real
+// shipping amount (getCheckoutShippingQuote) and passes it here once it has
+// one, which is the only thing that makes `total` genuinely diverge.
 export type CartSummary = {
   lines: CartSummaryLine[];
   subtotal: number;
@@ -26,26 +26,12 @@ export type CartSummary = {
   formattedTotal: string;
 };
 
-export function formatCartMoney(amount: string | number, currencyCode: string | undefined, language: Language): string {
-  const currency = currencyCode || 'COP';
-  const numericAmount = typeof amount === 'number' ? amount : Number(amount);
-  const safeAmount = Number.isFinite(numericAmount) ? numericAmount : 0;
-
-  return new Intl.NumberFormat(LANGUAGE_LOCALES[language], {
-    style: 'currency',
-    currency,
-    currencyDisplay: currency === 'COP' ? 'code' : 'narrowSymbol',
-    maximumFractionDigits: currency === 'COP' ? 0 : 2,
-    minimumFractionDigits: currency === 'COP' ? 0 : 2,
-  }).format(safeAmount);
-}
-
 export function buildLocalCartSummary(args: {
   items: LocalCartItem[];
   getItemSubtotal: (item: LocalCartItem) => number;
   total: number;
-  language: Language;
   defaultCurrencyCode?: string;
+  shippingAmount?: number;
 }): CartSummary {
   const currencyCode = args.items.find(item => item.currencyCode)?.currencyCode || args.defaultCurrencyCode || 'COP';
   const lines = args.items.map(item => {
@@ -58,17 +44,20 @@ export function buildLocalCartSummary(args: {
       quantity: item.quantity,
       currencyCode: lineCurrency,
       amount,
-      formattedLineTotal: formatCartMoney(amount, lineCurrency, args.language),
+      formattedLineTotal: formatPrice(amount, lineCurrency),
       itemKind: item.itemKind,
     };
   });
 
+  const subtotal = args.total;
+  const total = subtotal + (args.shippingAmount ?? 0);
+
   return {
     lines,
-    subtotal: args.total,
-    total: args.total,
+    subtotal,
+    total,
     currencyCode,
-    formattedSubtotal: formatCartMoney(args.total, currencyCode, args.language),
-    formattedTotal: formatCartMoney(args.total, currencyCode, args.language),
+    formattedSubtotal: formatPrice(subtotal, currencyCode),
+    formattedTotal: formatPrice(total, currencyCode),
   };
 }

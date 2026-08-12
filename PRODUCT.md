@@ -66,6 +66,12 @@ posición real es la independencia: nadie tiene que intervenir entre el dueño y
   transitorios, recibo de compra para el cliente con la marca de la tienda, aviso aparte al comercio
   por cada pedido nuevo, y correos de estado durante el ciclo de vida del pedido (enviado, entregado,
   cancelado, devuelto).
+- Costo de envío, con dos modos de cálculo por tienda: coordinar el envío con el cliente, o tarifas
+  propias. En tarifas propias el dueño define zonas de envío por departamento o municipio, cada una
+  con su propia escalera de tarifas (fija, por valor del pedido o por peso). Cada pedido resuelve el
+  envío en uno de cuatro estados: a convenir con la tienda, tarifa calculada, envío gratis, o destino
+  fuera de las zonas configuradas. La cotización automática con transportadoras externas todavía no
+  existe.
 - Editor visual por tienda: tema, tipografía, composición del home y configuración de la vitrina.
 - Moneda: pesos colombianos (`COP`) por defecto, con moneda propia por tienda en el contrato de
   datos.
@@ -75,8 +81,6 @@ posición real es la independencia: nadie tiene que intervenir entre el dueño y
 **Explícitamente sin decidir — no inventar**
 - **Métodos de pago.** Aún no está confirmado cómo van a funcionar. Lo que existe hoy en el código
   es únicamente pago contra entrega, y eso es un estado de implementación, no el modelo elegido.
-- **Costo de envío.** Pendiente de desarrollo. Hoy el campo existe pero siempre vale cero; no hay
-  cálculo por zona.
 - **Dominio propio por tienda.** La estructura actual de subdominios es correcta, pero algún cliente
   podría pedir traer su propio dominio. No está resuelto.
 - **Monetización.** No existe ninguna facturación, plan ni suscripción en el producto. Cómo cobra

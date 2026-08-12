@@ -1,36 +1,65 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useCart as useLocalCart, type CartItem } from "@/contexts/cart-context"
 import { GuestCheckoutForm, GuestCustomerData } from "@/components/checkout/guest-checkout-form"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Loader } from "@/components/ui/loader"
 import { ArrowLeft, ShoppingBag } from "lucide-react"
 import { buildLocalCartSummary } from "@/lib/cart/cart-summary"
+import { formatPrice } from "@/lib/commerce/utils"
 import { useLanguage } from "@/contexts/language-context"
 import { toast } from "sonner"
 import Link from "next/link"
 import { useAuth } from "@/contexts/auth-context"
-import { AuthenticatedCheckoutForm } from "@/components/checkout/authenticated-checkout-form"
+import {
+  AuthenticatedCheckoutForm,
+  type AuthenticatedCheckoutData,
+} from "@/components/checkout/authenticated-checkout-form"
 import { GuestLoginBanner } from "@/components/checkout/guest-login-banner"
-import { getCheckoutPrefill, placeCheckoutOrder, type CheckoutPrefill } from "@/app/checkout/actions"
+import {
+  getCheckoutPrefill,
+  getCheckoutStoreContactPhone,
+  placeCheckoutOrder,
+  type CheckoutPrefill,
+} from "@/app/checkout/actions"
+import { useStore } from "@/contexts/store-context"
 import { enabledPaymentMethodIds } from "@/lib/checkout/payment-methods"
 import type { CheckoutOrderInput } from "@/lib/checkout/schemas"
+import type { Translations } from "@/lib/i18n/translations"
+import type { ShippingDestination } from "@/lib/shipping/schemas"
+import { shippingStatusLabelKeyForBuyer } from "@/lib/shipping/status-label"
+import { buildWhatsAppLink } from "@/lib/stores/whatsapp-contact"
+import { useShippingQuote, type ShippingQuoteState } from "@/app/checkout/use-shipping-quote"
 
 export default function CheckoutPage() {
   const router = useRouter()
   const localCart = useLocalCart()
   const { user, isAuthenticated, isLoading: authLoading } = useAuth()
-  const { language, t } = useLanguage()
+  const { t } = useLanguage()
+  const { store } = useStore()
   const [customerData, setCustomerData] = useState<GuestCustomerData | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [prefill, setPrefill] = useState<CheckoutPrefill>(null)
-  // D28: un solo id por carga de página, reenviado sin cambios en cada
-  // reintento de este mismo intento de compra (doble clic, error transitorio
-  // y "intentar de nuevo"). Una recarga de página genera uno nuevo a propósito
-  // -- eso es un intento de compra distinto.
-  const [checkoutIdempotencyKey] = useState(() => crypto.randomUUID())
+  const [contactPhone, setContactPhone] = useState<string | null>(null)
+  const [destination, setDestination] = useState<ShippingDestination | null>(null)
+
+  // Identity stays stable across renders (empty deps): the two checkout
+  // forms call this from an effect keyed on their own watched fields, and a
+  // fresh function reference every render would refire that effect forever.
+  // The functional update bails out to the SAME state object when the
+  // destination didn't actually change, so picking the same municipality
+  // twice never triggers a re-quote.
+  const handleDestinationChange = useCallback((next: ShippingDestination | null) => {
+    setDestination((previous) => {
+      if (previous?.departmentCode === next?.departmentCode && previous?.municipalityCode === next?.municipalityCode) {
+        return previous
+      }
+      return next
+    })
+  }, [])
 
   // Limpiar datos previos del checkout al cargar la página
   // Esto asegura que siempre se muestre el formulario para una nueva compra
@@ -56,13 +85,50 @@ export default function CheckoutPage() {
     }
   }, [isAuthenticated])
 
+  // D14/D11: names who the customer is coordinating the shipment with. No
+  // phone on file just means whatsappHref stays null and the coordination
+  // note below never renders -- same "absent, not a fallback" rule as
+  // components/ui/floating-contact-button.tsx.
+  useEffect(() => {
+    let cancelled = false
+    getCheckoutStoreContactPhone().then((phone) => {
+      if (!cancelled) setContactPhone(phone)
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const hasLocalItems = localCart.items.length > 0
+  const cartSubtotal = localCart.getTotal()
+  const {
+    quote: shippingQuote,
+    fingerprint: quoteRequestFingerprint,
+    retry: retryShippingQuote,
+  } = useShippingQuote(destination, localCart.items, cartSubtotal)
+  const isShippingBlocked = shippingQuote.kind === "blocked"
+
   const localSummary = buildLocalCartSummary({
     items: localCart.items,
     getItemSubtotal: localCart.getItemSubtotal,
-    total: localCart.getTotal(),
-    language,
+    total: cartSubtotal,
+    shippingAmount: shippingQuote.kind === "resolved" ? shippingQuote.amount : 0,
   })
+  const whatsappHref = contactPhone ? buildWhatsAppLink(contactPhone) : null
+  // D28/D25: one id per checkout ATTEMPT (Stripe's model). quoteRequestFingerprint
+  // is exactly "the destination or the cart", the only two things that alter
+  // the price -- reusing it as the trigger means this regenerates in lockstep
+  // with the quote above instead of drifting from a second copy of the same
+  // rule. Retries of the same content (nothing changed, "try again" after a
+  // failed submit) keep the SAME key on purpose: crypto.randomUUID() never
+  // runs again unless the fingerprint itself changed, or
+  // ecommerce.create_order_with_notifications rejects the reuse as a
+  // conflict (the exact bug D25 exists to prevent). A page reload always
+  // mints a new one regardless (fresh mount, fresh useMemo) -- that's a
+  // different attempt.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const checkoutIdempotencyKey = useMemo(() => crypto.randomUUID(), [quoteRequestFingerprint])
 
   useEffect(() => {
     // Redirigir si el carrito está vacío, solo una vez hidratado desde localStorage
@@ -77,29 +143,29 @@ export default function CheckoutPage() {
   // Para usuarios invitados, mostrar formulario completo
 
   // Función para procesar checkout de usuario autenticado
-  const handleAuthenticatedCheckoutComplete = async (data: {
-    firstName: string
-    lastName: string
-    phone: string
-    address: string
-    paymentMethod: string
-  }) => {
+  const handleAuthenticatedCheckoutComplete = async (data: AuthenticatedCheckoutData) => {
     if (!user || !hasLocalItems) return
 
     setIsProcessing(true)
 
     try {
       // El nombre lo captura el formulario (el perfil puede no traerlo); el
-      // correo sigue viniendo de la cuenta porque es de solo lectura.
+      // correo sigue viniendo de la cuenta porque es de solo lectura. D24: el
+      // destino (departamento/municipio) lo captura el mismo picker que usa
+      // el invitado -- ya no se fuerza a vacío.
       const customerDataForOrder: GuestCustomerData = {
         firstName: data.firstName,
         lastName: data.lastName,
         email: user.email || "",
         phone: data.phone,
         address: data.address,
-        city: "",
-        postalCode: "",
-        country: "Colombia",
+        departmentCode: data.departmentCode,
+        departmentName: data.departmentName,
+        city: data.city,
+        municipalityCode: data.municipalityCode,
+        locationId: data.locationId,
+        postalCode: data.postalCode,
+        country: data.country,
         notes: "",
         paymentMethod: data.paymentMethod,
       }
@@ -138,7 +204,11 @@ export default function CheckoutPage() {
         customer_last_name: data.lastName,
         customer_phone: data.phone || undefined,
         shipping_address: data.address,
+        shipping_department_code: data.departmentCode || "",
+        shipping_department_name: data.departmentName || "",
         shipping_city: data.city || "",
+        shipping_municipality_code: data.municipalityCode || "",
+        shipping_location_id: data.locationId || "",
         shipping_postal_code: data.postalCode || "",
         shipping_country: data.country,
         shipping_notes: data.notes || undefined,
@@ -291,6 +361,8 @@ export default function CheckoutPage() {
                 onComplete={handleAuthenticatedCheckoutComplete}
                 isLoading={isProcessing}
                 prefill={prefill}
+                onDestinationChange={handleDestinationChange}
+                shippingBlocked={isShippingBlocked}
               />
             ) : (
               <div className="space-y-6">
@@ -298,6 +370,8 @@ export default function CheckoutPage() {
                 <GuestCheckoutForm
                   onComplete={handleGuestCheckoutComplete}
                   isLoading={isProcessing}
+                  onDestinationChange={handleDestinationChange}
+                  shippingBlocked={isShippingBlocked}
                 />
               </div>
             )
@@ -377,14 +451,33 @@ export default function CheckoutPage() {
                 <div className="flex justify-between gap-4 text-sm">
                   <span className="text-muted-foreground">{t.cart.shipping}</span>
                   <span className="text-right text-muted-foreground">
-                    {t.checkout.shippingConfirmedByStore}
+                    {renderShippingQuoteValue(shippingQuote, t, localSummary.currencyCode)}
                   </span>
                 </div>
                 <div className="flex justify-between text-lg font-bold pt-2 border-t">
                   <span>{t.cart.total}</span>
-                  <span>{localSummary.formattedTotal}</span>
+                  <span>
+                    {shippingQuote.kind === "resolved" ? localSummary.formattedTotal : t.checkout.totalPendingShipping}
+                  </span>
                 </div>
+                {renderShippingQuoteIssue(shippingQuote, t, retryShippingQuote)}
               </div>
+
+              {needsShippingCoordinationNote(shippingQuote) && whatsappHref && store?.store_name && (
+                <div className="pt-2 text-xs text-muted-foreground">
+                  <p>
+                    {t.checkout.shippingCoordinationContact.replace("{storeName}", store.store_name)}{" "}
+                    <Link
+                      href={whatsappHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-medium underline underline-offset-4"
+                    >
+                      {t.checkout.shippingCoordinationCta}
+                    </Link>
+                  </p>
+                </div>
+              )}
 
               <div className="pt-4 text-xs text-muted-foreground">
                 <p>
@@ -453,5 +546,53 @@ async function buildOrderItemsFromCart(
         selected_options: {},
       }
     }),
+  )
+}
+
+function needsShippingCoordinationNote(quote: ShippingQuoteState): boolean {
+  if (quote.kind === "blocked") return true
+  return quote.kind === "resolved" && shippingStatusLabelKeyForBuyer(quote.status) === "agreed"
+}
+
+// The price column: a blocked or failed quote is a hard stop, not a value,
+// so it renders the same "—" the rest of the app uses for an absent value
+// (see e.g. app/orders/[orderNumber]/order-detail-client.tsx) -- the actual
+// sentence explaining why lives in renderShippingQuoteIssue below, as its
+// own full-width block, not squeezed into this value slot.
+function renderShippingQuoteValue(quote: ShippingQuoteState, t: Translations, currencyCode: string) {
+  if (quote.kind === "idle") return t.checkout.shippingSelectDestination
+  if (quote.kind === "blocked" || quote.kind === "failed") return "—"
+  if (quote.kind === "loading") {
+    return (
+      <span className="inline-flex items-center gap-2">
+        <Loader size="sm" />
+        {t.checkout.shippingCalculating}
+      </span>
+    )
+  }
+
+  // A15: buyer-facing audience-scoped mapping -- lib/shipping/status-label.ts.
+  const labelKey = shippingStatusLabelKeyForBuyer(quote.status)
+  return labelKey ? t.orders.shippingStatusLabels.buyer[labelKey] : formatPrice(quote.amount, currencyCode)
+}
+
+// The full-width sentence a blocked or failed quote earns below the totals:
+// blocked is destructive (a hard stop -- D7's "antes de continuar con la
+// compra"), failed stays normal foreground and carries its own retry, since
+// re-picking the SAME municipality can't re-fire the quote on its own
+// (handleDestinationChange's identity check above).
+function renderShippingQuoteIssue(quote: ShippingQuoteState, t: Translations, retry: () => void) {
+  if (quote.kind === "blocked") {
+    return <p className="text-sm text-destructive">{t.checkout.shippingBlocked}</p>
+  }
+  if (quote.kind !== "failed") return null
+
+  return (
+    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+      <p className="text-sm text-foreground">{t.checkout.shippingQuoteFailed}</p>
+      <Button type="button" variant="link" size="sm" className="h-auto p-0" onClick={retry}>
+        {t.common.retry}
+      </Button>
+    </div>
   )
 }

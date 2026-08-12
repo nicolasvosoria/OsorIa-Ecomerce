@@ -5,6 +5,7 @@ import {
   type ReactElement,
   type ReactNode,
 } from "react"
+import { render, screen } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { AdminPageHeader } from "@/components/admin/page-header"
@@ -22,7 +23,11 @@ vi.mock("@/lib/supabase/orders-api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/supabase/orders-api")>()
   return { ...actual, getOrderById }
 })
-vi.mock("next/navigation", () => ({ notFound, redirect }))
+vi.mock("next/navigation", () => ({
+  notFound,
+  redirect,
+  usePathname: () => "/admin/orders/1042",
+}))
 
 import AdminOrderDetailPage from "@/app/admin/orders/[id]/page"
 
@@ -84,5 +89,63 @@ describe("AdminOrderDetailPage", () => {
     expect(header).not.toBeNull()
     expect(header?.props.entityLabel).toBe(`Pedido ${ORDER.order_number}`)
     expect(header?.props.entityLabel).not.toContain(ORDER.id)
+  })
+})
+
+// D23/A15: the admin is STORE-facing, so unlike the buyer-facing success
+// page and order detail it does NOT collapse out_of_zone onto agreed's own
+// phrase -- to the owner a coverage gap in their own zones is a different
+// fact from their coordinate-shipping policy working as intended. A legacy
+// order with no shipping_status (nullable since S9) has to keep rendering
+// the way it always did instead of crashing.
+describe("AdminOrderDetailPage shipping status rendering (D23/A15)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    authorizeActiveStoreAdmin.mockResolvedValue({
+      supabase: {},
+      storeId: "store-1",
+      userId: "user-1",
+    })
+  })
+
+  async function renderOrderDetailPage(
+    shippingStatus: OrderWithItems["shipping_status"],
+    shippingCost: number,
+  ) {
+    getOrderById.mockResolvedValue({ ...ORDER, shipping_status: shippingStatus, shipping_cost: shippingCost })
+    const page = await AdminOrderDetailPage({ params: Promise.resolve({ id: ORDER.id }) })
+    render(page)
+  }
+
+  it("shows the resolved amount for a real zone rate", async () => {
+    await renderOrderDetailPage("rate", 2000)
+
+    expect(screen.getByText("$ 2.000")).toBeInTheDocument()
+  })
+
+  it("shows the coordinate phrase for a coordinate-mode order, never a bare zero", async () => {
+    await renderOrderDetailPage("agreed", 0)
+
+    expect(screen.getByText("A convenir con la tienda")).toBeInTheDocument()
+  })
+
+  it("shows its OWN coverage-gap phrase for a destination outside every zone, distinct from agreed's", async () => {
+    await renderOrderDetailPage("out_of_zone", 0)
+
+    expect(screen.getByText("Fuera de zona configurada")).toBeInTheDocument()
+    expect(screen.queryByText("A convenir con la tienda")).not.toBeInTheDocument()
+  })
+
+  it("shows Gratis for a ladder's free rung, distinct from the coordinate phrase", async () => {
+    await renderOrderDetailPage("free", 0)
+
+    expect(screen.getByText("Gratis")).toBeInTheDocument()
+    expect(screen.queryByText("A convenir con la tienda")).not.toBeInTheDocument()
+  })
+
+  it("falls back to the amount for a legacy order with no shipping_status", async () => {
+    await renderOrderDetailPage(null, 2000)
+
+    expect(screen.getByText("$ 2.000")).toBeInTheDocument()
   })
 })

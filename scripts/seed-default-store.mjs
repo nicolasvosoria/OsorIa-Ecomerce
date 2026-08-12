@@ -12,7 +12,7 @@
 //                                  is granted by MEMBERSHIP, not a global role)
 //   - the default store (subdomain 'default') via ecommerce.provision_store,
 //     then flipped is_public = true so the storefront renders
-//   - satellite config: store_branding / store_contact / store_commerce_settings
+//   - satellite config: store_branding / store_contact / store_shipping_settings
 //     / store_seo (+ store_seo_keywords)
 //   - catalog: 4 categories, 10 products (single-origin coffees, ground/whole
 //     bean, a mug, a subscription), variants, item_images, promotions
@@ -96,10 +96,11 @@ const CONTACT = {
   address: "Pitalito, Huila, Colombia",
 };
 
-const COMMERCE = {
-  tax_rate: 0,
-  shipping_enabled: true,
-  free_shipping_threshold: 150000,
+// D11/D17: every store is born mode='coordinate' -- ecommerce.store_shipping_settings
+// replaces the dropped store_commerce_settings, which this seed used to write
+// tax_rate/shipping_enabled/free_shipping_threshold into (D4: unread values).
+const SHIPPING = {
+  mode: "coordinate",
 };
 
 const SEO = {
@@ -996,7 +997,7 @@ async function ensureStore(ecommerce, ownerId) {
 async function upsertSatelliteConfig(ecommerce, storeId) {
   await upsertByStoreId(ecommerce, "store_branding", { store_id: storeId, ...BRANDING });
   await upsertByStoreId(ecommerce, "store_contact", { store_id: storeId, ...CONTACT });
-  await upsertByStoreId(ecommerce, "store_commerce_settings", { store_id: storeId, ...COMMERCE });
+  await upsertByStoreId(ecommerce, "store_shipping_settings", { store_id: storeId, ...SHIPPING });
   await upsertByStoreId(ecommerce, "store_seo", {
     store_id: storeId,
     seo_title: SEO.seo_title,

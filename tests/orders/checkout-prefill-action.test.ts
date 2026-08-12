@@ -55,10 +55,34 @@ const SAVED_DEFAULT_ADDRESS = {
   id: "address-1",
   label: "Casa",
   addressLine1: "Calle 10 # 4-5",
+  departmentCode: "11",
+  departmentName: "Bogotá, D.C.",
   city: "Bogotá",
+  municipalityCode: "11001",
+  locationId: "1",
   postalCode: "110111",
   country: "Colombia",
   isDefault: true,
+};
+
+// D24: toPrefillFields siempre devuelve las cinco claves del destino
+// estructurado, aunque no haya dirección guardada -- "" en ese caso, nunca
+// ausentes. Se comparte para no repetir el mismo objeto vacío en cada test
+// que no tiene libreta.
+const NO_LOCATION_PREFILL = {
+  departmentCode: "",
+  departmentName: "",
+  city: "",
+  municipalityCode: "",
+  locationId: "",
+};
+
+const SAVED_LOCATION_PREFILL = {
+  departmentCode: "11",
+  departmentName: "Bogotá, D.C.",
+  city: "Bogotá",
+  municipalityCode: "11001",
+  locationId: "1",
 };
 
 describe("getCheckoutPrefill", () => {
@@ -112,9 +136,12 @@ describe("getCheckoutPrefill", () => {
     const result = await getCheckoutPrefill();
 
     expect(findDefaultUserAddressMock).toHaveBeenCalledWith("user-3", expect.anything());
+    // D24: solo la calle -- el destino estructurado (departamento/municipio)
+    // llega por su cuenta en vez de venir aplanado dentro de "address".
     expect(result).toEqual({
       phone: "3009998877",
-      address: "Calle 10 # 4-5, Bogotá, 110111, Colombia",
+      address: "Calle 10 # 4-5",
+      ...SAVED_LOCATION_PREFILL,
     });
     expect(getMostRecentOrderByUserIdMock).not.toHaveBeenCalled();
   });
@@ -130,7 +157,11 @@ describe("getCheckoutPrefill", () => {
     });
     getMostRecentOrderByUserIdMock.mockResolvedValue(null);
 
-    expect(await getCheckoutPrefill()).toEqual({ phone: "3009998877", address: "" });
+    expect(await getCheckoutPrefill()).toEqual({
+      phone: "3009998877",
+      address: "",
+      ...NO_LOCATION_PREFILL,
+    });
   });
 
   // El teléfono (perfil) y la dirección (libreta) se guardan por separado: con
@@ -151,6 +182,7 @@ describe("getCheckoutPrefill", () => {
     expect(await getCheckoutPrefill()).toEqual({
       phone: "3009998877",
       address: "Cra 1 # 2-3",
+      ...NO_LOCATION_PREFILL,
     });
   });
 
@@ -164,7 +196,8 @@ describe("getCheckoutPrefill", () => {
 
     expect(await getCheckoutPrefill()).toEqual({
       phone: "3001234567",
-      address: "Calle 10 # 4-5, Bogotá, 110111, Colombia",
+      address: "Calle 10 # 4-5",
+      ...SAVED_LOCATION_PREFILL,
     });
   });
 
@@ -180,6 +213,7 @@ describe("getCheckoutPrefill", () => {
     expect(await getCheckoutPrefill()).toEqual({
       phone: "3001234567",
       address: "Cra 1 # 2-3",
+      ...NO_LOCATION_PREFILL,
     });
   });
 
@@ -195,6 +229,7 @@ describe("getCheckoutPrefill", () => {
     expect(await getCheckoutPrefill()).toEqual({
       phone: "3001234567",
       address: "Cra 1 # 2-3",
+      ...NO_LOCATION_PREFILL,
     });
   });
 
@@ -213,7 +248,7 @@ describe("getCheckoutPrefill", () => {
       "user-1",
       ECOMMERCE_SCOPED_CLIENT,
     );
-    expect(result).toEqual({ phone: "3001234567", address: "Cra 1 # 2-3" });
+    expect(result).toEqual({ phone: "3001234567", address: "Cra 1 # 2-3", ...NO_LOCATION_PREFILL });
   });
 
   it("returns null when the signed-in customer has no previous orders", async () => {

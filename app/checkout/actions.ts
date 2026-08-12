@@ -1,10 +1,18 @@
 "use server"
 
-import { formatSavedAddressLine, type SavedAddress } from "@/lib/account/saved-address"
+import type { SavedAddress } from "@/lib/account/saved-address"
 import { computeCheckoutPayloadFingerprint } from "@/lib/checkout/idempotency"
 import { CheckoutIdempotencyConflictError, StoreIdentityNotReadyError } from "@/lib/checkout/order-writer"
 import { checkoutOrderSchema } from "@/lib/checkout/schemas"
+import {
+  UnservedDestinationError,
+  resolveShipping,
+  type ShippingResolution,
+  type ShippingResolutionItem,
+} from "@/lib/shipping/resolver"
+import type { ShippingDestination } from "@/lib/shipping/schemas"
 import { getAccountProfile } from "@/lib/supabase/account-profile-api"
+import { buildComboOrderSnapshotById } from "@/lib/supabase/combos-api"
 import {
   createOrder,
   getMostRecentOrderByUserId,
@@ -17,18 +25,38 @@ import {
   type ServerAuthSession,
 } from "@/lib/supabase/server-auth-session"
 import { getServiceEcommerceClient } from "@/lib/supabase/service-client"
+import { loadPublicStoreContactPhone } from "@/lib/supabase/store-contact-public"
 import { findDefaultUserAddress } from "@/lib/supabase/user-addresses-api"
+import { getRuntimeStoreId } from "@/lib/utils/store"
 
 export type PlaceCheckoutOrderResult =
   | { success: true; orderNumber: string; orderId: string }
   | { success: false; error: string; validationResult?: InventoryValidationResult }
 
-export type CheckoutPrefill = { phone: string; address: string } | null
+type CheckoutContactPrefill = { phone: string; address: string }
+
+// D24: el checkout autenticado precarga el destino estructurado (departamento
+// y municipio) igual que precarga teléfono y dirección -- sale SOLO de la
+// dirección predeterminada de la libreta (nunca del último pedido, que hoy
+// nunca guardó un destino estructurado para empezar).
+type CheckoutLocationPrefill = {
+  departmentCode: string
+  departmentName: string
+  city: string
+  municipalityCode: string
+  locationId: string
+}
+
+export type CheckoutPrefill = (CheckoutContactPrefill & CheckoutLocationPrefill) | null
 
 const IDENTITY_NOT_READY_MESSAGE =
   "Esta tienda todavía no completó su configuración y no puede recibir pedidos en este momento."
 const IDEMPOTENCY_CONFLICT_MESSAGE =
   "Tu carrito cambió desde el último intento. Actualiza la página e inténtalo de nuevo."
+// Shared by placeCheckoutOrder and getCheckoutShippingQuote below -- both
+// need a service-role client and both hit this same "not configured" outcome,
+// so it is one declaration rather than one hardcoded copy per action.
+const SERVICE_ROLE_NOT_CONFIGURED_MESSAGE = "Supabase service role no configurado"
 
 // D28: idempotencyKey is the client's per-checkout-attempt correlation token
 // (app/checkout/page.tsx generates one UUID per page load and resends the
@@ -72,7 +100,7 @@ export async function placeCheckoutOrder(
 
   const serviceClient = getServiceEcommerceClient()
   if (!serviceClient) {
-    return { success: false, error: "Supabase service role no configurado" }
+    return { success: false, error: SERVICE_ROLE_NOT_CONFIGURED_MESSAGE }
   }
 
   try {
@@ -104,12 +132,85 @@ export async function placeCheckoutOrder(
   }
 }
 
+export type CheckoutShippingQuoteInput = {
+  destination: ShippingDestination
+  subtotal: number
+  items: ShippingResolutionItem[]
+}
+
+export type CheckoutShippingQuoteResult =
+  | { ok: true; resolution: ShippingResolution }
+  | { ok: false; blocked: boolean }
+
+// D27: shipping_zones/shipping_rates (and store_shipping_settings) are closed
+// to anon and to authenticated shoppers -- only service_role can read them --
+// so this action is the only door into the live checkout preview, the same
+// way it resolves the store as the rest of the public storefront does
+// (getRuntimeStoreId, also loadPublicStoreContactPhone's fallback). It calls
+// resolveShipping directly with the service client -- the exact function
+// createOrder (lib/supabase/orders-api.ts) calls for the order write -- so
+// quoting and the order write cannot disagree, structurally rather than by
+// convention.
+// D7: resolveShipping throws UnservedDestinationError specifically when the
+// store's own setting blocks this destination -- distinguished here so the
+// preview can say exactly that instead of a generic failure; any other
+// throw (a network blip, a misconfigured zone, no service client configured)
+// is honestly "we don't know yet", not "you can't buy this".
+export async function getCheckoutShippingQuote(
+  input: CheckoutShippingQuoteInput,
+): Promise<CheckoutShippingQuoteResult> {
+  const storeId = await getRuntimeStoreId()
+  if (!storeId) {
+    return { ok: false, blocked: false }
+  }
+
+  if (!(await comboItemsAreAvailable(input.items))) {
+    return { ok: false, blocked: false }
+  }
+
+  try {
+    const supabase = getServiceEcommerceClient()
+    if (!supabase) {
+      throw new Error(SERVICE_ROLE_NOT_CONFIGURED_MESSAGE)
+    }
+
+    const resolution = await resolveShipping(supabase, {
+      storeId,
+      destination: input.destination,
+      subtotal: input.subtotal,
+      items: input.items,
+    })
+    return { ok: true, resolution }
+  } catch (error: any) {
+    return { ok: false, blocked: error instanceof UnservedDestinationError }
+  }
+}
+
+// Mirrors the gate prepareComboOrderItems already puts in front of the ORDER
+// path (lib/supabase/orders-api.ts): a combo whose product_combo_components
+// went missing quotes as 0g instead of throwing (resolveOrderWeightGrams's
+// reduce over an empty array), a gap that path never reaches because an
+// unavailable combo is rejected before resolveShipping ever runs. The live
+// preview has no such gate in front of it, so it runs the same availability
+// check here, first.
+async function comboItemsAreAvailable(items: ShippingResolutionItem[]): Promise<boolean> {
+  const comboItems = items.filter((item): item is ShippingResolutionItem & { comboId: string } =>
+    Boolean(item.comboId),
+  )
+  const snapshots = await Promise.all(
+    comboItems.map((item) => buildComboOrderSnapshotById(item.comboId, item.quantity)),
+  )
+  return snapshots.every((snapshot) => snapshot?.availability.isAvailable)
+}
+
 // D16: con datos guardados en la cuenta el checkout deja de adivinar — lee la
 // dirección predeterminada de la libreta y el teléfono del perfil (A1) en vez de
 // copiar el último pedido. El teléfono y la dirección se guardan por separado,
 // así que cada campo decide su fuente por su cuenta: lo guardado manda y el
 // último pedido rellena el hueco que quede. Quien todavía no ha guardado nada,
-// que hoy es casi todo el mundo, conserva el comportamiento anterior.
+// que hoy es casi todo el mundo, conserva el comportamiento anterior. D24: el
+// destino estructurado (departamento/municipio) viaja siempre junto a "saved",
+// nunca lo completa el último pedido.
 export async function getCheckoutPrefill(): Promise<CheckoutPrefill> {
   const session = await resolveServerAuthSession()
   if (!session) {
@@ -127,17 +228,36 @@ export async function getCheckoutPrefill(): Promise<CheckoutPrefill> {
   }
 
   return {
+    ...saved,
     phone: saved.phone || lastOrder.phone,
     address: saved.address || lastOrder.address,
   }
 }
 
+// D14/D11: names who the customer is coordinating the shipment with -- the
+// checkout page is a client component and must not query the store itself
+// (lib/supabase/store-contact-public.ts is the one place that does). No
+// phone on file just means the coordination note never renders, same as the
+// WhatsApp button in components/ui/floating-contact-button.tsx.
+export async function getCheckoutStoreContactPhone(): Promise<string | null> {
+  return loadPublicStoreContactPhone()
+}
+
 type SavedAccountData = { phone: string | null; defaultAddress: SavedAddress | null }
 
+// El destino estructurado se lee tal cual de la dirección guardada -- a
+// diferencia de phone/address, no tiene una segunda fuente (el último pedido)
+// de la que rellenar el hueco.
 function toPrefillFields(saved: SavedAccountData): NonNullable<CheckoutPrefill> {
+  const location = saved.defaultAddress
   return {
     phone: saved.phone ?? "",
-    address: saved.defaultAddress ? formatSavedAddressLine(saved.defaultAddress) : "",
+    address: location?.addressLine1 ?? "",
+    departmentCode: location?.departmentCode ?? "",
+    departmentName: location?.departmentName ?? "",
+    city: location?.city ?? "",
+    municipalityCode: location?.municipalityCode ?? "",
+    locationId: location?.locationId ?? "",
   }
 }
 
@@ -160,7 +280,7 @@ async function readSavedAccountData(session: ServerAuthSession): Promise<SavedAc
 
 async function prefillFromMostRecentOrder(
   session: ServerAuthSession,
-): Promise<CheckoutPrefill> {
+): Promise<CheckoutContactPrefill | null> {
   const lastOrder = await getMostRecentOrderByUserId(
     session.userId,
     ecommerceForSession(session.client),

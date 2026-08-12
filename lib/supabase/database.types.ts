@@ -336,6 +336,45 @@ export type Database = {
           },
         ]
       }
+      co_locations: {
+        Row: {
+          created_at: string
+          department_code: string
+          department_name: string
+          id: number
+          latitude: number | null
+          longitude: number | null
+          municipality_code: string
+          municipality_name: string
+          municipality_type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          department_code: string
+          department_name: string
+          id?: number
+          latitude?: number | null
+          longitude?: number | null
+          municipality_code: string
+          municipality_name: string
+          municipality_type: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          department_code?: string
+          department_name?: string
+          id?: number
+          latitude?: number | null
+          longitude?: number | null
+          municipality_code?: string
+          municipality_name?: string
+          municipality_type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       component_styles: {
         Row: {
           component_name: string
@@ -944,6 +983,7 @@ export type Database = {
           updated_at: string | null
           variant_code: string | null
           variant_options: Json | null
+          weight_grams: number | null
         }
         Insert: {
           compare_at_price?: number | null
@@ -959,6 +999,7 @@ export type Database = {
           updated_at?: string | null
           variant_code?: string | null
           variant_options?: Json | null
+          weight_grams?: number | null
         }
         Update: {
           compare_at_price?: number | null
@@ -974,6 +1015,7 @@ export type Database = {
           updated_at?: string | null
           variant_code?: string | null
           variant_options?: Json | null
+          weight_grams?: number | null
         }
         Relationships: [
           {
@@ -1241,7 +1283,7 @@ export type Database = {
           customer_phone: string | null
           customer_type: string | null
           delivered_at: string | null
-          discount_amount: number | null
+          discount_amount: number
           id: string
           idempotency_key: string | null
           inventory_decremented_at: string | null
@@ -1258,14 +1300,19 @@ export type Database = {
           shipped_at: string | null
           shipping_address: string | null
           shipping_city: string | null
-          shipping_cost: number | null
+          shipping_cost: number
           shipping_country: string | null
+          shipping_department_code: string | null
+          shipping_department_name: string | null
+          shipping_location_id: number | null
+          shipping_municipality_code: string | null
           shipping_notes: string | null
           shipping_postal_code: string | null
+          shipping_status: string | null
           status: Database["ecommerce"]["Enums"]["order_status"] | null
           store_id: string
           subtotal: number
-          tax_amount: number | null
+          tax_amount: number
           total_amount: number
           updated_at: string | null
           user_id: string | null
@@ -1281,7 +1328,7 @@ export type Database = {
           customer_phone?: string | null
           customer_type?: string | null
           delivered_at?: string | null
-          discount_amount?: number | null
+          discount_amount?: number
           id?: string
           idempotency_key?: string | null
           inventory_decremented_at?: string | null
@@ -1298,14 +1345,19 @@ export type Database = {
           shipped_at?: string | null
           shipping_address?: string | null
           shipping_city?: string | null
-          shipping_cost?: number | null
+          shipping_cost?: number
           shipping_country?: string | null
+          shipping_department_code?: string | null
+          shipping_department_name?: string | null
+          shipping_location_id?: number | null
+          shipping_municipality_code?: string | null
           shipping_notes?: string | null
           shipping_postal_code?: string | null
+          shipping_status?: string | null
           status?: Database["ecommerce"]["Enums"]["order_status"] | null
           store_id: string
           subtotal?: number
-          tax_amount?: number | null
+          tax_amount?: number
           total_amount?: number
           updated_at?: string | null
           user_id?: string | null
@@ -1321,7 +1373,7 @@ export type Database = {
           customer_phone?: string | null
           customer_type?: string | null
           delivered_at?: string | null
-          discount_amount?: number | null
+          discount_amount?: number
           id?: string
           idempotency_key?: string | null
           inventory_decremented_at?: string | null
@@ -1338,19 +1390,31 @@ export type Database = {
           shipped_at?: string | null
           shipping_address?: string | null
           shipping_city?: string | null
-          shipping_cost?: number | null
+          shipping_cost?: number
           shipping_country?: string | null
+          shipping_department_code?: string | null
+          shipping_department_name?: string | null
+          shipping_location_id?: number | null
+          shipping_municipality_code?: string | null
           shipping_notes?: string | null
           shipping_postal_code?: string | null
+          shipping_status?: string | null
           status?: Database["ecommerce"]["Enums"]["order_status"] | null
           store_id?: string
           subtotal?: number
-          tax_amount?: number | null
+          tax_amount?: number
           total_amount?: number
           updated_at?: string | null
           user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "orders_shipping_location_id_fkey"
+            columns: ["shipping_location_id"]
+            isOneToOne: false
+            referencedRelation: "co_locations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "orders_store_id_fkey"
             columns: ["store_id"]
@@ -1743,6 +1807,146 @@ export type Database = {
           },
         ]
       }
+      shipping_rates: {
+        Row: {
+          amount: number
+          basis: string
+          created_at: string
+          id: string
+          range_from: number | null
+          range_to: number | null
+          zone_id: string
+        }
+        Insert: {
+          amount: number
+          basis: string
+          created_at?: string
+          id?: string
+          range_from?: number | null
+          range_to?: number | null
+          zone_id: string
+        }
+        Update: {
+          amount?: number
+          basis?: string
+          created_at?: string
+          id?: string
+          range_from?: number | null
+          range_to?: number | null
+          zone_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shipping_rates_zone_id_fkey"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "shipping_zones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shipping_zone_destinations: {
+        Row: {
+          created_at: string
+          department_code: string
+          id: string
+          municipality_code: string | null
+          store_id: string
+          zone_id: string
+        }
+        Insert: {
+          created_at?: string
+          department_code: string
+          id?: string
+          municipality_code?: string | null
+          store_id: string
+          zone_id: string
+        }
+        Update: {
+          created_at?: string
+          department_code?: string
+          id?: string
+          municipality_code?: string | null
+          store_id?: string
+          zone_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shipping_zone_destinations_municipality_fk"
+            columns: ["department_code", "municipality_code"]
+            isOneToOne: false
+            referencedRelation: "co_locations"
+            referencedColumns: ["department_code", "municipality_code"]
+          },
+          {
+            foreignKeyName: "shipping_zone_destinations_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shipping_zone_destinations_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores_legacy"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shipping_zone_destinations_zone_id_fkey"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "shipping_zones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shipping_zone_destinations_zone_store_fk"
+            columns: ["zone_id", "store_id"]
+            isOneToOne: false
+            referencedRelation: "shipping_zones"
+            referencedColumns: ["id", "store_id"]
+          },
+        ]
+      }
+      shipping_zones: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          store_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          store_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          store_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shipping_zones_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shipping_zones_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores_legacy"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shop_config: {
         Row: {
           config: Json
@@ -1814,45 +2018,6 @@ export type Database = {
           },
           {
             foreignKeyName: "store_branding_store_id_fkey"
-            columns: ["store_id"]
-            isOneToOne: true
-            referencedRelation: "stores_legacy"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      store_commerce_settings: {
-        Row: {
-          free_shipping_threshold: number | null
-          shipping_enabled: boolean | null
-          store_id: string
-          tax_rate: number | null
-          updated_at: string | null
-        }
-        Insert: {
-          free_shipping_threshold?: number | null
-          shipping_enabled?: boolean | null
-          store_id: string
-          tax_rate?: number | null
-          updated_at?: string | null
-        }
-        Update: {
-          free_shipping_threshold?: number | null
-          shipping_enabled?: boolean | null
-          store_id?: string
-          tax_rate?: number | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "store_commerce_settings_store_id_fkey"
-            columns: ["store_id"]
-            isOneToOne: true
-            referencedRelation: "stores"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "store_commerce_settings_store_id_fkey"
             columns: ["store_id"]
             isOneToOne: true
             referencedRelation: "stores_legacy"
@@ -1979,6 +2144,7 @@ export type Database = {
           tags: string[] | null
           track_inventory: boolean | null
           updated_at: string | null
+          weight_grams: number | null
         }
         Insert: {
           base_price?: number
@@ -2008,6 +2174,7 @@ export type Database = {
           tags?: string[] | null
           track_inventory?: boolean | null
           updated_at?: string | null
+          weight_grams?: number | null
         }
         Update: {
           base_price?: number
@@ -2037,6 +2204,7 @@ export type Database = {
           tags?: string[] | null
           track_inventory?: boolean | null
           updated_at?: string | null
+          weight_grams?: number | null
         }
         Relationships: [
           {
@@ -2176,6 +2344,42 @@ export type Database = {
           },
         ]
       }
+      store_shipping_settings: {
+        Row: {
+          mode: string
+          store_id: string
+          unmatched_destination_action: string
+          updated_at: string
+        }
+        Insert: {
+          mode?: string
+          store_id: string
+          unmatched_destination_action?: string
+          updated_at?: string
+        }
+        Update: {
+          mode?: string
+          store_id?: string
+          unmatched_destination_action?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_shipping_settings_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: true
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "store_shipping_settings_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: true
+            referencedRelation: "stores_legacy"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       store_user_roles: {
         Row: {
           role_id: string
@@ -2310,9 +2514,13 @@ export type Database = {
           city: string | null
           country: string
           created_at: string
+          department_code: string | null
+          department_name: string | null
           id: string
           is_default: boolean
           label: string | null
+          location_id: number | null
+          municipality_code: string | null
           postal_code: string | null
           updated_at: string
           user_id: string
@@ -2322,9 +2530,13 @@ export type Database = {
           city?: string | null
           country?: string
           created_at?: string
+          department_code?: string | null
+          department_name?: string | null
           id?: string
           is_default?: boolean
           label?: string | null
+          location_id?: number | null
+          municipality_code?: string | null
           postal_code?: string | null
           updated_at?: string
           user_id: string
@@ -2334,14 +2546,26 @@ export type Database = {
           city?: string | null
           country?: string
           created_at?: string
+          department_code?: string | null
+          department_name?: string | null
           id?: string
           is_default?: boolean
           label?: string | null
+          location_id?: number | null
+          municipality_code?: string | null
           postal_code?: string | null
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_addresses_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "co_locations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_profiles: {
         Row: {
@@ -2485,6 +2709,13 @@ export type Database = {
         }
         Relationships: []
       }
+      co_departments: {
+        Row: {
+          department_code: string | null
+          department_name: string | null
+        }
+        Relationships: []
+      }
       component_styles_legacy: {
         Row: {
           component_name: string | null
@@ -2598,6 +2829,7 @@ export type Database = {
           track_inventory: boolean | null
           updated_at: string | null
           view_count: number | null
+          weight_grams: number | null
         }
         Relationships: [
           {
@@ -2633,7 +2865,6 @@ export type Database = {
           deleted_at: string | null
           domain: string | null
           favicon_url: string | null
-          free_shipping_threshold: number | null
           id: string | null
           is_active: boolean | null
           is_public: boolean | null
@@ -2644,10 +2875,8 @@ export type Database = {
           seo_description: string | null
           seo_keywords: string[] | null
           seo_title: string | null
-          shipping_enabled: boolean | null
           store_name: string | null
           subdomain: string | null
-          tax_rate: number | null
           updated_at: string | null
         }
         Relationships: []

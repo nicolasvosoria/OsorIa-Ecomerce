@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { toast } from "sonner"
 
 import { PaymentMethodSection } from "@/components/checkout/payment-method-section"
+import { ShippingDestinationFields } from "@/components/checkout/shipping-destination-fields"
 import { SubmitOrderButton } from "@/components/checkout/submit-order-button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FormField } from "@/components/ui/form-field"
@@ -15,22 +16,45 @@ import {
   authenticatedCheckoutFormSchema,
   type AuthenticatedCheckoutFormValues,
 } from "@/lib/checkout/schemas"
+import type { ShippingDestination } from "@/lib/shipping/schemas"
 import type { UserProfile } from "@/lib/types/user"
 import type { CheckoutPrefill } from "@/app/checkout/actions"
 
+// D24: el checkout autenticado envía exactamente lo mismo que arma
+// GuestCheckoutForm's submitValidatedForm (ver ese componente) -- misma
+// tarjeta de envío, mismos campos.
+export interface AuthenticatedCheckoutData {
+  firstName: string
+  lastName: string
+  phone: string
+  address: string
+  departmentCode: string
+  departmentName: string
+  city: string
+  municipalityCode: string
+  locationId: string
+  postalCode: string
+  country: string
+  paymentMethod: string
+}
+
 interface AuthenticatedCheckoutFormProps {
   user: UserProfile
-  onComplete: (data: {
-    firstName: string
-    lastName: string
-    phone: string
-    address: string
-    paymentMethod: string
-  }) => void
+  onComplete: (data: AuthenticatedCheckoutData) => void
   isLoading?: boolean
   // Llega de forma asíncrona (D4): el formulario nunca espera por esto para
   // renderizarse, solo aplica los valores cuando lleguen.
   prefill?: CheckoutPrefill
+  // The checkout page's shipping quote lives outside this form (the order
+  // summary card), so it needs the destination the instant the two chained
+  // selects resolve one -- long before this form's own onComplete fires at
+  // submit.
+  onDestinationChange?: (destination: ShippingDestination | null) => void
+  // D7: a destination out of every configured zone (shippingQuote.kind ===
+  // "blocked") must keep "Realizar pedido" from ever submitting -- the
+  // server re-resolves and would reject it anyway, and by then it's a toast
+  // after a full round trip instead of a button that was never live.
+  shippingBlocked?: boolean
 }
 
 function buildDefaultValues(user: UserProfile): AuthenticatedCheckoutFormValues {
@@ -39,6 +63,13 @@ function buildDefaultValues(user: UserProfile): AuthenticatedCheckoutFormValues 
     customer_last_name: user.last_name ?? "",
     customer_phone: "",
     shipping_address: "",
+    shipping_department_code: "",
+    shipping_department_name: "",
+    shipping_city: "",
+    shipping_municipality_code: "",
+    shipping_location_id: "",
+    shipping_postal_code: "",
+    shipping_country: "Colombia",
     payment_method: enabledPaymentMethodIds()[0],
   }
 }
@@ -48,8 +79,10 @@ export function AuthenticatedCheckoutForm({
   onComplete,
   isLoading = false,
   prefill,
+  onDestinationChange,
+  shippingBlocked = false,
 }: AuthenticatedCheckoutFormProps) {
-  const { register, handleSubmit, formState, setValue } = useForm<AuthenticatedCheckoutFormValues>({
+  const { register, handleSubmit, formState, setValue, control } = useForm<AuthenticatedCheckoutFormValues>({
     resolver: zodResolver(authenticatedCheckoutFormSchema),
     defaultValues: buildDefaultValues(user),
   })
@@ -57,8 +90,10 @@ export function AuthenticatedCheckoutForm({
 
   // No pisa lo que el usuario ya haya escrito: solo completa un campo si hay
   // un valor con el que precargarlo y ese campo sigue como llegó (sin tocar).
-  // El nombre sale del perfil de la cuenta (puede faltar); teléfono y
-  // dirección salen del pedido más reciente, que llega de forma asíncrona.
+  // El nombre sale del perfil de la cuenta (puede faltar); teléfono, dirección
+  // y el destino estructurado (departamento/municipio) salen de la dirección
+  // guardada por defecto (D24, ver getCheckoutPrefill), que llega de forma
+  // asíncrona.
   useEffect(() => {
     if (user.first_name && !dirtyFields.customer_first_name) {
       setValue("customer_first_name", user.first_name)
@@ -75,6 +110,13 @@ export function AuthenticatedCheckoutForm({
     if (prefill.address && !dirtyFields.shipping_address) {
       setValue("shipping_address", prefill.address)
     }
+    if (prefill.locationId && !dirtyFields.shipping_location_id) {
+      setValue("shipping_department_code", prefill.departmentCode, { shouldValidate: true })
+      setValue("shipping_department_name", prefill.departmentName, { shouldValidate: true })
+      setValue("shipping_city", prefill.city, { shouldValidate: true })
+      setValue("shipping_municipality_code", prefill.municipalityCode, { shouldValidate: true })
+      setValue("shipping_location_id", prefill.locationId, { shouldValidate: true })
+    }
   }, [
     user,
     prefill,
@@ -82,6 +124,7 @@ export function AuthenticatedCheckoutForm({
     dirtyFields.customer_last_name,
     dirtyFields.customer_phone,
     dirtyFields.shipping_address,
+    dirtyFields.shipping_location_id,
     setValue,
   ])
 
@@ -91,6 +134,13 @@ export function AuthenticatedCheckoutForm({
       lastName: values.customer_last_name,
       phone: values.customer_phone,
       address: values.shipping_address,
+      departmentCode: values.shipping_department_code,
+      departmentName: values.shipping_department_name,
+      city: values.shipping_city,
+      municipalityCode: values.shipping_municipality_code,
+      locationId: values.shipping_location_id,
+      postalCode: values.shipping_postal_code ?? "",
+      country: values.shipping_country ?? "",
       paymentMethod: values.payment_method,
     })
   }
@@ -178,6 +228,18 @@ export function AuthenticatedCheckoutForm({
               />
             )}
           </FormField>
+
+          <ShippingDestinationFields
+            control={control}
+            setValue={setValue}
+            register={register}
+            departmentError={formState.errors.shipping_department_code?.message}
+            municipalityError={
+              formState.errors.shipping_location_id?.message ?? formState.errors.shipping_city?.message
+            }
+            isLoading={isLoading}
+            onDestinationChange={onDestinationChange}
+          />
         </CardContent>
       </Card>
 
@@ -187,7 +249,7 @@ export function AuthenticatedCheckoutForm({
         error={formState.errors.payment_method?.message}
       />
 
-      <SubmitOrderButton isLoading={isLoading} />
+      <SubmitOrderButton isLoading={isLoading} disabled={shippingBlocked} />
     </form>
   )
 }

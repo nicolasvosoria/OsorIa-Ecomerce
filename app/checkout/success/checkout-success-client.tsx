@@ -18,8 +18,9 @@ import type { SuccessPageOrderSummary } from "@/app/checkout/success/fallback-or
 import { useCart as useLocalCart } from "@/contexts/cart-context";
 import { useLanguage } from "@/contexts/language-context";
 import { deferStateUpdate } from "@/lib/react/defer-state-update";
-import { formatCartMoney } from "@/lib/cart/cart-summary";
+import { formatPrice } from "@/lib/commerce/utils";
 import { PAYMENT_METHODS } from "@/lib/checkout/payment-methods";
+import { shippingStatusLabelKeyForBuyer } from "@/lib/shipping/status-label";
 
 interface CheckoutSuccessClientProps {
   initialOrderNumber: string | null;
@@ -34,7 +35,7 @@ export function CheckoutSuccessClient({
 }: CheckoutSuccessClientProps) {
   const searchParams = useSearchParams();
   const localCart = useLocalCart();
-  const { language, t } = useLanguage();
+  const { t } = useLanguage();
   const [customerData, setCustomerData] = useState<GuestCustomerData | null>(
     initialCustomerData,
   );
@@ -47,6 +48,15 @@ export function CheckoutSuccessClient({
   const paymentMethodLabel = orderSummary
     ? PAYMENT_METHODS.find((method) => method.id === orderSummary.paymentMethod)
         ?.label ?? orderSummary.paymentMethod
+    : null;
+  // A15: buyer-facing audience-scoped mapping -- lib/shipping/status-label.ts.
+  const shippingLabelKey = orderSummary
+    ? shippingStatusLabelKeyForBuyer(orderSummary.shippingStatus)
+    : null;
+  const shippingDisplay = orderSummary
+    ? shippingLabelKey
+      ? t.orders.shippingStatusLabels.buyer[shippingLabelKey]
+      : formatPrice(orderSummary.shippingCost, orderSummary.currencyCode)
     : null;
 
   useEffect(() => {
@@ -146,31 +156,27 @@ export function CheckoutSuccessClient({
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {t.checkout.unitPrice}:{" "}
-                        {formatCartMoney(
-                          item.unitPrice,
-                          item.currencyCode,
-                          language,
-                        )}
+                        {formatPrice(item.unitPrice, item.currencyCode)}
                       </p>
                     </div>
                     <p className="text-sm font-semibold ml-4">
-                      {formatCartMoney(
-                        item.totalPrice,
-                        item.currencyCode,
-                        language,
-                      )}
+                      {formatPrice(item.totalPrice, item.currencyCode)}
                     </p>
                   </div>
                 ))}
               </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">{t.cart.subtotal}</span>
+                <span>{formatPrice(orderSummary.subtotal, orderSummary.currencyCode)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">{t.cart.shipping}</span>
+                <span>{shippingDisplay}</span>
+              </div>
               <div className="flex justify-between text-base font-bold pt-3 border-t">
                 <span>{t.cart.total}</span>
                 <span>
-                  {formatCartMoney(
-                    orderSummary.totalAmount,
-                    orderSummary.currencyCode,
-                    language,
-                  )}
+                  {formatPrice(orderSummary.totalAmount, orderSummary.currencyCode)}
                 </span>
               </div>
               <div className="flex justify-between text-sm">
