@@ -6,6 +6,7 @@ import { translations } from "@/lib/i18n/translations"
 import { listDepartments } from "@/lib/shipping/locations-api"
 import { authorizeActiveStoreAdmin } from "@/lib/supabase/active-store"
 import {
+  findClaimedDestinations,
   findMissingWeightProducts,
   listShippingZones,
   type ShippingZoneRecord,
@@ -26,10 +27,11 @@ export default async function EditShippingZonePage({
   }
 
   const { supabase, storeId } = authorization
-  const [zone, departments, missingWeightProducts] = await Promise.all([
+  const [zone, departments, missingWeightProducts, claimedDestinations] = await Promise.all([
     findStoreZone(zoneId, supabase, storeId),
     listDepartments(supabase),
     findMissingWeightProducts(supabase, storeId),
+    findClaimedDestinations(supabase, storeId, zoneId),
   ])
 
   if (!zone) {
@@ -39,7 +41,13 @@ export default async function EditShippingZonePage({
   return (
     <AdminPageContainer maxWidth="4xl">
       <AdminPageHeader title={copy.editTitle} subtitle={copy.sectionDescription} />
-      <ZoneForm zoneId={zone.id} zone={zone} departments={departments} missingWeightProducts={missingWeightProducts} />
+      <ZoneForm
+        zoneId={zone.id}
+        zone={zone}
+        departments={departments}
+        missingWeightProducts={missingWeightProducts}
+        claimedDestinations={claimedDestinations}
+      />
     </AdminPageContainer>
   )
 }

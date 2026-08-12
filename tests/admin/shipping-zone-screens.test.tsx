@@ -7,15 +7,23 @@ import {
 } from "react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-const { authorizeActiveStoreAdmin, listDepartments, findMissingWeightProducts, listShippingZones, notFound, redirect } =
-  vi.hoisted(() => ({
-    authorizeActiveStoreAdmin: vi.fn(),
-    listDepartments: vi.fn(),
-    findMissingWeightProducts: vi.fn(),
-    listShippingZones: vi.fn(),
-    notFound: vi.fn(),
-    redirect: vi.fn(),
-  }))
+const {
+  authorizeActiveStoreAdmin,
+  listDepartments,
+  findClaimedDestinations,
+  findMissingWeightProducts,
+  listShippingZones,
+  notFound,
+  redirect,
+} = vi.hoisted(() => ({
+  authorizeActiveStoreAdmin: vi.fn(),
+  listDepartments: vi.fn(),
+  findClaimedDestinations: vi.fn(),
+  findMissingWeightProducts: vi.fn(),
+  listShippingZones: vi.fn(),
+  notFound: vi.fn(),
+  redirect: vi.fn(),
+}))
 
 const { saveShippingZoneAction, listShippingMunicipalitiesAction } = vi.hoisted(() => ({
   saveShippingZoneAction: vi.fn(),
@@ -24,7 +32,7 @@ const { saveShippingZoneAction, listShippingMunicipalitiesAction } = vi.hoisted(
 
 vi.mock("@/lib/supabase/active-store", () => ({ authorizeActiveStoreAdmin }))
 vi.mock("@/lib/shipping/locations-api", () => ({ listDepartments }))
-vi.mock("@/lib/supabase/shipping-zones-api", () => ({ findMissingWeightProducts, listShippingZones }))
+vi.mock("@/lib/supabase/shipping-zones-api", () => ({ findClaimedDestinations, findMissingWeightProducts, listShippingZones }))
 vi.mock("next/navigation", () => ({ notFound, redirect }))
 vi.mock("@/app/admin/settings/shipping/actions", () => ({
   saveShippingZoneAction,
@@ -68,6 +76,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   authorizeActiveStoreAdmin.mockResolvedValue(GRANT)
   listDepartments.mockResolvedValue([])
+  findClaimedDestinations.mockResolvedValue([])
   findMissingWeightProducts.mockResolvedValue([])
   listShippingZones.mockResolvedValue([ZONE])
 })
@@ -79,6 +88,17 @@ describe("CreateShippingZonePage", () => {
 
     expect(form?.props.zoneId).toBeNull()
     expect(form?.props.zone).toBeNull()
+  })
+
+  it("loads the store's claimed destinations with no zone excluded, since there is no zone yet", async () => {
+    const claimed = [{ departmentCode: "05", municipalityCode: null, zoneName: "Zona Norte" }]
+    findClaimedDestinations.mockResolvedValue(claimed)
+
+    const page = await CreateShippingZonePage()
+    const form = zoneFormOf(page)
+
+    expect(findClaimedDestinations).toHaveBeenCalledWith(SERVICE, "store-1")
+    expect(form?.props.claimedDestinations).toBe(claimed)
   })
 
   it("redirects instead of loading when the active store admin gate denies access", async () => {
@@ -106,6 +126,12 @@ describe("EditShippingZonePage", () => {
     await EditShippingZonePage({ params: Promise.resolve({ zoneId: ZONE.id }) })
 
     expect(listShippingZones).toHaveBeenCalledWith(SERVICE, "store-1")
+  })
+
+  it("loads claimed destinations excluding the zone being edited, so its own current destinations never show as claimed", async () => {
+    await EditShippingZonePage({ params: Promise.resolve({ zoneId: ZONE.id }) })
+
+    expect(findClaimedDestinations).toHaveBeenCalledWith(SERVICE, "store-1", ZONE.id)
   })
 
   it("404s on a zoneId outside the active store instead of opening a blank form", async () => {

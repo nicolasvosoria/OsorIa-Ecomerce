@@ -199,14 +199,17 @@ export interface Translations {
       nameLabel: string
       namePlaceholder: string
       destinationsLabel: string
-      departmentPlaceholder: string
-      addWholeDepartmentButton: string
-      addMunicipalityButton: string
+      selectAllDepartmentsButton: string
+      clearDestinationsButton: string
+      selectedDestinationsCountLabel: string
+      selectedMunicipalitiesCountLabel: string
+      showMunicipalitiesButton: string
+      hideMunicipalitiesButton: string
+      claimedByPrefix: string
       municipalitySearchPlaceholder: string
       loadingMunicipalities: string
       noMunicipalitiesFound: string
       wholeDepartmentPrefix: string
-      removeDestinationLabel: string
       destinationsColumn: string
       basisColumn: string
       actionsColumn: string
@@ -661,14 +664,17 @@ export const translations: Record<Language, Translations> = {
         nameLabel: 'Nombre de la zona',
         namePlaceholder: 'Ej. Eje Cafetero',
         destinationsLabel: 'Destinos',
-        departmentPlaceholder: 'Selecciona un departamento',
-        addWholeDepartmentButton: 'Agregar departamento completo',
-        addMunicipalityButton: 'Agregar municipio…',
+        selectAllDepartmentsButton: 'Seleccionar todos',
+        clearDestinationsButton: 'Limpiar',
+        selectedDestinationsCountLabel: 'destinos seleccionados',
+        selectedMunicipalitiesCountLabel: 'municipios seleccionados',
+        showMunicipalitiesButton: 'Ver municipios',
+        hideMunicipalitiesButton: 'Ocultar municipios',
+        claimedByPrefix: 'Ya asignado a la zona',
         municipalitySearchPlaceholder: 'Buscar municipio…',
         loadingMunicipalities: 'Cargando municipios…',
         noMunicipalitiesFound: 'Sin resultados',
         wholeDepartmentPrefix: 'Todo:',
-        removeDestinationLabel: 'Quitar destino',
         destinationsColumn: 'Destinos',
         basisColumn: 'Tarifa',
         actionsColumn: 'Acciones',
@@ -1108,14 +1114,17 @@ export const translations: Record<Language, Translations> = {
         nameLabel: 'Zone name',
         namePlaceholder: 'E.g. Coffee Region',
         destinationsLabel: 'Destinations',
-        departmentPlaceholder: 'Select a department',
-        addWholeDepartmentButton: 'Add the whole department',
-        addMunicipalityButton: 'Add municipality…',
+        selectAllDepartmentsButton: 'Select all',
+        clearDestinationsButton: 'Clear',
+        selectedDestinationsCountLabel: 'destinations selected',
+        selectedMunicipalitiesCountLabel: 'municipalities selected',
+        showMunicipalitiesButton: 'Show municipalities',
+        hideMunicipalitiesButton: 'Hide municipalities',
+        claimedByPrefix: 'Already assigned to zone',
         municipalitySearchPlaceholder: 'Search municipality…',
         loadingMunicipalities: 'Loading municipalities…',
         noMunicipalitiesFound: 'No results',
         wholeDepartmentPrefix: 'Whole:',
-        removeDestinationLabel: 'Remove destination',
         destinationsColumn: 'Destinations',
         basisColumn: 'Rate',
         actionsColumn: 'Actions',
@@ -1554,14 +1563,17 @@ export const translations: Record<Language, Translations> = {
         nameLabel: 'Nome da zona',
         namePlaceholder: 'Ex. Eixo Cafeeiro',
         destinationsLabel: 'Destinos',
-        departmentPlaceholder: 'Selecione um departamento',
-        addWholeDepartmentButton: 'Adicionar departamento completo',
-        addMunicipalityButton: 'Adicionar município…',
+        selectAllDepartmentsButton: 'Selecionar todos',
+        clearDestinationsButton: 'Limpar',
+        selectedDestinationsCountLabel: 'destinos selecionados',
+        selectedMunicipalitiesCountLabel: 'municípios selecionados',
+        showMunicipalitiesButton: 'Ver municípios',
+        hideMunicipalitiesButton: 'Ocultar municípios',
+        claimedByPrefix: 'Já atribuído à zona',
         municipalitySearchPlaceholder: 'Buscar município…',
         loadingMunicipalities: 'Carregando municípios…',
         noMunicipalitiesFound: 'Sem resultados',
         wholeDepartmentPrefix: 'Todo:',
-        removeDestinationLabel: 'Remover destino',
         destinationsColumn: 'Destinos',
         basisColumn: 'Tarifa',
         actionsColumn: 'Ações',

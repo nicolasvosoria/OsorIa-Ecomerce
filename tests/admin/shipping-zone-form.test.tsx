@@ -2,15 +2,18 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
 import { useForm } from "react-hook-form"
 
-const { saveShippingZoneAction, listShippingMunicipalitiesAction, routerPush } = vi.hoisted(() => ({
-  saveShippingZoneAction: vi.fn(),
-  listShippingMunicipalitiesAction: vi.fn(),
-  routerPush: vi.fn(),
-}))
+const { saveShippingZoneAction, listShippingMunicipalitiesAction, searchShippingMunicipalitiesAction, routerPush } =
+  vi.hoisted(() => ({
+    saveShippingZoneAction: vi.fn(),
+    listShippingMunicipalitiesAction: vi.fn(),
+    searchShippingMunicipalitiesAction: vi.fn(),
+    routerPush: vi.fn(),
+  }))
 
 vi.mock("@/app/admin/settings/shipping/actions", () => ({
   saveShippingZoneAction,
   listShippingMunicipalitiesAction,
+  searchShippingMunicipalitiesAction,
 }))
 
 vi.mock("next/navigation", () => ({
@@ -28,8 +31,9 @@ beforeAll(() => {
 
 import { ZoneForm } from "@/app/admin/settings/shipping/components/zone-form"
 import { RateLadderField } from "@/app/admin/settings/shipping/components/rate-ladder-field"
+import type { Department } from "@/lib/shipping/locations-api"
 import type { ZoneEditorFormValues } from "@/lib/shipping/schemas"
-import type { MissingWeightProduct, ShippingZoneRecord } from "@/lib/supabase/shipping-zones-api"
+import type { ClaimedDestination, MissingWeightProduct, ShippingZoneRecord } from "@/lib/supabase/shipping-zones-api"
 
 const ZONE: ShippingZoneRecord = {
   id: "zone-1",
@@ -46,9 +50,15 @@ const ZONE: ShippingZoneRecord = {
   },
 }
 
+const DEPARTMENTS: Department[] = [
+  { code: "05", name: "ANTIOQUIA" },
+  { code: "76", name: "VALLE DEL CAUCA" },
+]
+
 beforeEach(() => {
   vi.clearAllMocks()
   listShippingMunicipalitiesAction.mockResolvedValue([])
+  searchShippingMunicipalitiesAction.mockResolvedValue([])
 })
 
 describe("ZoneForm", () => {
@@ -76,6 +86,107 @@ describe("ZoneForm", () => {
 
     await waitFor(() => expect(saveShippingZoneAction).toHaveBeenCalled())
     expect(saveShippingZoneAction.mock.calls[0][1]).toBe("zone-route-param")
+  })
+})
+
+describe("ZoneForm destinations picker", () => {
+  it("renders a destination already claimed by another zone as disabled, naming the owning zone", () => {
+    const claimedDestinations: ClaimedDestination[] = [
+      { departmentCode: "05", municipalityCode: null, zoneName: "Costa Caribe" },
+    ]
+    render(
+      <ZoneForm
+        zoneId={null}
+        zone={null}
+        departments={DEPARTMENTS}
+        missingWeightProducts={[]}
+        claimedDestinations={claimedDestinations}
+      />,
+    )
+
+    expect(screen.getByText('Ya asignado a la zona "Costa Caribe"')).toBeInTheDocument()
+    expect(screen.getByRole("checkbox", { name: "ANTIOQUIA" })).toBeDisabled()
+    expect(screen.getByRole("checkbox", { name: "VALLE DEL CAUCA" })).toBeEnabled()
+  })
+
+  it("selects every department at once with 'Seleccionar todos', and clears everything with 'Limpiar'", () => {
+    render(<ZoneForm zoneId={null} zone={null} departments={DEPARTMENTS} missingWeightProducts={[]} />)
+
+    fireEvent.click(screen.getByRole("button", { name: "Seleccionar todos" }))
+
+    expect(screen.getByRole("checkbox", { name: "ANTIOQUIA" })).toBeChecked()
+    expect(screen.getByRole("checkbox", { name: "VALLE DEL CAUCA" })).toBeChecked()
+    expect(screen.getByText("2 destinos seleccionados")).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole("button", { name: "Limpiar" }))
+
+    expect(screen.getByRole("checkbox", { name: "ANTIOQUIA" })).not.toBeChecked()
+    expect(screen.getByRole("checkbox", { name: "VALLE DEL CAUCA" })).not.toBeChecked()
+    expect(screen.getByText("0 destinos seleccionados")).toBeInTheDocument()
+  })
+
+  it("skips a department already claimed whole by another zone when 'Seleccionar todos' runs", () => {
+    const claimedDestinations: ClaimedDestination[] = [
+      { departmentCode: "05", municipalityCode: null, zoneName: "Costa Caribe" },
+    ]
+    render(
+      <ZoneForm
+        zoneId={null}
+        zone={null}
+        departments={DEPARTMENTS}
+        missingWeightProducts={[]}
+        claimedDestinations={claimedDestinations}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole("button", { name: "Seleccionar todos" }))
+
+    expect(screen.getByRole("checkbox", { name: "ANTIOQUIA" })).not.toBeChecked()
+    expect(screen.getByRole("checkbox", { name: "VALLE DEL CAUCA" })).toBeChecked()
+  })
+
+  it("selecting a whole department clears its municipios selected individually, so the two can never coexist for the same department", async () => {
+    listShippingMunicipalitiesAction.mockResolvedValue([
+      { id: 1, code: "05001", name: "MEDELLÍN", departmentCode: "05", departmentName: "ANTIOQUIA" },
+      { id: 2, code: "05002", name: "ABEJORRAL", departmentCode: "05", departmentName: "ANTIOQUIA" },
+    ])
+    saveShippingZoneAction.mockResolvedValue({ success: true })
+    render(<ZoneForm zoneId={null} zone={null} departments={DEPARTMENTS} missingWeightProducts={[]} />)
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Ver municipios" })[0])
+    await screen.findByRole("checkbox", { name: "MEDELLÍN" })
+    fireEvent.click(screen.getByRole("checkbox", { name: "MEDELLÍN" }))
+    expect(screen.getByRole("checkbox", { name: "MEDELLÍN" })).toBeChecked()
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "ANTIOQUIA" }))
+
+    expect(screen.getByRole("checkbox", { name: "ANTIOQUIA" })).toBeChecked()
+    expect(screen.getByRole("checkbox", { name: "MEDELLÍN" })).toBeChecked()
+    expect(screen.getByRole("checkbox", { name: "MEDELLÍN" })).toBeDisabled()
+    expect(screen.getByRole("checkbox", { name: "ABEJORRAL" })).toBeChecked()
+    expect(screen.getByRole("checkbox", { name: "ABEJORRAL" })).toBeDisabled()
+
+    fireEvent.change(screen.getByLabelText("Nombre de la zona"), { target: { value: "Zona Test" } })
+    fireEvent.click(screen.getByRole("button", { name: "Guardar zona" }))
+
+    await waitFor(() => expect(saveShippingZoneAction).toHaveBeenCalled())
+    expect(saveShippingZoneAction.mock.calls[0][0].destinations).toEqual([{ departmentCode: "05", municipalityCode: null }])
+  })
+
+  it("finds a municipio through the global search, disambiguated by department, and adds it on select", async () => {
+    searchShippingMunicipalitiesAction.mockResolvedValue([
+      { id: 3, code: "76001", name: "CALI", departmentCode: "76", departmentName: "VALLE DEL CAUCA" },
+    ])
+    render(<ZoneForm zoneId={null} zone={null} departments={DEPARTMENTS} missingWeightProducts={[]} />)
+
+    fireEvent.click(screen.getByText("Buscar municipio…"))
+    fireEvent.change(screen.getByPlaceholderText("Buscar municipio…"), { target: { value: "cali" } })
+
+    await waitFor(() => expect(searchShippingMunicipalitiesAction).toHaveBeenCalledWith("cali"), { timeout: 2000 })
+    const result = await screen.findByText("CALI (VALLE DEL CAUCA)")
+    fireEvent.click(result)
+
+    expect(screen.getByText("1 destinos seleccionados")).toBeInTheDocument()
   })
 })
 

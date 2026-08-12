@@ -5,12 +5,13 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useFieldArray, useForm, type Control, type FieldPath } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { Check, ChevronsUpDown, Loader2, Save, X } from "lucide-react"
+import { Check, ChevronDown, ChevronRight, ChevronsUpDown, Loader2, Save } from "lucide-react"
 import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Command,
   CommandEmpty,
@@ -24,9 +25,8 @@ import { FormField } from "@/components/ui/form-field"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { translations } from "@/lib/i18n/translations"
-import type { Department, Municipality } from "@/lib/shipping/locations-api"
+import { MUNICIPALITY_SEARCH_MIN_LENGTH, type Department, type Municipality } from "@/lib/shipping/locations-api"
 import {
   destinationKey,
   findShippingLadderGaps,
@@ -36,13 +36,23 @@ import {
   type ShippingRateLadder,
   type ZoneEditorFormValues,
 } from "@/lib/shipping/schemas"
-import type { MissingWeightProduct, ShippingZoneRecord } from "@/lib/supabase/shipping-zones-api"
-import { listShippingMunicipalitiesAction, saveShippingZoneAction } from "../actions"
+import type {
+  ClaimedDestination,
+  MissingWeightProduct,
+  ShippingZoneRecord,
+} from "@/lib/supabase/shipping-zones-api"
+import {
+  listShippingMunicipalitiesAction,
+  saveShippingZoneAction,
+  searchShippingMunicipalitiesAction,
+} from "../actions"
 import { EMPTY_RANGE_ROW, RateLadderField } from "./rate-ladder-field"
 
 const copy = translations.es.shipping.zones
 
 const SHIPPING_ZONES_LIST_PATH = "/admin/settings/shipping"
+
+type DestinationValue = ZoneEditorFormValues["destinations"][number]
 
 function toRateLadderFormValues(ladder: ShippingRateLadder): ZoneEditorFormValues["rateLadder"] {
   if (ladder.basis === "flat") {
@@ -70,34 +80,20 @@ function toDefaultValues(zone: ShippingZoneRecord | null): ZoneEditorFormValues 
   }
 }
 
-function nameHintKey(kind: "department" | "municipality", code: string): string {
-  return `${kind}:${code}`
-}
-
-function buildNameHints(zone: ShippingZoneRecord | null): Map<string, string> {
-  const hints = new Map<string, string>()
-  for (const destination of zone?.destinations ?? []) {
-    hints.set(nameHintKey("department", destination.departmentCode), destination.departmentName)
-    if (destination.municipalityCode && destination.municipalityName) {
-      hints.set(nameHintKey("municipality", destination.municipalityCode), destination.municipalityName)
-    }
-  }
-  return hints
-}
-
 export function ZoneForm({
   zoneId,
   zone,
   departments,
   missingWeightProducts,
+  claimedDestinations = [],
 }: {
   zoneId: string | null
   zone: ShippingZoneRecord | null
   departments: Department[]
   missingWeightProducts: MissingWeightProduct[]
+  claimedDestinations?: ClaimedDestination[]
 }) {
   const router = useRouter()
-  const nameHints = useMemo(() => buildNameHints(zone), [zone])
 
   const {
     control,
@@ -169,7 +165,7 @@ export function ZoneForm({
             {(field) => <Input {...field} placeholder={copy.namePlaceholder} {...register("name")} />}
           </FormField>
 
-          <DestinationsField control={control} departments={departments} nameHints={nameHints} />
+          <DestinationsField control={control} departments={departments} claimedDestinations={claimedDestinations} />
           <FieldError message={errors.destinations?.message} />
 
           <RateLadderField control={control} missingWeightProducts={missingWeightProducts} />
@@ -189,35 +185,151 @@ export function ZoneForm({
   )
 }
 
+function withoutDepartment(destinations: DestinationValue[], departmentCode: string): DestinationValue[] {
+  return destinations.filter((destination) => destination.departmentCode !== departmentCode)
+}
+
+function nextDestinationsForWholeDepartment(
+  destinations: DestinationValue[],
+  departmentCode: string,
+  checked: boolean,
+): DestinationValue[] {
+  const rest = withoutDepartment(destinations, departmentCode)
+  return checked ? [...rest, { departmentCode, municipalityCode: null }] : rest
+}
+
+function nextDestinationsForMunicipality(
+  destinations: DestinationValue[],
+  municipality: Municipality,
+  checked: boolean,
+): DestinationValue[] {
+  const key = destinationKey({ departmentCode: municipality.departmentCode, municipalityCode: municipality.code })
+  const rest = destinations.filter((destination) => destinationKey(destination) !== key)
+  return checked
+    ? [...rest, { departmentCode: municipality.departmentCode, municipalityCode: municipality.code }]
+    : rest
+}
+
+function selectableWholeDepartments(departments: Department[], claimedByKey: Map<string, string>): DestinationValue[] {
+  return departments
+    .filter((department) => !claimedByKey.has(destinationKey({ departmentCode: department.code, municipalityCode: null })))
+    .map((department) => ({ departmentCode: department.code, municipalityCode: null }))
+}
+
+function claimedDestinationsByKey(claimedDestinations: ClaimedDestination[]): Map<string, string> {
+  return new Map(
+    claimedDestinations.map((destination) => [
+      destinationKey({ departmentCode: destination.departmentCode, municipalityCode: destination.municipalityCode }),
+      destination.zoneName,
+    ]),
+  )
+}
+
+const EMPTY_MUNICIPALITY_CODES = new Set<string>()
+
 function DestinationsField({
   control,
   departments,
-  nameHints,
+  claimedDestinations,
 }: {
   control: Control<ZoneEditorFormValues>
   departments: Department[]
-  nameHints: Map<string, string>
+  claimedDestinations: ClaimedDestination[]
 }) {
-  const { fields, append, remove } = useFieldArray({ control, name: "destinations" })
-  const [names, setNames] = useState(nameHints)
-  const [selectedDepartment, setSelectedDepartment] = useState("")
+  const { fields, replace } = useFieldArray({ control, name: "destinations" })
+  const claimedByKey = useMemo(() => claimedDestinationsByKey(claimedDestinations), [claimedDestinations])
+
+  const existingKeys = new Set(fields.map(destinationKey))
+  const wholeDepartmentCodes = new Set(
+    fields.filter((field) => field.municipalityCode === null).map((field) => field.departmentCode),
+  )
+  const municipalityCodesByDepartment = new Map<string, Set<string>>()
+  for (const field of fields) {
+    if (field.municipalityCode === null) continue
+    const codes = municipalityCodesByDepartment.get(field.departmentCode) ?? new Set<string>()
+    codes.add(field.municipalityCode)
+    municipalityCodesByDepartment.set(field.departmentCode, codes)
+  }
+
+  function toggleDepartmentWhole(departmentCode: string, checked: boolean) {
+    replace(nextDestinationsForWholeDepartment(fields, departmentCode, checked))
+  }
+
+  function toggleMunicipality(municipality: Municipality, checked: boolean) {
+    replace(nextDestinationsForMunicipality(fields, municipality, checked))
+  }
+
+  return (
+    <div className="space-y-3">
+      <Label>{copy.destinationsLabel}</Label>
+
+      <MunicipalitySearchField
+        wholeDepartmentCodes={wholeDepartmentCodes}
+        existingKeys={existingKeys}
+        claimedByKey={claimedByKey}
+        onSelect={(municipality) => toggleMunicipality(municipality, true)}
+      />
+
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => replace(selectableWholeDepartments(departments, claimedByKey))}
+          >
+            {copy.selectAllDepartmentsButton}
+          </Button>
+          <Button type="button" variant="outline" size="sm" onClick={() => replace([])}>
+            {copy.clearDestinationsButton}
+          </Button>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          {fields.length} {copy.selectedDestinationsCountLabel}
+        </p>
+      </div>
+
+      <div className="max-h-96 divide-y overflow-y-auto rounded-md border">
+        {departments.map((department) => (
+          <DepartmentRow
+            key={department.code}
+            department={department}
+            claimedByKey={claimedByKey}
+            wholeSelected={wholeDepartmentCodes.has(department.code)}
+            selectedMunicipalityCodes={municipalityCodesByDepartment.get(department.code) ?? EMPTY_MUNICIPALITY_CODES}
+            onToggleWhole={(checked) => toggleDepartmentWhole(department.code, checked)}
+            onToggleMunicipality={toggleMunicipality}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function DepartmentRow({
+  department,
+  claimedByKey,
+  wholeSelected,
+  selectedMunicipalityCodes,
+  onToggleWhole,
+  onToggleMunicipality,
+}: {
+  department: Department
+  claimedByKey: Map<string, string>
+  wholeSelected: boolean
+  selectedMunicipalityCodes: Set<string>
+  onToggleWhole: (checked: boolean) => void
+  onToggleMunicipality: (municipality: Municipality, checked: boolean) => void
+}) {
+  const [expanded, setExpanded] = useState(false)
   const [municipalities, setMunicipalities] = useState<Municipality[]>([])
   const [loadingMunicipalities, setLoadingMunicipalities] = useState(false)
-  const [municipalityPickerOpen, setMunicipalityPickerOpen] = useState(false)
 
-  // Fetches, not a state mirror: the effect's only job is asking the server
-  // for the chosen department's municipios, so it stays an effect. Every
-  // setState the effect body itself would need synchronously (clearing the
-  // previous department's stale list, flagging the fetch as loading) instead
-  // happens in the SELECT handler below that causes it -- only the async
-  // .then/.finally callbacks reporting the fetch's own outcome set state
-  // from here, the "derive it from the event that caused it" shape React's
-  // own effect guidance asks for.
   useEffect(() => {
-    if (!selectedDepartment) return
+    if (!expanded) return
 
     let active = true
-    listShippingMunicipalitiesAction(selectedDepartment)
+    listShippingMunicipalitiesAction(department.code)
       .then((result) => {
         if (active) setMunicipalities(result)
       })
@@ -229,121 +341,216 @@ function DestinationsField({
     return () => {
       active = false
     }
-  }, [selectedDepartment])
+  }, [expanded, department.code])
 
-  function selectDepartment(departmentCode: string) {
-    setSelectedDepartment(departmentCode)
-    setMunicipalities([])
-    setLoadingMunicipalities(true)
+  function toggleExpanded() {
+    if (!expanded) setLoadingMunicipalities(true)
+    setExpanded((current) => !current)
   }
 
-  // departmentName falls back to the `departments` prop directly instead of
-  // seeding it into `names` on every prop change: `names` only needs to hold
-  // hints the prop can't supply (a destination's name once picked, or an
-  // already-saved zone's own destinations).
-  function departmentName(departmentCode: string): string {
-    return (
-      names.get(nameHintKey("department", departmentCode)) ??
-      departments.find((department) => department.code === departmentCode)?.name ??
-      departmentCode
-    )
-  }
-
-  const existingKeys = new Set(fields.map(destinationKey))
-
-  function addWholeDepartment() {
-    if (!selectedDepartment || existingKeys.has(destinationKey({ departmentCode: selectedDepartment, municipalityCode: null }))) return
-    append({ departmentCode: selectedDepartment, municipalityCode: null })
-  }
-
-  function addMunicipality(municipality: Municipality) {
-    if (existingKeys.has(destinationKey({ departmentCode: municipality.departmentCode, municipalityCode: municipality.code }))) return
-
-    setNames((current) => {
-      const next = new Map(current)
-      next.set(nameHintKey("department", municipality.departmentCode), municipality.departmentName)
-      next.set(nameHintKey("municipality", municipality.code), municipality.name)
-      return next
-    })
-    append({ departmentCode: municipality.departmentCode, municipalityCode: municipality.code })
-    setMunicipalityPickerOpen(false)
-  }
+  const claimedWholeBy = claimedByKey.get(destinationKey({ departmentCode: department.code, municipalityCode: null }))
+  const checkboxId = `department-${department.code}`
 
   return (
-    <div className="space-y-3">
-      <Label>{copy.destinationsLabel}</Label>
-
-      <div className="flex flex-col gap-2 sm:flex-row">
-        <Select value={selectedDepartment} onValueChange={selectDepartment}>
-          <SelectTrigger className="w-full sm:w-64">
-            <SelectValue placeholder={copy.departmentPlaceholder} />
-          </SelectTrigger>
-          <SelectContent className="editor-chrome">
-            {departments.map((department) => (
-              <SelectItem key={department.code} value={department.code}>
-                {department.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Button type="button" variant="outline" size="sm" disabled={!selectedDepartment} onClick={addWholeDepartment}>
-          {copy.addWholeDepartmentButton}
+    <div className="p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <Checkbox
+          id={checkboxId}
+          checked={wholeSelected}
+          disabled={Boolean(claimedWholeBy)}
+          onCheckedChange={(checked) => onToggleWhole(checked === true)}
+        />
+        <Label htmlFor={checkboxId} className="min-w-0 flex-1 cursor-pointer">
+          {department.name}
+        </Label>
+        {claimedWholeBy ? (
+          <Badge variant="outline" className="normal-case">{`${copy.claimedByPrefix} "${claimedWholeBy}"`}</Badge>
+        ) : selectedMunicipalityCodes.size > 0 ? (
+          <span className="text-xs text-muted-foreground">
+            {selectedMunicipalityCodes.size} {copy.selectedMunicipalitiesCountLabel}
+          </span>
+        ) : null}
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="gap-1"
+          aria-expanded={expanded}
+          onClick={toggleExpanded}
+        >
+          {expanded ? copy.hideMunicipalitiesButton : copy.showMunicipalitiesButton}
+          {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         </Button>
       </div>
 
-      {selectedDepartment ? (
-        <Popover open={municipalityPickerOpen} onOpenChange={setMunicipalityPickerOpen}>
-          <PopoverTrigger asChild>
-            <Button type="button" variant="outline" size="sm" className="w-full justify-between sm:w-72">
-              {copy.addMunicipalityButton}
-              <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="editor-chrome w-72 p-0">
-            <Command>
-              <CommandInput placeholder={copy.municipalitySearchPlaceholder} />
-              <CommandList>
-                <CommandEmpty>{loadingMunicipalities ? copy.loadingMunicipalities : copy.noMunicipalitiesFound}</CommandEmpty>
+      {expanded ? (
+        <MunicipalityChecklist
+          loading={loadingMunicipalities}
+          municipalities={municipalities}
+          claimedByKey={claimedByKey}
+          wholeSelected={wholeSelected}
+          selectedMunicipalityCodes={selectedMunicipalityCodes}
+          onToggleMunicipality={onToggleMunicipality}
+        />
+      ) : null}
+    </div>
+  )
+}
+
+function MunicipalityChecklist({
+  loading,
+  municipalities,
+  claimedByKey,
+  wholeSelected,
+  selectedMunicipalityCodes,
+  onToggleMunicipality,
+}: {
+  loading: boolean
+  municipalities: Municipality[]
+  claimedByKey: Map<string, string>
+  wholeSelected: boolean
+  selectedMunicipalityCodes: Set<string>
+  onToggleMunicipality: (municipality: Municipality, checked: boolean) => void
+}) {
+  if (loading) {
+    return <p className="mt-2 pl-6 text-sm text-muted-foreground">{copy.loadingMunicipalities}</p>
+  }
+
+  if (municipalities.length === 0) {
+    return <p className="mt-2 pl-6 text-sm text-muted-foreground">{copy.noMunicipalitiesFound}</p>
+  }
+
+  return (
+    <div className="mt-2 grid grid-cols-1 gap-1 pl-6 sm:grid-cols-2">
+      {municipalities.map((municipality) => {
+        const claimedBy = claimedByKey.get(
+          destinationKey({ departmentCode: municipality.departmentCode, municipalityCode: municipality.code }),
+        )
+        const checked = wholeSelected || selectedMunicipalityCodes.has(municipality.code)
+        const checkboxId = `municipality-${municipality.code}`
+
+        return (
+          <div key={municipality.id} className="flex items-center gap-2">
+            <Checkbox
+              id={checkboxId}
+              checked={checked}
+              disabled={wholeSelected || Boolean(claimedBy)}
+              onCheckedChange={(value) => onToggleMunicipality(municipality, value === true)}
+            />
+            <Label htmlFor={checkboxId} className="min-w-0 flex-1 cursor-pointer text-sm">
+              {municipality.name}
+            </Label>
+            {claimedBy ? (
+              <Badge variant="outline" className="normal-case">{`${copy.claimedByPrefix} "${claimedBy}"`}</Badge>
+            ) : null}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+const MUNICIPALITY_SEARCH_DEBOUNCE_MS = 300
+
+function MunicipalitySearchField({
+  wholeDepartmentCodes,
+  existingKeys,
+  claimedByKey,
+  onSelect,
+}: {
+  wholeDepartmentCodes: Set<string>
+  existingKeys: Set<string>
+  claimedByKey: Map<string, string>
+  onSelect: (municipality: Municipality) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState("")
+  const [results, setResults] = useState<Municipality[]>([])
+  const [searching, setSearching] = useState(false)
+
+  const trimmedQuery = query.trim()
+  const queryTooShort = trimmedQuery.length < MUNICIPALITY_SEARCH_MIN_LENGTH
+
+  useEffect(() => {
+    if (queryTooShort) return
+
+    let active = true
+    const timeoutId = setTimeout(() => {
+      searchShippingMunicipalitiesAction(trimmedQuery)
+        .then((municipalities) => {
+          if (active) setResults(municipalities)
+        })
+        .catch((error) => console.error("[Shipping Zones] Error al buscar municipios:", error))
+        .finally(() => {
+          if (active) setSearching(false)
+        })
+    }, MUNICIPALITY_SEARCH_DEBOUNCE_MS)
+
+    return () => {
+      active = false
+      clearTimeout(timeoutId)
+    }
+  }, [trimmedQuery, queryTooShort])
+
+  function handleQueryChange(value: string) {
+    setQuery(value)
+    if (value.trim().length < MUNICIPALITY_SEARCH_MIN_LENGTH) {
+      setResults([])
+      setSearching(false)
+    } else {
+      setSearching(true)
+    }
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button type="button" variant="outline" role="combobox" aria-expanded={open} className="w-full justify-between font-normal">
+          {copy.municipalitySearchPlaceholder}
+          <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="editor-chrome w-[--radix-popover-trigger-width] p-0" align="start">
+        <Command shouldFilter={false}>
+          <CommandInput value={query} onValueChange={handleQueryChange} placeholder={copy.municipalitySearchPlaceholder} />
+          <CommandList>
+            {queryTooShort ? null : (
+              <>
+                <CommandEmpty>{searching ? copy.loadingMunicipalities : copy.noMunicipalitiesFound}</CommandEmpty>
                 <CommandGroup>
-                  {municipalities.map((municipality) => {
-                    const alreadyAdded = existingKeys.has(
-                      destinationKey({ departmentCode: municipality.departmentCode, municipalityCode: municipality.code }),
-                    )
+                  {results.map((municipality) => {
+                    const key = destinationKey({
+                      departmentCode: municipality.departmentCode,
+                      municipalityCode: municipality.code,
+                    })
+                    const claimedBy = claimedByKey.get(key)
+                    const alreadySelected = wholeDepartmentCodes.has(municipality.departmentCode) || existingKeys.has(key)
+
                     return (
                       <CommandItem
                         key={municipality.id}
-                        value={municipality.name}
-                        disabled={alreadyAdded}
-                        onSelect={() => addMunicipality(municipality)}
+                        value={municipality.code}
+                        disabled={alreadySelected || Boolean(claimedBy)}
+                        onSelect={() => {
+                          onSelect(municipality)
+                          setOpen(false)
+                          setQuery("")
+                        }}
                       >
-                        <Check className={alreadyAdded ? "mr-2 h-4 w-4 opacity-100" : "mr-2 h-4 w-4 opacity-0"} />
-                        {municipality.name}
+                        <Check className={alreadySelected ? "h-4 w-4 opacity-100" : "h-4 w-4 opacity-0"} />
+                        <span className="flex-1">{`${municipality.name} (${municipality.departmentName})`}</span>
+                        {claimedBy ? (
+                          <Badge variant="outline" className="normal-case">{`${copy.claimedByPrefix} "${claimedBy}"`}</Badge>
+                        ) : null}
                       </CommandItem>
                     )
                   })}
                 </CommandGroup>
-              </CommandList>
-            </Command>
-          </PopoverContent>
-        </Popover>
-      ) : null}
-
-      <div className="flex flex-wrap gap-2">
-        {fields.map((field, index) => {
-          const label = field.municipalityCode
-            ? names.get(nameHintKey("municipality", field.municipalityCode)) ?? field.municipalityCode
-            : `${copy.wholeDepartmentPrefix} ${departmentName(field.departmentCode)}`
-
-          return (
-            <Badge key={field.id} variant="secondary" className="gap-1.5 normal-case">
-              {label}
-              <button type="button" onClick={() => remove(index)} aria-label={copy.removeDestinationLabel}>
-                <X className="h-3 w-3" />
-              </button>
-            </Badge>
-          )
-        })}
-      </div>
-    </div>
+              </>
+            )}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   )
 }

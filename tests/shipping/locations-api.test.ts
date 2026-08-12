@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest"
 
-import { listDepartments, listMunicipalitiesByDepartment } from "@/lib/shipping/locations-api"
+import {
+  MUNICIPALITY_SEARCH_MIN_LENGTH,
+  listDepartments,
+  listMunicipalitiesByDepartment,
+  searchMunicipalities,
+} from "@/lib/shipping/locations-api"
 
 type CoLocationRow = {
   id: number
@@ -39,27 +44,46 @@ function createDivipolaDouble(coLocationRows: CoLocationRow[]) {
   }
 
   function select(relationRows: Record<string, unknown>[], columns: string) {
-    const filters: { column: string; value: unknown }[] = []
+    const equalityFilters: { column: string; value: unknown }[] = []
+    const ilikeFilters: { column: string; pattern: string }[] = []
     let sortColumn: string | null = null
+    let limitCount: number | null = null
+
+    function matches(row: Record<string, unknown>): boolean {
+      const matchesEquality = equalityFilters.every(({ column, value }) => row[column] === value)
+      const matchesIlike = ilikeFilters.every(({ column, pattern }) =>
+        String(row[column]).toLowerCase().includes(pattern.replace(/%/g, "").toLowerCase()),
+      )
+      return matchesEquality && matchesIlike
+    }
 
     const builder = {
       eq(column: string, value: unknown) {
-        filters.push({ column, value })
+        equalityFilters.push({ column, value })
+        return builder
+      },
+      ilike(column: string, pattern: string) {
+        ilikeFilters.push({ column, pattern })
         return builder
       },
       order(column: string) {
         sortColumn = column
         return builder
       },
+      limit(count: number) {
+        limitCount = count
+        return builder
+      },
       then(onFulfilled: (result: { data: unknown; error: null }) => unknown) {
-        const matched = relationRows.filter((row) => filters.every(({ column, value }) => row[column] === value))
+        const matched = relationRows.filter(matches)
         const sorted = sortColumn
           ? [...matched].sort((a, b) => (String(a[sortColumn as string]) < String(b[sortColumn as string]) ? -1 : 1))
           : matched
         // The row cap applies after ORDER BY, same as PostgREST's own
         // response slicing -- never before.
-        const paged = sorted.slice(0, POSTGREST_MAX_ROWS)
-        const projected = paged.map((row) => projectColumns(row, columns))
+        const capped = sorted.slice(0, POSTGREST_MAX_ROWS)
+        const limited = limitCount === null ? capped : capped.slice(0, limitCount)
+        const projected = limited.map((row) => projectColumns(row, columns))
         return Promise.resolve({ data: projected, error: null }).then(onFulfilled)
       },
     }
@@ -93,6 +117,27 @@ function coLocationRow(overrides: Partial<CoLocationRow> & Pick<CoLocationRow, "
     municipality_name: "MEDELLÍN",
     ...overrides,
   }
+}
+
+function buildDepartmentCatalog(departmentCount: number, municipiosPerDepartment: number): CoLocationRow[] {
+  const rows: CoLocationRow[] = []
+  let id = 1
+  for (let d = 1; d <= departmentCount; d++) {
+    const departmentCode = String(d).padStart(2, "0")
+    const departmentName = `DEPARTAMENTO ${departmentCode}`
+    for (let m = 1; m <= municipiosPerDepartment; m++) {
+      rows.push(
+        coLocationRow({
+          id: id++,
+          department_code: departmentCode,
+          department_name: departmentName,
+          municipality_code: `${departmentCode}${String(m).padStart(3, "0")}`,
+          municipality_name: `MUNICIPIO ${m}`,
+        }),
+      )
+    }
+  }
+  return rows
 }
 
 describe("listMunicipalitiesByDepartment", () => {
@@ -168,24 +213,7 @@ describe("listDepartments", () => {
   // simply never show.
   it("hits PostgREST's row cap when read off co_locations directly (reproduces Finding 1 -- must pass through co_departments instead)", async () => {
     const departmentCount = 40
-    const municipiosPerDepartment = 30
-    const rows: CoLocationRow[] = []
-    let id = 1
-    for (let d = 1; d <= departmentCount; d++) {
-      const departmentCode = String(d).padStart(2, "0")
-      const departmentName = `DEPARTAMENTO ${departmentCode}`
-      for (let m = 1; m <= municipiosPerDepartment; m++) {
-        rows.push(
-          coLocationRow({
-            id: id++,
-            department_code: departmentCode,
-            department_name: departmentName,
-            municipality_code: `${departmentCode}${String(m).padStart(3, "0")}`,
-            municipality_name: `MUNICIPIO ${m}`,
-          }),
-        )
-      }
-    }
+    const rows = buildDepartmentCatalog(departmentCount, 30)
     expect(rows.length).toBeGreaterThan(POSTGREST_MAX_ROWS)
 
     const client = createDivipolaDouble(rows)
@@ -194,5 +222,36 @@ describe("listDepartments", () => {
 
     expect(departments).toHaveLength(departmentCount)
     expect(departments.map((department) => department.code)).toContain("40")
+  })
+})
+
+describe("searchMunicipalities", () => {
+  it("finds a municipio past PostgREST's row cap, proving the filter runs in the database rather than after an unfiltered fetch (search variant of Finding 1)", async () => {
+    const rows = buildDepartmentCatalog(40, 30)
+    const needleIndex = rows.findIndex((row) => row.department_code === "40" && row.municipality_code === "40015")
+    rows[needleIndex] = { ...rows[needleIndex], municipality_name: "SANTUARIO DEL SOL" }
+    const client = createDivipolaDouble(rows)
+
+    const results = await searchMunicipalities("santuario", 50, client)
+
+    expect(results).toEqual([
+      { id: rows[needleIndex].id, code: "40015", name: "SANTUARIO DEL SOL", departmentCode: "40", departmentName: "DEPARTAMENTO 40" },
+    ])
+  })
+
+  it("sends a limit to the database, never returning more results than requested even with many matches", async () => {
+    const rows = buildDepartmentCatalog(5, 30)
+    const client = createDivipolaDouble(rows)
+
+    const results = await searchMunicipalities("municipio", 10, client)
+
+    expect(results.length).toBeLessThanOrEqual(10)
+  })
+
+  it("returns nothing for a query shorter than the minimum search length, without ever reaching the database", async () => {
+    const client = createDivipolaDouble([coLocationRow({ id: 1, municipality_name: "MEDELLÍN" })])
+    const tooShortQuery = "m".repeat(MUNICIPALITY_SEARCH_MIN_LENGTH - 1)
+
+    expect(await searchMunicipalities(tooShortQuery, 50, client)).toEqual([])
   })
 })
