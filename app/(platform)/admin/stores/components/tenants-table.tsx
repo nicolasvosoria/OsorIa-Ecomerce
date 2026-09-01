@@ -100,7 +100,11 @@ function buildColumns(managedStoreIds: string[]): Column<TenantRow>[] {
             isPublic={tenant.is_public}
           />
           {managedStoreIds.includes(tenant.id) ? (
-            <EnterStoreButton storeId={tenant.id} storeName={tenant.store_name} />
+            <EnterStoreButton
+              storeId={tenant.id}
+              storeName={tenant.store_name}
+              subdomain={tenant.subdomain}
+            />
           ) : (
             <SupportAccessButton storeId={tenant.id} storeName={tenant.store_name} />
           )}

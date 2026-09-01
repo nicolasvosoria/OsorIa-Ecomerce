@@ -20,7 +20,7 @@ export default async function CreateProductPage() {
   return (
     <AdminPageContainer maxWidth="4xl">
       <AdminPageHeader
-        title="Crear Nuevo Producto"
+        title="Nuevo Producto"
         subtitle="Completa el formulario para agregar un nuevo producto al catálogo"
       />
       <CreateProductForm categories={categories} />

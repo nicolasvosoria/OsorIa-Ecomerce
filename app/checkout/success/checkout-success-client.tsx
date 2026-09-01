@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { CheckCircle2, Home } from "lucide-react";
+import { formatAddressLine } from "@/lib/orders/order-format";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -205,11 +206,9 @@ export function CheckoutSuccessClient({
               </div>
               <div>
                 <h3 className="font-semibold mb-2">Dirección de Envío:</h3>
+                <p className="text-sm">{formatAddressLine([customerData.address, customerData.city])}</p>
                 <p className="text-sm">
-                  {customerData.address}, {customerData.city}
-                </p>
-                <p className="text-sm">
-                  {customerData.postalCode}, {customerData.country}
+                  {formatAddressLine([customerData.postalCode, customerData.country])}
                 </p>
               </div>
               {customerData.notes && (

@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button"
 import { Loader } from "@/components/ui/loader"
 import { ArrowLeft, ShoppingBag } from "lucide-react"
 import { buildLocalCartSummary } from "@/lib/cart/cart-summary"
+import { clearGuestCheckoutDraft } from "@/lib/checkout/guest-draft"
+import { formatAddressLine } from "@/lib/orders/order-format"
 import { formatPrice } from "@/lib/commerce/utils"
 import { useLanguage } from "@/contexts/language-context"
 import { toast } from "sonner"
@@ -260,6 +262,8 @@ export default function CheckoutPage() {
 
     toast.success(`Pedido creado: ${order.orderNumber}`)
 
+    clearGuestCheckoutDraft()
+
     // Redirigir a la página de éxito
     router.push(
       `/checkout/success?order=${encodeURIComponent(order.orderNumber)}&email=${encodeURIComponent(data.email)}`,
@@ -396,10 +400,10 @@ export default function CheckoutPage() {
                   <div className="p-4 bg-muted rounded-lg">
                     <p className="font-semibold mb-2">Dirección de Envío:</p>
                     <p className="text-sm">
-                      {customerData.address}, {customerData.city}
+                      {formatAddressLine([customerData.address, customerData.city])}
                     </p>
                     <p className="text-sm">
-                      {customerData.postalCode}, {customerData.country}
+                      {formatAddressLine([customerData.postalCode, customerData.country])}
                     </p>
                   </div>
                 </div>

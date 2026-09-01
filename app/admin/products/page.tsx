@@ -81,7 +81,7 @@ async function loadProducts(
       {
         store_id: storeId,
         item_kind: "products",
-        is_active: true,
+        is_active: null,
         limit: pageSize,
         offset: (page - 1) * pageSize,
         order_by: "created_at",

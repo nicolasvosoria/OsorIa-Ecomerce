@@ -200,6 +200,9 @@ export function normalizeHomeDiscountPopupConfig(
   };
 }
 
+const MISSING_REDIRECT_CTA_URL_MESSAGE =
+  "El CTA de redirección necesita una URL http(s) válida.";
+const MISSING_COPY_COUPON_MESSAGE = "El CTA de copiar cupón necesita un código.";
 const INVALID_DELAY_SECONDS_MESSAGE = `El delay debe estar entre ${MIN_DELAY_SECONDS} y ${MAX_DELAY_SECONDS} segundos`;
 const INVALID_FREQUENCY_HOURS_MESSAGE = `La frecuencia debe estar entre ${MIN_FREQUENCY_HOURS} y ${MAX_FREQUENCY_HOURS} horas`;
 const INVALID_VISIBLE_DURATION_MESSAGE = `La duración visible debe estar entre ${MIN_VISIBLE_DURATION_SECONDS} y ${MAX_VISIBLE_DURATION_SECONDS} segundos`;
@@ -237,7 +240,24 @@ export const homeDiscountPopupFormSchema = z.object({
       INVALID_VISIBLE_DURATION_MESSAGE,
     ),
   ctaMode: z.enum(["redirect", "copy_coupon"]),
-});
+})
+  .superRefine((values, ctx) => {
+    if (values.ctaMode === "redirect" && !sanitizePublicUrl(values.ctaUrl)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["ctaUrl"],
+        message: MISSING_REDIRECT_CTA_URL_MESSAGE,
+      });
+    }
+
+    if (values.ctaMode === "copy_coupon" && !values.coupon.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["coupon"],
+        message: MISSING_COPY_COUPON_MESSAGE,
+      });
+    }
+  });
 
 export type HomeDiscountPopupFormValues = z.infer<typeof homeDiscountPopupFormSchema>;
 

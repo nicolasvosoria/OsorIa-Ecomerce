@@ -25,6 +25,9 @@ async function withTimeout<T>(
 // formulario deba distinguir para quien está registrándose.
 const PREPARE_AUTH_REDIRECT_ERROR = 'No se pudo iniciar el registro. Intenta de nuevo en un momento.'
 
+const PREPARE_RECOVERY_REDIRECT_ERROR =
+  'No se pudo enviar el correo de recuperación de contraseña. Intenta de nuevo en un momento.'
+
 /**
  * Registrar un nuevo usuario.
  *
@@ -557,7 +560,7 @@ export async function resetPassword(
 
     const prepared = await prepareAuthRedirect({ email, purpose: 'recovery', path: '/auth/reset-password', turnstileToken })
     if (!prepared.ok) {
-      return { success: false, error: PREPARE_AUTH_REDIRECT_ERROR }
+      return { success: false, error: PREPARE_RECOVERY_REDIRECT_ERROR }
     }
 
     // `redirectTo` es el nombre real de la opción: resetPasswordForEmail ignora

@@ -1,6 +1,7 @@
 "use client"
 
-import { useForm, type UseFormReturn } from "react-hook-form"
+import { useEffect } from "react"
+import { useForm, useWatch, type UseFormReturn } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { toast } from "sonner"
 
@@ -11,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { FormField } from "@/components/ui/form-field"
 import { Input } from "@/components/ui/input"
 import { enabledPaymentMethodIds } from "@/lib/checkout/payment-methods"
+import { readGuestCheckoutDraft, saveGuestCheckoutDraft } from "@/lib/checkout/guest-draft"
 import { guestCheckoutFormSchema, type GuestCheckoutFormValues } from "@/lib/checkout/schemas"
 import type { ShippingDestination } from "@/lib/shipping/schemas"
 
@@ -78,6 +80,24 @@ export function GuestCheckoutForm({
     resolver: zodResolver(guestCheckoutFormSchema),
     defaultValues: DEFAULT_VALUES,
   })
+
+  const { reset, control } = form
+  const watchedValues = useWatch({ control })
+  const { isDirty } = form.formState
+
+  useEffect(() => {
+    const draft = readGuestCheckoutDraft()
+    if (draft) {
+      reset({ ...DEFAULT_VALUES, ...draft })
+    }
+  }, [reset])
+
+  useEffect(() => {
+    if (!isDirty) {
+      return
+    }
+    saveGuestCheckoutDraft(watchedValues as Partial<GuestCheckoutFormValues>)
+  }, [watchedValues, isDirty])
 
   const submitValidatedForm = (values: GuestCheckoutFormValues) => {
     onComplete({

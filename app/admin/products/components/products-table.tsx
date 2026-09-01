@@ -92,27 +92,35 @@ const columns: Column<StoreItemWithDetails>[] = [
   {
     key: "stock",
     header: "Stock",
-    cell: (product) => (
-      <div>
-        <div className="font-medium">{product.inventory_quantity}</div>
-        {product.track_inventory &&
-          product.inventory_quantity <= product.low_stock_threshold && (
+    cell: (product) =>
+      product.track_inventory ? (
+        <div>
+          <div className="font-medium">{product.inventory_quantity}</div>
+          {product.inventory_quantity <= product.low_stock_threshold && (
             <Badge variant="destructive" className="mt-1 text-xs">
               Stock bajo
             </Badge>
           )}
-      </div>
-    ),
+        </div>
+      ) : (
+        <Badge variant="outline" className="w-fit text-xs font-normal">
+          Sin seguimiento
+        </Badge>
+      ),
   },
   {
     key: "status",
     header: "Estado",
-    cell: (product) =>
-      product.is_featured ? (
-        <Badge variant="outline" className="w-fit">
-          Destacado
-        </Badge>
-      ) : null,
+    cell: (product) => (
+      <div className="flex flex-wrap items-center gap-1.5">
+        {!product.is_active && <Badge variant="secondary">Inactivo</Badge>}
+        {product.is_featured && (
+          <Badge variant="outline" className="w-fit">
+            Destacado
+          </Badge>
+        )}
+      </div>
+    ),
   },
   {
     key: "actions",

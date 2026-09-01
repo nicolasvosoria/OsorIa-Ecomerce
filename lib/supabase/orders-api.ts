@@ -1582,9 +1582,10 @@ export async function createOrder(
 export async function getOrderById(
   orderId: string,
   storeId: string,
+  supabaseOverride?: any,
 ): Promise<OrderWithItems | null> {
   try {
-    const supabase = getSupabaseEcommerce();
+    const supabase = supabaseOverride ?? getSupabaseEcommerce();
     if (!supabase) {
       console.error("[Orders] Supabase no configurado");
       return null;

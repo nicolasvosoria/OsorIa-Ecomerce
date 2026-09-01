@@ -22,7 +22,7 @@ export default async function AdminOrdersPage({ searchParams }: OrdersPageProps)
   const page = parsePositiveInt(pageParam, 1);
   const pageSize = parsePositiveInt(pageSizeParam, DEFAULT_PAGE_SIZE);
 
-  const list = await loadOrders(authorization.storeId, page, pageSize);
+  const list = await loadOrders(authorization.supabase, authorization.storeId, page, pageSize);
 
   return (
     <AdminPageContainer>
@@ -47,18 +47,22 @@ type OrdersList =
   | { state: "error"; total: number };
 
 async function loadOrders(
+  supabase: any,
   storeId: string,
   page: number,
   pageSize: number,
 ): Promise<OrdersList> {
   try {
-    const { orders, total } = await getOrders({
-      storeId,
-      limit: pageSize,
-      offset: (page - 1) * pageSize,
-      order_by: "created_at",
-      order_direction: "desc",
-    });
+    const { orders, total } = await getOrders(
+      {
+        storeId,
+        limit: pageSize,
+        offset: (page - 1) * pageSize,
+        order_by: "created_at",
+        order_direction: "desc",
+      },
+      supabase,
+    );
 
     if (orders.length === 0) {
       return { state: "empty", total };

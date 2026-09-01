@@ -116,9 +116,15 @@ type StoreUserRow = {
   store_user_roles: StoreRoleLinks;
 };
 
-// The active store's team: members joined to their profile and store role.
-// Every query is scoped by the passed storeId — that explicit filter is the
-// tenant isolation, since the service client bypasses RLS.
+/**
+ * The active store's team: members joined to their profile and store role.
+ *
+ * Every query is scoped by the passed storeId — that explicit filter is the
+ * tenant isolation, since the service client bypasses RLS. The `user_profiles`
+ * embed names its foreign key because `store_users` references `user_profiles`
+ * twice (`user_id` and `granted_by`), and an unqualified embed is ambiguous to
+ * PostgREST, which answers PGRST201.
+ */
 export async function listStoreMembers(
   storeId: string,
   supabaseOverride?: any,
@@ -131,7 +137,7 @@ export async function listStoreMembers(
   const { data, error } = await service
     .from(ECOMMERCE_TABLES.storeUsers)
     .select(
-      "user_id, granted_by, user_profiles(email, first_name, last_name), store_user_roles(roles(role_name))",
+      "user_id, granted_by, user_profiles!store_users_user_id_fkey(email, first_name, last_name), store_user_roles(roles(role_name))",
     )
     .eq("store_id", storeId);
 

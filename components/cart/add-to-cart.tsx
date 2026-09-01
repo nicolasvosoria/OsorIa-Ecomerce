@@ -28,6 +28,14 @@ interface AddToCartButtonProps extends ButtonProps {
   className?: string;
 }
 
+type ItemContext = {
+  productId: string;
+  isCombo: boolean;
+  isRealVariant: boolean;
+};
+
+const CART_QUANTITY_CEILING = 99;
+
 const getBaseProductVariant = (product: Product): ProductVariant => {
   return {
     id: product.id,
@@ -53,6 +61,7 @@ export function AddToCartButton({
   const localCart = useLocalCart();
   const [isLoading, startTransition] = useTransition();
   const [showQuantityModal, setShowQuantityModal] = useState(false);
+  const [selectableQuantity, setSelectableQuantity] = useState<number | null>(null);
 
   // Resolve variant locally only for variantless products (purely synchronous)
   const resolvedVariant = useMemo(() => {
@@ -78,98 +87,117 @@ export function AddToCartButton({
     return 'default';
   };
 
+  const resolveItemContext = (variantId: string): ItemContext => {
+    const productId = product.id;
+    const isCombo = isComboProduct(product);
+    const isRealVariant =
+      !isCombo && variantId !== productId && product.variants.length > 1;
+    return { productId, isCombo, isRealVariant };
+  };
+
+  const readStock = async (
+    variantId: string,
+    { productId, isCombo, isRealVariant }: ItemContext,
+  ): Promise<number | null> => {
+    if (isCombo) {
+      const { getComboStock } = await import('@/lib/supabase/combos-api');
+      return getComboStock(productId);
+    }
+
+    const { getProductStock, getVariantStock } = await import('@/lib/supabase/products-read');
+    return isRealVariant ? getVariantStock(variantId) : getProductStock(productId);
+  };
+
+  const cartQuantityFor = (variantId: string) =>
+    localCart.items.find((item) => item.id === variantId)?.quantity ?? 0;
+
+  const notifySoldOut = async () => {
+    const { toast } = await import('sonner');
+    toast.error(`${product.title} está agotado`, { duration: 4000 });
+  };
+
+  const notifyCartAlreadyHoldsAll = async () => {
+    const { toast } = await import('sonner');
+    toast.error(`Ya tienes la cantidad máxima disponible de ${product.title} en tu carrito`, {
+      duration: 4000,
+    });
+  };
+
+  const openQuantityModal = (variantId: string) => {
+    setSelectableQuantity(null);
+    setShowQuantityModal(true);
+
+    void readStock(variantId, resolveItemContext(variantId))
+      .then(async (stock) => {
+        if (stock === null) return;
+
+        const remaining = stock - cartQuantityFor(variantId);
+        if (remaining > 0) {
+          setSelectableQuantity(remaining);
+          return;
+        }
+
+        setShowQuantityModal(false);
+        await (stock === 0 ? notifySoldOut() : notifyCartAlreadyHoldsAll());
+      })
+      .catch((error: unknown) => {
+        console.error('[Cart] Error al resolver el stock disponible:', error);
+      });
+  };
+
   const handleAddToCart = (quantity: number) => {
     if (!resolvedVariant) return;
 
     startTransition(async () => {
       const variantId = resolvedVariant.id;
-      const productId = product.id;
-      const isCombo = isComboProduct(product);
+      const itemContext = resolveItemContext(variantId);
+      const { isCombo, isRealVariant } = itemContext;
 
-      // Determinar si es una variante o el producto base
-      // Si variantId !== productId, es una variante real
-      // Si variantId === productId, es el producto base o una variante por defecto
-      const isRealVariant = !isCombo && variantId !== productId && product.variants && product.variants.length > 1;
-
-      // Validar stock antes de agregar al carrito
       try {
-        const { getProductStock, getVariantStock } = await import('@/lib/supabase/products-read');
+        const stock = await readStock(variantId, itemContext);
 
-        let stock: number | null = null;
-
-        if (isCombo) {
-          const { getComboStock } = await import('@/lib/supabase/combos-api');
-          stock = await getComboStock(productId);
-        }
-        // Si es una variante real, obtener stock de la variante
-        else if (isRealVariant) {
-          stock = await getVariantStock(variantId);
-        } else {
-          // Es el producto base o variante por defecto, obtener stock del producto
-          stock = await getProductStock(productId);
-        }
-
-        // Si el producto rastrea inventario y hay stock limitado
         if (stock !== null) {
-          // Obtener cantidad actual en el carrito para este item
-          const existingItem = localCart.items.find(item => item.id === variantId);
-          const currentCartQuantity = existingItem?.quantity || 0;
-          const totalRequestedQuantity = currentCartQuantity + quantity;
-
-          // Validar que haya suficiente stock
           if (stock === 0) {
-            const { toast } = await import('sonner');
-            toast.error(`${product.title} está agotado`, {
-              duration: 4000,
-            });
+            await notifySoldOut();
             return;
           }
 
-          if (totalRequestedQuantity > stock) {
-            const availableQuantity = stock - currentCartQuantity;
+          const remaining = stock - cartQuantityFor(variantId);
+
+          if (remaining <= 0) {
+            await notifyCartAlreadyHoldsAll();
+            return;
+          }
+
+          if (quantity > remaining) {
             const { toast } = await import('sonner');
-
-            if (availableQuantity <= 0) {
-              toast.error(`Ya tienes la cantidad máxima disponible de ${product.title} en tu carrito`, {
-                duration: 4000,
-              });
-            } else {
-              toast.warning(`Solo hay ${availableQuantity} unidad${availableQuantity !== 1 ? 'es' : ''} disponible${availableQuantity !== 1 ? 's' : ''} de ${product.title}. Se agregará ${availableQuantity} ${availableQuantity === 1 ? 'unidad' : 'unidades'}`, {
-                duration: 4000,
-              });
-              // Ajustar cantidad al stock disponible
-              quantity = availableQuantity;
-            }
-
-            if (availableQuantity <= 0) {
-              return;
-            }
+            toast.warning(`Solo hay ${remaining} unidad${remaining !== 1 ? 'es' : ''} disponible${remaining !== 1 ? 's' : ''} de ${product.title}. Se agregará ${remaining} ${remaining === 1 ? 'unidad' : 'unidades'}`, {
+              duration: 4000,
+            });
+            quantity = remaining;
           }
         }
       } catch (error: any) {
-        // Si falla la validación, registrar error pero permitir agregar (no bloquear)
         console.error('[Cart] Error al validar stock:', error);
       }
 
       const variantPrice = resolvedVariant.price.amount;
       const formattedPrice = formatPrice(variantPrice, resolvedVariant.price.currencyCode);
 
-      // Obtener precio original si existe (compareAtPrice)
       let originalPrice: string | undefined;
       let salePrice: string | undefined;
 
       if (product.compareAtPrice && parseFloat(product.compareAtPrice.amount) > parseFloat(variantPrice)) {
-        // Hay descuento
         originalPrice = formatPrice(product.compareAtPrice.amount, product.compareAtPrice.currencyCode);
-        salePrice = formattedPrice; // Precio con descuento
+        salePrice = formattedPrice;
       }
 
       localCart.addToCart({
         id: resolvedVariant.id,
         name: product.title,
-        price: formattedPrice, // Precio base
+        price: formattedPrice,
         image: product.featuredImage?.url || product.images?.[0]?.url || '/placeholder.jpg',
-        category: product.categoryId,
+        category: product.categoryName,
         originalPrice: originalPrice,
         salePrice: salePrice,
         productId: isCombo ? undefined : product.id,
@@ -182,7 +210,6 @@ export function AddToCartButton({
         currencyCode: resolvedVariant.price.currencyCode,
       }, quantity);
 
-      // Mostrar notificación de éxito
       const { toast } = await import('sonner');
       toast.success(`${quantity} ${quantity === 1 ? 'unidad' : 'unidades'} de ${product.title} agregada${quantity === 1 ? '' : 's'} al carrito`, {
         duration: 3000,
@@ -196,7 +223,7 @@ export function AddToCartButton({
         onSubmit={e => {
           e.preventDefault();
           if (resolvedVariant) {
-            setShowQuantityModal(true);
+            openQuantityModal(resolvedVariant.id);
           }
         }}
         className={className}
@@ -249,7 +276,7 @@ export function AddToCartButton({
       onConfirm={handleAddToCart}
       productName={product.title}
       productImage={product.featuredImage?.url || product.images?.[0]?.url}
-      maxQuantity={99}
+      maxQuantity={Math.min(selectableQuantity ?? CART_QUANTITY_CEILING, CART_QUANTITY_CEILING)}
       initialQuantity={1}
     />
     </>

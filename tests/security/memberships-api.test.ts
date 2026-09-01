@@ -294,7 +294,7 @@ describe("listStoreMembers support signal", () => {
     const members = await listStoreMembers("store-1");
 
     expect(chains.store_users.select).toHaveBeenCalledWith(
-      "user_id, granted_by, user_profiles(email, first_name, last_name), store_user_roles(roles(role_name))",
+      "user_id, granted_by, user_profiles!store_users_user_id_fkey(email, first_name, last_name), store_user_roles(roles(role_name))",
     );
     expect(members).toEqual([
       expect.objectContaining({ userId: "super-1", role: "admin", isSupportAccess: true }),
