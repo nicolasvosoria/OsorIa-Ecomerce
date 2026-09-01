@@ -19,8 +19,6 @@
 //     (compare_at_price), featured flags, and 3 combos
 //   - product images uploaded to the public `products` bucket
 //   - a designed home: ecommerce.component_styles (per-section look + copy),
-//     ecommerce.home_section_layout (section order/visibility), and a coffee
-//     theme in ecommerce.app_themes + ecommerce.app_theme_versions
 //
 // Default-store subdomain decision (evidence in proxy.ts + lib/utils/store.ts):
 //   The apex domain resolves the storefront through getStoreBySubdomain('default')
@@ -556,6 +554,8 @@ const COFFEE_COLORS_DARK = {
   muted: "#372A1D",
   mutedForeground: "#BBA98F",
 };
+
+const BASE_THEME_NAME = "Boutique";
 
 const COFFEE_THEME = {
   themeName: "Cumbre Dorada",
@@ -1351,13 +1351,8 @@ async function ensureHomeComposition(ecommerce, storeId) {
   );
 }
 
-// Seeds the coffee theme: an app_themes preset row (full 10-color light
-// palette) plus one CURRENT app_theme_versions row carrying the two-axis
-// definition in `variables` and the resolved font pairing in `fonts`. Idempotent
-// per store: re-running updates the existing coffee version in place (no history
-// growth) and respects the one-current-per-store partial-unique index.
 async function ensureTheme(ecommerce, storeId) {
-  const themeId = await ensureAppTheme(ecommerce);
+  const baseThemeId = await resolveBaseThemeId(ecommerce);
   const fontPairingId = await resolveFontPairingId(ecommerce, COFFEE_THEME.fontPairingName);
 
   // variables jsonb = ThemeDefinition; getActiveTheme lifts fontPairingId from
@@ -1370,7 +1365,7 @@ async function ensureTheme(ecommerce, storeId) {
     .from("app_theme_versions")
     .select("id")
     .eq("store_id", storeId)
-    .eq("theme_id", themeId)
+    .eq("theme_id", baseThemeId)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -1388,7 +1383,7 @@ async function ensureTheme(ecommerce, storeId) {
 
     const { error } = await ecommerce
       .from("app_theme_versions")
-      .update({ variables, fonts, is_current: true, is_custom: false })
+      .update({ variables, fonts, is_current: true, is_custom: true })
       .eq("id", existing.id);
     if (error) throw new Error(`Could not update app_theme_versions: ${error.message}`);
   } else {
@@ -1402,46 +1397,32 @@ async function ensureTheme(ecommerce, storeId) {
     const { error } = await ecommerce.from("app_theme_versions").insert({
       id: crypto.randomUUID(),
       store_id: storeId,
-      theme_id: themeId,
+      theme_id: baseThemeId,
       variables,
       fonts,
       is_current: true,
-      is_custom: false,
+      is_custom: true,
     });
     if (error) throw new Error(`Could not insert app_theme_versions: ${error.message}`);
   }
 
   console.log(
-    `${LOG} theme applied: "${COFFEE_THEME.themeName}" (theme_id=${themeId}, fontPairingId=${fontPairingId ?? "null"}).`,
+    `${LOG} theme applied: "${COFFEE_THEME.themeName}" (theme_id=${baseThemeId}, fontPairingId=${fontPairingId ?? "null"}).`,
   );
 }
 
-// Upserts the coffee preset in the shared app_themes catalog by theme_name
-// (unique). `colors` is the full 10-color light palette so normalizeThemeRecord
-// accepts it. is_active stays false: per-store activation is via app_theme_versions.
-async function ensureAppTheme(ecommerce) {
-  const { data: existing, error: readError } = await ecommerce
-    .from("app_themes")
-    .select("id")
-    .eq("theme_name", COFFEE_THEME.themeName)
-    .maybeSingle();
-  if (readError) throw new Error(`Could not read app_themes: ${readError.message}`);
-
-  if (existing) {
-    const { error } = await ecommerce
-      .from("app_themes")
-      .update({ colors: COFFEE_COLORS_LIGHT, updated_at: nowIso() })
-      .eq("id", existing.id);
-    if (error) throw new Error(`Could not update app_themes: ${error.message}`);
-    return existing.id;
-  }
-
+async function resolveBaseThemeId(ecommerce) {
   const { data, error } = await ecommerce
     .from("app_themes")
-    .insert({ theme_name: COFFEE_THEME.themeName, colors: COFFEE_COLORS_LIGHT, is_active: false })
     .select("id")
-    .single();
-  if (error) throw new Error(`Could not insert app_themes: ${error.message}`);
+    .eq("theme_name", BASE_THEME_NAME)
+    .maybeSingle();
+  if (error) throw new Error(`Could not read app_themes: ${error.message}`);
+  if (!data?.id) {
+    throw new Error(
+      `Base theme "${BASE_THEME_NAME}" not found in ecommerce.app_themes; run migration 20260807000800_ecommerce_seed_base_theme_presets.sql first.`,
+    );
+  }
   return data.id;
 }
 
