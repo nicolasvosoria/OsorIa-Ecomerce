@@ -78,7 +78,7 @@ export const DEFAULT_RUNTIME_THEME: RuntimeTheme = {
   sections: DEFAULT_RUNTIME_THEME_DEFINITION.sections,
 };
 
-const THEME_COLOR_KEYS: (keyof ThemeColors)[] = [
+export const THEME_COLOR_KEYS: (keyof ThemeColors)[] = [
   "primary",
   "secondary",
   "accent",
