@@ -450,7 +450,7 @@ export function Header() {
               setShowSuggestions(true)
             }
           }}
-          className="pl-10 lg:pl-14 pr-4 h-9 lg:h-10 rounded-full w-full font-inter font-medium text-sm lg:text-base border"
+          className="pl-10 lg:pl-14 pr-4 h-9 lg:h-10 rounded-full w-full font-inter font-medium text-sm lg:text-base border [&::-webkit-search-cancel-button]:appearance-none"
           style={{
             backgroundColor: header.searchBgColor || "var(--muted)",
             borderColor: header.searchBorderColor || "var(--border)",
@@ -521,6 +521,70 @@ export function Header() {
     </Button>
   )
 
+  const handleLogout = async () => {
+    const wasOnAdminPage = pathname === '/admin' || pathname === '/dashboard'
+
+    await logout()
+
+    if (isAdmin && wasOnAdminPage) {
+      router.push('/')
+    } else {
+      router.refresh()
+    }
+
+    toast.success(t.header.sessionClosed, {
+      description: t.header.sessionClosedDescription,
+      duration: 3000,
+    })
+  }
+
+  const renderAccountMenuContent = () => (
+    <DropdownMenuContent align="end" style={{ backgroundColor: "var(--background)", borderColor: "var(--border)" }}>
+      <DropdownMenuLabel style={{ color: "var(--foreground)" }}>
+        {isAdmin
+          ? "Administrador"
+          : user?.first_name && user?.last_name
+            ? `${user.first_name} ${user.last_name}`
+            : user?.email || "Usuario"}
+      </DropdownMenuLabel>
+      <DropdownMenuSeparator style={{ backgroundColor: "var(--border)" }} />
+      <DropdownMenuItem asChild style={{ color: "var(--foreground)" }}>
+        <Link href="/auth/cuenta">
+          <User className="mr-2 h-4 w-4" />
+          {t.nav.account}
+        </Link>
+      </DropdownMenuItem>
+      <DropdownMenuItem asChild style={{ color: "var(--foreground)" }}>
+        <Link href="/orders">
+          <Package className="mr-2 h-4 w-4" />
+          {t.nav.orders}
+        </Link>
+      </DropdownMenuItem>
+      {isAdmin && (
+        <>
+          <DropdownMenuSeparator style={{ backgroundColor: "var(--border)" }} />
+          <DropdownMenuItem asChild style={{ color: "var(--foreground)" }}>
+            <Link href="/dashboard">
+              <LayoutDashboard className="mr-2 h-4 w-4" />
+              {t.nav.dashboard}
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild style={{ color: "var(--foreground)" }}>
+            <Link href="/admin">
+              <Edit className="mr-2 h-4 w-4" />
+              {t.admin.pageEditor}
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator style={{ backgroundColor: "var(--border)" }} />
+        </>
+      )}
+      <DropdownMenuItem onClick={handleLogout} style={{ color: "var(--foreground)" }}>
+        <LogOut className="mr-2 h-4 w-4" />
+        {t.auth.logout}
+      </DropdownMenuItem>
+    </DropdownMenuContent>
+  )
+
   // Iconos de acción (cuenta, wishlist, carrito), compartidos por las 3 variantes
   const renderActionIcons = () => (
     <>
@@ -545,66 +609,7 @@ export function Header() {
               </span>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" style={{ backgroundColor: "var(--background)", borderColor: "var(--border)" }}>
-            <DropdownMenuLabel style={{ color: "var(--foreground)" }}>
-              {isAdmin
-                ? "Administrador"
-                : user?.first_name && user?.last_name
-                  ? `${user.first_name} ${user.last_name}`
-                  : user?.email || "Usuario"}
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator style={{ backgroundColor: "var(--border)" }} />
-            <DropdownMenuItem asChild style={{ color: "var(--foreground)" }}>
-              <Link href="/auth/cuenta">
-                <User className="mr-2 h-4 w-4" />
-                {t.nav.account}
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild style={{ color: "var(--foreground)" }}>
-              <Link href="/orders">
-                <Package className="mr-2 h-4 w-4" />
-                {t.nav.orders}
-              </Link>
-            </DropdownMenuItem>
-            {isAdmin && (
-              <>
-                <DropdownMenuSeparator style={{ backgroundColor: "var(--border)" }} />
-                <DropdownMenuItem asChild style={{ color: "var(--foreground)" }}>
-                  <Link href="/dashboard">
-                    <LayoutDashboard className="mr-2 h-4 w-4" />
-                    {t.nav.dashboard}
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild style={{ color: "var(--foreground)" }}>
-                  <Link href="/admin">
-                    <Edit className="mr-2 h-4 w-4" />
-                    {t.admin.pageEditor}
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator style={{ backgroundColor: "var(--border)" }} />
-              </>
-            )}
-            <DropdownMenuItem
-              onClick={async () => {
-                const wasOnAdminPage = pathname === '/admin' || pathname === '/dashboard'
-
-                await logout()
-
-                if (isAdmin && wasOnAdminPage) {
-                  router.push('/')
-                }
-
-                toast.success(t.header.sessionClosed, {
-                  description: t.header.sessionClosedDescription,
-                  duration: 3000,
-                })
-              }}
-              style={{ color: "var(--foreground)" }}
-            >
-              <LogOut className="mr-2 h-4 w-4" />
-              {t.auth.logout}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
+          {renderAccountMenuContent()}
         </DropdownMenu>
       ) : (
         <Button
@@ -877,66 +882,7 @@ export function Header() {
                       <User className="h-4 w-4" style={{ color: header.loginButtonColor || "var(--foreground)" }} />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" style={{ backgroundColor: "var(--background)", borderColor: "var(--border)" }}>
-                    <DropdownMenuLabel style={{ color: "var(--foreground)" }}>
-                      {isAdmin
-                        ? "Administrador"
-                        : user?.first_name && user?.last_name 
-                          ? `${user.first_name} ${user.last_name}`
-                          : user?.email || "Usuario"}
-                    </DropdownMenuLabel>
-                    <DropdownMenuSeparator style={{ backgroundColor: "var(--border)" }} />
-                    <DropdownMenuItem asChild style={{ color: "var(--foreground)" }}>
-                      <Link href="/auth/cuenta">
-                        <User className="mr-2 h-4 w-4" />
-                        {t.nav.account}
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild style={{ color: "var(--foreground)" }}>
-                      <Link href="/orders">
-                        <Package className="mr-2 h-4 w-4" />
-                        {t.nav.orders}
-                      </Link>
-                    </DropdownMenuItem>
-                    {isAdmin && (
-                      <>
-                        <DropdownMenuSeparator style={{ backgroundColor: "var(--border)" }} />
-                        <DropdownMenuItem asChild style={{ color: "var(--foreground)" }}>
-                          <Link href="/dashboard">
-                            <LayoutDashboard className="mr-2 h-4 w-4" />
-                            {t.nav.dashboard}
-                          </Link>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem asChild style={{ color: "var(--foreground)" }}>
-                          <Link href="/admin">
-                            <Edit className="mr-2 h-4 w-4" />
-                            {t.admin.pageEditor}
-                          </Link>
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator style={{ backgroundColor: "var(--border)" }} />
-                      </>
-                    )}
-                    <DropdownMenuItem
-                      onClick={async () => {
-                        const wasOnAdminPage = pathname === '/admin' || pathname === '/dashboard'
-
-                        await logout()
-
-                        if (isAdmin && wasOnAdminPage) {
-                          router.push('/')
-                        }
-
-                        toast.success("Sesión cerrada", {
-                          description: "Has cerrado sesión exitosamente",
-                          duration: 3000,
-                        })
-                      }}
-                      style={{ color: "var(--foreground)" }}
-                    >
-                      <LogOut className="mr-2 h-4 w-4" />
-                      {t.auth.logout}
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
+                  {renderAccountMenuContent()}
                 </DropdownMenu>
               ) : (
                 <Button
@@ -1006,7 +952,7 @@ export function Header() {
                     setShowSuggestions(true)
                   }
                 }}
-                className="pl-10 pr-10 h-10 rounded-full w-full text-sm border"
+                className="pl-10 pr-10 h-10 rounded-full w-full text-sm border [&::-webkit-search-cancel-button]:appearance-none"
                 style={{
                   backgroundColor: header.searchBgColor || "var(--muted)",
                   borderColor: header.searchBorderColor || "var(--border)",
@@ -1048,7 +994,7 @@ export function Header() {
       {/* Menú lateral */}
       <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
         <SheetContent
-          side="left"
+          side="right"
           className="w-[300px] sm:w-[400px] p-0 flex flex-col"
           style={{ backgroundColor: "var(--background)" }}
         >

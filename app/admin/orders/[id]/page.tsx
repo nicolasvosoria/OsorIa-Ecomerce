@@ -38,7 +38,7 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailPagePr
   }
 
   const { id } = await params;
-  const order = await getOrderById(id, authorization.storeId);
+  const order = await getOrderById(id, authorization.storeId, authorization.supabase);
   if (!order) {
     notFound();
   }

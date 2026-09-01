@@ -1,10 +1,4 @@
-import {
-  Children,
-  isValidElement,
-  type ComponentProps,
-  type ReactElement,
-  type ReactNode,
-} from "react"
+import { type ComponentProps, type ReactElement } from "react"
 import { render, screen } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -30,6 +24,7 @@ vi.mock("next/navigation", () => ({
 }))
 
 import AdminOrderDetailPage from "@/app/admin/orders/[id]/page"
+import { findElementOfType } from "./_helpers/find-element-of-type"
 
 const ORDER: OrderWithItems = {
   id: "0c9f9a1e-1c4c-4f0a-9d1f-6a1b2c3d4e5f",
@@ -56,23 +51,13 @@ const ORDER: OrderWithItems = {
   items: [],
 }
 
-function findElementOfType(node: ReactNode, type: unknown): ReactElement | null {
-  if (!isValidElement(node)) return null
-  if (node.type === type) return node
-
-  const children = (node.props as { children?: ReactNode }).children
-  for (const child of Children.toArray(children)) {
-    const found = findElementOfType(child, type)
-    if (found) return found
-  }
-  return null
-}
+const AUTHORIZED_CLIENT = { tag: "service-client" }
 
 describe("AdminOrderDetailPage", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     authorizeActiveStoreAdmin.mockResolvedValue({
-      supabase: {},
+      supabase: AUTHORIZED_CLIENT,
       storeId: "store-1",
       userId: "user-1",
     })
@@ -89,6 +74,13 @@ describe("AdminOrderDetailPage", () => {
     expect(header).not.toBeNull()
     expect(header?.props.entityLabel).toBe(`Pedido ${ORDER.order_number}`)
     expect(header?.props.entityLabel).not.toContain(ORDER.id)
+  })
+
+  it("consulta el pedido con el cliente autorizado, no con el cliente anónimo", async () => {
+    await AdminOrderDetailPage({ params: Promise.resolve({ id: ORDER.id }) })
+
+    expect(getOrderById).toHaveBeenCalledTimes(1)
+    expect(getOrderById.mock.calls[0][2]).toBe(AUTHORIZED_CLIENT)
   })
 })
 

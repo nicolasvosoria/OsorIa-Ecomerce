@@ -286,6 +286,8 @@ async function replaceZoneRates(supabase: any, zoneId: string, ladder: ShippingR
   return !insertResult.error
 }
 
+const UNKNOWN_ZONE_NAME = "otra zona"
+
 type ExistingDestination = { zoneId: string; departmentCode: string; municipalityCode: string | null }
 
 async function fetchStoreDestinations(
@@ -374,7 +376,39 @@ async function findDestinationConflictError(
 
 async function fetchZoneName(supabase: any, zoneId: string): Promise<string> {
   const result = await supabase.from(ECOMMERCE_TABLES.shippingZones).select("name").eq("id", zoneId).maybeSingle()
-  return result.data?.name ?? "otra zona"
+  return result.data?.name ?? UNKNOWN_ZONE_NAME
+}
+
+export type ClaimedDestination = {
+  departmentCode: string
+  municipalityCode: string | null
+  zoneName: string
+}
+
+export async function findClaimedDestinations(
+  supabase: any,
+  storeId: string,
+  excludeZoneId?: string,
+): Promise<ClaimedDestination[]> {
+  const existingDestinations = await fetchStoreDestinations(supabase, storeId, excludeZoneId)
+  const uniqueZoneIds = [...new Set(existingDestinations.map((destination) => destination.zoneId))]
+  const zoneNamesResult =
+    uniqueZoneIds.length === 0
+      ? { data: [], error: null }
+      : await supabase.from(ECOMMERCE_TABLES.shippingZones).select("id, name").in("id", uniqueZoneIds)
+  if (zoneNamesResult.error) {
+    throw new Error("No se pudieron leer los nombres de las zonas", { cause: zoneNamesResult.error })
+  }
+
+  const zoneNameByZoneId = new Map<string, string>(
+    (zoneNamesResult.data ?? []).map((zone: { id: string; name: string }) => [zone.id, zone.name]),
+  )
+
+  return existingDestinations.map((destination) => ({
+    departmentCode: destination.departmentCode,
+    municipalityCode: destination.municipalityCode,
+    zoneName: zoneNameByZoneId.get(destination.zoneId) ?? UNKNOWN_ZONE_NAME,
+  }))
 }
 
 type LocationNames = { departments: Map<string, string>; municipalities: Map<string, string> }

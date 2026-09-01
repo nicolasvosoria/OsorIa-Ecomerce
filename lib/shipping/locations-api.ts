@@ -1,6 +1,9 @@
+import { sanitizeIlikeSearchTerm } from "@/lib/security/postgrest-search"
 import { getSupabaseEcommerce } from "@/lib/supabase/client"
 import { ECOMMERCE_TABLES, ECOMMERCE_VIEWS } from "@/lib/supabase/contract"
 import { withTimeout } from "@/lib/supabase/with-timeout"
+
+export const MUNICIPALITY_SEARCH_MIN_LENGTH = 2
 
 export type Department = {
   code: string
@@ -79,6 +82,33 @@ export async function listMunicipalitiesByDepartment(
 
   if (result.error) {
     throw new Error(`No se pudieron leer los municipios: ${result.error.message}`)
+  }
+
+  return (result.data ?? []).map(toMunicipality)
+}
+
+export async function searchMunicipalities(
+  query: string,
+  limit: number,
+  client: EcommerceClient = getSupabaseEcommerce(),
+): Promise<Municipality[]> {
+  if (!client) return []
+
+  const sanitizedQuery = sanitizeIlikeSearchTerm(query)
+  if (sanitizedQuery.length < MUNICIPALITY_SEARCH_MIN_LENGTH) return []
+
+  const result = (await withTimeout(
+    coLocations(client)
+      .select("id, department_code, department_name, municipality_code, municipality_name")
+      .ilike("municipality_name", `%${sanitizedQuery}%`)
+      .order("municipality_name")
+      .limit(limit),
+    LOCATIONS_TIMEOUT_MS,
+    "searchMunicipalities",
+  )) as { data: CoLocationRow[] | null; error: any }
+
+  if (result.error) {
+    throw new Error(`No se pudieron buscar los municipios: ${result.error.message}`)
   }
 
   return (result.data ?? []).map(toMunicipality)

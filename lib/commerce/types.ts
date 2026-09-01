@@ -20,6 +20,7 @@ export type Product = {
   productKind?: 'product' | 'combo';
   comboDetails?: ComboCatalogDetails;
   categoryId?: string;
+  categoryName?: string;
   description: string;
   descriptionHtml: string;
   featuredImage: Image;

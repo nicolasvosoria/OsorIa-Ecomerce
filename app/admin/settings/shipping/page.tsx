@@ -8,14 +8,14 @@ import { getStoreIdentityReadiness, type StoreIdentityReadiness } from "@/lib/st
 import { buildWhatsAppLink } from "@/lib/stores/whatsapp-contact"
 import { authorizeActiveStoreAdmin } from "@/lib/supabase/active-store"
 import { loadShippingSettings } from "@/lib/supabase/shipping-settings-api"
-import { findMissingWeightProducts, listShippingZones } from "@/lib/supabase/shipping-zones-api"
+import { listShippingZones } from "@/lib/supabase/shipping-zones-api"
 import { loadStoreIdentity } from "@/lib/supabase/store-identity-api"
 import {
   ShippingContactPendingNotice,
   type ShippingContactPendingReason,
 } from "./components/shipping-contact-pending-notice"
 import { ShippingModeForm } from "./components/shipping-mode-form"
-import { ShippingZonesSection } from "./components/zone-editor"
+import { ShippingZonesSection } from "./components/zones-section"
 
 const copy = translations.es.shipping
 
@@ -30,11 +30,10 @@ export default async function ShippingSettingsPage() {
   }
 
   const { supabase, storeId } = authorization
-  const [settings, identity, zones, missingWeightProducts] = await Promise.all([
+  const [settings, identity, zones] = await Promise.all([
     loadShippingSettings(supabase, storeId),
     loadStoreIdentity(supabase, storeId),
     listShippingZones(supabase, storeId),
-    findMissingWeightProducts(supabase, storeId),
   ])
   const readiness = getStoreIdentityReadiness(identity)
   const contactPendingReason = resolveContactPendingReason(settings.mode, readiness, identity.phone)
@@ -45,8 +44,8 @@ export default async function ShippingSettingsPage() {
       {contactPendingReason && <ShippingContactPendingNotice reason={contactPendingReason} />}
       <ShippingModeForm defaultValues={{ mode: toSelectableShippingMode(settings.mode) }} />
       <ShippingZonesSection
+        mode={settings.mode}
         zones={zones}
-        missingWeightProducts={missingWeightProducts}
         unmatchedDestinationAction={settings.unmatchedDestinationAction}
       />
     </AdminPageContainer>

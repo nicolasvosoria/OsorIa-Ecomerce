@@ -116,6 +116,64 @@ describe("AdminSidebar highlight", () => {
   })
 })
 
+describe("AdminSidebar Configuración submenu", () => {
+  it("expands on /admin/settings/shipping and marks Envío as the current page", () => {
+    mockedPathname = "/admin/settings/shipping"
+    renderSidebar()
+
+    expect(activeNavLabel()).toBe("Envío")
+    expect(screen.getByRole("link", { name: "Configuración" })).not.toHaveAttribute("aria-current")
+  })
+
+  it("keeps Envío highlighted on the zone create screen, its child route with no nav entry", () => {
+    mockedPathname = "/admin/settings/shipping/zones/new"
+    renderSidebar()
+
+    expect(activeNavLabel()).toBe("Envío")
+  })
+
+  it("expands on /admin/settings and marks General as the current page", () => {
+    mockedPathname = "/admin/settings"
+    renderSidebar()
+
+    expect(activeNavLabel()).toBe("General")
+    expect(screen.getByRole("link", { name: "Configuración" })).not.toHaveAttribute("aria-current")
+  })
+
+  it("always renders Envío and General under Configuración, with no aria-expanded state to announce", () => {
+    mockedPathname = "/admin/products"
+    renderSidebar()
+
+    expect(screen.getByRole("link", { name: "Configuración" })).not.toHaveAttribute("aria-expanded")
+    expect(screen.getByRole("link", { name: "Envío" })).toBeInTheDocument()
+    expect(screen.getByRole("link", { name: "General" })).toBeInTheDocument()
+    expect(screen.getByRole("link", { name: "Envío" })).not.toHaveAttribute("aria-current")
+    expect(screen.getByRole("link", { name: "General" })).not.toHaveAttribute("aria-current")
+  })
+
+  it("keeps the submenu mounted on an already-mounted sidebar navigating to an unrelated route", () => {
+    mockedPathname = "/admin/settings/shipping"
+    const { rerender } = render(
+      <SidebarProvider defaultPinned>
+        <AdminSidebar />
+      </SidebarProvider>,
+    )
+
+    expect(screen.getByRole("link", { name: "Envío" })).toBeInTheDocument()
+
+    mockedPathname = "/admin/products"
+    rerender(
+      <SidebarProvider defaultPinned>
+        <AdminSidebar />
+      </SidebarProvider>,
+    )
+
+    expect(screen.getByRole("link", { name: "Envío" })).toBeInTheDocument()
+    expect(screen.getByRole("link", { name: "General" })).toBeInTheDocument()
+    expect(screen.getByRole("link", { name: "Envío" })).not.toHaveAttribute("aria-current")
+  })
+})
+
 describe("AdminSidebar pinned vs peeking", () => {
   beforeEach(() => {
     vi.useFakeTimers()

@@ -100,6 +100,8 @@ export function resolveStoreLookupSubdomain(
 // lib/stores/schemas.ts RESERVED_SUBDOMAINS keeps it off tenants).
 const PLATFORM_ADMIN_SUBDOMAIN = "admin";
 
+const DNS_LABEL_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+
 export function isPlatformAdminHost(host: string | null | undefined): boolean {
   return resolveStoreSubdomain(host) === PLATFORM_ADMIN_SUBDOMAIN;
 }
@@ -126,6 +128,25 @@ export function resolveDeploymentRootHost(
  */
 export function toPlatformAdminHost(host: string | null | undefined): string {
   return `${PLATFORM_ADMIN_SUBDOMAIN}.${resolveDeploymentRootHost(host)}`;
+}
+
+/**
+ * A tenant's own host derived from the current one, port preserved:
+ * admin.localhost:3000 + "tienda2" → tienda2.localhost:3000,
+ * admin.osoria.help + "default" → default.osoria.help. The mirror of
+ * toPlatformAdminHost: every cookie here is host-only, so a store is entered by
+ * going to its own host, never by setting something on the console's.
+ */
+export function toStoreHost(
+  subdomain: string,
+  host: string | null | undefined,
+): string {
+  const label = subdomain.trim().toLowerCase();
+  if (!DNS_LABEL_PATTERN.test(label)) {
+    throw new Error("The tenant subdomain must be a validated DNS label.");
+  }
+
+  return `${label}.${resolveDeploymentRootHost(host)}`;
 }
 
 function stripStorefrontLabels(hostname: string): string {

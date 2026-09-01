@@ -1,10 +1,4 @@
-import {
-  Children,
-  isValidElement,
-  type ComponentProps,
-  type ReactElement,
-  type ReactNode,
-} from "react"
+import { type ComponentProps, type ReactElement, type ReactNode } from "react"
 import { render, screen } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -44,6 +38,7 @@ import EditComboPage from "@/app/admin/products/combos/[id]/edit/page"
 import { CombosTable } from "@/app/admin/products/combos/components/combos-table"
 import CreateComboPage from "@/app/admin/products/combos/create/page"
 import AdminCombosPage from "@/app/admin/products/combos/page"
+import { findElementOfType } from "./_helpers/find-element-of-type"
 
 const SERVICE = { marker: "service-client" }
 const GRANT = { supabase: SERVICE, storeId: "store-1", userId: "user-1" }
@@ -74,18 +69,6 @@ function comboFixture(id: string, name: string): ComboCatalogDetails {
     availability: { isAvailable: true, derivedStock: 5, blockingComponents: [] },
     components: [],
   }
-}
-
-function findElementOfType(node: ReactNode, type: unknown): ReactElement | null {
-  if (!isValidElement(node)) return null
-  if (node.type === type) return node
-
-  const children = (node.props as { children?: ReactNode }).children
-  for (const child of Children.toArray(children)) {
-    const found = findElementOfType(child, type)
-    if (found) return found
-  }
-  return null
 }
 
 function comboFormOf(page: ReactNode) {

@@ -79,3 +79,44 @@ describe("home discount popup form schema", () => {
     expect(result.success).toBe(true)
   })
 })
+
+describe("homeDiscountPopupFormSchema CTA destination", () => {
+  const redirectWithoutUrl = { ...validInput, ctaMode: "redirect" as const, ctaUrl: null }
+
+  it("rejects the redirect mode with no URL", () => {
+    const result = homeDiscountPopupFormSchema.safeParse(redirectWithoutUrl)
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues.some((issue) => issue.path[0] === "ctaUrl")).toBe(true)
+    }
+  })
+
+  it("rejects a URL that is not http(s)", () => {
+    const result = homeDiscountPopupFormSchema.safeParse({
+      ...redirectWithoutUrl,
+      ctaUrl: "javascript:alert(1)",
+    })
+
+    expect(result.success).toBe(false)
+  })
+
+  it("accepts the redirect mode with a valid URL", () => {
+    const result = homeDiscountPopupFormSchema.safeParse({
+      ...redirectWithoutUrl,
+      ctaUrl: "https://osoria.help/promos",
+    })
+
+    expect(result.success).toBe(true)
+  })
+
+  it("rejects the copy-coupon mode with no code", () => {
+    const result = homeDiscountPopupFormSchema.safeParse({
+      ...validInput,
+      ctaMode: "copy_coupon" as const,
+      coupon: "   ",
+    })
+
+    expect(result.success).toBe(false)
+  })
+})

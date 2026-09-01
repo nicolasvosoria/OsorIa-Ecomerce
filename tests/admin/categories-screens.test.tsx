@@ -1,4 +1,4 @@
-import { Children, isValidElement, type ComponentProps, type ReactElement, type ReactNode } from "react"
+import { type ComponentProps, type ReactElement, type ReactNode } from "react"
 import { render, screen } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -40,6 +40,7 @@ import EditCategoryPage from "@/app/admin/products/categories/[id]/edit/page"
 import { CategoriesTable } from "@/app/admin/products/categories/components/categories-table"
 import CreateCategoryPage from "@/app/admin/products/categories/create/page"
 import AdminCategoriesPage from "@/app/admin/products/categories/page"
+import { findElementOfType } from "./_helpers/find-element-of-type"
 
 const SERVICE = { marker: "service-client" }
 const GRANT = { supabase: SERVICE, storeId: "store-1", userId: "user-1" }
@@ -63,18 +64,6 @@ function categoryFixture(
     updated_at: "2026-01-01",
     productCount,
   }
-}
-
-function findElementOfType(node: ReactNode, type: unknown): ReactElement | null {
-  if (!isValidElement(node)) return null
-  if (node.type === type) return node
-
-  const children = (node.props as { children?: ReactNode }).children
-  for (const child of Children.toArray(children)) {
-    const found = findElementOfType(child, type)
-    if (found) return found
-  }
-  return null
 }
 
 function categoryFormOf(page: ReactNode) {

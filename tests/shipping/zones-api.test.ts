@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest"
 
-import { deleteShippingZone, listShippingZones, saveShippingZone, type SaveShippingZoneInput } from "@/lib/supabase/shipping-zones-api"
+import {
+  deleteShippingZone,
+  findClaimedDestinations,
+  listShippingZones,
+  saveShippingZone,
+  type SaveShippingZoneInput,
+} from "@/lib/supabase/shipping-zones-api"
 import { createShippingSupabase } from "./fake-supabase"
 
 const ANTIOQUIA_MEDELLIN = {
@@ -208,5 +214,71 @@ describe("deleteShippingZone", () => {
     const ownStoreResult = await deleteShippingZone(supabase as any, STORE_ID, "zone-1")
     expect(ownStoreResult.success).toBe(true)
     expect(tables.get("shipping_zones")).toHaveLength(1)
+  })
+})
+
+describe("findClaimedDestinations", () => {
+  it("names the owning zone for each destination already claimed by another zone of the same store", async () => {
+    const { supabase } = createShippingSupabase({
+      co_locations: [ANTIOQUIA_MEDELLIN],
+      shipping_zones: [
+        { id: "zone-north", store_id: STORE_ID, name: "Zona Norte" },
+        { id: "zone-south", store_id: STORE_ID, name: "Zona Sur" },
+      ],
+      shipping_zone_destinations: [
+        { id: "dest-1", zone_id: "zone-north", store_id: STORE_ID, department_code: "05", municipality_code: null },
+        { id: "dest-2", zone_id: "zone-south", store_id: STORE_ID, department_code: "76", municipality_code: "76001" },
+      ],
+    })
+
+    const claimed = await findClaimedDestinations(supabase as any, STORE_ID)
+
+    expect(claimed).toEqual([
+      { departmentCode: "05", municipalityCode: null, zoneName: "Zona Norte" },
+      { departmentCode: "76", municipalityCode: "76001", zoneName: "Zona Sur" },
+    ])
+  })
+
+  it("excludes the given zone's own destinations from what it reports as claimed", async () => {
+    const { supabase } = createShippingSupabase({
+      shipping_zones: [{ id: "zone-north", store_id: STORE_ID, name: "Zona Norte" }],
+      shipping_zone_destinations: [
+        { id: "dest-1", zone_id: "zone-north", store_id: STORE_ID, department_code: "05", municipality_code: null },
+      ],
+    })
+
+    const claimed = await findClaimedDestinations(supabase as any, STORE_ID, "zone-north")
+
+    expect(claimed).toEqual([])
+  })
+
+  it("throws when the zone-name lookup fails, instead of labelling every destination as an unknown zone", async () => {
+    const supabase = {
+      from: (table: string) => {
+        if (table === "shipping_zone_destinations") {
+          return {
+            select: () => ({
+              eq: () =>
+                Promise.resolve({
+                  data: [{ zone_id: "zone-north", department_code: "05", municipality_code: null }],
+                  error: null,
+                }),
+            }),
+          }
+        }
+        if (table === "shipping_zones") {
+          return {
+            select: () => ({
+              in: () => Promise.resolve({ data: null, error: { message: "statement timeout" } }),
+            }),
+          }
+        }
+        throw new Error(`unexpected table ${table}`)
+      },
+    }
+
+    await expect(findClaimedDestinations(supabase as any, STORE_ID)).rejects.toThrow(
+      "No se pudieron leer los nombres de las zonas",
+    )
   })
 })

@@ -265,6 +265,7 @@ export function adaptSupabaseProduct(item: StoreItemWithDetails): Product {
     productKind: isCombo ? 'combo' : 'product',
     comboDetails: item.combo,
     categoryId: item.category?.id,
+    categoryName: item.category?.category_name,
     description: description.length > 200 ? description.substring(0, 200) + '...' : description,
     descriptionHtml: item.item_description_html || `<p>${description}</p>`,
     featuredImage,

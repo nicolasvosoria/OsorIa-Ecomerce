@@ -1,10 +1,4 @@
-import {
-  Children,
-  isValidElement,
-  type ComponentProps,
-  type ReactElement,
-  type ReactNode,
-} from "react"
+import { type ComponentProps, type ReactElement } from "react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { StoreIdentityPanel } from "@/app/admin/settings/components/store-identity-panel"
@@ -19,6 +13,7 @@ vi.mock("@/lib/supabase/active-store", () => ({ authorizeActiveStoreAdmin }))
 vi.mock("next/navigation", () => ({ redirect }))
 
 import StoreSettingsPage from "@/app/admin/settings/page"
+import { findElementOfType } from "./_helpers/find-element-of-type"
 
 const ACTIVE_STORE_ID = "store-1"
 
@@ -52,18 +47,6 @@ function createSupabaseMock(storeRow: { store_name: string; is_public: boolean; 
     return { select, eq, maybeSingle }
   })
   return { from }
-}
-
-function findElementOfType(node: ReactNode, type: unknown): ReactElement | null {
-  if (!isValidElement(node)) return null
-  if (node.type === type) return node
-
-  const children = (node.props as { children?: ReactNode }).children
-  for (const child of Children.toArray(children)) {
-    const found = findElementOfType(child, type)
-    if (found) return found
-  }
-  return null
 }
 
 describe("StoreSettingsPage", () => {

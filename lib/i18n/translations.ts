@@ -187,25 +187,40 @@ export interface Translations {
     contactPhoneInvalidCta: string
     // D3/D5/D6/D8/D10: zonas de envío, sus destinos y su escalera de tarifas (S7).
     zones: {
+      coordinateModeTitle: string
+      coordinateModeDescription: string
+      coordinateModeCta: string
       sectionTitle: string
       sectionDescription: string
       addButton: string
       createTitle: string
       editTitle: string
+      formTitle: string
+      formDescription: string
       emptyTitle: string
       emptyDescription: string
       nameLabel: string
       namePlaceholder: string
       destinationsLabel: string
-      departmentPlaceholder: string
-      addWholeDepartmentButton: string
-      addMunicipalityButton: string
+      selectAllDepartmentsButton: string
+      selectedAllDestinationsToast: string
+      clearDestinationsButton: string
+      clearDestinationsConfirmTitle: string
+      clearDestinationsConfirmDescription: string
+      clearDestinationsConfirmButton: string
+      clearedDestinationsToast: string
+      selectedDestinationsCountLabel: string
+      selectedMunicipalitiesCountLabel: string
+      showMunicipalitiesButton: string
+      hideMunicipalitiesButton: string
+      claimedByPrefix: string
       municipalitySearchPlaceholder: string
       loadingMunicipalities: string
       noMunicipalitiesFound: string
+      municipalitiesLoadError: string
       wholeDepartmentPrefix: string
-      removeDestinationLabel: string
       destinationsColumn: string
+      moreDestinationsLabel: string
       basisColumn: string
       actionsColumn: string
       basisLabel: string
@@ -354,6 +369,10 @@ export interface Translations {
     administration: string
     changeTheme: string
     changeFont: string
+    settingsNav: {
+      general: string
+      shipping: string
+    }
   }
   // Página no encontrada (404)
   notFound: {
@@ -643,25 +662,41 @@ export const translations: Record<Language, Translations> = {
         'Guardaste un teléfono, pero no arma un enlace válido de WhatsApp. Revisa el número en Configuración.',
       contactPhoneInvalidCta: 'Corregir en Configuración',
       zones: {
+        coordinateModeTitle: 'Esta tienda coordina el envío por WhatsApp',
+        coordinateModeDescription:
+          'No necesitas zonas ni tarifas: cada envío se acuerda directo con el cliente. Si quieres cobrar envío automático por zona, cambia el modo de envío.',
+        coordinateModeCta: 'Ir al modo de envío',
         sectionTitle: 'Zonas de envío',
         sectionDescription: 'Define las zonas de entrega, sus destinos y su escalera de tarifas.',
         addButton: 'Agregar zona',
         createTitle: 'Nueva zona de envío',
         editTitle: 'Editar zona de envío',
+        formTitle: 'Datos de la zona',
+        formDescription: 'Nombre, destinos y escalera de tarifas de la zona.',
         emptyTitle: 'Todavía no hay zonas de envío',
         emptyDescription: 'Agrega una zona para empezar a cobrar envío según el destino.',
         nameLabel: 'Nombre de la zona',
         namePlaceholder: 'Ej. Eje Cafetero',
         destinationsLabel: 'Destinos',
-        departmentPlaceholder: 'Selecciona un departamento',
-        addWholeDepartmentButton: 'Agregar departamento completo',
-        addMunicipalityButton: 'Agregar municipio…',
+        selectAllDepartmentsButton: 'Seleccionar todos',
+        selectedAllDestinationsToast: 'Se seleccionaron los {count} destinos disponibles, reemplazando cualquier selección anterior.',
+        clearDestinationsButton: 'Limpiar',
+        clearDestinationsConfirmTitle: '¿Vaciar los destinos seleccionados?',
+        clearDestinationsConfirmDescription: 'Se perderán los {count} destinos que elegiste. Esta acción no se puede deshacer.',
+        clearDestinationsConfirmButton: 'Vaciar',
+        clearedDestinationsToast: 'Se vació la selección de destinos',
+        selectedDestinationsCountLabel: 'destinos seleccionados',
+        selectedMunicipalitiesCountLabel: 'municipios seleccionados',
+        showMunicipalitiesButton: 'Ver municipios',
+        hideMunicipalitiesButton: 'Ocultar municipios',
+        claimedByPrefix: 'Ya asignado a la zona',
         municipalitySearchPlaceholder: 'Buscar municipio…',
         loadingMunicipalities: 'Cargando municipios…',
         noMunicipalitiesFound: 'Sin resultados',
+        municipalitiesLoadError: 'No pudimos cargar los municipios.',
         wholeDepartmentPrefix: 'Todo:',
-        removeDestinationLabel: 'Quitar destino',
         destinationsColumn: 'Destinos',
+        moreDestinationsLabel: '+{count} más',
         basisColumn: 'Tarifa',
         actionsColumn: 'Acciones',
         basisLabel: 'Tipo de tarifa',
@@ -797,6 +832,10 @@ export const translations: Record<Language, Translations> = {
       administration: 'Administración',
       changeTheme: 'Cambiar tema',
       changeFont: 'Cambiar fuente',
+      settingsNav: {
+        general: 'General',
+        shipping: 'Envío',
+      },
     },
     notFound: {
       heading: 'Página no encontrada',
@@ -1084,25 +1123,41 @@ export const translations: Record<Language, Translations> = {
         'You saved a phone, but it does not build a valid WhatsApp link. Check the number in Settings.',
       contactPhoneInvalidCta: 'Fix it in Settings',
       zones: {
+        coordinateModeTitle: 'This store coordinates shipping over WhatsApp',
+        coordinateModeDescription:
+          "You don't need zones or rates: every shipment is arranged directly with the customer. If you want to charge automatic shipping by zone, change the shipping mode.",
+        coordinateModeCta: 'Go to shipping mode',
         sectionTitle: 'Shipping zones',
         sectionDescription: 'Define your delivery zones, their destinations and their rate ladder.',
         addButton: 'Add zone',
         createTitle: 'New shipping zone',
         editTitle: 'Edit shipping zone',
+        formTitle: 'Zone details',
+        formDescription: 'Name, destinations and rate ladder for the zone.',
         emptyTitle: 'No shipping zones yet',
         emptyDescription: 'Add a zone to start charging shipping by destination.',
         nameLabel: 'Zone name',
         namePlaceholder: 'E.g. Coffee Region',
         destinationsLabel: 'Destinations',
-        departmentPlaceholder: 'Select a department',
-        addWholeDepartmentButton: 'Add the whole department',
-        addMunicipalityButton: 'Add municipality…',
+        selectAllDepartmentsButton: 'Select all',
+        selectedAllDestinationsToast: 'Selected all {count} available destinations, replacing any previous selection.',
+        clearDestinationsButton: 'Clear',
+        clearDestinationsConfirmTitle: 'Clear the selected destinations?',
+        clearDestinationsConfirmDescription: "You'll lose the {count} destinations you picked. This action cannot be undone.",
+        clearDestinationsConfirmButton: 'Clear',
+        clearedDestinationsToast: 'Destinations selection cleared',
+        selectedDestinationsCountLabel: 'destinations selected',
+        selectedMunicipalitiesCountLabel: 'municipalities selected',
+        showMunicipalitiesButton: 'Show municipalities',
+        hideMunicipalitiesButton: 'Hide municipalities',
+        claimedByPrefix: 'Already assigned to zone',
         municipalitySearchPlaceholder: 'Search municipality…',
         loadingMunicipalities: 'Loading municipalities…',
         noMunicipalitiesFound: 'No results',
+        municipalitiesLoadError: "We couldn't load the municipalities.",
         wholeDepartmentPrefix: 'Whole:',
-        removeDestinationLabel: 'Remove destination',
         destinationsColumn: 'Destinations',
+        moreDestinationsLabel: '+{count} more',
         basisColumn: 'Rate',
         actionsColumn: 'Actions',
         basisLabel: 'Rate type',
@@ -1237,6 +1292,10 @@ export const translations: Record<Language, Translations> = {
       administration: 'Administration',
       changeTheme: 'Change theme',
       changeFont: 'Change font',
+      settingsNav: {
+        general: 'General',
+        shipping: 'Shipping',
+      },
     },
     notFound: {
       heading: 'Page Not Found',
@@ -1524,25 +1583,41 @@ export const translations: Record<Language, Translations> = {
         'Você salvou um telefone, mas ele não gera um link válido do WhatsApp. Revise o número em Configurações.',
       contactPhoneInvalidCta: 'Corrigir em Configurações',
       zones: {
+        coordinateModeTitle: 'Esta loja combina o frete pelo WhatsApp',
+        coordinateModeDescription:
+          'Você não precisa de zonas nem tarifas: cada frete é combinado direto com o cliente. Se quiser cobrar frete automático por zona, mude o modo de frete.',
+        coordinateModeCta: 'Ir para o modo de frete',
         sectionTitle: 'Zonas de frete',
         sectionDescription: 'Defina as zonas de entrega, seus destinos e sua escada de tarifas.',
         addButton: 'Adicionar zona',
         createTitle: 'Nova zona de frete',
         editTitle: 'Editar zona de frete',
+        formTitle: 'Dados da zona',
+        formDescription: 'Nome, destinos e escada de tarifas da zona.',
         emptyTitle: 'Ainda não há zonas de frete',
         emptyDescription: 'Adicione uma zona para começar a cobrar frete por destino.',
         nameLabel: 'Nome da zona',
         namePlaceholder: 'Ex. Eixo Cafeeiro',
         destinationsLabel: 'Destinos',
-        departmentPlaceholder: 'Selecione um departamento',
-        addWholeDepartmentButton: 'Adicionar departamento completo',
-        addMunicipalityButton: 'Adicionar município…',
+        selectAllDepartmentsButton: 'Selecionar todos',
+        selectedAllDestinationsToast: 'Foram selecionados os {count} destinos disponíveis, substituindo qualquer seleção anterior.',
+        clearDestinationsButton: 'Limpar',
+        clearDestinationsConfirmTitle: 'Esvaziar os destinos selecionados?',
+        clearDestinationsConfirmDescription: 'Você vai perder os {count} destinos que escolheu. Esta ação não pode ser desfeita.',
+        clearDestinationsConfirmButton: 'Esvaziar',
+        clearedDestinationsToast: 'Seleção de destinos esvaziada',
+        selectedDestinationsCountLabel: 'destinos selecionados',
+        selectedMunicipalitiesCountLabel: 'municípios selecionados',
+        showMunicipalitiesButton: 'Ver municípios',
+        hideMunicipalitiesButton: 'Ocultar municípios',
+        claimedByPrefix: 'Já atribuído à zona',
         municipalitySearchPlaceholder: 'Buscar município…',
         loadingMunicipalities: 'Carregando municípios…',
         noMunicipalitiesFound: 'Sem resultados',
+        municipalitiesLoadError: 'Não conseguimos carregar os municípios.',
         wholeDepartmentPrefix: 'Todo:',
-        removeDestinationLabel: 'Remover destino',
         destinationsColumn: 'Destinos',
+        moreDestinationsLabel: '+{count} mais',
         basisColumn: 'Tarifa',
         actionsColumn: 'Ações',
         basisLabel: 'Tipo de tarifa',
@@ -1676,6 +1751,10 @@ export const translations: Record<Language, Translations> = {
       administration: 'Administração',
       changeTheme: 'Mudar tema',
       changeFont: 'Mudar fonte',
+      settingsNav: {
+        general: 'Geral',
+        shipping: 'Envio',
+      },
     },
     notFound: {
       heading: 'Página não encontrada',

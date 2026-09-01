@@ -139,7 +139,8 @@ export interface GetItemsParams {
   store_id?: string // ID de la tienda para filtrar productos
   item_kind?: 'all' | 'products' | 'combos'
   category_id?: string
-  is_active?: boolean
+  /** `null` asks for both states; omitting it filters to the active ones. */
+  is_active?: boolean | null
   is_featured?: boolean
   is_available_for_sale?: boolean
   on_sale?: boolean

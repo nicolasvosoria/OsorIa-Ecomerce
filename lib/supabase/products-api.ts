@@ -223,8 +223,11 @@ export async function getItems(
         .from(ECOMMERCE_VIEWS.storeItemsLegacy)
         .select(STORE_ITEMS_SELECT, { count: 'exact' })
         .eq('store_id', currentStoreId!) // Filtrar por tienda (currentStoreId ya está validado)
-        .eq('is_active', is_active)
         .eq('is_available_for_sale', is_available_for_sale)
+
+      if (is_active !== null) {
+        query = query.eq('is_active', is_active)
+      }
 
       // Filtros opcionales
       if (category_id) {
@@ -278,7 +281,7 @@ export async function getItems(
       const combos = await listCombos({
         store_id: currentStoreId,
         category_id,
-        includeInactive: is_active === false,
+        includeInactive: is_active !== true,
       })
       const comboItems = comboItemsMatching(combos, {
         isAvailableForSale: is_available_for_sale,

@@ -1,10 +1,4 @@
-import {
-  Children,
-  isValidElement,
-  type ComponentProps,
-  type ReactElement,
-  type ReactNode,
-} from "react"
+import { type ComponentProps, type ReactElement, type ReactNode } from "react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { ShippingContactPendingNotice } from "@/app/admin/settings/shipping/components/shipping-contact-pending-notice"
@@ -33,6 +27,7 @@ vi.mock("@/lib/supabase/store-identity-api", () => ({ loadStoreIdentity }))
 vi.mock("next/navigation", () => ({ redirect }))
 
 import ShippingSettingsPage from "@/app/admin/settings/shipping/page"
+import { findElementOfType } from "./_helpers/find-element-of-type"
 
 const SERVICE = { marker: "service-client" }
 const GRANT = { supabase: SERVICE, storeId: "store-1", userId: "user-1" }
@@ -46,18 +41,6 @@ const COMPLETE_IDENTITY = {
   commercialAddress: "Bogotá, Colombia",
   replyToVerifiedAt: "2026-01-01T00:00:00.000Z",
   orderMailboxVerifiedAt: "2026-01-01T00:00:00.000Z",
-}
-
-function findElementOfType(node: ReactNode, type: unknown): ReactElement | null {
-  if (!isValidElement(node)) return null
-  if (node.type === type) return node
-
-  const children = (node.props as { children?: ReactNode }).children
-  for (const child of Children.toArray(children)) {
-    const found = findElementOfType(child, type)
-    if (found) return found
-  }
-  return null
 }
 
 describe("ShippingSettingsPage", () => {

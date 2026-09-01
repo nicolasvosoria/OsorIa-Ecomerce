@@ -1,10 +1,4 @@
-import {
-  Children,
-  isValidElement,
-  type ComponentProps,
-  type ReactElement,
-  type ReactNode,
-} from "react"
+import { type ComponentProps, type ReactElement } from "react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { HomeDiscountPopupForm } from "@/app/admin/home-discount-popup/components/home-discount-popup-form"
@@ -21,6 +15,7 @@ vi.mock("@/lib/home-discount-popup-admin", () => ({ loadHomeDiscountPopupConfig 
 vi.mock("next/navigation", () => ({ redirect }))
 
 import HomeDiscountPopupConfigPage from "@/app/admin/home-discount-popup/page"
+import { findElementOfType } from "./_helpers/find-element-of-type"
 
 const SERVICE = { marker: "service-client" }
 const GRANT = { supabase: SERVICE, storeId: "store-1", userId: "user-1" }
@@ -33,18 +28,6 @@ const ACTIVE_STORE_CONFIG = normalizeHomeDiscountPopupConfig({
   coupon: "HOME10",
   ctaMode: "copy_coupon",
 })
-
-function findElementOfType(node: ReactNode, type: unknown): ReactElement | null {
-  if (!isValidElement(node)) return null
-  if (node.type === type) return node
-
-  const children = (node.props as { children?: ReactNode }).children
-  for (const child of Children.toArray(children)) {
-    const found = findElementOfType(child, type)
-    if (found) return found
-  }
-  return null
-}
 
 describe("HomeDiscountPopupConfigPage", () => {
   beforeEach(() => {

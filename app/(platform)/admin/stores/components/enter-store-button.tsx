@@ -1,21 +1,22 @@
 "use client"
 
 import { useTransition } from "react"
-import { useRouter } from "next/navigation"
 import { LogIn, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { setActiveStore } from "@/app/admin/actions/active-store"
+import { toStoreHost } from "@/lib/utils/store-host"
 
 export function EnterStoreButton({
   storeId,
   storeName,
+  subdomain,
 }: {
   storeId: string
   storeName: string
+  subdomain: string
 }) {
-  const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
   function handleEnter() {
@@ -26,7 +27,9 @@ export function EnterStoreButton({
         return
       }
 
-      router.push("/admin")
+      window.location.assign(
+        `${window.location.protocol}//${toStoreHost(subdomain, window.location.host)}/admin`,
+      )
     })
   }
 

@@ -1,10 +1,4 @@
-import {
-  Children,
-  isValidElement,
-  type ComponentProps,
-  type ReactElement,
-  type ReactNode,
-} from "react"
+import { type ComponentProps, type ReactElement } from "react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { ChatbotConfigForm } from "@/app/admin/chatbot/components/chatbot-config-form"
@@ -23,21 +17,10 @@ vi.mock("@/lib/supabase/chatbot-api", async (importOriginal) => {
 vi.mock("next/navigation", () => ({ redirect }))
 
 import ChatbotConfigPage from "@/app/admin/chatbot/page"
+import { findElementOfType } from "./_helpers/find-element-of-type"
 
 const SERVICE = { marker: "service-client" }
 const GRANT = { supabase: SERVICE, storeId: "store-1", userId: "user-1" }
-
-function findElementOfType(node: ReactNode, type: unknown): ReactElement | null {
-  if (!isValidElement(node)) return null
-  if (node.type === type) return node
-
-  const children = (node.props as { children?: ReactNode }).children
-  for (const child of Children.toArray(children)) {
-    const found = findElementOfType(child, type)
-    if (found) return found
-  }
-  return null
-}
 
 describe("ChatbotConfigPage", () => {
   beforeEach(() => {
